@@ -615,69 +615,146 @@ function AIStack() {
 /* ====================================================
    8. ASK MY CLONE
 ==================================================== */
-function AskMyClone() {
-  const qa: Record<string, string> = {
-    "How would you grow my biotech startup?":
-      "First I'd find the 100 people who actually bleed for your product — not a broad audience, a sharp ICP. I'd do manual outreach to learn their exact words, then build the AI engine that turns that into a repeatable pipeline. In bio, credibility converts: we'd lead with mechanism and science, test it, and scale only behind what's already pulling. I'd have the system capturing your data by week two.",
-    "What makes you different from other operators?":
-      "I build, I don't just advise. Most operators hand you a deck — I hand you a working system. I'm AI-native: n8n, Claude Code, Supabase, the whole stack wired together so it runs while you sleep. And I treat your company like my own, because I've built my own from zero. Twice.",
-    "What's your background?":
-      "USC drug development, honors, while running three operating roles. Founder of Your Aura Fragrance. I've run HIPAA-compliant growth for a USC Alzheimer's clinic, built an AI email engine that pipelined 400+ creators, and took Metaba Health from zero to paying clients. Bilingual, LA-based, with a deployable network of design, merch, and SEO contractors.",
-    "Can you really code and automate?":
-      "Yes — and not in theory. The n8n flow on this page is real: it finds creators, cleans them with AI in batches, writes personalized emails, sends at scale, and books calls. It cut 10+ hours a week and hit 100% follow-up. I build the tools I need when I need them.",
-    "Why should a founder pick you as a partner?":
-      "Because I'm complementary, not redundant. You know the science cold — I bring the GTM, the systems, and the hustle to turn it into revenue. I move fast, I treat it like my own, and I arrive with a network: LA design, merch, and SEO/AIO/GEO contractors ready to deploy. You're not hiring a consultant; you're getting an operating partner.",
-    "What are you like to work with?":
-      "Direct, fast, and genuinely invested. I'd rather show you a working system than a deck. I play bass in an LA band, so I think in rhythm — find the beat, get everyone in sync, ship something people feel. Founders tell me I make the chaos calm.",
-  };
+type Message = { role: "user" | "assistant"; content: string };
 
-  const questions = Object.keys(qa);
-  const [active, setActive] = useState<string | null>(null);
+const STARTERS = [
+  "How would you grow my biotech startup?",
+  "What makes you different from other operators?",
+  "What's your background?",
+  "Can you really code and automate?",
+  "Why should a founder pick you as a partner?",
+  "What are you like to work with?",
+];
+
+function AskMyClone() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [streaming, setStreaming] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const scrollToBottom = () =>
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+
+  useEffect(() => { scrollToBottom(); }, [messages]);
+
+  async function send(text: string) {
+    if (!text.trim() || streaming) return;
+    const userMsg: Message = { role: "user", content: text.trim() };
+    const next = [...messages, userMsg];
+    setMessages(next);
+    setInput("");
+    setStreaming(true);
+
+    // placeholder for streaming text
+    setMessages([...next, { role: "assistant", content: "" }]);
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: next }),
+      });
+      if (!res.body) throw new Error("No stream");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let full = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        full += decoder.decode(value, { stream: true });
+        setMessages([...next, { role: "assistant", content: full }]);
+      }
+    } catch {
+      setMessages([
+        ...next,
+        { role: "assistant", content: "Something went wrong — email me at juan.arenas.rec@gmail.com." },
+      ]);
+    } finally {
+      setStreaming(false);
+    }
+  }
 
   return (
     <section className="px-6 md:px-12 lg:px-20 py-24 border-t border-[#F2EFE6]/10">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-3xl mx-auto">
         <Reveal>
-          <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-3">
+          <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-2">
             Ask my AI.
           </h2>
-          <p className="text-[#F2EFE6]/60 italic mb-10">
-            I&apos;m an AI-native operator — so of course you can interrogate
-            an AI version of me. Pick a question.
+          <p className="text-[#F2EFE6]/60 italic mb-8">
+            I&apos;m AI-native — so of course there&apos;s an AI version of me.
+            Ask anything.
           </p>
         </Reveal>
+
         <Reveal delay={100}>
-          <div className="rounded-2xl border border-[#284A3C] bg-[#0e1813] p-6 md:p-8">
-            <div className="min-h-[120px] mb-6">
-              {active ? (
-                <div>
-                  <p className="text-sm text-[#C9A24B] mb-3 uppercase tracking-widest">
-                    {active}
-                  </p>
-                  <p className="text-[#F2EFE6]/85 leading-relaxed font-display text-lg">
-                    {qa[active]}
-                  </p>
-                </div>
-              ) : (
-                <p className="text-[#F2EFE6]/40 italic">
-                  Choose a question below — answered in my voice.
+          <div className="rounded-2xl border border-[#284A3C] bg-[#0e1813] flex flex-col overflow-hidden">
+
+            {/* message thread */}
+            <div className="flex-1 overflow-y-auto max-h-[380px] p-6 space-y-5">
+              {messages.length === 0 ? (
+                <p className="text-[#F2EFE6]/30 italic text-sm">
+                  Choose a prompt below or type your own question.
                 </p>
+              ) : (
+                messages.map((m, i) => (
+                  <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                    <div
+                      className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                        m.role === "user"
+                          ? "bg-[#284A3C] text-[#F2EFE6]"
+                          : "bg-[#1a2e24] text-[#F2EFE6]/90 font-display text-base"
+                      }`}
+                    >
+                      {m.content}
+                      {m.role === "assistant" && streaming && i === messages.length - 1 && m.content === "" && (
+                        <span className="inline-block w-2 h-4 bg-[#C9A24B] ml-1 animate-pulse rounded-sm" />
+                      )}
+                      {m.role === "assistant" && streaming && i === messages.length - 1 && m.content !== "" && (
+                        <span className="inline-block w-1.5 h-4 bg-[#C9A24B]/70 ml-0.5 animate-pulse rounded-sm align-middle" />
+                      )}
+                    </div>
+                  </div>
+                ))
               )}
+              <div ref={bottomRef} />
             </div>
-            <div className="flex flex-wrap gap-3">
-              {questions.map((q) => (
-                <button
-                  key={q}
-                  onClick={() => setActive(active === q ? null : q)}
-                  className={`text-left text-sm rounded-full border px-4 py-2 transition-colors cursor-pointer ${
-                    active === q
-                      ? "bg-[#C9A24B] text-[#13201A] border-[#C9A24B]"
-                      : "border-[#284A3C] text-[#F2EFE6]/80 hover:border-[#C9A24B]"
-                  }`}
-                >
-                  {q}
-                </button>
-              ))}
+
+            {/* starter chips */}
+            {messages.length === 0 && (
+              <div className="px-6 pb-4 flex flex-wrap gap-2">
+                {STARTERS.map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => send(q)}
+                    disabled={streaming}
+                    className="text-xs rounded-full border border-[#284A3C] text-[#F2EFE6]/70 px-3 py-1.5 hover:border-[#C9A24B] hover:text-[#F2EFE6] transition-colors cursor-pointer disabled:opacity-40"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* input bar */}
+            <div className="border-t border-[#284A3C] px-4 py-3 flex gap-3 items-center">
+              <input
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && send(input)}
+                placeholder="Ask anything…"
+                disabled={streaming}
+                className="flex-1 bg-transparent text-sm text-[#F2EFE6] placeholder-[#F2EFE6]/30 outline-none disabled:opacity-50"
+              />
+              <button
+                onClick={() => send(input)}
+                disabled={!input.trim() || streaming}
+                className="rounded-full bg-[#C9A24B] text-[#13201A] px-4 py-1.5 text-xs font-medium uppercase tracking-widest hover:bg-[#d8b563] transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {streaming ? "…" : "Send"}
+              </button>
             </div>
           </div>
         </Reveal>
