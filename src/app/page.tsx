@@ -539,42 +539,42 @@ function GTMFramework() {
   const phases = [
     {
       key: "Phase 0",
-      title: "Earn the first 100",
+      title: "Earn the first 100 users",
       weeks: "Wk 1–4",
       points: [
-        "A sharp ICP — the 100 who bleed for it, not a broad audience.",
-        "Deliberately manual outreach to learn the customer's exact words.",
-        "Instrument everything: one source of truth, every touch logged.",
+        "Define a sharp ICP: prioritize the people actively trying to solve this now.",
+        "Run manual outreach and concierge-style onboarding to hear the buyer's real language.",
+        "Track every touchpoint in one system so positioning and funnel decisions come from evidence.",
       ],
     },
     {
       key: "Phase 1",
-      title: "Find the message that converts",
+      title: "Find the message that pulls",
       weeks: "Wk 4–10",
       points: [
-        "Test claims, not just creative — credibility often beats lifestyle in bio/health.",
-        "Build the AI content engine: brief → variants → ship → measure → repeat.",
-        "Find the one channel with real pull before spreading thin.",
+        "Test claims, hooks, and proof points; in health, credibility usually outperforms cleverness.",
+        "Build a fast content loop: brief → create variants → launch → measure → refine.",
+        "Focus on the first channel showing real pull before expanding across too many surfaces.",
       ],
     },
     {
       key: "Phase 2",
-      title: "Build the repeatable engine",
+      title: "Build the repeatable system",
       weeks: "Wk 10–20",
       points: [
-        "Automate the proven motion: lead → qualify → personalize → send → follow-up.",
-        "Layer a creator/UGC pipeline for social proof at scale.",
-        "Stand up retention early — repeat purchase is the whole business.",
+        "Turn the winning journey into a system: lead capture → qualify → personalize → follow-up.",
+        "Add creator or UGC workflows only once the story and proof already resonate.",
+        "Build retention early through education, repeat usage, and post-purchase follow-through.",
       ],
     },
     {
       key: "Phase 3",
-      title: "Pour fuel only where proven",
+      title: "Scale what is proven",
       weeks: "Wk 20+",
       points: [
-        "Scale paid behind a channel already converting organically — never before.",
-        "Watch CAC:LTV — the bio-DTC trap is buying growth that doesn't repeat.",
-        "Compliance scales with you; I've run regulated workflows with zero gaps.",
+        "Increase spend only behind channels that already convert with healthy economics.",
+        "Watch CAC:LTV and payback closely; growth is only useful when it compounds.",
+        "Keep compliance, ops, and reporting tight so scale does not introduce fragility.",
       ],
     },
   ];
@@ -786,8 +786,7 @@ function AskMyClone() {
             Ask my AI.
           </h2>
           <p className="text-[#F2EFE6]/60 italic mb-8">
-            I&apos;m AI-native — so of course there&apos;s an AI version of me.
-            Ask anything.
+            I trained this AI to answer in my voice. Ask me anything!
           </p>
         </Reveal>
 
@@ -810,7 +809,7 @@ function AskMyClone() {
                           : "bg-[#1a2e24] text-[#F2EFE6]/90 font-display text-base"
                       }`}
                     >
-                      {m.content}
+                      <span className="whitespace-pre-wrap">{m.content}</span>
                       {m.role === "assistant" && streaming && i === messages.length - 1 && m.content === "" && (
                         <span className="inline-block w-2 h-4 bg-[#C9A24B] ml-1 animate-pulse rounded-sm" />
                       )}
