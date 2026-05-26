@@ -135,7 +135,7 @@ function Hero() {
           alt="JA monogram"
           width={40}
           height={40}
-          className="rounded-md"
+          className="rounded-xl"
           priority
         />
         <a
@@ -269,6 +269,72 @@ function BrandStrip() {
 }
 
 /* ====================================================
+   CASE ARTIFACT — media slot for each case study
+==================================================== */
+function CaseArtifact({ art }: { art: string }) {
+  if (art === "aura-collage") {
+    return (
+      <div className="grid grid-cols-2 gap-3 h-[420px]">
+        {/* Perfumer — left, full height */}
+        <div className="rounded-3xl overflow-hidden relative row-span-2">
+          <Image
+            src="/img/juan-perfumer.png"
+            alt="Juan Arenas as Lead Perfumer at Your Aura Fragrance"
+            fill
+            className="object-cover object-center"
+            sizes="(max-width: 1024px) 50vw, 25vw"
+          />
+        </div>
+        {/* USC portrait — top right */}
+        <div className="rounded-3xl overflow-hidden relative">
+          <Image
+            src="/img/juan-usc.png"
+            alt="Juan Arenas at USC"
+            fill
+            className="object-cover object-top"
+            sizes="(max-width: 1024px) 50vw, 25vw"
+          />
+        </div>
+        {/* Tan suit — bottom right */}
+        <div className="rounded-3xl overflow-hidden relative">
+          <Image
+            src="/img/juan-tan.jpg"
+            alt="Juan Arenas"
+            fill
+            className="object-cover object-top"
+            sizes="(max-width: 1024px) 50vw, 25vw"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (art === "n8n-video") {
+    return (
+      <div className="rounded-3xl overflow-hidden border border-[#284A3C]">
+        <video
+          className="w-full"
+          controls
+          muted
+          loop
+          playsInline
+          poster="/img/hero_poster.jpg"
+        >
+          <source src="/video/hero.mp4" type="video/mp4" />
+        </video>
+      </div>
+    );
+  }
+
+  // default placeholder
+  return (
+    <div className="aspect-video rounded-3xl border border-[#284A3C] bg-[#0e1813] flex items-center justify-center text-[#F2EFE6]/20 text-sm px-6 text-center">
+      {art}
+    </div>
+  );
+}
+
+/* ====================================================
    4. CASE STUDIES
 ==================================================== */
 function CaseStudies() {
@@ -287,7 +353,7 @@ function CaseStudies() {
       body: "Your Aura Fragrance — a bio-based perfumery startup built from zero. Outbound at events and online, consultative pitches closing DTC and small B2B, a customer journey mapped into an automated pipeline, a 6-person ambassador team, supplier terms at a 20% B2B discount.",
       result:
         "Repeat purchases at 30% of 200+ sales. Proof I build the whole GTM motion.",
-      art: "perfumer",
+      art: "aura-collage",
     },
     {
       tag: "HIPAA · CLINICAL GTM · AI SYSTEMS",
@@ -303,7 +369,7 @@ function CaseStudies() {
       body: "Milieu + Biotech Connection LA. An AI engine pipelining 400+ creators; n8n + Supabase email automation at 100% follow-up; outreach to 200+ accounts and 20+ KOLs via a custom CRM; sponsor packages that grew revenue 30%.",
       result:
         "10+ hrs/week eliminated, 100% follow-up, 30% revenue lift. I turn chaos into systems that scale.",
-      art: "n8n pipeline demo video",
+      art: "n8n-video",
     },
   ];
 
@@ -330,21 +396,7 @@ function CaseStudies() {
                   <p className="text-[#9FC4AE] italic">{c.result}</p>
                 </div>
                 <div className={i % 2 ? "lg:order-1" : ""}>
-                  {c.art === "perfumer" ? (
-                    <div className="aspect-video rounded-xl border border-[#284A3C] overflow-hidden relative">
-                      <Image
-                        src="/img/juan-perfumer.png"
-                        alt="Juan Arenas as Lead Perfumer at Your Aura Fragrance"
-                        fill
-                        className="object-cover object-top"
-                        sizes="(max-width: 1024px) 100vw, 50vw"
-                      />
-                    </div>
-                  ) : (
-                    <div className="aspect-video rounded-xl border border-[#284A3C] bg-[#0e1813] flex items-center justify-center text-[#F2EFE6]/20 text-sm px-6 text-center">
-                      {c.art}
-                    </div>
-                  )}
+                  <CaseArtifact art={c.art} />
                 </div>
               </article>
             </Reveal>
@@ -396,7 +448,7 @@ function Capabilities() {
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
           {caps.map(([title, desc], i) => (
             <Reveal key={i} delay={i * 60}>
-              <div className="group rounded-xl border border-[#284A3C] p-6 bg-[#0e1813] hover:bg-[#284A3C] transition-colors h-full">
+              <div className="group rounded-2xl border border-[#284A3C] p-6 bg-[#0e1813] hover:bg-[#284A3C] transition-colors h-full">
                 <p className="font-display text-xl text-[#C9A24B] group-hover:text-[#F2EFE6] mb-2 transition-colors">
                   {title}
                 </p>
@@ -473,7 +525,7 @@ function GTMFramework() {
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {phases.map((p, i) => (
             <Reveal key={i} delay={i * 80}>
-              <div className="rounded-xl border border-[#284A3C] p-6 bg-[#0e1813] h-full">
+              <div className="rounded-2xl border border-[#284A3C] p-6 bg-[#0e1813] h-full">
                 <p className="text-[#C9A24B] text-xs tracking-widest uppercase">
                   {p.key}
                 </p>
@@ -524,7 +576,7 @@ function AIStack() {
           </h2>
         </Reveal>
         <Reveal delay={100}>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-px bg-[#284A3C] rounded-xl overflow-hidden border border-[#284A3C]">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-px bg-[#284A3C] rounded-2xl overflow-hidden border border-[#284A3C]">
             {tools.map(([name, job], i) => (
               <div key={i} className="bg-[#0e1813] p-6">
                 <p className="font-display text-xl text-[#C9A24B] mb-1">{name}</p>
@@ -651,7 +703,7 @@ function Testimonials() {
         <div className="grid md:grid-cols-3 gap-6">
           {testimonials.map((t, i) => (
             <Reveal key={i} delay={i * 80}>
-              <div className="rounded-xl border border-[#284A3C] p-6 bg-[#0e1813] h-full flex flex-col">
+              <div className="rounded-2xl border border-[#284A3C] p-6 bg-[#0e1813] h-full flex flex-col">
                 <p className="text-[#C9A24B] font-display text-4xl leading-none mb-3">
                   &ldquo;
                 </p>
@@ -683,7 +735,7 @@ function About() {
     <section className="px-6 md:px-12 lg:px-20 py-24 border-t border-[#F2EFE6]/10">
       <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-12 items-center">
         <Reveal>
-          <div className="aspect-[4/5] rounded-xl border border-[#284A3C] overflow-hidden relative">
+          <div className="aspect-[4/5] rounded-3xl border border-[#284A3C] overflow-hidden relative">
             <Image
               src="/img/juan-usc.png"
               alt="Juan Arenas at USC"
