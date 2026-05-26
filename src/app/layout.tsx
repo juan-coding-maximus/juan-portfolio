@@ -18,9 +18,16 @@ const hanken = Hanken_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Juan Arenas — GTM & Ops for Scientific Startups",
+  title: "Juan Arenas",
   description:
     "AI-native GTM operator for scientific startups. I make complexity disappear — and I fight like it's my own company.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico",    sizes: "any" },
+      { url: "/favicon-32.png", type: "image/png", sizes: "32x32" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({
