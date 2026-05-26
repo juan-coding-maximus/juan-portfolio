@@ -246,21 +246,29 @@ function MetricWall() {
 ==================================================== */
 
 type BrandItem =
-  | { kind: "img";  src: string; alt: string; rounded?: boolean }
-  | { kind: "text"; label: string };
+  | { kind: "img";  src: string; alt: string; rounded?: boolean; href?: string }
+  | { kind: "text"; label: string; href?: string };
 
 function BrandStrip() {
-  // rounded:true = logo has a light/coloured bg — clip it with overflow-hidden rounded-2xl
   const brands: BrandItem[] = [
-    { kind: "img",  src: "/img/logos/aura-white.png",        alt: "Your Aura Fragrance" },
-    { kind: "img",  src: "/img/logos/usc-brain.png",         alt: "USC Center for Personalized Brain Health", rounded: true },
-    { kind: "img",  src: "/img/logos/superbiome.png",        alt: "Superbiome / Milieu",                     rounded: true },
-    { kind: "img",  src: "/img/logos/metaba.png",            alt: "Metaba Health",                           rounded: true },
-    { kind: "img",  src: "/img/logos/biotech-connection.png",alt: "Biotech Connection LA",                   rounded: true },
+    { kind: "img",  src: "/img/logos/aura-white.png",        alt: "Your Aura Fragrance",                     href: "https://youraurafragrance.com" },
+    { kind: "img",  src: "/img/logos/usc-brain.png",         alt: "USC Center for Personalized Brain Health", href: "https://keck.usc.edu/cpbh",      rounded: true },
+    { kind: "img",  src: "/img/logos/superbiome.png",        alt: "Milieu Skin Microbiome",                   href: "https://milieuskin.com",          rounded: true },
+    { kind: "img",  src: "/img/logos/metaba.png",            alt: "Metaba Health",                            href: "https://metabahealth.us",         rounded: true },
+    { kind: "img",  src: "/img/logos/biotech-connection.png",alt: "Biotech Connection LA",                    href: "https://bc-la.org",               rounded: true },
     { kind: "text", label: "Tranquilísimo" },
   ];
 
   const all = [...brands, ...brands];
+
+  function tooltip(href: string) {
+    const domain = href.replace(/^https?:\/\//, "");
+    return (
+      <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-[#284A3C] bg-[#0e1813] px-3 py-1 text-xs text-[#F2EFE6]/70 opacity-0 transition-opacity group-hover:opacity-100">
+        go to {domain}
+      </span>
+    );
+  }
 
   function renderItem(item: BrandItem, i: number) {
     if (item.kind === "text") {
@@ -280,19 +288,26 @@ function BrandStrip() {
       />
     );
 
-    if (item.rounded) {
-      // clip the white/coloured bg with rounded corners — no extra wrapper bg
+    const inner = item.rounded ? (
+      <div className="h-12 rounded-2xl overflow-hidden">{img}</div>
+    ) : (
+      <div className="h-14 flex items-center">{img}</div>
+    );
+
+    if (item.href) {
       return (
-        <div key={i} className="shrink-0 h-12 rounded-2xl overflow-hidden">
-          {img}
+        <div key={i} className="relative group shrink-0">
+          <a href={item.href} target="_blank" rel="noopener noreferrer" className="block opacity-70 hover:opacity-100 transition-opacity">
+            {inner}
+          </a>
+          {tooltip(item.href)}
         </div>
       );
     }
 
-    // transparent/white-on-dark logo (Your Aura) — just show it, a bit taller
     return (
-      <div key={i} className="shrink-0 h-14 flex items-center">
-        {img}
+      <div key={i} className="shrink-0">
+        {inner}
       </div>
     );
   }
