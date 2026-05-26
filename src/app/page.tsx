@@ -366,6 +366,37 @@ function ScrollVideo() {
 /* ====================================================
    CASE ARTIFACT — media slot for each case study
 ==================================================== */
+function MetabaVideo() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) video.play().catch(() => {});
+        else video.pause();
+      },
+      { threshold: 0.3 }
+    );
+    io.observe(video);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <div className="rounded-3xl overflow-hidden aspect-video bg-[#0e1813]">
+      <video
+        ref={videoRef}
+        muted
+        loop
+        playsInline
+        preload="none"
+        className="w-full h-full object-cover"
+      >
+        <source src="/video/metaba.mp4" type="video/mp4" />
+      </video>
+    </div>
+  );
+}
+
 function CaseArtifact({ art }: { art: string }) {
   if (art === "aura-collage") {
     return (
@@ -383,6 +414,10 @@ function CaseArtifact({ art }: { art: string }) {
 
   if (art === "n8n-video") {
     return <ScrollVideo />;
+  }
+
+  if (art === "Metaba Health — site / ops board") {
+    return <MetabaVideo />;
   }
 
   // default placeholder
