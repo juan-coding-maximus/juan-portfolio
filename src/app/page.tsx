@@ -269,6 +269,49 @@ function BrandStrip() {
 }
 
 /* ====================================================
+   SCROLL-TRIGGERED VIDEO — plays 2 s after entering view
+==================================================== */
+function ScrollVideo() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          timer = setTimeout(() => video.play().catch(() => {}), 2000);
+        } else {
+          clearTimeout(timer);
+          video.pause();
+        }
+      },
+      { threshold: 0.4 }
+    );
+    io.observe(video);
+    return () => { io.disconnect(); clearTimeout(timer); };
+  }, []);
+
+  return (
+    <div className="rounded-3xl overflow-hidden border border-[#284A3C]">
+      <video
+        ref={videoRef}
+        className="w-full"
+        controls
+        muted
+        loop
+        playsInline
+        poster="/img/hero_poster.jpg"
+      >
+        <source src="/video/hero.mp4" type="video/mp4" />
+      </video>
+    </div>
+  );
+}
+
+/* ====================================================
    CASE ARTIFACT — media slot for each case study
 ==================================================== */
 function CaseArtifact({ art }: { art: string }) {
@@ -287,20 +330,7 @@ function CaseArtifact({ art }: { art: string }) {
   }
 
   if (art === "n8n-video") {
-    return (
-      <div className="rounded-3xl overflow-hidden border border-[#284A3C]">
-        <video
-          className="w-full"
-          controls
-          muted
-          loop
-          playsInline
-          poster="/img/hero_poster.jpg"
-        >
-          <source src="/video/hero.mp4" type="video/mp4" />
-        </video>
-      </div>
-    );
+    return <ScrollVideo />;
   }
 
   // default placeholder
