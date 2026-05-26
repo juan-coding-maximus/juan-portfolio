@@ -57,19 +57,28 @@ Operating partner role at a scientific or consumer-health startup. Own GTM end-t
 - No bullet-point walls. Prose or tight numbered lists only.`;
 
 export async function POST(req: Request) {
-  const { messages } = await req.json();
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return new Response("API key not configured.", { status: 503 });
+  }
 
-  const stream = client.messages.stream({
-    model: "claude-sonnet-4-6",
-    max_tokens: 300,
-    system: SYSTEM_PROMPT,
-    messages,
-  });
+  let messages: unknown[];
+  try {
+    ({ messages } = await req.json());
+  } catch {
+    return new Response("Bad request.", { status: 400 });
+  }
 
   const encoder = new TextEncoder();
   const readable = new ReadableStream({
     async start(controller) {
       try {
+        const stream = client.messages.stream({
+          model: "claude-sonnet-4-6",
+          max_tokens: 300,
+          system: SYSTEM_PROMPT,
+          messages: messages as Parameters<typeof client.messages.stream>[0]["messages"],
+        });
+
         for await (const chunk of stream) {
           if (
             chunk.type === "content_block_delta" &&
@@ -78,6 +87,9 @@ export async function POST(req: Request) {
             controller.enqueue(encoder.encode(chunk.delta.text));
           }
         }
+      } catch (err) {
+        console.error("Anthropic stream error:", err);
+        controller.enqueue(encoder.encode("__ERROR__"));
       } finally {
         controller.close();
       }

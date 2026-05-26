@@ -691,28 +691,47 @@ function AskMyClone() {
     // placeholder for streaming text
     setMessages([...next, { role: "assistant", content: "" }]);
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000); // 15s hard timeout
+
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: next }),
+        signal: controller.signal,
       });
-      if (!res.body) throw new Error("No stream");
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.body) throw new Error("No stream body");
+
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let full = "";
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         full += decoder.decode(value, { stream: true });
         setMessages([...next, { role: "assistant", content: full }]);
       }
-    } catch {
+
+      // if we got nothing at all, show fallback
+      if (!full.trim()) throw new Error("Empty response");
+
+    } catch (err: unknown) {
+      const isTimeout = err instanceof Error && err.name === "AbortError";
       setMessages([
         ...next,
-        { role: "assistant", content: "Something went wrong — email me at juan.arenas.rec@gmail.com." },
+        {
+          role: "assistant",
+          content: isTimeout
+            ? "Took too long — try again or email juan.arenas.rec@gmail.com."
+            : "Couldn't reach the AI. Email me directly: juan.arenas.rec@gmail.com.",
+        },
       ]);
     } finally {
+      clearTimeout(timeout);
       setStreaming(false);
     }
   }
