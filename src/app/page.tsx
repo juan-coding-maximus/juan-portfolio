@@ -231,59 +231,55 @@ function MetricWall() {
    3. BRAND STRIP
 ==================================================== */
 
-// pill wrapper for logos that have a light/coloured background
-function LogoPill({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="bg-[#F2EFE6]/[0.07] rounded-2xl px-5 py-3 flex items-center justify-center h-16 shrink-0">
-      {children}
-    </div>
-  );
-}
-
 type BrandItem =
-  | { kind: "img";  src: string; alt: string; pill?: boolean; cls?: string }
-  | { kind: "gif";  src: string; alt: string }
+  | { kind: "img";  src: string; alt: string; rounded?: boolean }
   | { kind: "text"; label: string };
 
 function BrandStrip() {
+  // rounded:true = logo has a light/coloured bg — clip it with overflow-hidden rounded-2xl
   const brands: BrandItem[] = [
-    // Your Aura — white PNG on dark bg, no pill needed
-    { kind: "img",  src: "/img/logos/aura-white.png",  alt: "Your Aura Fragrance", cls: "h-14 w-auto object-contain" },
-    // USC Brain Health — coloured screenshot → pill
-    { kind: "img",  src: "/img/logos/usc-brain.png",   alt: "USC Center for Personalized Brain Health", pill: true, cls: "h-10 w-auto object-contain" },
-    // Superbiome (Milieu brand) — light bg screenshot → pill
-    { kind: "img",  src: "/img/logos/superbiome.png",  alt: "Superbiome / Milieu", pill: true, cls: "h-9 w-auto object-contain" },
-    // Milieu circle mark — animated GIF
-    { kind: "gif",  src: "/img/logos/milieu.gif",      alt: "Milieu" },
-    // Metaba — blue bg screenshot → heavy-rounded pill
-    { kind: "img",  src: "/img/logos/metaba.png",      alt: "Metaba Health", pill: true, cls: "h-9 w-auto object-contain rounded-xl" },
-    // Biotech Connection LA — text placeholder
-    { kind: "text", label: "Biotech Connection LA" },
-    // Tranquilísimo — text placeholder
+    { kind: "img",  src: "/img/logos/aura-white.png",        alt: "Your Aura Fragrance" },
+    { kind: "img",  src: "/img/logos/usc-brain.png",         alt: "USC Center for Personalized Brain Health", rounded: true },
+    { kind: "img",  src: "/img/logos/superbiome.png",        alt: "Superbiome / Milieu",                     rounded: true },
+    { kind: "img",  src: "/img/logos/metaba.png",            alt: "Metaba Health",                           rounded: true },
+    { kind: "img",  src: "/img/logos/biotech-connection.png",alt: "Biotech Connection LA",                   rounded: true },
     { kind: "text", label: "Tranquilísimo" },
   ];
 
-  const all = [...brands, ...brands]; // duplicate for seamless loop
+  const all = [...brands, ...brands];
 
   function renderItem(item: BrandItem, i: number) {
-    if (item.kind === "img") {
-      const img = (
-        <img src={item.src} alt={item.alt} className={item.cls ?? "h-10 w-auto object-contain"} />
-      );
-      return item.pill ? <LogoPill key={i}>{img}</LogoPill> : <div key={i} className="shrink-0 flex items-center h-16">{img}</div>;
-    }
-    if (item.kind === "gif") {
+    if (item.kind === "text") {
       return (
-        <div key={i} className="shrink-0 flex items-center h-16">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={item.src} alt={item.alt} className="h-12 w-12 rounded-full object-cover" />
+        <span key={i} className="shrink-0 font-display text-lg text-[#F2EFE6]/40 flex items-center h-12">
+          {item.label}
+        </span>
+      );
+    }
+
+    const img = (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={item.src}
+        alt={item.alt}
+        className="h-full w-auto object-contain"
+      />
+    );
+
+    if (item.rounded) {
+      // clip the white/coloured bg with rounded corners — no extra wrapper bg
+      return (
+        <div key={i} className="shrink-0 h-12 rounded-2xl overflow-hidden">
+          {img}
         </div>
       );
     }
+
+    // transparent/white-on-dark logo (Your Aura) — just show it, a bit taller
     return (
-      <span key={i} className="shrink-0 font-display text-lg text-[#F2EFE6]/40 flex items-center h-16">
-        {item.label}
-      </span>
+      <div key={i} className="shrink-0 h-14 flex items-center">
+        {img}
+      </div>
     );
   }
 
@@ -295,7 +291,7 @@ function BrandStrip() {
         </p>
       </div>
       <div
-        className="flex gap-x-12 items-center whitespace-nowrap"
+        className="flex gap-x-14 items-center whitespace-nowrap"
         style={{ animation: "marquee 36s linear infinite" }}
       >
         {all.map((item, i) => renderItem(item, i))}
