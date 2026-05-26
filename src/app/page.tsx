@@ -130,7 +130,14 @@ function Hero() {
 
       {/* nav */}
       <div className="absolute top-6 left-6 right-6 md:left-12 md:right-12 flex justify-between items-center text-sm">
-        <span className="font-display italic text-lg text-[#F2EFE6]">Juan Arenas</span>
+        <Image
+          src="/img/ja-logo.png"
+          alt="JA monogram"
+          width={40}
+          height={40}
+          className="rounded-md"
+          priority
+        />
         <a
           href="#contact"
           className="rounded-full bg-[#C9A24B] text-[#13201A] px-5 py-2 uppercase tracking-widest text-xs font-medium hover:bg-[#d8b563] transition-colors"
@@ -785,8 +792,17 @@ function CTA() {
 ==================================================== */
 function Footer() {
   return (
-    <footer className="px-6 md:px-12 lg:px-20 py-10 border-t border-[#F2EFE6]/10 text-xs text-[#F2EFE6]/40 flex flex-col md:flex-row gap-2 justify-between">
-      <span>Juan Arenas Martin · Los Angeles, CA</span>
+    <footer className="px-6 md:px-12 lg:px-20 py-10 border-t border-[#F2EFE6]/10 text-xs text-[#F2EFE6]/40 flex flex-col md:flex-row gap-4 justify-between items-center">
+      <div className="flex items-center gap-3">
+        <Image
+          src="/img/ja-logo.png"
+          alt="JA monogram"
+          width={32}
+          height={32}
+          className="rounded-sm opacity-80"
+        />
+        <span>Juan Arenas Martin · Los Angeles, CA</span>
+      </div>
       <span>
         (323) 775-3850 · juan.arenas.rec@gmail.com ·
         linkedin.com/in/juanarenasmartin

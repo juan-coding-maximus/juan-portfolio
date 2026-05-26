@@ -21,6 +21,10 @@ export const metadata: Metadata = {
   title: "Juan Arenas — GTM & Ops for Scientific Startups",
   description:
     "AI-native GTM operator for scientific startups. I make complexity disappear — and I fight like it's my own company.",
+  icons: {
+    icon: "/img/ja-logo.png",
+    apple: "/img/ja-logo.png",
+  },
 };
 
 export default function RootLayout({
