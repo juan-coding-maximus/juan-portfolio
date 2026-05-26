@@ -732,6 +732,9 @@ function AskMyClone() {
     }
   }
 
+  const userCount = messages.filter(m => m.role === "user").length;
+  const showCTA = userCount >= 3 && !streaming;
+
   return (
     <section className="px-6 md:px-12 lg:px-20 py-24 border-t border-[#F2EFE6]/10">
       <div className="max-w-3xl mx-auto">
@@ -775,6 +778,24 @@ function AskMyClone() {
                   </div>
                 ))
               )}
+
+              {/* CTA after 3 questions */}
+              {showCTA && (
+                <div className="flex justify-start">
+                  <div className="bg-[#1a2e24] rounded-2xl px-4 py-4 max-w-[85%] space-y-3">
+                    <p className="text-[#F2EFE6]/80 font-display text-base">
+                      Honestly just ask me&nbsp;😉&nbsp; here&apos;s my number: <span className="text-[#C9A24B]">+1 (323) 775‑3850</span>
+                    </p>
+                    <a
+                      href="sms:+13237753850"
+                      className="inline-block rounded-full bg-[#C9A24B] text-[#13201A] px-5 py-2 text-xs font-medium uppercase tracking-widest hover:bg-[#d8b563] transition-colors"
+                    >
+                      Text me
+                    </a>
+                  </div>
+                </div>
+              )}
+
               <div ref={bottomRef} />
             </div>
 
