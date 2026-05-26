@@ -5,6 +5,7 @@
 
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
 /* ---------- scroll reveal hook ---------- */
@@ -279,7 +280,7 @@ function CaseStudies() {
       body: "Your Aura Fragrance — a bio-based perfumery startup built from zero. Outbound at events and online, consultative pitches closing DTC and small B2B, a customer journey mapped into an automated pipeline, a 6-person ambassador team, supplier terms at a 20% B2B discount.",
       result:
         "Repeat purchases at 30% of 200+ sales. Proof I build the whole GTM motion.",
-      art: "Your Aura Fragrance — product / pipeline",
+      art: "perfumer",
     },
     {
       tag: "HIPAA · CLINICAL GTM · AI SYSTEMS",
@@ -322,9 +323,21 @@ function CaseStudies() {
                   <p className="text-[#9FC4AE] italic">{c.result}</p>
                 </div>
                 <div className={i % 2 ? "lg:order-1" : ""}>
-                  <div className="aspect-video rounded-xl border border-[#284A3C] bg-[#0e1813] flex items-center justify-center text-[#F2EFE6]/20 text-sm px-6 text-center">
-                    {c.art}
-                  </div>
+                  {c.art === "perfumer" ? (
+                    <div className="aspect-video rounded-xl border border-[#284A3C] overflow-hidden relative">
+                      <Image
+                        src="/img/juan-perfumer.png"
+                        alt="Juan Arenas as Lead Perfumer at Your Aura Fragrance"
+                        fill
+                        className="object-cover object-top"
+                        sizes="(max-width: 1024px) 100vw, 50vw"
+                      />
+                    </div>
+                  ) : (
+                    <div className="aspect-video rounded-xl border border-[#284A3C] bg-[#0e1813] flex items-center justify-center text-[#F2EFE6]/20 text-sm px-6 text-center">
+                      {c.art}
+                    </div>
+                  )}
                 </div>
               </article>
             </Reveal>
@@ -663,8 +676,15 @@ function About() {
     <section className="px-6 md:px-12 lg:px-20 py-24 border-t border-[#F2EFE6]/10">
       <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-12 items-center">
         <Reveal>
-          <div className="aspect-[4/5] rounded-xl border border-[#284A3C] bg-[#0e1813] flex items-center justify-center text-[#F2EFE6]/20 text-sm">
-            [Portrait — drop /public/img/juan.jpg]
+          <div className="aspect-[4/5] rounded-xl border border-[#284A3C] overflow-hidden relative">
+            <Image
+              src="/img/juan-usc.png"
+              alt="Juan Arenas at USC"
+              fill
+              className="object-cover object-top"
+              sizes="(max-width: 768px) 100vw, 50vw"
+              priority
+            />
           </div>
         </Reveal>
         <Reveal delay={120}>
