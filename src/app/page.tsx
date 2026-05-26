@@ -128,6 +128,20 @@ function Hero() {
         <div className="absolute inset-0 bg-gradient-to-b from-[#13201A]/70 via-[#13201A]/40 to-[#13201A]" />
       </div>
 
+      {/* Juan portrait — right side, fades left into the dark bg */}
+      <div className="absolute inset-y-0 right-0 w-1/2 md:w-2/5 -z-10 hidden md:block">
+        <Image
+          src="/img/juan-usc.png"
+          alt=""
+          fill
+          className="object-cover object-top opacity-30"
+          sizes="40vw"
+          priority
+        />
+        {/* gradient fade from left so portrait bleeds into the dark naturally */}
+        <div className="absolute inset-0 bg-gradient-to-r from-[#13201A] via-[#13201A]/60 to-transparent" />
+      </div>
+
       {/* nav */}
       <div className="absolute top-6 left-6 right-6 md:left-12 md:right-12 flex justify-between items-center text-sm">
         <Image
@@ -191,7 +205,7 @@ function MetricWall() {
     { n: <CountUp to={30} prefix="+" suffix="%" />, label: "sponsor revenue growth", color: "" },
     { n: <CountUp to={2} suffix="×" />, label: "reach in 8 months", color: "" },
     { n: <CountUp to={10} suffix="+ hrs" />, label: "/week automated", color: "sage" },
-    { n: <CountUp to={0} />, label: "HIPAA compliance gaps", color: "" },
+    { n: <CountUp to={100} suffix="%" />, label: "HIPAA compliant", color: "sage" },
   ];
 
   return (
@@ -1008,13 +1022,9 @@ function CTA() {
       <div className="relative max-w-4xl mx-auto text-center">
         <Reveal>
           <h2 className="font-display text-[clamp(2.2rem,5vw,3.6rem)] leading-tight">
-            I&apos;m the GTM/Ops partner{" "}
+            I&apos;m the Go To Market partner{" "}
             <span className="italic text-[#9FC4AE]">your science needs.</span>
           </h2>
-          <p className="mt-6 text-[#F2EFE6]/70 max-w-2xl mx-auto">
-            USC honors. Companies I built myself. AI fluency most operators
-            don&apos;t have. And a work ethic that&apos;s genuinely hard to match.
-          </p>
         </Reveal>
         <Reveal delay={120}>
           <div className="mt-10 flex flex-wrap gap-4 justify-center">
