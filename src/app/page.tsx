@@ -711,17 +711,38 @@ function AskMyClone() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [extraContext, setExtraContext] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const scrollToBottom = () =>
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollChatToBottom = () => {
+    const el = containerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  };
 
-  useEffect(() => { scrollToBottom(); }, [messages]);
+  useEffect(() => {
+    if (messages.length > 0) scrollChatToBottom();
+  }, [messages]);
 
   async function send(text: string) {
     if (!text.trim() || streaming) return;
-    const userMsg: Message = { role: "user", content: text.trim() };
+    const trimmed = text.trim();
+
+    // "I am Juan — ..." updates the AI's live context for this session
+    if (/^i am juan\b/i.test(trimmed)) {
+      const memo = trimmed.replace(/^i am juan[\s\-–—]*/i, "").trim();
+      if (memo) {
+        setExtraContext(prev => prev ? `${prev}\n${memo}` : memo);
+        setMessages(prev => [
+          ...prev,
+          { role: "assistant", content: `✓ Got it — context updated.` },
+        ]);
+      }
+      setInput("");
+      return;
+    }
+
+    const userMsg: Message = { role: "user", content: trimmed };
     const next = [...messages, userMsg];
     setMessages(next);
     setInput("");
@@ -737,7 +758,7 @@ function AskMyClone() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: next }),
+        body: JSON.stringify({ messages: next, extraContext }),
         signal: controller.signal,
       });
 
@@ -794,7 +815,7 @@ function AskMyClone() {
           <div className="rounded-2xl border border-[#284A3C] bg-[#0e1813] flex flex-col overflow-hidden">
 
             {/* message thread */}
-            <div className="flex-1 overflow-y-auto max-h-[380px] p-6 space-y-5">
+            <div ref={containerRef} className="flex-1 overflow-y-auto max-h-[380px] p-6 space-y-5">
               {messages.length === 0 ? (
                 <p className="text-[#F2EFE6]/30 italic text-sm">
                   Choose a prompt below or type your own question.
@@ -838,7 +859,6 @@ function AskMyClone() {
                 </div>
               )}
 
-              <div ref={bottomRef} />
             </div>
 
             {/* starter chips */}

@@ -70,11 +70,16 @@ export async function POST(req: Request) {
   }
 
   let messages: unknown[];
+  let extraContext = "";
   try {
-    ({ messages } = await req.json());
+    ({ messages, extraContext = "" } = await req.json());
   } catch {
     return new Response("Bad request.", { status: 400 });
   }
+
+  const systemPrompt = extraContext.trim()
+    ? `${SYSTEM_PROMPT}\n\n━━━ LIVE CONTEXT UPDATE (from Juan) ━━━\n${extraContext.trim()}`
+    : SYSTEM_PROMPT;
 
   const encoder = new TextEncoder();
   const readable = new ReadableStream({
@@ -83,7 +88,7 @@ export async function POST(req: Request) {
         const stream = client.messages.stream({
           model: "claude-sonnet-4-6",
           max_tokens: 200,
-          system: SYSTEM_PROMPT,
+          system: systemPrompt,
           messages: messages as Parameters<typeof client.messages.stream>[0]["messages"],
         });
 
