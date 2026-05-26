@@ -274,37 +274,14 @@ function BrandStrip() {
 function CaseArtifact({ art }: { art: string }) {
   if (art === "aura-collage") {
     return (
-      <div className="grid grid-cols-2 gap-3 h-[420px]">
-        {/* Perfumer — left, full height */}
-        <div className="rounded-3xl overflow-hidden relative row-span-2">
-          <Image
-            src="/img/juan-perfumer.png"
-            alt="Juan Arenas as Lead Perfumer at Your Aura Fragrance"
-            fill
-            className="object-cover object-center"
-            sizes="(max-width: 1024px) 50vw, 25vw"
-          />
-        </div>
-        {/* USC portrait — top right */}
-        <div className="rounded-3xl overflow-hidden relative">
-          <Image
-            src="/img/juan-usc.png"
-            alt="Juan Arenas at USC"
-            fill
-            className="object-cover object-top"
-            sizes="(max-width: 1024px) 50vw, 25vw"
-          />
-        </div>
-        {/* Tan suit — bottom right */}
-        <div className="rounded-3xl overflow-hidden relative">
-          <Image
-            src="/img/juan-tan.jpg"
-            alt="Juan Arenas"
-            fill
-            className="object-cover object-top"
-            sizes="(max-width: 1024px) 50vw, 25vw"
-          />
-        </div>
+      <div className="rounded-3xl overflow-hidden relative aspect-[4/3]">
+        <Image
+          src="/img/juan-perfumer.png"
+          alt="Juan Arenas as Lead Perfumer at Your Aura Fragrance"
+          fill
+          className="object-cover object-center"
+          sizes="(max-width: 1024px) 100vw, 50vw"
+        />
       </div>
     );
   }
@@ -445,19 +422,28 @@ function Capabilities() {
             Not a service menu — a partner who picks up whatever the company needs.
           </p>
         </Reveal>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {caps.map(([title, desc], i) => (
-            <Reveal key={i} delay={i * 60}>
-              <div className="group rounded-2xl border border-[#284A3C] p-6 bg-[#0e1813] hover:bg-[#284A3C] transition-colors h-full">
-                <p className="font-display text-xl text-[#C9A24B] group-hover:text-[#F2EFE6] mb-2 transition-colors">
-                  {title}
-                </p>
-                <p className="text-sm text-[#F2EFE6]/70 group-hover:text-[#F2EFE6]/90 leading-relaxed transition-colors">
-                  {desc}
-                </p>
-              </div>
-            </Reveal>
-          ))}
+        {/* Olympic rings layout: 3 on top, 2 offset below */}
+        <div className="grid grid-cols-6 gap-5">
+          {caps.map(([title, desc], i) => {
+            // top row: items 0,1,2 → cols 1-2, 3-4, 5-6
+            // bottom row: items 3,4 → cols 2-3, 4-5 (offset by 1 col)
+            const colClass =
+              i === 3 ? "col-start-2 col-span-2" :
+              i === 4 ? "col-start-4 col-span-2" :
+              "col-span-2";
+            return (
+              <Reveal key={i} delay={i * 60} className={colClass}>
+                <div className="group rounded-2xl border border-[#284A3C] p-6 bg-[#0e1813] hover:bg-[#284A3C] transition-colors h-full">
+                  <p className="font-display text-xl text-[#C9A24B] group-hover:text-[#F2EFE6] mb-2 transition-colors">
+                    {title}
+                  </p>
+                  <p className="text-sm text-[#F2EFE6]/70 group-hover:text-[#F2EFE6]/90 leading-relaxed transition-colors">
+                    {desc}
+                  </p>
+                </div>
+              </Reveal>
+            );
+          })}
         </div>
       </div>
     </section>
