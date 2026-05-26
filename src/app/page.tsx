@@ -381,6 +381,37 @@ function ScrollVideo() {
 /* ====================================================
    CASE ARTIFACT — media slot for each case study
 ==================================================== */
+function CPBHVideo() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) video.play().catch(() => {});
+        else video.pause();
+      },
+      { threshold: 0.3 }
+    );
+    io.observe(video);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <div className="rounded-3xl overflow-hidden aspect-video bg-[#0e1813]">
+      <video
+        ref={videoRef}
+        muted
+        loop
+        playsInline
+        preload="none"
+        className="w-full h-full object-cover"
+      >
+        <source src="/video/cpbh.mp4" type="video/mp4" />
+      </video>
+    </div>
+  );
+}
+
 function MetabaVideo() {
   const videoRef = useRef<HTMLVideoElement>(null);
   useEffect(() => {
@@ -492,8 +523,8 @@ function CaseArtifact({ art }: { art: string }) {
     return <MetabaVideo />;
   }
 
-  if (art === "USC Brain Health — growth chart") {
-    return <NewsletterFan />;
+  if (art === "cpbh-video") {
+    return <CPBHVideo />;
   }
 
   // default placeholder
@@ -508,7 +539,10 @@ function CaseArtifact({ art }: { art: string }) {
    4. CASE STUDIES
 ==================================================== */
 function CaseStudies() {
-  const cases = [
+  const cases: {
+    tag: string; title: string; body: string; result: string;
+    art: string; newsletters?: boolean;
+  }[] = [
     {
       tag: "0→1 · COMPANY BUILD · OPS + GTM",
       title: "I took a health startup from zero to paying clients.",
@@ -531,7 +565,8 @@ function CaseStudies() {
       body: "USC Center for Personalized Brain Health. Liaison to a 1,000+ patient/caregiver community. Campaigns that doubled newsletter and social reach in 8 months, a Spanish-language newsletter that grew recipients 50%, HIPAA-compliant workflows with zero gaps.",
       result:
         "A bigger, more engaged pipeline — without breaking a compliance rule. I move fast without breaking what matters.",
-      art: "USC Brain Health — growth chart",
+      art: "cpbh-video",
+      newsletters: true,
     },
     {
       tag: "AI EMAIL ENGINE · B2B · EVENTS",
@@ -564,6 +599,14 @@ function CaseStudies() {
                   </h3>
                   <p className="text-[#F2EFE6]/70 leading-relaxed mb-5">{c.body}</p>
                   <p className="text-[#9FC4AE] italic">{c.result}</p>
+                  {c.newsletters && (
+                    <div className="mt-8 pt-6 border-t border-[#284A3C]/50">
+                      <p className="text-xs uppercase tracking-widest text-[#F2EFE6]/40 mb-5">
+                        A few of my newsletters
+                      </p>
+                      <NewsletterFan />
+                    </div>
+                  )}
                 </div>
                 <div className={i % 2 ? "lg:order-1" : ""}>
                   <CaseArtifact art={c.art} />
