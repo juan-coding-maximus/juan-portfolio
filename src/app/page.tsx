@@ -609,40 +609,69 @@ function GTMFramework() {
 }
 
 /* ====================================================
-   7. AI STACK
+   7. TEAM OF FIVE
 ==================================================== */
 function AIStack() {
-  const tools: [string, string][] = [
-    ["n8n", "orchestrates the whole pipeline"],
-    ["Claude Code", "builds the custom tools & CRMs I need"],
-    ["Supabase", "single source of truth for every contact"],
-    ["Apps Script", "glues Google Workspace into the system"],
-    ["HubSpot / custom CRM", "pipeline visibility end to end"],
-    ["Meta / Mailchimp / Manychat", "the demand and nurture layer"],
+  const cards: [string, string][] = [
+    [
+      "Creator engine at scale",
+      "400+ influencers pipelined with AI — personalized outreach, 100% follow-up, positive ROI. Most brands spend 3× more to get half the reach.",
+    ],
+    [
+      "A network that deploys",
+      "LA design teams, merch producers, SEO/AIO/GEO contractors on speed dial. I don't arrive empty-handed — I arrive with resources.",
+    ],
+    [
+      "Every hat, when needed",
+      "GTM, ops, sales, content, analytics — I've run all of them at once. You don't hire five people. You get one who functions like five.",
+    ],
+    [
+      "AI systems that run overnight",
+      "n8n + Claude Code + Supabase wired into one machine. 10+ hrs/week automated. Built from scratch, runs while you sleep.",
+    ],
+    [
+      "Regulated-market fluency",
+      "HIPAA-compliant, scientifically literate, clinical-sales-ready. I move fast inside frameworks most operators won't touch.",
+    ],
   ];
 
   return (
     <section className="px-6 md:px-12 lg:px-20 py-24 border-t border-[#F2EFE6]/10">
       <div className="max-w-7xl mx-auto">
         <Reveal>
-          <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-12">
+          <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-3">
             My unfair advantage: I operate like a team of five.
           </h2>
+          <p className="text-[#F2EFE6]/60 italic mb-12">
+            One hire. Five functions. A contractor network behind me and an AI stack underneath everything.
+          </p>
         </Reveal>
-        <Reveal delay={100}>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-px bg-[#284A3C] rounded-2xl overflow-hidden border border-[#284A3C]">
-            {tools.map(([name, job], i) => (
-              <div key={i} className="bg-[#0e1813] p-6">
-                <p className="font-display text-xl text-[#C9A24B] mb-1">{name}</p>
-                <p className="text-sm text-[#F2EFE6]/65">{job}</p>
-              </div>
-            ))}
-          </div>
-        </Reveal>
+
+        {/* Olympic rings layout: 3 on top, 2 offset below */}
+        <div className="grid grid-cols-6 gap-5">
+          {cards.map(([title, desc], i) => {
+            const colClass =
+              i === 3 ? "col-start-2 col-span-2" :
+              i === 4 ? "col-start-4 col-span-2" :
+              "col-span-2";
+            return (
+              <Reveal key={i} delay={i * 70} className={colClass}>
+                <div className="group rounded-2xl border border-[#284A3C] p-6 bg-[#0e1813] hover:bg-[#284A3C] transition-colors h-full">
+                  <p className="font-display text-xl text-[#C9A24B] group-hover:text-[#F2EFE6] mb-2 transition-colors">
+                    {title}
+                  </p>
+                  <p className="text-sm text-[#F2EFE6]/70 group-hover:text-[#F2EFE6]/90 leading-relaxed transition-colors">
+                    {desc}
+                  </p>
+                </div>
+              </Reveal>
+            );
+          })}
+        </div>
+
         <Reveal delay={200}>
-          <p className="mt-10 text-[#F2EFE6]/60 italic max-w-3xl">
-            Most operators can list these. I wire them into systems that run
-            while I sleep — and build the missing pieces myself.
+          <p className="mt-12 text-[#F2EFE6]/60 italic max-w-3xl">
+            Most operators show up with a framework. I show up with the system already running.
           </p>
         </Reveal>
       </div>
