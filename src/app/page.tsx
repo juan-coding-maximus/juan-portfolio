@@ -256,7 +256,7 @@ function BrandStrip() {
     { kind: "img",  src: "/img/logos/superbiome.png",        alt: "Milieu Skin Microbiome",                   href: "https://milieuskin.com",          rounded: true },
     { kind: "img",  src: "/img/logos/metaba.png",            alt: "Metaba Health",                            href: "https://metabahealth.us",         rounded: true },
     { kind: "img",  src: "/img/logos/biotech-connection.png",alt: "Biotech Connection LA",                    href: "https://bc-la.org",               rounded: true },
-    { kind: "text", label: "Tranquilísimo" },
+    { kind: "img",  src: "/img/logos/tranquilisimo.png", alt: "Tranquilísimo", href: "https://tranquilisimo.com" },
   ];
 
   const all = [...brands, ...brands];
@@ -405,9 +405,65 @@ function MetabaVideo() {
         playsInline
         preload="none"
         className="w-full h-full object-cover"
+        style={{ objectPosition: "center 65%" }}
       >
         <source src="/video/metaba.mp4" type="video/mp4" />
       </video>
+    </div>
+  );
+}
+
+const NEWSLETTERS = [
+  { pdf: "/pdfs/spanish-july.pdf",      thumb: "/img/newsletters/spanish-july.jpg",      label: "Julio 2025 · ES" },
+  { pdf: "/pdfs/september-2025.pdf",    thumb: "/img/newsletters/september-2025.jpg",    label: "Sep 2025 · EN" },
+  { pdf: "/pdfs/spanish-november.pdf",  thumb: "/img/newsletters/spanish-november.jpg",  label: "Nov 2025 · ES" },
+  { pdf: "/pdfs/december-february.pdf", thumb: "/img/newsletters/december-february.jpg", label: "Feb 2026 · ES" },
+];
+
+// rotations for the fan: spread from bottom-center
+const FAN_ROTATIONS = [-18, -6, 6, 18];
+
+function NewsletterFan() {
+  return (
+    <div className="flex flex-col items-center gap-4">
+      {/* fan */}
+      <div className="relative h-52 w-72 flex items-end justify-center">
+        {NEWSLETTERS.map((n, i) => (
+          <a
+            key={i}
+            href={n.pdf}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group absolute bottom-0 left-1/2 origin-bottom transition-transform duration-200 hover:-translate-y-3 hover:z-10"
+            style={{
+              transform: `translateX(-50%) rotate(${FAN_ROTATIONS[i]}deg)`,
+              zIndex: i,
+            }}
+            title={n.label}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={n.thumb}
+              alt={n.label}
+              className="w-24 rounded-lg shadow-lg border border-[#284A3C] group-hover:border-[#C9A24B] transition-colors"
+            />
+          </a>
+        ))}
+      </div>
+      {/* label row */}
+      <div className="flex gap-3 flex-wrap justify-center">
+        {NEWSLETTERS.map((n, i) => (
+          <a
+            key={i}
+            href={n.pdf}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] uppercase tracking-widest text-[#F2EFE6]/40 hover:text-[#C9A24B] transition-colors"
+          >
+            {n.label}
+          </a>
+        ))}
+      </div>
     </div>
   );
 }
@@ -420,7 +476,8 @@ function CaseArtifact({ art }: { art: string }) {
           src="/img/juan-perfumer.png"
           alt="Juan Arenas as Lead Perfumer at Your Aura Fragrance"
           fill
-          className="object-cover object-center"
+          className="object-cover"
+          style={{ objectPosition: "center 15%", transform: "scale(0.92)", transformOrigin: "center 15%" }}
           sizes="(max-width: 1024px) 100vw, 50vw"
         />
       </div>
@@ -433,6 +490,10 @@ function CaseArtifact({ art }: { art: string }) {
 
   if (art === "Metaba Health — site / ops board") {
     return <MetabaVideo />;
+  }
+
+  if (art === "USC Brain Health — growth chart") {
+    return <NewsletterFan />;
   }
 
   // default placeholder
