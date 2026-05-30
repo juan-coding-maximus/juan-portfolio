@@ -28,6 +28,19 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-touch-icon.png",
   },
+  openGraph: {
+    title: "Juan Arenas",
+    description:
+      "AI-native GTM operator for scientific startups. I make complexity disappear — and I fight like it's my own company.",
+    images: [{ url: "/img/og-image.jpg", width: 1200, height: 1600 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Juan Arenas",
+    description:
+      "AI-native GTM operator for scientific startups. I make complexity disappear — and I fight like it's my own company.",
+    images: ["/img/og-image.jpg"],
+  },
 };
 
 export default function RootLayout({
