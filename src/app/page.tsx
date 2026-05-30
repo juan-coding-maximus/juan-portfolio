@@ -152,10 +152,10 @@ function Hero() {
           priority
         />
         <a
-          href="#contact"
+          href="#portfolio"
           className="rounded-full bg-[#C9A24B] text-[#13201A] px-5 py-2 uppercase tracking-widest text-xs font-medium hover:bg-[#d8b563] transition-colors"
         >
-          Work together
+          Portfolio
         </a>
       </div>
 
@@ -179,15 +179,23 @@ function Hero() {
           </p>
         </div>
         <p className="mt-8 max-w-2xl mx-auto text-[#F2EFE6]/70 text-lg">
-          AI-native GTM operator for scientific startups. I make complexity
-          disappear — and I fight like it&apos;s my own company.
+          AI-native marketing and sales operator for scientific ventures.
         </p>
-        <div className="mt-9 flex gap-4 justify-center">
-          <a
-            href="#work"
-            className="rounded-full bg-[#284A3C] px-8 py-4 text-sm uppercase tracking-widest hover:bg-[#31594a] transition-colors"
-          >
-            See the work ↓
+        <div className="mt-12 flex justify-center">
+          <a href="#portfolio" className="text-[#F2EFE6]/40 hover:text-[#F2EFE6]/70 transition-colors" aria-label="Scroll down">
+            <svg
+              width="36"
+              height="22"
+              viewBox="0 0 36 22"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ animation: "chevron-drop 2.4s ease-in-out infinite" }}
+            >
+              <polyline points="2 2 18 20 34 2" />
+            </svg>
           </a>
         </div>
       </div>
@@ -208,7 +216,7 @@ function MetricWall() {
   ];
 
   return (
-    <section className="px-6 md:px-12 lg:px-20 py-20 border-t border-[#F2EFE6]/10">
+    <section id="portfolio" className="px-6 md:px-12 lg:px-20 py-20 border-t border-[#F2EFE6]/10">
       <div className="max-w-7xl mx-auto">
         <Reveal>
           <p className="font-display italic text-2xl text-[#F2EFE6]/60 mb-12">

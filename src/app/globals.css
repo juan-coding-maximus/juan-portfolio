@@ -33,6 +33,11 @@ body {
   overflow-x: hidden;
 }
 
+@keyframes chevron-drop {
+  0%, 100% { transform: translateY(0);   opacity: 0.4; }
+  50%       { transform: translateY(10px); opacity: 0.8; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
