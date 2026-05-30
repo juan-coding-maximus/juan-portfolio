@@ -351,21 +351,15 @@ function ScrollVideo() {
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    let timer: ReturnType<typeof setTimeout>;
-
     const io = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          timer = setTimeout(() => video.play().catch(() => {}), 2000);
-        } else {
-          clearTimeout(timer);
-          video.pause();
-        }
+        if (entry.isIntersecting) video.play().catch(() => {});
+        else video.pause();
       },
       { threshold: 0.4 }
     );
     io.observe(video);
-    return () => { io.disconnect(); clearTimeout(timer); };
+    return () => io.disconnect();
   }, []);
 
   return (
@@ -894,9 +888,43 @@ function AskMyClone() {
     <section className="px-6 md:px-12 lg:px-20 py-24 border-t border-[#F2EFE6]/10">
       <div className="max-w-3xl mx-auto">
         <Reveal>
-          <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-2">
-            Ask my AI.
-          </h2>
+          <div className="flex flex-wrap items-center gap-4 mb-2">
+            <h2 className="font-display text-[clamp(2rem,4vw,3rem)]">
+              Ask my AI.
+            </h2>
+            <div className="flex items-center gap-2 rounded-full border border-[#284A3C] bg-[#0e1813] px-4 py-2 text-xs text-[#F2EFE6]/50">
+              <span className="whitespace-nowrap">Or ask me directly</span>
+              <a
+                href="https://linkedin.com/in/juanarenasmartin"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="LinkedIn"
+                className="text-[#F2EFE6]/50 hover:text-[#C9A24B] transition-colors"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M20.447 20.452H16.89v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a1.975 1.975 0 1 1 0-3.95 1.975 1.975 0 0 1 0 3.95zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                </svg>
+              </a>
+              <a
+                href="sms:+13237753850"
+                aria-label="iMessage"
+                className="text-[#F2EFE6]/50 hover:text-[#9FC4AE] transition-colors"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0C5.373 0 0 4.975 0 11.111c0 3.497 1.745 6.616 4.472 8.652V24l4.086-2.242c1.09.301 2.246.464 3.442.464 6.627 0 12-4.975 12-11.111S18.627 0 12 0zm1.194 14.963-3.055-3.26-5.963 3.26L10.732 8.1l3.131 3.26L19.752 8.1l-6.558 6.863z"/>
+                </svg>
+              </a>
+              <a
+                href="mailto:juan.arenas.rec@gmail.com"
+                aria-label="Email"
+                className="text-[#F2EFE6]/50 hover:text-[#9FC4AE] transition-colors"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/>
+                </svg>
+              </a>
+            </div>
+          </div>
           <p className="text-[#F2EFE6]/60 italic mb-8">
             I trained this AI to answer in my voice. Ask me anything!
           </p>
