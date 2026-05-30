@@ -545,6 +545,15 @@ function CaseStudies() {
     art: string; newsletters?: boolean;
   }[] = [
     {
+      tag: "HIPAA · CLINICAL GTM · AI SYSTEMS",
+      title: "I run growth inside regulated science — and automate it.",
+      body: "USC Center for Personalized Brain Health. Liaison to a 1,000+ patient/caregiver community. Campaigns that doubled newsletter and social reach in 8 months, a Spanish-language newsletter that grew recipients 50%, HIPAA-compliant workflows with zero gaps.",
+      result:
+        "A bigger, more engaged pipeline — without breaking a compliance rule. I move fast without breaking what matters.",
+      art: "cpbh-video",
+      newsletters: true,
+    },
+    {
       tag: "0→1 · COMPANY BUILD · OPS + GTM",
       title: "I took a health startup from zero to paying clients.",
       body: "Metaba Health — built the company from the ground up: website live, first paying clients closed, operations running, and a team strategy with aligned milestones. Strategic and hands-on operating work, end to end.",
@@ -559,15 +568,6 @@ function CaseStudies() {
       result:
         "Repeat purchases at 30% of 200+ sales. Proof I build the whole GTM motion.",
       art: "aura-collage",
-    },
-    {
-      tag: "HIPAA · CLINICAL GTM · AI SYSTEMS",
-      title: "I run growth inside regulated science — and automate it.",
-      body: "USC Center for Personalized Brain Health. Liaison to a 1,000+ patient/caregiver community. Campaigns that doubled newsletter and social reach in 8 months, a Spanish-language newsletter that grew recipients 50%, HIPAA-compliant workflows with zero gaps.",
-      result:
-        "A bigger, more engaged pipeline — without breaking a compliance rule. I move fast without breaking what matters.",
-      art: "cpbh-video",
-      newsletters: true,
     },
     {
       tag: "AI EMAIL ENGINE · B2B · EVENTS",
@@ -739,10 +739,10 @@ function GTMFramework() {
       <div className="max-w-7xl mx-auto">
         <Reveal>
           <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-3">
-            If we matched tomorrow, here&apos;s how I&apos;d think about it.
+            How I think of business.
           </h2>
           <p className="text-[#F2EFE6]/60 mb-16 italic font-display text-lg">
-            A 0→1 GTM framework for a consumer-health / bio-based DTC startup.
+            A 0→1 GTM framework for a consumer health biotech startup.
           </p>
         </Reveal>
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
