@@ -697,9 +697,8 @@ function GTMFramework() {
       title: "Earn the first 100 users",
       weeks: "Wk 1–4",
       points: [
-        "Define a sharp ICP: prioritize the people actively trying to solve this now.",
-        "Run manual outreach and concierge-style onboarding to hear the buyer's real language.",
-        "Track every touchpoint in one system so positioning and funnel decisions come from evidence.",
+        "Define a sharp ICP — target people actively trying to solve this now.",
+        "Manual outreach and concierge onboarding to capture the buyer's real language.",
       ],
     },
     {
@@ -707,9 +706,8 @@ function GTMFramework() {
       title: "Find the message that pulls",
       weeks: "Wk 4–10",
       points: [
-        "Test claims, hooks, and proof points; in health, credibility usually outperforms cleverness.",
-        "Build a fast content loop: brief → create variants → launch → measure → refine.",
-        "Focus on the first channel showing real pull before expanding across too many surfaces.",
+        "Test claims and proof points; in health, credibility beats cleverness.",
+        "Double down on the one channel showing pull before touching anything else.",
       ],
     },
     {
@@ -717,9 +715,8 @@ function GTMFramework() {
       title: "Build the repeatable system",
       weeks: "Wk 10–20",
       points: [
-        "Turn the winning journey into a system: lead capture → qualify → personalize → follow-up.",
-        "Add creator or UGC workflows only once the story and proof already resonate.",
-        "Build retention early through education, repeat usage, and post-purchase follow-through.",
+        "Turn the winning journey into a system: capture → qualify → personalize → follow-up.",
+        "Layer in creator and UGC workflows only after the story already resonates.",
       ],
     },
     {
@@ -727,9 +724,8 @@ function GTMFramework() {
       title: "Scale what is proven",
       weeks: "Wk 20+",
       points: [
-        "Increase spend only behind channels that already convert with healthy economics.",
-        "Watch CAC:LTV and payback closely; growth is only useful when it compounds.",
-        "Keep compliance, ops, and reporting tight so scale does not introduce fragility.",
+        "Increase spend only behind channels that convert with healthy unit economics.",
+        "Keep compliance, ops, and reporting tight — scale should compound, not fragment.",
       ],
     },
   ];
@@ -766,12 +762,6 @@ function GTMFramework() {
             </Reveal>
           ))}
         </div>
-        <Reveal delay={200}>
-          <p className="mt-12 text-[#F2EFE6]/60 italic max-w-3xl">
-            A starting hypothesis, not a script. Your data rewrites it by week
-            2 — and I&apos;ll have built the system that captures that data.
-          </p>
-        </Reveal>
       </div>
     </section>
   );
