@@ -397,14 +397,14 @@ function CPBHVideo() {
     return () => io.disconnect();
   }, []);
   return (
-    <div className="rounded-3xl overflow-hidden aspect-video bg-[#0e1813]">
+    <div className="rounded-3xl overflow-hidden aspect-[4/3] bg-[#0e1813]">
       <video
         ref={videoRef}
         muted
         loop
         playsInline
         preload="none"
-        className="w-full h-full object-cover"
+        className="w-full h-full object-contain"
       >
         <source src="/video/cpbh.mp4" type="video/mp4" />
       </video>
