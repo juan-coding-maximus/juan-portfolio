@@ -253,12 +253,12 @@ function MetricWall() {
 ==================================================== */
 
 type BrandItem =
-  | { kind: "img";  src: string; alt: string; rounded?: boolean; href?: string }
+  | { kind: "img";  src: string; alt: string; rounded?: boolean; large?: boolean; href?: string }
   | { kind: "text"; label: string; href?: string };
 
 function BrandStrip() {
   const brands: BrandItem[] = [
-    { kind: "img",  src: "/img/logos/aura-white.png",        alt: "Your Aura Fragrance",                     href: "https://youraurafragrance.com" },
+    { kind: "img",  src: "/img/logos/aura-white.png",        alt: "Your Aura Fragrance",                     href: "https://youraurafragrance.com", large: true },
     { kind: "img",  src: "/img/logos/usc-brain.png",         alt: "USC Center for Personalized Brain Health", href: "https://keck.usc.edu/cpbh",      rounded: true },
     { kind: "img",  src: "/img/logos/superbiome.png",        alt: "Milieu Skin Microbiome",                   href: "https://milieuskin.com",          rounded: true },
     { kind: "img",  src: "/img/logos/metaba.png",            alt: "Metaba Health",                            href: "https://metabahealth.us",         rounded: true },
@@ -297,6 +297,8 @@ function BrandStrip() {
 
     const inner = item.rounded ? (
       <div className="h-12 rounded-2xl overflow-hidden">{img}</div>
+    ) : item.large ? (
+      <div className="h-20 flex items-center">{img}</div>
     ) : (
       <div className="h-14 flex items-center">{img}</div>
     );
@@ -505,11 +507,11 @@ function CaseArtifact({ art }: { art: string }) {
     return (
       <div className="rounded-3xl overflow-hidden relative aspect-[4/3]">
         <Image
-          src="/img/juan-perfumer.png"
-          alt="Juan Arenas as Lead Perfumer at Your Aura Fragrance"
+          src="/img/aura-founder.webp"
+          alt="Juan Arenas as Founder at Your Aura Fragrance"
           fill
           className="object-cover"
-          style={{ objectPosition: "center 15%", transform: "scale(0.92)", transformOrigin: "center 15%" }}
+          style={{ objectPosition: "center top" }}
           sizes="(max-width: 1024px) 100vw, 50vw"
         />
       </div>
