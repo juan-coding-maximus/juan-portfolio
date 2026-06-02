@@ -581,7 +581,7 @@ function CaseStudies() {
     {
       tag: "HIPAA COMPLIANT MARKETING",
       role: "Marketing & Revenue Operations Lead",
-      title: "I joined a world‑class Alzheimer's prevention center to get their science out of the journals and into the world, loud and clear.",
+      title: "I joined a world‑class Alzheimer's center to get their science out of the journals and into the world, loud and clear.",
       body: (
         <>
           Supporting the premier Alzheimer's Lab & Brain Health Clinic in Los Angeles. I led a cross‑functional marketing engine across content, email, social, and web, ensuring HIPAA‑compliant content and on‑brand delivery. I designed and executed multi‑channel campaigns that{" "}
