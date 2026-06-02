@@ -1006,9 +1006,11 @@ function AskMyClone() {
                 messages.map((m, i) => {
                   const hasText = m.role === "assistant" && m.content.includes("[TEXT_ME_BUTTON]");
                   const hasEmail = m.role === "assistant" && m.content.includes("[EMAIL_ME_BUTTON]");
+                  const hasLinkedIn = m.role === "assistant" && m.content.includes("[LINKEDIN_ME_BUTTON]");
                   const displayContent = m.content
                     .replace("[TEXT_ME_BUTTON]", "")
                     .replace("[EMAIL_ME_BUTTON]", "")
+                    .replace("[LINKEDIN_ME_BUTTON]", "")
                     .trimEnd();
                   return (
                     <div key={i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
@@ -1027,8 +1029,8 @@ function AskMyClone() {
                           <span className="inline-block w-1.5 h-4 bg-[#C9A24B]/70 ml-0.5 animate-pulse rounded-sm align-middle" />
                         )}
                       </div>
-                      {(hasText || hasEmail) && !streaming && (
-                        <div className="mt-2 flex gap-2">
+                      {(hasText || hasEmail || hasLinkedIn) && !streaming && (
+                        <div className="mt-2 flex flex-wrap gap-2">
                           {hasText && (
                             <a
                               href="sms:+13237753850"
@@ -1043,6 +1045,16 @@ function AskMyClone() {
                               className="inline-block rounded-full border border-[#C9A24B] text-[#C9A24B] px-5 py-2 text-xs font-medium uppercase tracking-widest hover:bg-[#C9A24B]/10 transition-colors"
                             >
                               Email me
+                            </a>
+                          )}
+                          {hasLinkedIn && (
+                            <a
+                              href="https://linkedin.com/in/juanarenasmartin"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-block rounded-full border border-[#9FC4AE] text-[#9FC4AE] px-5 py-2 text-xs font-medium uppercase tracking-widest hover:bg-[#9FC4AE]/10 transition-colors"
+                            >
+                              LinkedIn
                             </a>
                           )}
                         </div>
