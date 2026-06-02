@@ -1004,8 +1004,12 @@ function AskMyClone() {
             <div ref={containerRef} className="flex-1 overflow-y-auto min-h-[200px] max-h-[340px] p-5 space-y-4">
               {messages.length === 0 ? null : (
                 messages.map((m, i) => {
-                  const hasButton = m.role === "assistant" && m.content.includes("[TEXT_ME_BUTTON]");
-                  const displayContent = hasButton ? m.content.replace("[TEXT_ME_BUTTON]", "").trimEnd() : m.content;
+                  const hasText = m.role === "assistant" && m.content.includes("[TEXT_ME_BUTTON]");
+                  const hasEmail = m.role === "assistant" && m.content.includes("[EMAIL_ME_BUTTON]");
+                  const displayContent = m.content
+                    .replace("[TEXT_ME_BUTTON]", "")
+                    .replace("[EMAIL_ME_BUTTON]", "")
+                    .trimEnd();
                   return (
                     <div key={i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
                       <div
@@ -1023,13 +1027,25 @@ function AskMyClone() {
                           <span className="inline-block w-1.5 h-4 bg-[#C9A24B]/70 ml-0.5 animate-pulse rounded-sm align-middle" />
                         )}
                       </div>
-                      {hasButton && !streaming && (
-                        <a
-                          href="sms:+13237753850"
-                          className="mt-2 inline-block rounded-full bg-[#C9A24B] text-[#13201A] px-5 py-2 text-xs font-medium uppercase tracking-widest hover:bg-[#d8b563] transition-colors"
-                        >
-                          Text me
-                        </a>
+                      {(hasText || hasEmail) && !streaming && (
+                        <div className="mt-2 flex gap-2">
+                          {hasText && (
+                            <a
+                              href="sms:+13237753850"
+                              className="inline-block rounded-full bg-[#C9A24B] text-[#13201A] px-5 py-2 text-xs font-medium uppercase tracking-widest hover:bg-[#d8b563] transition-colors"
+                            >
+                              Text me
+                            </a>
+                          )}
+                          {hasEmail && (
+                            <a
+                              href="mailto:juan.arenas.rec@gmail.com"
+                              className="inline-block rounded-full border border-[#C9A24B] text-[#C9A24B] px-5 py-2 text-xs font-medium uppercase tracking-widest hover:bg-[#C9A24B]/10 transition-colors"
+                            >
+                              Email me
+                            </a>
+                          )}
+                        </div>
                       )}
                     </div>
                   );
