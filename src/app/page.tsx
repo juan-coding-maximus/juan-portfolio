@@ -927,23 +927,20 @@ function AskMyClone() {
 
         {/* Left — primary contact */}
         <Reveal>
-          <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-4">
+          <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-10">
             Ask me anything.
           </h2>
-          <p className="text-[#F2EFE6]/60 italic mb-12">
-            I trained this AI to answer in my voice. Or reach me directly:
-          </p>
           <div className="flex gap-10 items-end">
             {/* LinkedIn */}
             <a
               href="https://linkedin.com/in/juanarenasmartin"
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex flex-col items-center gap-3 text-[#F2EFE6]/35 hover:text-[#C9A24B] transition-all duration-300"
+              className="group flex flex-col items-center gap-3 text-[#F2EFE6]/35 hover:text-[#0A66C2] transition-all duration-300"
             >
               <svg
                 width="48" height="48" viewBox="0 0 24 24" fill="currentColor"
-                className="transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_14px_#C9A24B)]"
+                className="transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_14px_#0A66C2)]"
               >
                 <path d="M20.447 20.452H16.89v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a1.975 1.975 0 1 1 0-3.95 1.975 1.975 0 0 1 0 3.95zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
               </svg>
@@ -952,11 +949,11 @@ function AskMyClone() {
             {/* iMessage */}
             <a
               href="sms:+13237753850"
-              className="group flex flex-col items-center gap-3 text-[#F2EFE6]/35 hover:text-[#9FC4AE] transition-all duration-300"
+              className="group flex flex-col items-center gap-3 text-[#F2EFE6]/35 hover:text-[#34C759] transition-all duration-300"
             >
               <svg
                 width="48" height="48" viewBox="0 0 24 24" fill="currentColor"
-                className="transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_14px_#9FC4AE)]"
+                className="transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_14px_#34C759)]"
               >
                 <path d="M12 2C6.477 2 2 6.477 2 12c0 2.1.644 4.05 1.747 5.667L2 22l4.333-1.747A9.955 9.955 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/>
               </svg>
@@ -965,21 +962,63 @@ function AskMyClone() {
             {/* Email */}
             <a
               href="mailto:juan.arenas.rec@gmail.com"
-              className="group flex flex-col items-center gap-3 text-[#F2EFE6]/35 hover:text-[#9FC4AE] transition-all duration-300"
+              className="group flex flex-col items-center gap-3 transition-all duration-300"
             >
               <svg
-                width="48" height="48" viewBox="0 0 24 24" fill="currentColor"
-                className="transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_14px_#9FC4AE)]"
+                width="48" height="48" viewBox="0 0 24 24"
+                className="transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_14px_rgba(255,255,255,0.5))]"
               >
-                <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/>
+                {/* envelope body */}
+                <path
+                  d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2z"
+                  className="fill-[#F2EFE6]/35 group-hover:fill-white transition-colors duration-300"
+                />
+                {/* V flap */}
+                <path
+                  d="M20 8l-8 5-8-5V6l8 5 8-5v2z"
+                  className="fill-[#F2EFE6]/35 group-hover:fill-[#FF3B30] transition-colors duration-300"
+                />
               </svg>
-              <span className="text-xs uppercase tracking-widest">Email</span>
+              <span className="text-xs uppercase tracking-widest text-[#F2EFE6]/35 group-hover:text-white transition-colors duration-300">Email</span>
             </a>
           </div>
         </Reveal>
 
         {/* Right — AI sidekick */}
         <Reveal delay={100}>
+          {/* alien mascot + label */}
+          <div className="flex items-center gap-3 mb-3">
+            <svg
+              width="40" height="40" viewBox="0 0 64 64" fill="none"
+              style={{ animation: "alien-float 2.8s ease-in-out infinite" }}
+            >
+              {/* head */}
+              <ellipse cx="32" cy="30" rx="20" ry="22" fill="#E86F2C"/>
+              {/* left eye */}
+              <ellipse cx="23" cy="26" rx="5" ry="6" fill="#13201A"/>
+              <ellipse cx="24" cy="24.5" rx="2" ry="2.5" fill="#fff" opacity="0.5"/>
+              {/* right eye */}
+              <ellipse cx="41" cy="26" rx="5" ry="6" fill="#13201A"/>
+              <ellipse cx="42" cy="24.5" rx="2" ry="2.5" fill="#fff" opacity="0.5"/>
+              {/* mouth */}
+              <path d="M25 38 Q32 43 39 38" stroke="#13201A" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+              {/* left antenna */}
+              <line x1="20" y1="9" x2="26" y2="20" stroke="#E86F2C" strokeWidth="2.5" strokeLinecap="round"/>
+              <circle cx="19" cy="8" r="3" fill="#C9A24B"/>
+              {/* right antenna */}
+              <line x1="44" y1="9" x2="38" y2="20" stroke="#E86F2C" strokeWidth="2.5" strokeLinecap="round"/>
+              <circle cx="45" cy="8" r="3" fill="#C9A24B"/>
+            </svg>
+            <p className="text-sm text-[#F2EFE6]/55 italic">
+              I trained this chatbot to answer like me. try it out!
+            </p>
+          </div>
+          <style>{`
+            @keyframes alien-float {
+              0%, 100% { transform: translateY(0); }
+              50%       { transform: translateY(-6px); }
+            }
+          `}</style>
           <div className="rounded-2xl border border-[#284A3C] bg-[#0e1813] flex flex-col overflow-hidden">
             {/* message thread */}
             <div ref={containerRef} className="flex-1 overflow-y-auto max-h-[340px] p-5 space-y-4">
@@ -1116,14 +1155,16 @@ function About() {
       <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-12 items-center">
         <Reveal>
           <div className="aspect-[4/5] rounded-3xl border border-[#284A3C] overflow-hidden relative">
-            <Image
-              src="/img/juan-usc.png"
-              alt="Juan Arenas at USC"
-              fill
-              className="object-cover object-top"
-              sizes="(max-width: 768px) 100vw, 50vw"
-              priority
-            />
+            <div className="absolute -top-[15%] left-0 right-0 bottom-0 h-[115%]">
+              <Image
+                src="/img/juan-usc.png"
+                alt="Juan Arenas at USC"
+                fill
+                className="object-cover object-top"
+                sizes="(max-width: 768px) 100vw, 50vw"
+                priority
+              />
+            </div>
           </div>
         </Reveal>
         <Reveal delay={120}>
