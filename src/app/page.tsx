@@ -447,6 +447,37 @@ function MetabaVideo() {
   );
 }
 
+function BCLAVideo() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) video.play().catch(() => {});
+        else video.pause();
+      },
+      { threshold: 0.3 }
+    );
+    io.observe(video);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <div className="rounded-3xl overflow-hidden aspect-[3/4] bg-[#0e1813]">
+      <video
+        ref={videoRef}
+        muted
+        loop
+        playsInline
+        preload="none"
+        className="w-full h-full object-cover"
+      >
+        <source src="/video/bcla.mp4" type="video/mp4" />
+      </video>
+    </div>
+  );
+}
+
 const NEWSLETTERS = [
   { pdf: "/pdfs/spanish-july.pdf",      thumb: "/img/newsletters/spanish-july.jpg",      label: "Julio 2025 · ES" },
   { pdf: "/pdfs/september-2025.pdf",    thumb: "/img/newsletters/september-2025.jpg",    label: "Sep 2025 · EN" },
@@ -522,6 +553,10 @@ function CaseArtifact({ art }: { art: string }) {
     return <ScrollVideo />;
   }
 
+  if (art === "bcla-video") {
+    return <BCLAVideo />;
+  }
+
   if (art === "Metaba Health — site / ops board") {
     return <MetabaVideo />;
   }
@@ -578,6 +613,14 @@ function CaseStudies() {
       result:
         "10+ hrs/week eliminated, 100% follow-up, 30% revenue lift. I turn chaos into systems that scale.",
       art: "n8n-video",
+    },
+    {
+      tag: "PARTNERSHIPS · COMMUNITY · EVENTS",
+      title: "I grew a biotech community into a real pipeline.",
+      body: "Biotech Connection LA — USC's premier student-run biotech network. Cold outreach to 200+ biotech companies and research groups; built relationships with 20+ KOLs; redesigned sponsor packages that drove a 30% revenue lift; managed event logistics for multi-hundred-person programming that kept industry and student sides of the table coming back.",
+      result:
+        "A dormant org turned into a machine — packed events, paid sponsors, and a network that opens doors.",
+      art: "bcla-video",
     },
   ];
 
