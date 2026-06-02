@@ -492,7 +492,7 @@ function NewsletterFan() {
   return (
     <div className="flex flex-col items-center">
       {/* fan */}
-      <div className="relative h-[26rem] w-[36rem] flex items-end justify-center">
+      <div className="relative h-[18rem] w-[36rem] flex items-end justify-center overflow-visible">
         {NEWSLETTERS.map((n, i) => (
           <a
             key={i}
