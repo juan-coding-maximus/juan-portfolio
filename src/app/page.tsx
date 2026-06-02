@@ -600,7 +600,7 @@ function CaseStudies() {
       art: "Metaba Health — site / ops board",
     },
     {
-      tag: "0→1 · FOUNDER · DTC",
+      tag: "0→1 · EMBEDDED AI · DTC PRODUCTS",
       role: "Founder",
       title: "I bootstrapped a personalized perfume company into 5 figures of revenue.",
       body: (
