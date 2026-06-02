@@ -624,8 +624,8 @@ function CaseStudies() {
     {
       tag: "PARTNERSHIPS · COMMUNITY · EVENTS",
       role: "B2B Partnerships Associate",
-      title: "I built the commercial engine that kept USC's premier biotech network running.",
-      body: "Biotech Connection LA is USC's student-run bridge between the life sciences industry and the next generation of researchers. The org had community — packed rooms, credible names — but the commercial side needed real structure. I came in as the partnerships person: cold-reached 200+ biotech companies and research groups, built relationships with 20+ KOLs, and redesigned the sponsor packages from scratch. The new packages drove a 30% revenue lift and kept the best industry partners coming back for every event.",
+      title: "I fostered partnerships for LA's Biotech nonprofit, growing revenue 30% YOY.",
+      body: "Biotech Connection LA brings life sciences industry and academia together across LA. I ran partnerships end to end: cold outreach to biotech companies and research groups, pre-event promotion to drive attendance, live interviews on event day, and post-event follow-ups to keep sponsors warm. Consistent communication drove a 30% lift in sponsorship revenue and brought bigger names like Amgen and USC Keck to our sponsors list.",
       art: "bcla-video",
     },
   ];
@@ -1176,42 +1176,71 @@ function About() {
               Who I am.
             </h2>
             <p className="text-[#F2EFE6]/75 leading-relaxed mb-4">
-              I&apos;m a builder. I started a perfume company, took a health
-              startup from zero to revenue, and ran growth inside a USC clinic
-              without breaking a single compliance rule. I&apos;m AI-native —
-              I&apos;d rather build the system than write the memo about
-              building the system.
+              I&apos;m a Pharmacologist by training and a scientific marketing
+              operator by practice. I learned to understand science through
+              Alzheimer&apos;s and toxicology research, then built a career in
+              sales and marketing because I&apos;m obsessed with the real-world
+              impact good science can have.
             </p>
-            <p className="text-[#F2EFE6]/75 leading-relaxed mb-6">
-              Scientific founders are brilliant at the science and stuck on
-              go-to-market. That gap is where I live. I make the complexity
-              disappear, and I fight like it&apos;s my own company. (Because
-              I&apos;ve had my own — I know what&apos;s at stake.) When
-              I&apos;m not building systems, I&apos;m on stage playing bass —
-              same instinct, really: find the rhythm, make people feel
-              something, ship it.
+            <p className="text-[#F2EFE6]/75 leading-relaxed mb-8">
+              I like being the person who connects product, sales, and
+              leadership so we&apos;re all pushing toward a few visible,
+              meaningful goals with the most effective tools available — and
+              I&apos;m good at stripping away noise to get there. Clear
+              thinking &gt; jargon, always. I work best with teams who are
+              serious about improving health outcomes and doing honest work in
+              healthcare.
             </p>
-            <p className="text-xs uppercase tracking-[0.25em] text-[#C9A24B] mb-3">
-              Fun facts
-            </p>
-            <ul className="space-y-2 text-[#F2EFE6]/70">
-              <li className="flex gap-2">
-                <span className="text-[#9FC4AE] shrink-0">—</span>
-                I play bass for the indie band Stoke Club — deep in LA&apos;s
-                live music scene. (My original,{" "}
-                <span className="italic">Polaroid</span>, drops in June.)
-              </li>
-              <li className="flex gap-2">
-                <span className="text-[#9FC4AE] shrink-0">—</span>
-                I&apos;ve founded two brands: Your Aura Fragrance and
-                Tranquilísimo merch.
-              </li>
-              <li className="flex gap-2">
-                <span className="text-[#9FC4AE] shrink-0">—</span>
-                Bilingual and bicultural — I built a Spanish-language pipeline
-                that grew an audience 50%.
-              </li>
-            </ul>
+            <div className="flex gap-8 items-end">
+              {/* LinkedIn */}
+              <a
+                href="https://linkedin.com/in/juanarenasmartin"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex flex-col items-center gap-2 text-[#F2EFE6]/35 hover:text-[#0A66C2] transition-all duration-300"
+              >
+                <svg
+                  width="44" height="44" viewBox="0 0 24 24" fill="currentColor"
+                  className="transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_10px_#0A66C2)]"
+                >
+                  <path d="M20.447 20.452H16.89v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a1.975 1.975 0 1 1 0-3.95 1.975 1.975 0 0 1 0 3.95zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                </svg>
+                <span className="text-xs uppercase tracking-widest">LinkedIn</span>
+              </a>
+              {/* iMessage */}
+              <a
+                href="sms:+13237753850"
+                className="group flex flex-col items-center gap-2 text-[#F2EFE6]/35 hover:text-[#34C759] transition-all duration-300"
+              >
+                <svg
+                  width="44" height="44" viewBox="0 0 24 24" fill="currentColor"
+                  className="transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_10px_#34C759)]"
+                >
+                  <path d="M12 2C6.477 2 2 6.477 2 12c0 2.1.644 4.05 1.747 5.667L2 22l4.333-1.747A9.955 9.955 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/>
+                </svg>
+                <span className="text-xs uppercase tracking-widest">iMessage</span>
+              </a>
+              {/* Email */}
+              <a
+                href="mailto:juan.arenas.rec@gmail.com"
+                className="group flex flex-col items-center gap-2 transition-all duration-300"
+              >
+                <svg
+                  width="44" height="44" viewBox="0 0 24 24"
+                  className="transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_10px_rgba(255,255,255,0.5))]"
+                >
+                  <path
+                    d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2z"
+                    className="fill-[#F2EFE6]/35 group-hover:fill-white transition-colors duration-300"
+                  />
+                  <path
+                    d="M20 8l-8 5-8-5V6l8 5 8-5v2z"
+                    className="fill-[#F2EFE6]/35 group-hover:fill-[#FF3B30] transition-colors duration-300"
+                  />
+                </svg>
+                <span className="text-xs uppercase tracking-widest text-[#F2EFE6]/35 group-hover:text-white transition-colors duration-300">Email</span>
+              </a>
+            </div>
           </div>
         </Reveal>
       </div>
