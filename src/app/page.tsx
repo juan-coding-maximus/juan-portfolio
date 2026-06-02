@@ -220,7 +220,7 @@ function MetricWall() {
       <div className="max-w-7xl mx-auto">
         <Reveal>
           <p className="font-display italic text-2xl text-[#F2EFE6]/60 mb-12">
-            Outcomes, not adjectives.
+            Outcomes
           </p>
         </Reveal>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
@@ -485,14 +485,14 @@ const NEWSLETTERS = [
   { pdf: "/pdfs/december-february.pdf", thumb: "/img/newsletters/december-february.jpg", label: "Feb 2026 · ES" },
 ];
 
-// rotations for the fan: spread from bottom-center
-const FAN_ROTATIONS = [-18, -6, 6, 18];
+// rotations for the fan: spread from bottom-center, 14° gap between each
+const FAN_ROTATIONS = [-21, -7, 7, 21];
 
 function NewsletterFan() {
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center">
       {/* fan */}
-      <div className="relative h-52 w-72 flex items-end justify-center">
+      <div className="relative h-[26rem] w-[36rem] flex items-end justify-center">
         {NEWSLETTERS.map((n, i) => (
           <a
             key={i}
@@ -510,22 +510,8 @@ function NewsletterFan() {
             <img
               src={n.thumb}
               alt={n.label}
-              className="w-24 rounded-lg shadow-lg border border-[#284A3C] group-hover:border-[#C9A24B] transition-colors"
+              className="w-48 rounded-lg shadow-lg border border-[#284A3C] group-hover:border-[#C9A24B] transition-colors"
             />
-          </a>
-        ))}
-      </div>
-      {/* label row */}
-      <div className="flex gap-3 flex-wrap justify-center">
-        {NEWSLETTERS.map((n, i) => (
-          <a
-            key={i}
-            href={n.pdf}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[10px] uppercase tracking-widest text-[#F2EFE6]/40 hover:text-[#C9A24B] transition-colors"
-          >
-            {n.label}
           </a>
         ))}
       </div>
@@ -576,50 +562,58 @@ function CaseArtifact({ art }: { art: string }) {
 /* ====================================================
    4. CASE STUDIES
 ==================================================== */
+function SuitIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#C9A24B]">
+      <circle cx="12" cy="6" r="4"/>
+      <path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/>
+      <path d="M10 13l2 3 2-3"/>
+      <line x1="12" y1="16" x2="12" y2="20"/>
+    </svg>
+  );
+}
+
 function CaseStudies() {
   const cases: {
-    tag: string; title: string; body: string; result: string;
-    art: string; newsletters?: boolean;
+    tag: string; title: string; body: React.ReactNode; result?: string;
+    art: string; newsletters?: boolean; role?: string;
   }[] = [
     {
-      tag: "HIPAA · CLINICAL GTM · AI SYSTEMS",
-      title: "I run growth inside regulated science — and automate it.",
-      body: "USC Center for Personalized Brain Health. Liaison to a 1,000+ patient/caregiver community. Campaigns that doubled newsletter and social reach in 8 months, a Spanish-language newsletter that grew recipients 50%, HIPAA-compliant workflows with zero gaps.",
-      result:
-        "A bigger, more engaged pipeline — without breaking a compliance rule. I move fast without breaking what matters.",
+      tag: "HIPAA COMPLIANT MARKETING",
+      role: "Marketing & Revenue Operations",
+      title: "I joined a world‑class Alzheimer's prevention center to get their science out of the journals and into the world, loud and clear.",
+      body: (
+        <>
+          Supporting the premier Alzheimer's Lab & Brain Health Clinic in Los Angeles. I led a cross‑functional marketing engine across content, email, social, and web, ensuring HIPAA‑compliant content and on‑brand delivery. I designed and executed multi‑channel campaigns that{" "}
+          <strong className="text-[#C9A24B] font-medium">2x newsletter and social reach in 8 months</strong>
+          , growing a pipeline of engaged patients and caregivers. I also launched and scaled a Spanish‑language newsletter, expanding the addressable LA market and improving engagement with our community.
+        </>
+      ),
       art: "cpbh-video",
       newsletters: true,
     },
     {
-      tag: "0→1 · COMPANY BUILD · OPS + GTM",
-      title: "I took a health startup from zero to paying clients.",
-      body: "Metaba Health — built the company from the ground up: website live, first paying clients closed, operations running, and a team strategy with aligned milestones. Strategic and hands-on operating work, end to end.",
-      result:
-        "Zero → live, revenue, and a running operation. Proof I do the whole job, not a slice of it.",
+      tag: "0→1 · OPERATIONS · GO-TO-MARKET",
+      title: "We built a diagnostics startup from zero to revenue.",
+      body: "I came in when the idea was fresh: I gathered the founders' ideas, built the v1 deck, built the website, designed operational workflows, and warmed the B2B relationships with LA's longevity clinics. Both strategic and hands-on. A pleasure to work with these highly creative scientists.",
       art: "Metaba Health — site / ops board",
     },
     {
       tag: "0→1 · FOUNDER · DTC + B2B",
       title: "I started a company and sold it into the market myself.",
       body: "Your Aura Fragrance — a bio-based perfumery startup built from zero. Outbound at events and online, consultative pitches closing DTC and small B2B, a customer journey mapped into an automated pipeline, a 6-person ambassador team, supplier terms at a 20% B2B discount.",
-      result:
-        "Repeat purchases at 30% of 200+ sales. Proof I build the whole GTM motion.",
       art: "aura-collage",
     },
     {
       tag: "AI EMAIL ENGINE · B2B · EVENTS",
       title: "I build AI-native pipelines that close.",
       body: "Milieu + Biotech Connection LA. An AI engine pipelining 400+ creators; n8n + Supabase email automation at 100% follow-up; outreach to 200+ accounts and 20+ KOLs via a custom CRM; sponsor packages that grew revenue 30%.",
-      result:
-        "10+ hrs/week eliminated, 100% follow-up, 30% revenue lift. I turn chaos into systems that scale.",
       art: "n8n-video",
     },
     {
       tag: "PARTNERSHIPS · COMMUNITY · EVENTS",
       title: "I grew a biotech community into a real pipeline.",
       body: "Biotech Connection LA — USC's premier student-run biotech network. Cold outreach to 200+ biotech companies and research groups; built relationships with 20+ KOLs; redesigned sponsor packages that drove a 30% revenue lift; managed event logistics for multi-hundred-person programming that kept industry and student sides of the table coming back.",
-      result:
-        "A dormant org turned into a machine — packed events, paid sponsors, and a network that opens doors.",
       art: "bcla-video",
     },
   ];
@@ -629,7 +623,7 @@ function CaseStudies() {
       <div className="max-w-7xl mx-auto">
         <Reveal>
           <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-16">
-            What I&apos;ve actually built.
+            What I&apos;ve built.
           </h2>
         </Reveal>
         <div className="space-y-24">
@@ -637,14 +631,20 @@ function CaseStudies() {
             <Reveal key={i} delay={100}>
               <article className="grid lg:grid-cols-2 gap-10 items-center">
                 <div className={i % 2 ? "lg:order-2" : ""}>
-                  <p className="text-xs tracking-[0.25em] text-[#C9A24B] uppercase mb-4">
+                  <p className="text-xs tracking-[0.25em] text-[#C9A24B] uppercase mb-3">
                     {c.tag}
                   </p>
+                  {c.role && (
+                    <div className="flex items-center gap-2 mb-4">
+                      <SuitIcon />
+                      <span className="text-sm text-[#F2EFE6]/60">{c.role}</span>
+                    </div>
+                  )}
                   <h3 className="font-display text-2xl md:text-3xl leading-snug mb-5">
                     {c.title}
                   </h3>
                   <p className="text-[#F2EFE6]/70 leading-relaxed mb-5">{c.body}</p>
-                  <p className="text-[#9FC4AE] italic">{c.result}</p>
+                  {c.result && <p className="text-[#9FC4AE] italic">{c.result}</p>}
                   {c.newsletters && (
                     <div className="mt-8 pt-6 border-t border-[#284A3C]/50">
                       <p className="text-xs uppercase tracking-widest text-[#F2EFE6]/40 mb-5">
