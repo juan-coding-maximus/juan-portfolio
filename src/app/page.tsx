@@ -926,7 +926,7 @@ function AskMyClone() {
       <div className="max-w-7xl mx-auto grid lg:grid-cols-4 gap-6 items-start">
 
         {/* Left — primary contact */}
-        <Reveal className="lg:col-span-1">
+        <Reveal className="lg:col-span-2">
           <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-10">
             Ask me anything.
           </h2>
@@ -985,7 +985,7 @@ function AskMyClone() {
         </Reveal>
 
         {/* Right — AI sidekick */}
-        <Reveal delay={100} className="lg:col-span-3">
+        <Reveal delay={100} className="lg:col-span-2">
           {/* alien mascot + label */}
           <div className="flex items-center gap-3 mb-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1005,42 +1005,37 @@ function AskMyClone() {
             {/* message thread */}
             <div ref={containerRef} className="flex-1 overflow-y-auto max-h-[340px] p-5 space-y-4">
               {messages.length === 0 ? null : (
-                messages.map((m, i) => (
-                  <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                    <div
-                      className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                        m.role === "user"
-                          ? "bg-[#284A3C] text-[#F2EFE6]"
-                          : "bg-[#1a2e24] text-[#F2EFE6]/90 font-display text-base"
-                      }`}
-                    >
-                      <span className="whitespace-pre-wrap">{m.content}</span>
-                      {m.role === "assistant" && streaming && i === messages.length - 1 && m.content === "" && (
-                        <span className="inline-block w-2 h-4 bg-[#C9A24B] ml-1 animate-pulse rounded-sm" />
-                      )}
-                      {m.role === "assistant" && streaming && i === messages.length - 1 && m.content !== "" && (
-                        <span className="inline-block w-1.5 h-4 bg-[#C9A24B]/70 ml-0.5 animate-pulse rounded-sm align-middle" />
+                messages.map((m, i) => {
+                  const hasButton = m.role === "assistant" && m.content.includes("[TEXT_ME_BUTTON]");
+                  const displayContent = hasButton ? m.content.replace("[TEXT_ME_BUTTON]", "").trimEnd() : m.content;
+                  return (
+                    <div key={i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
+                      <div
+                        className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                          m.role === "user"
+                            ? "bg-[#284A3C] text-[#F2EFE6]"
+                            : "bg-[#1a2e24] text-[#F2EFE6]/90 font-display text-base"
+                        }`}
+                      >
+                        <span className="whitespace-pre-wrap">{displayContent}</span>
+                        {m.role === "assistant" && streaming && i === messages.length - 1 && m.content === "" && (
+                          <span className="inline-block w-2 h-4 bg-[#C9A24B] ml-1 animate-pulse rounded-sm" />
+                        )}
+                        {m.role === "assistant" && streaming && i === messages.length - 1 && m.content !== "" && (
+                          <span className="inline-block w-1.5 h-4 bg-[#C9A24B]/70 ml-0.5 animate-pulse rounded-sm align-middle" />
+                        )}
+                      </div>
+                      {hasButton && !streaming && (
+                        <a
+                          href="sms:+13237753850"
+                          className="mt-2 inline-block rounded-full bg-[#C9A24B] text-[#13201A] px-5 py-2 text-xs font-medium uppercase tracking-widest hover:bg-[#d8b563] transition-colors"
+                        >
+                          Text me
+                        </a>
                       )}
                     </div>
-                  </div>
-                ))
-              )}
-
-              {/* CTA after 3 questions */}
-              {showCTA && (
-                <div className="flex justify-start">
-                  <div className="bg-[#1a2e24] rounded-2xl px-4 py-4 max-w-[85%] space-y-3">
-                    <p className="text-[#F2EFE6]/80 font-display text-base">
-                      Honestly just ask me&nbsp;😉&nbsp; here&apos;s my number: <span className="text-[#C9A24B]">+1 (323) 775‑3850</span>
-                    </p>
-                    <a
-                      href="sms:+13237753850"
-                      className="inline-block rounded-full bg-[#C9A24B] text-[#13201A] px-5 py-2 text-xs font-medium uppercase tracking-widest hover:bg-[#d8b563] transition-colors"
-                    >
-                      Text me
-                    </a>
-                  </div>
-                </div>
+                  );
+                })
               )}
             </div>
 
