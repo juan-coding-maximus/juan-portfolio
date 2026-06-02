@@ -580,7 +580,7 @@ function CaseStudies() {
   }[] = [
     {
       tag: "HIPAA COMPLIANT MARKETING",
-      role: "Marketing & Revenue Operations",
+      role: "Marketing & Revenue Operations Lead",
       title: "I joined a world‑class Alzheimer's prevention center to get their science out of the journals and into the world, loud and clear.",
       body: (
         <>
@@ -594,24 +594,28 @@ function CaseStudies() {
     },
     {
       tag: "0→1 · OPERATIONS · GO-TO-MARKET",
+      role: "Founding Operator",
       title: "We built a diagnostics startup from zero to revenue.",
       body: "I came in when the idea was fresh: I gathered the founders' ideas, built the v1 deck, built the website, designed operational workflows, and warmed the B2B relationships with LA's longevity clinics. Both strategic and hands-on. A pleasure to work with these highly creative scientists.",
       art: "Metaba Health — site / ops board",
     },
     {
       tag: "0→1 · FOUNDER · DTC + B2B",
+      role: "Founder & CEO",
       title: "I started a company and sold it into the market myself.",
       body: "Your Aura Fragrance — a bio-based perfumery startup built from zero. Outbound at events and online, consultative pitches closing DTC and small B2B, a customer journey mapped into an automated pipeline, a 6-person ambassador team, supplier terms at a 20% B2B discount.",
       art: "aura-collage",
     },
     {
       tag: "AI EMAIL ENGINE · B2B · EVENTS",
+      role: "Growth & Automation Lead",
       title: "I build AI-native pipelines that close.",
       body: "Milieu + Biotech Connection LA. An AI engine pipelining 400+ creators; n8n + Supabase email automation at 100% follow-up; outreach to 200+ accounts and 20+ KOLs via a custom CRM; sponsor packages that grew revenue 30%.",
       art: "n8n-video",
     },
     {
       tag: "PARTNERSHIPS · COMMUNITY · EVENTS",
+      role: "VP of Partnerships",
       title: "I grew a biotech community into a real pipeline.",
       body: "Biotech Connection LA — USC's premier student-run biotech network. Cold outreach to 200+ biotech companies and research groups; built relationships with 20+ KOLs; redesigned sponsor packages that drove a 30% revenue lift; managed event logistics for multi-hundred-person programming that kept industry and student sides of the table coming back.",
       art: "bcla-video",
