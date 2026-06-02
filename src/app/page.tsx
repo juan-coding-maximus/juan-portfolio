@@ -988,29 +988,30 @@ function AskMyClone() {
         <Reveal delay={100}>
           {/* alien mascot + label */}
           <div className="flex items-center gap-3 mb-3">
+            {/* Claude Code pixel-art robot */}
             <svg
-              width="40" height="40" viewBox="0 0 64 64" fill="none"
+              width="44" height="44" viewBox="0 0 80 76" fill="none"
               style={{ animation: "alien-float 2.8s ease-in-out infinite" }}
             >
-              {/* head */}
-              <ellipse cx="32" cy="30" rx="20" ry="22" fill="#E86F2C"/>
+              {/* left ear */}
+              <rect x="5" y="19" width="8" height="13" rx="2" fill="#B86038"/>
+              {/* right ear */}
+              <rect x="67" y="19" width="8" height="13" rx="2" fill="#B86038"/>
+              {/* main head */}
+              <rect x="12" y="10" width="56" height="48" rx="4" fill="#B86038"/>
               {/* left eye */}
-              <ellipse cx="23" cy="26" rx="5" ry="6" fill="#13201A"/>
-              <ellipse cx="24" cy="24.5" rx="2" ry="2.5" fill="#fff" opacity="0.5"/>
+              <rect x="21" y="22" width="14" height="15" rx="1" fill="#1C1C1C"/>
               {/* right eye */}
-              <ellipse cx="41" cy="26" rx="5" ry="6" fill="#13201A"/>
-              <ellipse cx="42" cy="24.5" rx="2" ry="2.5" fill="#fff" opacity="0.5"/>
-              {/* mouth */}
-              <path d="M25 38 Q32 43 39 38" stroke="#13201A" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-              {/* left antenna */}
-              <line x1="20" y1="9" x2="26" y2="20" stroke="#E86F2C" strokeWidth="2.5" strokeLinecap="round"/>
-              <circle cx="19" cy="8" r="3" fill="#C9A24B"/>
-              {/* right antenna */}
-              <line x1="44" y1="9" x2="38" y2="20" stroke="#E86F2C" strokeWidth="2.5" strokeLinecap="round"/>
-              <circle cx="45" cy="8" r="3" fill="#C9A24B"/>
+              <rect x="45" y="22" width="14" height="15" rx="1" fill="#1C1C1C"/>
+              {/* left leg */}
+              <rect x="18" y="58" width="12" height="10" rx="2" fill="#B86038"/>
+              {/* center leg */}
+              <rect x="34" y="58" width="12" height="10" rx="2" fill="#B86038"/>
+              {/* right leg */}
+              <rect x="50" y="58" width="12" height="10" rx="2" fill="#B86038"/>
             </svg>
             <p className="text-sm text-[#F2EFE6]/55 italic">
-              I trained this chatbot to answer like me. try it out!
+              I trained this chatbot to answer like me. Try it out!
             </p>
           </div>
           <style>{`
