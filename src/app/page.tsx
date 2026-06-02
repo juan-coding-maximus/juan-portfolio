@@ -918,9 +918,6 @@ function AskMyClone() {
     }
   }
 
-  const userCount = messages.filter(m => m.role === "user").length;
-  const showCTA = userCount >= 3 && !streaming;
-
   return (
     <section className="px-6 md:px-12 lg:px-20 py-24 border-t border-[#F2EFE6]/10">
       <div className="max-w-7xl mx-auto grid lg:grid-cols-4 gap-6 items-start">
