@@ -704,9 +704,7 @@ function Capabilities() {
           <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-3">
             What I can do for your startup.
           </h2>
-          <p className="text-[#F2EFE6]/60 italic mb-12">
-            Not a service menu — a partner who picks up whatever the company needs.
-          </p>
+          <div className="mb-12" />
         </Reveal>
         {/* Olympic rings layout: 3 on top, 2 offset below */}
         <div className="grid grid-cols-6 gap-5">
