@@ -623,9 +623,9 @@ function CaseStudies() {
     },
     {
       tag: "PARTNERSHIPS · COMMUNITY · EVENTS",
-      role: "VP of Partnerships",
-      title: "I grew a biotech community into a real pipeline.",
-      body: "Biotech Connection LA — USC's premier student-run biotech network. Cold outreach to 200+ biotech companies and research groups; built relationships with 20+ KOLs; redesigned sponsor packages that drove a 30% revenue lift; managed event logistics for multi-hundred-person programming that kept industry and student sides of the table coming back.",
+      role: "B2B Partnerships Associate",
+      title: "I built the commercial engine that kept USC's premier biotech network running.",
+      body: "Biotech Connection LA is USC's student-run bridge between the life sciences industry and the next generation of researchers. The org had community — packed rooms, credible names — but the commercial side needed real structure. I came in as the partnerships person: cold-reached 200+ biotech companies and research groups, built relationships with 20+ KOLs, and redesigned the sponsor packages from scratch. The new packages drove a 30% revenue lift and kept the best industry partners coming back for every event.",
       art: "bcla-video",
     },
   ];
