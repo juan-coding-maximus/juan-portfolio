@@ -828,14 +828,6 @@ function GTMFramework() {
 ==================================================== */
 type Message = { role: "user" | "assistant"; content: string };
 
-const STARTERS = [
-  "How would you grow my biotech startup?",
-  "What makes you different from other operators?",
-  "What's your background?",
-  "Can you really code and automate?",
-  "Why should a founder pick you as a partner?",
-  "What are you like to work with?",
-];
 
 function AskMyClone() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -931,55 +923,66 @@ function AskMyClone() {
 
   return (
     <section className="px-6 md:px-12 lg:px-20 py-24 border-t border-[#F2EFE6]/10">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-7xl mx-auto grid lg:grid-cols-[1fr_400px] gap-16 items-start">
+
+        {/* Left — primary contact */}
         <Reveal>
-          <div className="flex flex-wrap items-center gap-4 mb-2">
-            <h2 className="font-display text-[clamp(2rem,4vw,3rem)]">
-              Ask me anything.
-            </h2>
-            <div className="flex items-center gap-2 rounded-full border border-[#284A3C] bg-[#0e1813] px-4 py-2 text-xs text-[#F2EFE6]/50">
-              <span className="whitespace-nowrap">Or chat with my AI</span>
-              <a
-                href="https://linkedin.com/in/juanarenasmartin"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="LinkedIn"
-                className="text-[#F2EFE6]/50 hover:text-[#C9A24B] transition-colors"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M20.447 20.452H16.89v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a1.975 1.975 0 1 1 0-3.95 1.975 1.975 0 0 1 0 3.95zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                </svg>
-              </a>
-              <a
-                href="sms:+13237753850"
-                aria-label="iMessage"
-                className="text-[#F2EFE6]/50 hover:text-[#9FC4AE] transition-colors"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.477 2 2 6.477 2 12c0 2.1.644 4.05 1.747 5.667L2 22l4.333-1.747A9.955 9.955 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/>
-                </svg>
-              </a>
-              <a
-                href="mailto:juan.arenas.rec@gmail.com"
-                aria-label="Email"
-                className="text-[#F2EFE6]/50 hover:text-[#9FC4AE] transition-colors"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/>
-                </svg>
-              </a>
-            </div>
-          </div>
-          <p className="text-[#F2EFE6]/60 italic mb-8">
-            I trained this AI to answer in my voice. Ask me anything!
+          <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-4">
+            Ask me anything.
+          </h2>
+          <p className="text-[#F2EFE6]/60 italic mb-12">
+            I trained this AI to answer in my voice. Or reach me directly:
           </p>
+          <div className="flex gap-10 items-end">
+            {/* LinkedIn */}
+            <a
+              href="https://linkedin.com/in/juanarenasmartin"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex flex-col items-center gap-3 text-[#F2EFE6]/35 hover:text-[#C9A24B] transition-all duration-300"
+            >
+              <svg
+                width="48" height="48" viewBox="0 0 24 24" fill="currentColor"
+                className="transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_14px_#C9A24B)]"
+              >
+                <path d="M20.447 20.452H16.89v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a1.975 1.975 0 1 1 0-3.95 1.975 1.975 0 0 1 0 3.95zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+              </svg>
+              <span className="text-xs uppercase tracking-widest">LinkedIn</span>
+            </a>
+            {/* iMessage */}
+            <a
+              href="sms:+13237753850"
+              className="group flex flex-col items-center gap-3 text-[#F2EFE6]/35 hover:text-[#9FC4AE] transition-all duration-300"
+            >
+              <svg
+                width="48" height="48" viewBox="0 0 24 24" fill="currentColor"
+                className="transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_14px_#9FC4AE)]"
+              >
+                <path d="M12 2C6.477 2 2 6.477 2 12c0 2.1.644 4.05 1.747 5.667L2 22l4.333-1.747A9.955 9.955 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/>
+              </svg>
+              <span className="text-xs uppercase tracking-widest">iMessage</span>
+            </a>
+            {/* Email */}
+            <a
+              href="mailto:juan.arenas.rec@gmail.com"
+              className="group flex flex-col items-center gap-3 text-[#F2EFE6]/35 hover:text-[#9FC4AE] transition-all duration-300"
+            >
+              <svg
+                width="48" height="48" viewBox="0 0 24 24" fill="currentColor"
+                className="transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_14px_#9FC4AE)]"
+              >
+                <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/>
+              </svg>
+              <span className="text-xs uppercase tracking-widest">Email</span>
+            </a>
+          </div>
         </Reveal>
 
+        {/* Right — AI sidekick */}
         <Reveal delay={100}>
           <div className="rounded-2xl border border-[#284A3C] bg-[#0e1813] flex flex-col overflow-hidden">
-
             {/* message thread */}
-            <div ref={containerRef} className="flex-1 overflow-y-auto max-h-[380px] p-6 space-y-5">
+            <div ref={containerRef} className="flex-1 overflow-y-auto max-h-[340px] p-5 space-y-4">
               {messages.length === 0 ? null : (
                 messages.map((m, i) => (
                   <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -1018,24 +1021,7 @@ function AskMyClone() {
                   </div>
                 </div>
               )}
-
             </div>
-
-            {/* starter chips */}
-            {messages.length === 0 && (
-              <div className="px-6 pb-4 flex flex-wrap gap-2">
-                {STARTERS.map((q) => (
-                  <button
-                    key={q}
-                    onClick={() => send(q)}
-                    disabled={streaming}
-                    className="text-xs rounded-full border border-[#284A3C] text-[#F2EFE6]/70 px-3 py-1.5 hover:border-[#C9A24B] hover:text-[#F2EFE6] transition-colors cursor-pointer disabled:opacity-40"
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            )}
 
             {/* input bar */}
             <div className="border-t border-[#284A3C] px-4 py-3 flex gap-3 items-center">
@@ -1044,7 +1030,7 @@ function AskMyClone() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && send(input)}
-                placeholder="Ask anything…"
+                placeholder="Ask AI Juan here:"
                 disabled={streaming}
                 className="flex-1 bg-transparent text-sm text-[#F2EFE6] placeholder-[#F2EFE6]/30 outline-none disabled:opacity-50"
               />
@@ -1058,6 +1044,7 @@ function AskMyClone() {
             </div>
           </div>
         </Reveal>
+
       </div>
     </section>
   );
