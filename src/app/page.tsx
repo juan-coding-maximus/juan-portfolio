@@ -923,10 +923,10 @@ function AskMyClone() {
 
   return (
     <section className="px-6 md:px-12 lg:px-20 py-24 border-t border-[#F2EFE6]/10">
-      <div className="max-w-7xl mx-auto grid lg:grid-cols-[1fr_400px] gap-16 items-start">
+      <div className="max-w-7xl mx-auto grid lg:grid-cols-4 gap-6 items-start">
 
         {/* Left — primary contact */}
-        <Reveal>
+        <Reveal className="lg:col-span-1">
           <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-10">
             Ask me anything.
           </h2>
@@ -939,7 +939,7 @@ function AskMyClone() {
               className="group flex flex-col items-center gap-3 text-[#F2EFE6]/35 hover:text-[#0A66C2] transition-all duration-300"
             >
               <svg
-                width="48" height="48" viewBox="0 0 24 24" fill="currentColor"
+                width="96" height="96" viewBox="0 0 24 24" fill="currentColor"
                 className="transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_14px_#0A66C2)]"
               >
                 <path d="M20.447 20.452H16.89v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a1.975 1.975 0 1 1 0-3.95 1.975 1.975 0 0 1 0 3.95zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
@@ -952,7 +952,7 @@ function AskMyClone() {
               className="group flex flex-col items-center gap-3 text-[#F2EFE6]/35 hover:text-[#34C759] transition-all duration-300"
             >
               <svg
-                width="48" height="48" viewBox="0 0 24 24" fill="currentColor"
+                width="96" height="96" viewBox="0 0 24 24" fill="currentColor"
                 className="transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_14px_#34C759)]"
               >
                 <path d="M12 2C6.477 2 2 6.477 2 12c0 2.1.644 4.05 1.747 5.667L2 22l4.333-1.747A9.955 9.955 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/>
@@ -965,7 +965,7 @@ function AskMyClone() {
               className="group flex flex-col items-center gap-3 transition-all duration-300"
             >
               <svg
-                width="48" height="48" viewBox="0 0 24 24"
+                width="96" height="96" viewBox="0 0 24 24"
                 className="transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_14px_rgba(255,255,255,0.5))]"
               >
                 {/* envelope body */}
@@ -985,7 +985,7 @@ function AskMyClone() {
         </Reveal>
 
         {/* Right — AI sidekick */}
-        <Reveal delay={100}>
+        <Reveal delay={100} className="lg:col-span-3">
           {/* alien mascot + label */}
           <div className="flex items-center gap-3 mb-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
