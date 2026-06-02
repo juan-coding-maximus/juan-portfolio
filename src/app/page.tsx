@@ -600,17 +600,25 @@ function CaseStudies() {
       art: "Metaba Health — site / ops board",
     },
     {
-      tag: "0→1 · FOUNDER · DTC + B2B",
-      role: "Founder & CEO",
-      title: "I started a company and sold it into the market myself.",
-      body: "Your Aura Fragrance — a bio-based perfumery startup built from zero. Outbound at events and online, consultative pitches closing DTC and small B2B, a customer journey mapped into an automated pipeline, a 6-person ambassador team, supplier terms at a 20% B2B discount.",
+      tag: "0→1 · FOUNDER · DTC",
+      role: "Founder",
+      title: "I bootstrapped a personalized perfume company into 5 figures of revenue.",
+      body: (
+        <>
+          I did Toxicology research at University of Southern California and found that some perfume ingredients are endocrine disruptors, phthalates and toxic parabens. I started making my own cologne with all-natural essential oils. Grew this hobby into a startup that delivers a personalized perfume as a service. To date, I&apos;ve made over 200 different perfumes for 200 unique customers. Everyone deserves to feel their best,{" "}
+          <a href="https://youraurafragrance.com" target="_blank" rel="noopener noreferrer" className="text-[#C9A24B] hover:underline">Your Aura</a>
+          {" "}allows you to define your scent. Safe &amp; Scented. I&apos;m ever-grateful to{" "}
+          <a href="https://www.linkedin.com/in/tommyknapp1/" target="_blank" rel="noopener noreferrer" className="text-[#C9A24B] hover:underline">Prof. Tommy Knapp</a>
+          {" "}for helping me stay curious and pushing me to find better product-market fit.
+        </>
+      ),
       art: "aura-collage",
     },
     {
-      tag: "AI EMAIL ENGINE · B2B · EVENTS",
+      tag: "LEAD GENERATION · B2B · AI ORCHESTRATION",
       role: "Growth & Automation Lead",
-      title: "I build AI-native pipelines that close.",
-      body: "Milieu + Biotech Connection LA. An AI engine pipelining 400+ creators; n8n + Supabase email automation at 100% follow-up; outreach to 200+ accounts and 20+ KOLs via a custom CRM; sponsor packages that grew revenue 30%.",
+      title: "I built an AI-native pipeline that engaged thousands of influencers.",
+      body: "Milieu Skin is the first personalized prebiotic skincare brand. Their product was awesome, but their marketing needed real volume. I came in with a Go-To-Market plan: engage tiktokers to create hundreds of videos with the product, and use the best-performing videos as Ads. The flow you see in this video reflects the mix of high-volume automation work, AI orchestration, and human touch when it matters. We reached hundreds of qualified inbound leads each week.",
       art: "n8n-video",
     },
     {
