@@ -920,13 +920,14 @@ function AskMyClone() {
 
   return (
     <section className="px-6 md:px-12 lg:px-20 py-24 border-t border-[#F2EFE6]/10">
-      <div className="max-w-7xl mx-auto grid lg:grid-cols-4 gap-6 items-start">
+      <div className="max-w-7xl mx-auto grid lg:grid-cols-4 gap-6 items-stretch">
 
         {/* Left — primary contact */}
-        <Reveal className="lg:col-span-2">
+        <Reveal className="lg:col-span-2 flex flex-col h-full">
           <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-10">
             Ask me anything.
           </h2>
+          <div className="flex-1" />
           <div className="flex gap-10 items-end">
             {/* LinkedIn */}
             <a
@@ -1000,7 +1001,7 @@ function AskMyClone() {
           </div>
           <div className="rounded-2xl border border-[#284A3C] bg-[#0e1813] flex flex-col overflow-hidden">
             {/* message thread */}
-            <div ref={containerRef} className="flex-1 overflow-y-auto max-h-[340px] p-5 space-y-4">
+            <div ref={containerRef} className="flex-1 overflow-y-auto min-h-[200px] max-h-[340px] p-5 space-y-4">
               {messages.length === 0 ? null : (
                 messages.map((m, i) => {
                   const hasButton = m.role === "assistant" && m.content.includes("[TEXT_ME_BUTTON]");
