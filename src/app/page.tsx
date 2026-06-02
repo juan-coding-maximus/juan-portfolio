@@ -929,10 +929,10 @@ function AskMyClone() {
         <Reveal>
           <div className="flex flex-wrap items-center gap-4 mb-2">
             <h2 className="font-display text-[clamp(2rem,4vw,3rem)]">
-              Ask my AI.
+              Ask me anything.
             </h2>
             <div className="flex items-center gap-2 rounded-full border border-[#284A3C] bg-[#0e1813] px-4 py-2 text-xs text-[#F2EFE6]/50">
-              <span className="whitespace-nowrap">Or ask me directly</span>
+              <span className="whitespace-nowrap">Or chat with my AI</span>
               <a
                 href="https://linkedin.com/in/juanarenasmartin"
                 target="_blank"
@@ -974,11 +974,7 @@ function AskMyClone() {
 
             {/* message thread */}
             <div ref={containerRef} className="flex-1 overflow-y-auto max-h-[380px] p-6 space-y-5">
-              {messages.length === 0 ? (
-                <p className="text-[#F2EFE6]/30 italic text-sm">
-                  Choose a prompt below or type your own question.
-                </p>
-              ) : (
+              {messages.length === 0 ? null : (
                 messages.map((m, i) => (
                   <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                     <div
