@@ -148,7 +148,7 @@ function Hero() {
       </div>
 
       {/* nav */}
-      <div className="absolute top-6 left-6 right-6 md:left-12 md:right-12 flex justify-between items-center text-sm">
+      <div className="absolute top-12 left-6 right-6 md:top-6 md:left-12 md:right-12 flex justify-between items-center text-sm">
         <Image
           src="/img/ja-logo.png"
           alt="JA monogram"
@@ -497,8 +497,29 @@ const FAN_ROTATIONS = [-21, -7, 7, 21];
 function NewsletterFan() {
   return (
     <div className="flex flex-col items-center">
-      {/* fan */}
-      <div className="relative h-[18rem] w-[36rem] flex items-end justify-center overflow-visible">
+      {/* Mobile: 2×2 grid */}
+      <div className="grid grid-cols-2 gap-3 w-full sm:hidden">
+        {NEWSLETTERS.map((n, i) => (
+          <a
+            key={i}
+            href={n.pdf}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group"
+            title={n.label}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={n.thumb}
+              alt={n.label}
+              className="w-full rounded-lg shadow-lg border border-[#284A3C] group-hover:border-[#C9A24B] transition-colors"
+            />
+            <p className="text-[10px] text-[#F2EFE6]/40 mt-1 text-center">{n.label}</p>
+          </a>
+        ))}
+      </div>
+      {/* Desktop: fan */}
+      <div className="hidden sm:flex relative h-[18rem] w-[36rem] items-end justify-center overflow-visible">
         {NEWSLETTERS.map((n, i) => (
           <a
             key={i}
@@ -637,16 +658,17 @@ function CaseStudies() {
   ];
 
   return (
-    <section id="work" className="px-6 md:px-12 lg:px-20 py-24 border-t border-[#F2EFE6]/10">
+    <section id="work" className="px-6 md:px-12 lg:px-20 py-16 md:py-24 border-t border-[#F2EFE6]/10">
       <div className="max-w-7xl mx-auto">
         <Reveal>
-          <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-16">
+          <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-8 md:mb-16">
             What I&apos;ve built.
           </h2>
         </Reveal>
-        <div className="space-y-24">
+        <div className="space-y-16 lg:space-y-24">
           {cases.map((c, i) => (
-            <Reveal key={i} delay={100} className={i === 2 ? "[margin-top:14rem!important]" : ""}>
+            <div key={i} className={i === 2 ? "lg:!mt-56" : ""}>
+            <Reveal delay={100}>
               <article className="grid lg:grid-cols-2 gap-10 items-center">
                 <div className={i % 2 ? "lg:order-2" : ""}>
                   <p className="text-xs tracking-[0.25em] text-[#C9A24B] uppercase mb-3">
@@ -677,6 +699,7 @@ function CaseStudies() {
                 </div>
               </article>
             </Reveal>
+            </div>
           ))}
         </div>
       </div>
@@ -712,23 +735,21 @@ function Capabilities() {
   ];
 
   return (
-    <section className="px-6 md:px-12 lg:px-20 py-24 border-t border-[#F2EFE6]/10">
+    <section className="px-6 md:px-12 lg:px-20 py-16 md:py-24 border-t border-[#F2EFE6]/10">
       <div className="max-w-7xl mx-auto">
         <Reveal>
           <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-3">
             How I help your team.
           </h2>
-          <div className="mb-12" />
+          <div className="mb-8 md:mb-12" />
         </Reveal>
-        {/* Olympic rings layout: 3 on top, 2 offset below */}
-        <div className="grid grid-cols-6 gap-5">
+        {/* Olympic rings layout: 3 on top, 2 offset below (lg+). Mobile: 1-col, sm: 2-col */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-5">
           {caps.map(([title, desc], i) => {
-            // top row: items 0,1,2 → cols 1-2, 3-4, 5-6
-            // bottom row: items 3,4 → cols 2-3, 4-5 (offset by 1 col)
             const colClass =
-              i === 3 ? "col-start-2 col-span-2" :
-              i === 4 ? "col-start-4 col-span-2" :
-              "col-span-2";
+              i === 3 ? "lg:col-start-2 lg:col-span-2" :
+              i === 4 ? "lg:col-start-4 lg:col-span-2" :
+              "lg:col-span-2";
             return (
               <Reveal key={i} delay={i * 60} className={colClass}>
                 <div className="group rounded-2xl border border-[#284A3C] p-6 bg-[#0e1813] hover:bg-[#284A3C] transition-colors h-full">
@@ -792,7 +813,7 @@ function GTMFramework() {
   ];
 
   return (
-    <section className="px-6 md:px-12 lg:px-20 py-24 border-t border-[#F2EFE6]/10">
+    <section className="px-6 md:px-12 lg:px-20 py-16 md:py-24 border-t border-[#F2EFE6]/10">
       <div className="max-w-7xl mx-auto">
         <Reveal>
           <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-3">
@@ -925,7 +946,7 @@ function AskMyClone() {
   }
 
   return (
-    <section className="px-6 md:px-12 lg:px-20 py-24 border-t border-[#F2EFE6]/10">
+    <section className="px-6 md:px-12 lg:px-20 py-16 md:py-24 border-t border-[#F2EFE6]/10">
       <div className="max-w-7xl mx-auto grid lg:grid-cols-4 gap-6 items-stretch">
 
         {/* Left — primary contact */}
@@ -934,7 +955,7 @@ function AskMyClone() {
             Ask me anything.
           </h2>
           <div className="flex-1" />
-          <div className="flex gap-10 items-end">
+          <div className="flex gap-4 sm:gap-10 items-end">
             {/* LinkedIn */}
             <a
               href="https://linkedin.com/in/juanarenasmartin"
@@ -943,8 +964,8 @@ function AskMyClone() {
               className="group flex flex-col items-center gap-3 text-[#F2EFE6]/35 hover:text-[#0A66C2] transition-all duration-300"
             >
               <svg
-                width="96" height="96" viewBox="0 0 24 24" fill="currentColor"
-                className="transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_14px_#0A66C2)]"
+                viewBox="0 0 24 24" fill="currentColor"
+                className="w-16 h-16 sm:w-24 sm:h-24 transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_14px_#0A66C2)]"
               >
                 <path d="M20.447 20.452H16.89v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a1.975 1.975 0 1 1 0-3.95 1.975 1.975 0 0 1 0 3.95zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
               </svg>
@@ -956,8 +977,8 @@ function AskMyClone() {
               className="group flex flex-col items-center gap-3 text-[#F2EFE6]/35 hover:text-[#34C759] transition-all duration-300"
             >
               <svg
-                width="96" height="96" viewBox="0 0 24 24" fill="currentColor"
-                className="transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_14px_#34C759)]"
+                viewBox="0 0 24 24" fill="currentColor"
+                className="w-16 h-16 sm:w-24 sm:h-24 transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_14px_#34C759)]"
               >
                 <path d="M12 2C6.477 2 2 6.477 2 12c0 2.1.644 4.05 1.747 5.667L2 22l4.333-1.747A9.955 9.955 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/>
               </svg>
@@ -969,8 +990,8 @@ function AskMyClone() {
               className="group flex flex-col items-center gap-3 transition-all duration-300"
             >
               <svg
-                width="96" height="96" viewBox="0 0 24 24"
-                className="transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_14px_rgba(255,255,255,0.5))]"
+                viewBox="0 0 24 24"
+                className="w-16 h-16 sm:w-24 sm:h-24 transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_14px_rgba(255,255,255,0.5))]"
               >
                 {/* envelope body */}
                 <path
@@ -1080,7 +1101,7 @@ function AskMyClone() {
                 onKeyDown={(e) => e.key === "Enter" && send(input)}
                 placeholder="Ask AI Juan here:"
                 disabled={streaming}
-                className="flex-1 bg-transparent text-sm text-[#F2EFE6] placeholder-[#F2EFE6]/30 outline-none disabled:opacity-50"
+                className="flex-1 bg-transparent text-base sm:text-sm text-[#F2EFE6] placeholder-[#F2EFE6]/30 outline-none disabled:opacity-50"
               />
               <button
                 onClick={() => send(input)}
@@ -1121,10 +1142,10 @@ function Testimonials() {
   ];
 
   return (
-    <section className="px-6 md:px-12 lg:px-20 py-24 border-t border-[#F2EFE6]/10">
+    <section className="px-6 md:px-12 lg:px-20 py-16 md:py-24 border-t border-[#F2EFE6]/10">
       <div className="max-w-7xl mx-auto">
         <Reveal>
-          <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-12">
+          <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-8 md:mb-12">
             What people say.
           </h2>
         </Reveal>
@@ -1160,7 +1181,7 @@ function Testimonials() {
 ==================================================== */
 function About() {
   return (
-    <section className="px-6 md:px-12 lg:px-20 py-24 border-t border-[#F2EFE6]/10">
+    <section className="px-6 md:px-12 lg:px-20 py-16 md:py-24 border-t border-[#F2EFE6]/10">
       <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-12 items-center">
         <Reveal>
           <div className="aspect-[4/4.25] rounded-3xl border border-[#284A3C] overflow-hidden relative">
@@ -1261,7 +1282,7 @@ function CTA() {
   return (
     <section
       id="contact"
-      className="px-6 md:px-12 lg:px-20 py-28 border-t border-[#F2EFE6]/10 relative"
+      className="px-6 md:px-12 lg:px-20 py-20 md:py-28 border-t border-[#F2EFE6]/10 relative"
     >
       <div className="pointer-events-none absolute inset-0 bg-[#284A3C] opacity-[0.07]" />
       <div className="relative max-w-4xl mx-auto text-center">

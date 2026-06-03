@@ -31,6 +31,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 @keyframes chevron-drop {
