@@ -595,7 +595,7 @@ function CaseStudies() {
     {
       tag: "0→1 · OPERATIONS · GO-TO-MARKET",
       role: "Founding Operator",
-      title: "We built a diagnostics startup from zero to revenue.",
+      title: "I helped build a diagnostics startup from zero to revenue.",
       body: "I came in when the idea was fresh: I gathered the founders' ideas, built the v1 deck, built the website, designed operational workflows, and warmed the B2B relationships with LA's longevity clinics. Both strategic and hands-on. A pleasure to work with these highly creative scientists.",
       art: "Metaba Health — site / ops board",
     },
@@ -693,7 +693,7 @@ function Capabilities() {
     ],
     [
       "Regulated marketing",
-      "HIPAA-compliant campaigns and content — fast, without breaking the rules that matter.",
+      "HIPAA-compliant campaigns and content, fast and without breaking the rules that matter.",
     ],
     [
       "B2B sales & pipeline",
@@ -752,7 +752,7 @@ function GTMFramework() {
       title: "Earn the first 100 users",
       weeks: "Wk 1–4",
       points: [
-        "Define a sharp ICP — target people actively trying to solve this now.",
+        "Define a sharp ICP and target people actively trying to solve this now.",
         "Manual outreach and concierge onboarding to capture the buyer's real language.",
       ],
     },
@@ -780,7 +780,7 @@ function GTMFramework() {
       weeks: "Wk 20+",
       points: [
         "Increase spend only behind channels that convert with healthy unit economics.",
-        "Keep compliance, ops, and reporting tight — scale should compound, not fragment.",
+        "Keep compliance, ops, and reporting tight so scale compounds, not fragments.",
       ],
     },
   ];
@@ -808,7 +808,7 @@ function GTMFramework() {
                 <ul className="space-y-3 text-sm text-[#F2EFE6]/70 leading-relaxed">
                   {p.points.map((pt, j) => (
                     <li key={j} className="flex gap-2">
-                      <span className="text-[#9FC4AE] shrink-0">—</span>
+                      <span className="text-[#9FC4AE] shrink-0">·</span>
                       <span>{pt}</span>
                     </li>
                   ))}
@@ -857,7 +857,7 @@ function AskMyClone() {
         setExtraContext(prev => prev ? `${prev}\n${memo}` : memo);
         setMessages(prev => [
           ...prev,
-          { role: "assistant", content: `✓ Got it — context updated.` },
+          { role: "assistant", content: `✓ Got it, context updated.` },
         ]);
       }
       setInput("");
@@ -908,7 +908,7 @@ function AskMyClone() {
         {
           role: "assistant",
           content: isTimeout
-            ? "Took too long — try again or email juan.arenas.rec@gmail.com."
+            ? "Took too long. Try again or email juan.arenas.rec@gmail.com."
             : "Couldn't reach the AI. Email me directly: juan.arenas.rec@gmail.com.",
         },
       ]);
@@ -1099,7 +1099,7 @@ function Testimonials() {
   const testimonials = [
     {
       quote:
-        "Juan built our entire GTM motion and treated the company like his own. Most people deliver a slide deck — he delivered a system.",
+        "Juan built our entire GTM motion and treated the company like his own. Most people deliver a slide deck. He delivered a system.",
       who: "Past CEO / Founder",
     },
     {
@@ -1141,7 +1141,7 @@ function Testimonials() {
         </div>
         <Reveal delay={200}>
           <p className="mt-8 text-xs text-[#F2EFE6]/30 italic">
-            * To be replaced with real quotes — names and companies pending permission.
+            * To be replaced with real quotes (names and companies pending permission).
           </p>
         </Reveal>
       </div>
@@ -1157,8 +1157,8 @@ function About() {
     <section className="px-6 md:px-12 lg:px-20 py-24 border-t border-[#F2EFE6]/10">
       <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-12 items-center">
         <Reveal>
-          <div className="aspect-[4/5] rounded-3xl border border-[#284A3C] overflow-hidden relative">
-            <div className="absolute -top-[15%] left-0 right-0 bottom-0 h-[115%]">
+          <div className="aspect-[4/4.25] rounded-3xl border border-[#284A3C] overflow-hidden relative">
+            <div className="absolute left-0 right-0 bottom-0 h-[135%]">
               <Image
                 src="/img/juan-usc.png"
                 alt="Juan Arenas at USC"
@@ -1185,7 +1185,7 @@ function About() {
             <p className="text-[#F2EFE6]/75 leading-relaxed mb-8">
               I like being the person who connects product, sales, and
               leadership so we&apos;re all pushing toward a few visible,
-              meaningful goals with the most effective tools available — and
+              meaningful goals with the most effective tools available, and
               I&apos;m good at stripping away noise to get there. Clear
               thinking &gt; jargon, always. I work best with teams who are
               serious about improving health outcomes and doing honest work in
