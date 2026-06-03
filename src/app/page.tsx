@@ -640,7 +640,7 @@ function CaseStudies() {
         </Reveal>
         <div className="space-y-24">
           {cases.map((c, i) => (
-            <Reveal key={i} delay={100} className={i === 2 ? "[margin-top:8rem!important]" : ""}>
+            <Reveal key={i} delay={100} className={i === 2 ? "[margin-top:14rem!important]" : ""}>
               <article className="grid lg:grid-cols-2 gap-10 items-center">
                 <div className={i % 2 ? "lg:order-2" : ""}>
                   <p className="text-xs tracking-[0.25em] text-[#C9A24B] uppercase mb-3">
