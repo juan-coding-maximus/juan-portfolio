@@ -92,10 +92,10 @@ export default function Page() {
   return (
     <main className="bg-[#13201A] text-[#F2EFE6] font-body antialiased overflow-x-hidden">
       <Hero />
+      <Capabilities />
       <MetricWall />
       <BrandStrip />
       <CaseStudies />
-      <Capabilities />
       <GTMFramework />
       <AskMyClone />
       <Testimonials />
@@ -685,23 +685,23 @@ function Capabilities() {
   const caps: [string, string][] = [
     [
       "0→1 GTM",
-      "Find the first customers, build the motion that wins them, make it repeatable.",
+      "Find your first customers, prove what works, then make the motion repeatable.",
     ],
     [
       "AI automation",
-      "n8n + Claude Code + Supabase systems that qualify, personalize, and follow up while you sleep.",
+      "Build AI-driven workflows that qualify, personalize, and follow up while you sleep.",
     ],
     [
       "Regulated marketing",
-      "HIPAA-compliant campaigns and content, fast and without breaking the rules that matter.",
+      "Ship HIPAA-compliant campaigns fast, without breaking the rules that matter.",
     ],
     [
       "B2B sales & pipeline",
-      "Outbound, KOL and account management, custom CRMs, sponsor and partnership deals.",
+      "Stand up outbound, KOL, and account motion that actually moves qualified opportunities.",
     ],
     [
       "A deployable network",
-      "LA design teams, merch, and SEO/AIO/GEO contractors ready to plug in. I arrive with resources.",
+      "Bring in trusted LA-based design, merch, and SEO/AIO/GEO talent on day one, no hiring cycle.",
     ],
   ];
 
@@ -710,7 +710,7 @@ function Capabilities() {
       <div className="max-w-7xl mx-auto">
         <Reveal>
           <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-3">
-            What I can do for your startup.
+            How I help your team.
           </h2>
           <div className="mb-12" />
         </Reveal>
