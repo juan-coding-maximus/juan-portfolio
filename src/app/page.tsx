@@ -170,7 +170,7 @@ function Hero() {
         <h1 className="font-display font-light leading-[0.95] text-[clamp(3rem,11vw,9rem)] tracking-tight">
           JUAN ARENAS
         </h1>
-        <div className="mt-8 font-display text-[clamp(1.6rem,4vw,3rem)] leading-[1.15] space-y-1">
+        <div className="mt-12 sm:mt-8 font-display text-[clamp(1.6rem,4vw,3rem)] leading-[1.15] space-y-1">
           <p>
             Build the{" "}
             <span className="italic text-[#C9A24B]">system.</span>
@@ -198,7 +198,7 @@ function Hero() {
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              style={{ animation: "chevron-drop 2.4s ease-in-out infinite" }}
+              style={{ animation: "chevron-drop 1.2s ease-in-out infinite" }}
             >
               <polyline points="2 2 18 20 34 2" />
             </svg>
@@ -336,7 +336,7 @@ function BrandStrip() {
       </div>
       <div
         className="flex gap-x-14 items-center whitespace-nowrap"
-        style={{ animation: "marquee 36s linear infinite" }}
+        style={{ animation: "marquee 20s linear infinite" }}
       >
         {all.map((item, i) => renderItem(item, i))}
       </div>
@@ -491,57 +491,27 @@ const NEWSLETTERS = [
   { pdf: "/pdfs/december-february.pdf", thumb: "/img/newsletters/december-february.jpg", label: "Feb 2026 · ES" },
 ];
 
-// rotations for the fan: spread from bottom-center, 14° gap between each
-const FAN_ROTATIONS = [-21, -7, 7, 21];
-
 function NewsletterFan() {
   return (
-    <div className="flex flex-col items-center">
-      {/* Mobile: 2×2 grid */}
-      <div className="grid grid-cols-2 gap-3 w-full sm:hidden">
-        {NEWSLETTERS.map((n, i) => (
-          <a
-            key={i}
-            href={n.pdf}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group"
-            title={n.label}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={n.thumb}
-              alt={n.label}
-              className="w-full rounded-lg shadow-lg border border-[#284A3C] group-hover:border-[#C9A24B] transition-colors"
-            />
-            <p className="text-[10px] text-[#F2EFE6]/40 mt-1 text-center">{n.label}</p>
-          </a>
-        ))}
-      </div>
-      {/* Desktop: fan */}
-      <div className="hidden sm:flex relative h-[18rem] w-[36rem] items-end justify-center overflow-visible">
-        {NEWSLETTERS.map((n, i) => (
-          <a
-            key={i}
-            href={n.pdf}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group absolute bottom-0 left-1/2 origin-bottom transition-transform duration-200 hover:-translate-y-3 hover:z-10"
-            style={{
-              transform: `translateX(-50%) rotate(${FAN_ROTATIONS[i]}deg)`,
-              zIndex: i,
-            }}
-            title={n.label}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={n.thumb}
-              alt={n.label}
-              className="w-48 rounded-lg shadow-lg border border-[#284A3C] group-hover:border-[#C9A24B] transition-colors"
-            />
-          </a>
-        ))}
-      </div>
+    <div className="flex gap-2 sm:gap-3">
+      {NEWSLETTERS.map((n, i) => (
+        <a
+          key={i}
+          href={n.pdf}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex-1 min-w-0 group"
+          title={n.label}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={n.thumb}
+            alt={n.label}
+            className="w-full rounded-md shadow-lg border border-[#284A3C] group-hover:border-[#C9A24B] transition-colors"
+          />
+          <p className="text-[9px] sm:text-[10px] text-[#F2EFE6]/40 mt-1 text-center truncate">{n.label}</p>
+        </a>
+      ))}
     </div>
   );
 }
@@ -665,38 +635,40 @@ function CaseStudies() {
             What I&apos;ve built.
           </h2>
         </Reveal>
-        <div className="space-y-16 lg:space-y-24">
+        <div className="space-y-24 lg:space-y-32">
           {cases.map((c, i) => (
             <div key={i} className={i === 2 ? "lg:!mt-56" : ""}>
             <Reveal delay={100}>
-              <article className="grid lg:grid-cols-2 gap-10 items-center">
-                <div className={i % 2 ? "lg:order-2" : ""}>
-                  <p className="text-xs tracking-[0.25em] text-[#C9A24B] uppercase mb-3">
-                    {c.tag}
-                  </p>
-                  {c.role && (
-                    <div className="flex items-center gap-2 mb-4">
-                      <SuitIcon />
-                      <span className="text-sm text-[#F2EFE6]/60">{c.role}</span>
-                    </div>
-                  )}
-                  <h3 className="font-display text-2xl md:text-3xl leading-snug mb-5">
-                    {c.title}
-                  </h3>
-                  <p className="text-[#F2EFE6]/70 leading-relaxed mb-5">{c.body}</p>
-                  {c.result && <p className="text-[#9FC4AE] italic">{c.result}</p>}
-                  {c.newsletters && (
-                    <div className="mt-8 pt-6 border-t border-[#284A3C]/50">
-                      <p className="text-xs uppercase tracking-widest text-[#F2EFE6]/40 mb-5">
-                        A few of my newsletters
-                      </p>
-                      <NewsletterFan />
-                    </div>
-                  )}
+              <article>
+                <div className="grid lg:grid-cols-2 gap-10 items-center">
+                  <div className={i % 2 ? "lg:order-2" : ""}>
+                    <p className="text-xs tracking-[0.25em] text-[#C9A24B] uppercase mb-3">
+                      {c.tag}
+                    </p>
+                    {c.role && (
+                      <div className="flex items-center gap-2 mb-4">
+                        <SuitIcon />
+                        <span className="text-sm text-[#F2EFE6]/60">{c.role}</span>
+                      </div>
+                    )}
+                    <h3 className="font-display text-2xl md:text-3xl leading-snug mb-5">
+                      {c.title}
+                    </h3>
+                    <p className="text-[#F2EFE6]/70 leading-relaxed mb-5">{c.body}</p>
+                    {c.result && <p className="text-[#9FC4AE] italic">{c.result}</p>}
+                  </div>
+                  <div className={i % 2 ? "lg:order-1" : ""}>
+                    <CaseArtifact art={c.art} />
+                  </div>
                 </div>
-                <div className={i % 2 ? "lg:order-1" : ""}>
-                  <CaseArtifact art={c.art} />
-                </div>
+                {c.newsletters && (
+                  <div className="mt-10 pt-6 border-t border-[#284A3C]/50">
+                    <p className="text-xs uppercase tracking-widest text-[#F2EFE6]/40 mb-4">
+                      A few of my newsletters
+                    </p>
+                    <NewsletterFan />
+                  </div>
+                )}
               </article>
             </Reveal>
             </div>
