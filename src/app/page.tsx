@@ -91,12 +91,18 @@ function Reveal({
 export default function Page() {
   return (
     <main className="bg-[#13201A] text-[#F2EFE6] font-body antialiased overflow-x-hidden">
+      {/* 1. Hero */}
       <Hero />
-      <Capabilities />
+      {/* 2. Proof bar */}
       <MetricWall />
       <BrandStrip />
+      {/* 3. Case studies */}
       <CaseStudies />
+      {/* 4. How I help */}
+      <Capabilities />
+      {/* 5. How I think */}
       <GTMFramework />
+      {/* 6. About + CTA */}
       <AskMyClone />
       <Testimonials />
       <About />
