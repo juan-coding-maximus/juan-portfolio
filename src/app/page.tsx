@@ -1187,13 +1187,12 @@ function About() {
             </p>
             <p className="text-[#F2EFE6]/75 leading-relaxed mb-4">
               I like connecting operators and leadership to push for the few
-              goals that matter.
-              <br />
-              I cut through the noise to make progress visible.
+              goals that matter. I cut through the noise to make progress
+              visible.
             </p>
             <p className="text-[#F2EFE6]/75 leading-relaxed mb-8">
-              I work best with people who care about clarity and want to improve
-              both business and health outcomes.
+              I work best with people who care about clarity. I&apos;m here to
+              scale business operations and improve health outcomes.
             </p>
             <div className="flex gap-8 items-end">
               {/* LinkedIn */}
