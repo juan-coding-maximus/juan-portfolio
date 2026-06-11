@@ -1174,21 +1174,26 @@ function About() {
             <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-6">
               Who I am.
             </h2>
+            <p className="text-[#F2EFE6] text-lg font-medium leading-relaxed mb-4">
+              My background is researching pharmacology; my day‑to‑day is
+              delivering growth.
+            </p>
             <p className="text-[#F2EFE6]/75 leading-relaxed mb-4">
-              I&apos;m a Pharmacologist by training and a scientific marketing
-              operator by practice. I learned to understand science through
-              Alzheimer&apos;s and toxicology research, then built a career in
-              sales and marketing because I&apos;m obsessed with the real-world
-              impact good science can have.
+              I started in the lab and moved toward where decisions get made.
+              <br />
+              Over time I went from Alzheimer&apos;s and toxicology research into
+              sales and marketing work, closer to real decisions, real teams,
+              and real outcomes.
+            </p>
+            <p className="text-[#F2EFE6]/75 leading-relaxed mb-4">
+              I like connecting operators and leadership to push for the few
+              goals that matter.
+              <br />
+              I cut through the noise to make progress visible.
             </p>
             <p className="text-[#F2EFE6]/75 leading-relaxed mb-8">
-              I like being the person who connects product, sales, and
-              leadership so we&apos;re all pushing toward a few visible,
-              meaningful goals with the most effective tools available, and
-              I&apos;m good at stripping away noise to get there. Clear
-              thinking &gt; jargon, always. I work best with teams who are
-              serious about improving health outcomes and doing honest work in
-              healthcare.
+              I work best with people who care about clarity and want to improve
+              both business and health outcomes.
             </p>
             <div className="flex gap-8 items-end">
               {/* LinkedIn */}
