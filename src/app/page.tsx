@@ -262,16 +262,18 @@ type BrandItem =
   | { kind: "text"; label: string; href?: string };
 
 function BrandStrip() {
-  const brands: BrandItem[] = [
-    { kind: "img",  src: "/img/logos/aura-white.png",        alt: "Your Aura Fragrance",                     href: "https://youraurafragrance.com", large: true },
-    { kind: "img",  src: "/img/logos/usc-brain.png",         alt: "USC Center for Personalized Brain Health", href: "https://keck.usc.edu/cpbh",      rounded: true },
-    { kind: "img",  src: "/img/logos/superbiome.png",        alt: "Milieu Skin Microbiome",                   href: "https://milieuskin.com",          rounded: true },
-    { kind: "img",  src: "/img/logos/metaba.png",            alt: "Metaba Health",                            href: "https://metabahealth.us",         rounded: true },
-    { kind: "img",  src: "/img/logos/biotech-connection.png",alt: "Biotech Connection LA",                    href: "https://bc-la.org",               rounded: true },
-    { kind: "img",  src: "/img/logos/tranquilisimo.png", alt: "Tranquilísimo", href: "https://tranquilisimo.com" },
-  ];
+  const aura:    BrandItem = { kind: "img", src: "/img/logos/aura-white.png",        alt: "Your Aura Fragrance",                     href: "https://youraurafragrance.com", large: true };
+  const tranq:   BrandItem = { kind: "img", src: "/img/logos/tranquilisimo.png",     alt: "Tranquilísimo",                            href: "https://tranquilisimo.com" };
+  const brain:   BrandItem = { kind: "img", src: "/img/logos/usc-brain.png",         alt: "USC Center for Personalized Brain Health", href: "https://keck.usc.edu/cpbh",     rounded: true };
+  const bio:     BrandItem = { kind: "img", src: "/img/logos/biotech-connection.png",alt: "Biotech Connection LA",                    href: "https://bc-la.org",             rounded: true };
+  const metaba:  BrandItem = { kind: "img", src: "/img/logos/metaba.png",            alt: "Metaba Health",                            href: "https://metabahealth.us",       rounded: true };
+  const super_:  BrandItem = { kind: "img", src: "/img/logos/superbiome.png",        alt: "Milieu Skin Microbiome",                   href: "https://milieuskin.com",        rounded: true };
 
-  const all = [...brands, ...brands];
+  const all: BrandItem[] = [
+    brain, metaba, bio, super_, brain, aura,
+    metaba, bio, brain, super_, tranq, metaba,
+    bio, super_, aura, tranq,
+  ];
 
   function tooltip(href: string) {
     const domain = href.replace(/^https?:\/\//, "");
