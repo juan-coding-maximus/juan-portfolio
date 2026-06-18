@@ -104,7 +104,6 @@ export default function Page() {
       <GTMFramework />
       {/* 6. About + CTA */}
       <AskMyClone />
-      <Testimonials />
       <About />
       <CTA />
       <Footer />
@@ -1086,63 +1085,6 @@ function AskMyClone() {
           </div>
         </Reveal>
 
-      </div>
-    </section>
-  );
-}
-
-/* ====================================================
-   9. TESTIMONIALS
-==================================================== */
-function Testimonials() {
-  const testimonials = [
-    {
-      quote:
-        "Juan built our entire GTM motion and treated the company like his own. Most people deliver a slide deck. He delivered a system.",
-      who: "Past CEO / Founder",
-    },
-    {
-      quote:
-        "Turned chaos into systems no one else could build. He was the operating glue that held everything together.",
-      who: "Past Manager",
-    },
-    {
-      quote:
-        "Scrappy, AI-fluent, and relentless about results. Bilingual, operates at a pace that's hard to match.",
-      who: "Collaborator",
-    },
-  ];
-
-  return (
-    <section className="px-6 md:px-12 lg:px-20 py-16 md:py-24 border-t border-[#F2EFE6]/10">
-      <div className="max-w-7xl mx-auto">
-        <Reveal>
-          <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-8 md:mb-12">
-            What people say.
-          </h2>
-        </Reveal>
-        <div className="grid md:grid-cols-3 gap-6">
-          {testimonials.map((t, i) => (
-            <Reveal key={i} delay={i * 80}>
-              <div className="rounded-2xl border border-[#284A3C] p-6 bg-[#0e1813] h-full flex flex-col">
-                <p className="text-[#C9A24B] font-display text-4xl leading-none mb-3">
-                  &ldquo;
-                </p>
-                <p className="text-[#F2EFE6]/80 italic leading-relaxed mb-4 flex-1">
-                  {t.quote}
-                </p>
-                <p className="text-xs uppercase tracking-widest text-[#F2EFE6]/50">
-                  {t.who}
-                </p>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-        <Reveal delay={200}>
-          <p className="mt-8 text-xs text-[#F2EFE6]/30 italic">
-            * To be replaced with real quotes (names and companies pending permission).
-          </p>
-        </Reveal>
       </div>
     </section>
   );
