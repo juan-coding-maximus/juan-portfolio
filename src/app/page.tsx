@@ -337,7 +337,7 @@ function BrandStrip() {
       </div>
       <div
         className="flex gap-x-14 items-center whitespace-nowrap"
-        style={{ animation: "marquee 20s linear infinite" }}
+        style={{ animation: "marquee 60s linear infinite" }}
       >
         {all.map((item, i) => renderItem(item, i))}
       </div>
