@@ -270,7 +270,7 @@ function BrandStrip() {
   const super_:  BrandItem = { kind: "img", src: "/img/logos/superbiome.png",        alt: "Milieu Skin Microbiome",                   href: "https://milieuskin.com",        rounded: true };
 
   const all: BrandItem[] = [
-    brain, metaba, bio, super_, brain, aura,
+    aura, metaba, bio, super_, brain, aura,
     metaba, bio, brain, super_, tranq, metaba,
     bio, super_, aura, tranq,
   ];
@@ -337,7 +337,7 @@ function BrandStrip() {
       </div>
       <div
         className="flex gap-x-14 items-center whitespace-nowrap"
-        style={{ animation: "marquee 60s linear infinite" }}
+        style={{ animation: "marquee 20s linear infinite" }}
       >
         {all.map((item, i) => renderItem(item, i))}
       </div>
