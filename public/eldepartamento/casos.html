@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<base href="/eldepartamento/">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Casos · El Departamento</title>
+<meta name="description" content="Decisiones que cambiaron porque cambió lo que se sabía. Casos de investigación y estrategia.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="gate.js"></script>
+</head>
+<body>
+
+<header class="site-header" id="header">
+  <div class="container nav">
+    <a href="index.html" class="brand">El Departamento<span class="dot">.</span></a>
+    <nav class="nav-links">
+      <a href="index.html#hacemos">Qué hacemos</a>
+      <a href="casos.html">Casos</a>
+      <a href="index.html#metodo">Método</a>
+      <a href="index.html#equipo">Equipo</a>
+      <a href="index.html#contacto" class="nav-cta">Hablemos</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Menú" onclick="location.href='index.html#contacto'">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+<section class="index-head">
+  <div class="container">
+    <p class="eyebrow reveal">Casos</p>
+    <h1 class="display reveal d1" style="font-size:clamp(40px,7vw,88px);margin-top:22px;max-width:16ch">Decisiones que cambiaron porque cambió lo que se sabía.</h1>
+    <p class="lead reveal d2" style="margin-top:28px;max-width:54ch">Una selección del trabajo. Algunos casos son públicos; en otros, la marca queda reservada y mostramos solo la estructura de razonamiento. <span class="ph">contenido de muestra</span></p>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="container">
+    <div class="filters reveal">
+      <div class="filter-group" data-dim="sector">
+        <span class="fl">Sector</span>
+        <button class="chip active" data-val="all">Todos</button>
+        <button class="chip" data-val="consumo">Gran consumo</button>
+        <button class="chip" data-val="audio">Audio · Tech</button>
+        <button class="chip" data-val="auto">Automoción</button>
+        <button class="chip" data-val="retail">Retail</button>
+      </div>
+      <div class="filter-group" data-dim="tipo">
+        <span class="fl">Tipo</span>
+        <button class="chip active" data-val="all">Todos</button>
+        <button class="chip" data-val="cuali">Cuali</button>
+        <button class="chip" data-val="cuanti">Cuanti</button>
+        <button class="chip" data-val="mixto">Mixto</button>
+      </div>
+      <div class="filter-group" data-dim="estado">
+        <span class="fl">Estado</span>
+        <button class="chip active" data-val="all">Todos</button>
+        <button class="chip" data-val="publico">Público</button>
+        <button class="chip" data-val="anon">Anonimizado</button>
+      </div>
+    </div>
+
+    <div class="index-grid" id="grid">
+
+      <a href="caso.html" class="index-card" data-sector="consumo" data-tipo="mixto" data-estado="publico">
+        <div class="meta-row"><span class="tag">Cerveza</span><span class="state">Público</span><span class="ph">muestra</span></div>
+        <h3 class="h3">Una marca líder perdía a los de 25 sin que las ventas lo dijeran.</h3>
+        <p>Un cambio de ritual de consumo que el dato agregado escondía. Reorientó la campaña del año.</p>
+        <span class="go">Leer el caso <span class="ar">→</span></span>
+      </a>
+
+      <a href="caso.html" class="index-card" data-sector="audio auto" data-tipo="cuali" data-estado="anon">
+        <div class="meta-row"><span class="tag">Audio × Automoción</span><span class="state">Anonimizado</span><span class="ph">muestra</span></div>
+        <h3 class="h3">Spotify × Renault: ¿quién manda en la experiencia dentro del coche?</h3>
+        <p>Dos sub-públicos con expectativas opuestas sobre quién lidera el momento. Definió el reparto de marca.</p>
+        <span class="go">Leer el caso <span class="ar">→</span></span>
+      </a>
+
+      <a href="caso.html" class="index-card" data-sector="consumo retail" data-tipo="mixto" data-estado="anon">
+        <div class="meta-row"><span class="tag">Helados · Lanzamiento</span><span class="state">Anonimizado</span><span class="ph">muestra</span></div>
+        <h3 class="h3">Twister: gustaba en test y se hundía en lineal.</h3>
+        <p>No era el sabor: era el código de categoría en el momento de compra. El packaging salió más barato que la fórmula.</p>
+        <span class="go">Leer el caso <span class="ar">→</span></span>
+      </a>
+
+      <a href="caso.html" class="index-card" data-sector="consumo" data-tipo="cuanti" data-estado="publico">
+        <div class="meta-row"><span class="tag">Bebidas · Pricing</span><span class="state">Público</span><span class="ph">muestra</span></div>
+        <h3 class="h3">Cuánto podía subir el precio sin perder al comprador fiel.</h3>
+        <p>Sensibilidad al precio por sub-perfil real, no por media. Encontró el techo que el instinto no veía.</p>
+        <span class="go">Leer el caso <span class="ar">→</span></span>
+      </a>
+
+      <a href="caso.html" class="index-card" data-sector="audio" data-tipo="cuali" data-estado="anon">
+        <div class="meta-row"><span class="tag">Plataforma · Producto</span><span class="state">Anonimizado</span><span class="ph">muestra</span></div>
+        <h3 class="h3">Por qué se daban de baja justo cuando más usaban el producto.</h3>
+        <p>La fricción no estaba en el producto, estaba en lo que el usuario creía que estaba pagando. Cambió el onboarding.</p>
+        <span class="go">Leer el caso <span class="ar">→</span></span>
+      </a>
+
+      <a href="caso.html" class="index-card" data-sector="retail" data-tipo="mixto" data-estado="anon">
+        <div class="meta-row"><span class="tag">Retail · Posicionamiento</span><span class="state">Anonimizado</span><span class="ph">muestra</span></div>
+        <h3 class="h3">Una enseña querida que ya no sabía a quién le hablaba.</h3>
+        <p>Tres territorios posibles, uno solo defendible con el público que de verdad paga. Reescribió la promesa de marca.</p>
+        <span class="go">Leer el caso <span class="ar">→</span></span>
+      </a>
+
+    </div>
+    <div class="no-results" id="noResults">No hay casos con esos filtros. Prueba a soltar alguno.</div>
+  </div>
+</section>
+
+<section class="cta-final" style="background:var(--paper-2)">
+  <div class="container">
+    <h2 class="h2 reveal" style="margin:0 auto;max-width:18ch">Tu caso no está aquí. Todavía.</h2>
+    <p class="lead reveal d1">Si tienes una decisión que depende de entender algo que nadie te sabe explicar, ese es exactamente nuestro trabajo.</p>
+    <div class="acts reveal d1">
+      <a href="mailto:info@el-departamento.com" class="btn btn-amber">Plantear un proyecto <span class="ar">→</span></a>
+      <a href="index.html" class="btn btn-ghost">Volver al inicio</a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <div class="brand">El Departamento<span class="dot">.</span></div>
+        <p>Investigación que acaba en decisiones. Despacho independiente de investigación y estrategia desde 2013.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Navegar</h5>
+        <a href="index.html#hacemos">Qué hacemos</a>
+        <a href="casos.html">Casos</a>
+        <a href="index.html#metodo">Método</a>
+        <a href="index.html#equipo">Equipo</a>
+      </div>
+      <div class="footer-col">
+        <h5>Contacto</h5>
+        <a href="mailto:info@el-departamento.com">info@el-departamento.com</a>
+        <span>+34 918 052 508</span>
+        <span>Calle Soria 9, 2º · 28005 Madrid</span>
+      </div>
+    </div>
+    <div class="footer-base">
+      <span>© 2026 El Departamento · Investegia</span>
+      <span class="demo-note">Demo de reposicionamiento · casos de muestra para ilustrar el formato.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const header=document.getElementById('header');
+  const onScroll=()=>header.classList.toggle('scrolled',window.scrollY>10);
+  onScroll();window.addEventListener('scroll',onScroll,{passive:true});
+
+  const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.12});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+  // soft filters
+  const state={sector:'all',tipo:'all',estado:'all'};
+  const cards=[...document.querySelectorAll('.index-card')];
+  const noRes=document.getElementById('noResults');
+
+  document.querySelectorAll('.filter-group').forEach(group=>{
+    const dim=group.dataset.dim;
+    group.querySelectorAll('.chip').forEach(chip=>{
+      chip.addEventListener('click',()=>{
+        group.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+        chip.classList.add('active');
+        state[dim]=chip.dataset.val;
+        apply();
+      });
+    });
+  });
+
+  function matches(card){
+    return ['sector','tipo','estado'].every(dim=>{
+      if(state[dim]==='all')return true;
+      return (card.dataset[dim]||'').split(' ').includes(state[dim]);
+    });
+  }
+  function apply(){
+    let shown=0;
+    cards.forEach(card=>{
+      const ok=matches(card);
+      card.classList.toggle('hide',!ok);
+      if(ok){card.classList.remove('in');requestAnimationFrame(()=>card.classList.add('in'));shown++;}
+    });
+    noRes.style.display=shown?'none':'block';
+  }
+  cards.forEach(c=>c.classList.add('in'));
+</script>
+</body>
+</html>

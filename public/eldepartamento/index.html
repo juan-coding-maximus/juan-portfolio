@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<base href="/eldepartamento/">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>El Departamento · Investigación que acaba en decisiones</title>
+<meta name="description" content="Despacho de investigación y estrategia. Convertimos lo difícil de entender en una decisión que se puede defender. Investigación que acaba en decisiones.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="gate.js"></script>
+<style>
+  /* RAZONES / claims stack (integrado de brand-claims) */
+  .claims-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(18px,2.4vw,26px);margin-top:clamp(40px,6vw,64px)}
+  @media(max-width:860px){.claims-grid{grid-template-columns:1fr}}
+  .claim-card{background:var(--white);border:1px solid var(--line);border-radius:6px;padding:clamp(30px,3.4vw,42px);display:flex;flex-direction:column;min-height:286px;transition:transform .5s cubic-bezier(.2,.7,.2,1),box-shadow .5s,border-color .5s}
+  .claim-card:hover{transform:translateY(-3px);box-shadow:0 26px 60px -40px rgba(20,33,61,.5);border-color:var(--line-2)}
+  .claim-card .ct{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--amber-deep);margin-bottom:auto}
+  .claim-card .cb{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(27px,3vw,38px);line-height:1.02;letter-spacing:-.02em;margin:30px 0 16px}
+  .claim-card .cl{font-size:15.5px;color:var(--ink-soft);line-height:1.5}
+  .claim-card .cl b{color:var(--ink);font-weight:600}
+  .claim-banner{margin-top:clamp(18px,2.4vw,26px);background:var(--ink);color:var(--paper);border-radius:6px;padding:clamp(36px,4.6vw,60px);display:grid;grid-template-columns:1.5fr 1fr;gap:clamp(24px,3vw,44px);align-items:center}
+  @media(max-width:760px){.claim-banner{grid-template-columns:1fr;gap:24px}}
+  .claim-banner h3{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(26px,3.4vw,42px);line-height:1.05;letter-spacing:-.02em;max-width:24ch}
+  .claim-banner h3 .em{color:var(--amber)}
+  .claim-banner .why{display:flex;flex-direction:column;gap:11px;font-size:14.5px;color:#8893ad}
+  .claim-banner .why span{padding-left:20px;position:relative}
+  .claim-banner .why span::before{content:"+";position:absolute;left:0;color:var(--amber);font-weight:700}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="site-header" id="header">
+  <div class="container nav">
+    <a href="index.html" class="brand">El Departamento<span class="dot">.</span></a>
+    <nav class="nav-links">
+      <a href="#autoridad">Trayectoria</a>
+      <a href="#hacemos">Qué hacemos</a>
+      <a href="casos.html">Casos</a>
+      <a href="#metodo">Método</a>
+      <a href="#equipo">Equipo</a>
+      <a href="#contacto" class="nav-cta">Hablemos</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Menú">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+
+<!-- HERO -->
+<section class="hero" id="top">
+  <div class="container">
+    <p class="eyebrow reveal">Investigación · Estrategia · Decisión</p>
+    <h1 class="display reveal d1" style="margin-top:26px">Investigación que acaba en <span class="em">decisiones</span>.</h1>
+    <p class="lead hero-sub reveal d2">No entregamos informes para archivar. Convertimos lo difícil de entender, un mercado, una marca, una persona, en la decisión que tu equipo puede tomar el lunes y defender el martes.</p>
+    <div class="hero-actions reveal d2">
+      <a href="casos.html" class="btn btn-ink">Ver casos <span class="ar">→</span></a>
+      <a href="#contacto" class="btn btn-ghost">Plantear un proyecto</a>
+    </div>
+    <p class="hero-micro reveal d3">Trabajamos con quien tiene una decisión cara delante. Si solo necesitas un gráfico bonito, hay sitios más baratos.</p>
+    <hr class="hr hero-rule reveal">
+  </div>
+</section>
+
+<!-- AUTORIDAD: métricas + logos -->
+<section id="autoridad" style="padding-top:clamp(40px,5vw,60px)">
+  <div class="container">
+    <div class="metrics">
+      <div class="metric reveal"><div class="v">600</div><div class="k">estudios diseñados y dirigidos</div></div>
+      <div class="metric reveal d1"><div class="v">13 años</div><div class="k">independientes, desde 2013</div></div>
+      <div class="metric reveal d2"><div class="v">+200</div><div class="k">marcas asesoradas</div></div>
+      <div class="metric reveal d3"><div class="v">hasta 80k+</div><div class="k">por proyecto, de principio a decisión</div></div>
+    </div>
+
+    <div class="about" style="margin-top:clamp(72px,9vw,120px)">
+      <div class="reveal">
+        <p class="eyebrow" style="margin-bottom:20px">Sobre nosotros</p>
+        <h2 class="h2">El Departamento</h2>
+      </div>
+      <div class="about-body reveal d1">
+        <p>Tras más de 10 años trabajando juntos como equipo en una multinacional de investigación de mercados y consultoría de marcas, fundamos El Departamento en <b>2013</b>. Estamos convencidas de que el <b>rigor técnico</b> es perfectamente compatible con presentaciones atractivas, entretenidas y fáciles de entender.</p>
+      </div>
+    </div>
+
+    <div style="margin-top:clamp(56px,7vw,96px)">
+      <div class="reveal" style="display:flex;align-items:baseline;justify-content:space-between;gap:18px;flex-wrap:wrap">
+        <p class="clientes-label">Tenemos clientes de todos los colores.</p>
+        <p class="demo-note">logos reales de cliente · ordenados por color</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="marquee reveal" id="marquee" aria-label="Clientes de El Departamento">
+    <div class="band b1" id="band1"></div>
+    <div class="band b2" id="band2"></div>
+    <div class="band b3" id="band3"></div>
+  </div>
+</section>
+
+<!-- QUÉ HACEMOS REALMENTE -->
+<section id="hacemos">
+  <div class="container">
+    <div class="do-grid">
+      <div class="reveal">
+        <p class="eyebrow"><span class="idx">01</span>Qué hacemos realmente</p>
+        <h2 class="h2" style="margin-top:24px">No hacemos encuestas. Quitamos la duda de las decisiones que cuestan dinero.</h2>
+        <p class="lead" style="margin-top:26px;font-size:18px">La investigación es el medio. El producto es una decisión más clara: qué decir, a quién, a qué precio y por qué canal, antes de que el presupuesto salga por la puerta.</p>
+      </div>
+      <div class="do-list">
+        <div class="do-item reveal">
+          <div class="no">01</div>
+          <div>
+            <h4>Entender por qué no se vende lo que debería venderse</h4>
+            <p>Cuando el producto es bueno y el mercado no responde, el problema casi nunca está donde parece. Lo encontramos.</p>
+          </div>
+        </div>
+        <div class="do-item reveal">
+          <div class="no">02</div>
+          <div>
+            <h4>Saber a quién hablarle, con qué mensaje y a qué precio</h4>
+            <p>Sub-perfiles reales, no arquetipos de manual. El territorio de marca, la sensibilidad al precio y el canal donde sí están.</p>
+          </div>
+        </div>
+        <div class="do-item reveal">
+          <div class="no">03</div>
+          <div>
+            <h4>Validar antes de gastar, no después de fallar</h4>
+            <p>Concepto, packaging, campaña o lanzamiento: probado con método antes de comprometer la inversión grande.</p>
+          </div>
+        </div>
+        <div class="do-item reveal">
+          <div class="no">04</div>
+          <div>
+            <h4>Convertir mil datos en una sola decisión defendible</h4>
+            <p>Cuali y cuanti que terminan en una recomendación con dueño, no en un anexo de cien páginas que nadie abre.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CASOS (3 teasers) -->
+<section id="casos-teaser" style="background:var(--paper-2)">
+  <div class="container">
+    <div class="section-head reveal" style="max-width:none;display:flex;justify-content:space-between;align-items:baseline;gap:24px;flex-wrap:wrap">
+      <div>
+        <p class="eyebrow"><span class="idx">02</span>Casos</p>
+        <h2 class="h2" style="margin-top:22px;max-width:24ch">Tres decisiones que cambiaron porque cambió lo que se sabía.</h2>
+      </div>
+      <a href="casos.html" class="link-amber" style="white-space:nowrap">Todos los casos →</a>
+    </div>
+
+    <div class="cases-grid">
+      <a href="caso.html" class="case-card reveal">
+        <div>
+          <div class="meta-row">
+            <span class="tag dot">Gran consumo · Cerveza</span>
+            <span class="state">Caso público</span>
+            <span class="ph">muestra</span>
+          </div>
+          <h3 class="h3">Por qué una marca líder estaba perdiendo a los de 25 sin que las ventas lo dijeran todavía.</h3>
+          <p class="found">Lo que apareció no fue una preferencia de producto, sino <b>un cambio de ritual de consumo</b> que el dato agregado escondía. Reorientó la campaña del año.</p>
+        </div>
+        <span class="go">Leer el caso <span class="ar">→</span></span>
+      </a>
+
+      <a href="caso.html" class="case-card reveal">
+        <div>
+          <div class="meta-row">
+            <span class="tag dot">Audio × Automoción</span>
+            <span class="state">Anonimizado</span>
+            <span class="ph">muestra</span>
+          </div>
+          <h3 class="h3">Spotify × Renault: si dos marcas se juntan en el coche, ¿quién manda en la experiencia?</h3>
+          <p class="found">El estudio reveló <b>dos sub-públicos con expectativas opuestas</b> sobre quién debía "liderar" el momento. Definió el reparto de marca del partnership.</p>
+        </div>
+        <span class="go">Leer el caso <span class="ar">→</span></span>
+      </a>
+
+      <a href="caso.html" class="case-card reveal">
+        <div>
+          <div class="meta-row">
+            <span class="tag dot">Helados · Lanzamiento</span>
+            <span class="state">Anonimizado</span>
+            <span class="ph">muestra</span>
+          </div>
+          <h3 class="h3">Twister: un sabor que gustaba en test y se hundía en lineal. ¿Qué fallaba?</h3>
+          <p class="found">No era el sabor. Era <b>el código de la categoría en el momento de compra</b>. Cambiar el packaging salió mucho más barato que cambiar la fórmula.</p>
+        </div>
+        <span class="go">Leer el caso <span class="ar">→</span></span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- CÓMO PIENSAN (manifiesto) -->
+<section class="manifesto" id="manifiesto">
+  <div class="container">
+    <p class="eyebrow reveal"><span class="idx">03</span>Cómo pensamos</p>
+    <div class="manifesto-list">
+      <p class="manifesto-line reveal">Un dato sin decisión es <span class="em">entretenimiento caro</span>.</p>
+      <p class="manifesto-line reveal d1">La pregunta correcta vale más que mil respuestas a la equivocada.</p>
+      <p class="manifesto-line reveal d2">Lo que la mayoría dice importa. Lo que dice la minoría que crece, <span class="em">decide</span>.</p>
+      <p class="manifesto-line reveal d3">Si no se lo puedes explicar a tu jefe en una frase, no lo has entendido.</p>
+    </div>
+    <p class="manifesto-foot reveal">Por eso no entregamos informes de archivar. Entregamos una decisión con dueño, fecha y argumento. El resto es bibliografía.</p>
+  </div>
+</section>
+
+<!-- MÉTODO (fases) -->
+<section id="metodo">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="eyebrow"><span class="idx">04</span>Método</p>
+      <h2 class="h2" style="margin-top:22px">De la pregunta de negocio a la decisión. Cinco pasos, sin relleno.</h2>
+    </div>
+    <div class="phases">
+      <div class="phase reveal">
+        <div class="pn">01</div>
+        <h4>Encuadre</h4>
+        <p>Antes de investigar, acordamos cuál es la decisión real que hay que tomar. La mitad del valor está aquí.</p>
+      </div>
+      <div class="phase reveal d1">
+        <div class="pn">02</div>
+        <h4>Diseño</h4>
+        <p>Elegimos el método por la pregunta, no por costumbre. Cuali donde hay que entender, cuanti donde hay que medir.</p>
+      </div>
+      <div class="phase reveal">
+        <div class="pn">03</div>
+        <h4>Campo</h4>
+        <p>Ejecutamos con rigor y con IA donde acelera, sin perder el contacto humano que ningún panel sintético sustituye.</p>
+      </div>
+      <div class="phase reveal d1">
+        <div class="pn">04</div>
+        <h4>Lectura</h4>
+        <p>El paso que casi todos saltan: qué significa esto para tu marca, en concreto, en tu mercado, esta temporada.</p>
+      </div>
+      <div class="phase reveal" style="grid-column:1 / -1">
+        <div class="pn">05</div>
+        <h4>Decisión</h4>
+        <p style="max-width:64ch">La entrega no es un PDF. Es la recomendación: el mensaje, el sub-perfil, el precio y el canal. Y lo que conscientemente dejamos fuera, con su porqué.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- RAZONES PARA CREERNOS (claims) -->
+<section id="razones">
+  <div class="container">
+    <div class="section-head reveal" style="max-width:36ch">
+      <p class="eyebrow"><span class="idx">05</span>Razones para creernos</p>
+      <h2 class="h2" style="margin-top:22px">Todo lo que decimos es cierto, y se puede demostrar.</h2>
+    </div>
+    <div class="claims-grid">
+      <div class="claim-card reveal">
+        <div class="ct">La disciplina</div>
+        <div class="cb">Inventamos la <span class="amber">Investegia</span>.</div>
+        <div class="cl">Una forma de trabajar propia: <b>investigación + estrategia</b>. No la copiamos, la creamos. Hasta escribimos el libro.</div>
+      </div>
+      <div class="claim-card reveal d1">
+        <div class="ct">La confianza</div>
+        <div class="cb">De Coca-Cola a Google.</div>
+        <div class="cl">Santander, Mahou, Ballantine's, Facebook, IE. <b>Las marcas más exigentes de España</b> nos eligen. Y repiten.</div>
+      </div>
+      <div class="claim-card reveal d2">
+        <div class="ct">La autoridad</div>
+        <div class="cb">Formamos a los que investigan.</div>
+        <div class="cl">Docentes en el <b>IE</b> y en universidad. Enseñamos la disciplina que después trabaja para ti.</div>
+      </div>
+    </div>
+    <div class="claim-banner reveal">
+      <h3>Por tamaño, calidad, agilidad y trato, no hay <span class="em">mejor equipo de Investegia</span> en España.</h3>
+      <div class="why">
+        <span>Senior real, cero junior</span>
+        <span>Guante blanco y agilidad</span>
+        <span>De la idea a la campaña validada</span>
+        <span>Las marcas más exigentes, y repiten</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- EQUIPO -->
+<section id="equipo" style="background:var(--paper-2)">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="eyebrow"><span class="idx">06</span>Equipo</p>
+      <h2 class="h2" style="margin-top:22px">Cinco socios. Casi un siglo de oficio sumado. Cero junior en la sala.</h2>
+      <p class="lead" style="margin-top:22px;font-size:18px">Quien te vende el proyecto es quien lo dirige. <span class="ph">datos de muestra</span></p>
+    </div>
+    <div class="team-grid">
+      <div class="member reveal">
+        <div class="por">JA</div>
+        <h4>Javier Arenas</h4>
+        <div class="role">Socio fundador · Cuantitativa</div>
+        <ul class="creds">
+          <li>30 años en investigación de mercados</li>
+          <li>Profesor de cuantitativa en el IE</li>
+          <li>Sociólogo</li>
+        </ul>
+      </div>
+      <div class="member reveal d1">
+        <div class="por">BD</div>
+        <h4>Beatriz Domínguez</h4>
+        <div class="role">Socia · Estrategia</div>
+        <ul class="creds">
+          <li>~20 años en investigación y estrategia</li>
+          <li>Docente de planificación estratégica</li>
+          <li>Socióloga + marketing</li>
+        </ul>
+      </div>
+      <div class="member reveal d2">
+        <div class="por">LC</div>
+        <h4>Lourdes Carmona</h4>
+        <div class="role">Socia · Análisis</div>
+        <ul class="creds">
+          <li>~20 años en análisis del consumidor</li>
+          <li>Especialista en estadística aplicada</li>
+          <li>Socióloga (U. Granada)</li>
+        </ul>
+      </div>
+      <div class="member reveal">
+        <div class="por">CP</div>
+        <h4>Carolina Pallardó</h4>
+        <div class="role">Socia · Datos & Social</div>
+        <ul class="creds">
+          <li>En investigación desde 2011</li>
+          <li>Big data, redes y técnicas cuanti</li>
+          <li>Socióloga y politóloga</li>
+        </ul>
+      </div>
+      <div class="member reveal d1">
+        <div class="por">PC</div>
+        <h4>Paula Campos</h4>
+        <div class="role">Socia · Insight & Relato</div>
+        <ul class="creds">
+          <li>~10 años cuanti + visualización</li>
+          <li>Convierte el dato en relato accionable</li>
+          <li>Publicista</li>
+        </ul>
+      </div>
+      <div class="member reveal d2" style="display:flex;flex-direction:column;justify-content:center;background:var(--ink);border-color:var(--ink)">
+        <h4 class="serif" style="color:var(--paper);font-size:24px">Investegia.</h4>
+        <p style="color:#9aa3bb;font-size:14.5px;margin-top:10px">Investigación + estrategia. La disciplina que inventamos, y sobre la que escribimos el libro.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA FINAL -->
+<section class="cta-final" id="contacto">
+  <div class="container">
+    <p class="eyebrow reveal" style="display:flex;justify-content:center">Hablemos</p>
+    <h2 class="h2 reveal d1" style="margin-top:24px">¿Tienes una decisión cara por delante?</h2>
+    <p class="lead reveal d1">Cuéntanos qué tienes que decidir. Te diremos si podemos quitarte la duda, y cómo. La primera conversación no se factura.</p>
+    <div class="acts reveal d2">
+      <a href="mailto:info@el-departamento.com" class="btn btn-amber">Plantear un proyecto <span class="ar">→</span></a>
+      <a href="casos.html" class="btn btn-ghost">Ver cómo trabajamos</a>
+    </div>
+    <p class="micro reveal d2">Madrid · Calle Soria 9 · +34 918 052 508</p>
+  </div>
+</section>
+
+</main>
+
+<!-- FOOTER -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <div class="brand">El Departamento<span class="dot">.</span></div>
+        <p>Investigación que acaba en decisiones. Despacho independiente de investigación y estrategia desde 2013.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Navegar</h5>
+        <a href="#hacemos">Qué hacemos</a>
+        <a href="casos.html">Casos</a>
+        <a href="#metodo">Método</a>
+        <a href="#equipo">Equipo</a>
+      </div>
+      <div class="footer-col">
+        <h5>Contacto</h5>
+        <a href="mailto:info@el-departamento.com">info@el-departamento.com</a>
+        <span>+34 918 052 508</span>
+        <span>Calle Soria 9, 2º · 28005 Madrid</span>
+      </div>
+    </div>
+    <div class="footer-base">
+      <span>© 2026 El Departamento · Investegia</span>
+      <span class="demo-note">Demo de reposicionamiento · logos, casos y cifras de equipo son contenido de muestra para ilustrar el formato.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // header border on scroll
+  const header=document.getElementById('header');
+  const onScroll=()=>header.classList.toggle('scrolled',window.scrollY>10);
+  onScroll();window.addEventListener('scroll',onScroll,{passive:true});
+
+  // soft reveal
+  const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.14,rootMargin:'0px 0px -8% 0px'});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+  // mobile nav: jump to contact
+  document.querySelector('.nav-toggle').addEventListener('click',()=>{document.getElementById('contacto').scrollIntoView({behavior:'smooth'})});
+
+  // ---- LOGO MARQUEE (3 bandas) ----
+  // logo: slug de PNG real en /logos. null = tarjeta con nombre (sustituir por PNG real).
+  // Ordenado por color (rojo -> naranja -> amarillo -> verde -> teal -> azul -> púrpura -> negro/gris),
+  // para que el tono fluya en diagonal a través de las 3 bandas (banda = índice % 3).
+  const CLIENTES=[
+    {n:'Coca-Cola',logo:'cocacola'},{n:'Santander',logo:'santander'},{n:'¡HOLA!',logo:'hola'},
+    {n:'Mahou',logo:'mahou'},{n:'FEV',logo:'fev'},{n:'DYC',logo:'dyc'},
+    {n:'Cinco Jotas',logo:'cincojotas'},{n:'La Casera',logo:'la-casera'},{n:'Amstel',logo:'amstel'},
+    {n:'Airbnb',logo:'airbnb'},{n:'Yatekomo',logo:'yatekomo'},{n:'ABC',logo:'abc'},
+    {n:'Gallina Blanca',logo:'gallinablanca'},{n:'Famosa',logo:'famosa'},{n:'Beefeater',logo:'beefeater'},
+    {n:'Larios',logo:'larios'},{n:'Bankinter',logo:'bankinter'},{n:'PC Componentes',logo:'pccomponentes'},
+    {n:'Orange',logo:'orange'},{n:'Cupra',logo:'cupra'},{n:'Glovo',logo:'glovo'},
+    {n:"Ballantine's",logo:'ballantines'},{n:'Correos',logo:'correos'},{n:'IKEA',logo:'ikea'},
+    {n:'Renault',logo:'renault'},{n:'Ladrón de Manzanas',logo:'ladron'},{n:'Oxfam',logo:'oxfam'},
+    {n:'Jolca',logo:'jolca'},{n:'Sportium',logo:'sportium'},{n:'Caja Rural de Navarra',logo:'cajaruralnavarra'},
+    {n:'Heineken',logo:'heineken'},{n:'Spotify',logo:'spotify'},{n:'Contra el Cáncer',logo:'aecc'},
+    {n:'Cervezas Alhambra',logo:'alhambra'},{n:'Deoleo',logo:'deoleo'},{n:'Deliveroo',logo:'deliveroo'},
+    {n:'Twitter',logo:'twitter'},{n:'Sanitas',logo:'sanitas'},{n:'Solán de Cabras',logo:'solandecabras'},
+    {n:'Danone',logo:'danone'},{n:'Lactalis',logo:'lactalis'},{n:'Pascual',logo:'pascual'},
+    {n:'Mutua Madrileña',logo:'mutua'},{n:'Brugal',logo:'brugal'},{n:'Facebook',logo:'facebook'},
+    {n:'BBVA',logo:'bbva'},{n:'IE',logo:'ie'},{n:'Google',logo:'google'},
+    {n:'Fuerte Hoteles',logo:'fuertehoteles'},{n:'Quirónsalud',logo:'quironsalud'},{n:'Delaviuda',logo:'delaviuda'},
+    {n:'Osborne',logo:'osborne'},{n:'Nestlé',logo:'nestle'},{n:'Webedia',logo:'webedia'},
+    {n:'Plataforma de ONG',logo:'plataforma'}
+  ];
+  function cardHTML(c){
+    if(c.logo){return `<div class="client-card"><img src="logos/${c.logo}.png" alt="${c.n}" loading="lazy"></div>`;}
+    return `<div class="client-card"><span class="nm">${c.n}</span></div>`;
+  }
+  const bands=[document.getElementById('band1'),document.getElementById('band2'),document.getElementById('band3')];
+  const buckets=[[],[],[]];
+  CLIENTES.forEach((c,i)=>buckets[i%3].push(c));
+  bands.forEach((band,bi)=>{
+    const set=buckets[bi].map(cardHTML).join('');
+    band.innerHTML=set+set; // duplicado para loop continuo
+  });
+</script>
+</body>
+</html>
