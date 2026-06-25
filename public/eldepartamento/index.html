@@ -196,6 +196,12 @@
   @media(max-width:540px){.ia-side-legs{flex-direction:column}}
   .ia-copy{font-size:clamp(15px,1.7vw,17.5px);color:#c8cee0;max-width:62ch;line-height:1.68;margin-bottom:14px}
   .ia-remate{font-family:'Fraunces',serif;font-weight:600;font-size:clamp(22px,3vw,36px);color:var(--paper);margin-top:36px;max-width:34ch;line-height:1.1}
+  /* two cited proofs */
+  .proofs{display:grid;grid-template-columns:1fr 1fr;gap:34px;margin-top:42px;max-width:760px}
+  .proof{border-left:3px solid var(--gold);padding:2px 0 2px 22px}
+  .proof .pfig{font-family:'Fraunces',serif;font-weight:600;font-size:clamp(42px,6.2vw,62px);line-height:1;color:var(--gold);letter-spacing:-.02em}
+  .proof .pclaim{font-size:clamp(14px,1.6vw,16.5px);color:#c8cee0;line-height:1.5;margin-top:12px;max-width:32ch}
+  @media(max-width:640px){.proofs{grid-template-columns:1fr;gap:26px}}
   /* value ladder */
   .vlad{margin-top:48px;max-width:620px}
   .vlstep{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:center;padding:18px 0 18px 22px;border-top:1px solid rgba(200,206,224,.1);border-left-width:3px;border-left-style:solid}
@@ -581,6 +587,21 @@
     </div>
     <p class="ia-copy reveal">En este mercado, la marca no es estética. Es una promesa de criterio, reputación y efectividad.</p>
     <p class="ia-remate reveal">Una buena marca produce confianza visible, y esa confianza se traduce en tarifa.</p>
+    <div class="proofs reveal">
+      <div class="proof">
+        <div class="pfig">+38%</div>
+        <p class="pclaim">Paga de más quien percibe una marca como significativamente diferente.</p>
+      </div>
+      <div class="proof">
+        <div class="pfig">5-10%</div>
+        <p class="pclaim">El sobreprecio de las marcas B2B más fuertes: se paga por reducir el riesgo de decidir.</p>
+      </div>
+    </div>
+    <div class="srcs reveal" style="max-width:760px;margin-top:30px">
+      <div class="sh">Fuentes</div>
+      <a class="src" href="https://www.kantar.com/inspiration/brands/why-pricing-power-is-a-brands-greatest-asset" target="_blank" rel="noopener noreferrer">Why pricing power is a brand&rsquo;s greatest asset <span class="meta"><span class="mid">&middot;</span> Kantar BrandZ</span></a>
+      <a class="src" href="https://www.mckinsey.com/industries/industrials-and-electronics/our-insights/the-rising-value-of-industrial-brands" target="_blank" rel="noopener noreferrer">The rising value of industrial brands <span class="meta"><span class="mid">&middot;</span> McKinsey <span class="mid">&middot;</span> 2021</span></a>
+    </div>
   </div>
 </section>
 
@@ -655,11 +676,11 @@
       </div>
       <div class="slot">
         <div class="time">1:25<small>20 MIN</small></div>
-        <div><div class="name">Dinámica 4</div><h4>Titular o firma</h4><p>Dos columnas: lo que ya no puede ser titular, y lo que sí debe liderar. Qué parte del carácter sigue viva al subir de categoría, y qué ya no es ingenio sino costumbre.</p></div>
+        <div><div class="name">Dinámica 4</div><h4>Titular o firma</h4><p>Dos columnas: lo que ya no puede ser titular, y lo que sí debe liderar. Qué parte del carácter sigue viva al subir de categoría, y qué ya no es ingenio sino error de posicionamiento.</p></div>
       </div>
       <div class="slot">
         <div class="time">1:45<small>15 MIN</small></div>
-        <div><div class="name">Cierre</div><h4>El siguiente paso, y el motor</h4><p>No cerramos una web. Salimos con los 3 casos elegidos, un primer borrador de posicionamiento y una idea concreta: un motor de IA sobre vuestros 200+ clientes dormidos que redacta, con base real, por qué merece la pena volver a hablar con cada uno. Lo que mejor sé construir, listo para vosotros.</p></div>
+        <div><div class="name">Cierre</div><h4>El siguiente paso, y el motor</h4><p>Salimos con los 3 casos elegidos, un primer borrador de posicionamiento y una idea concreta: un motor de IA sobre vuestros 200+ clientes dormidos que redacta, con base real, por qué merece la pena volver a hablar con cada uno. Lo que mejor sé construir, a medida para vosotras.</p></div>
       </div>
     </div>
   </div>
