@@ -120,16 +120,18 @@ function Hero() {
       {/* video bg + scrim */}
       <div className="absolute inset-0 -z-10">
         <video
-          className="w-full h-full object-cover opacity-40"
+          className="w-full h-full object-cover opacity-50"
+          style={{ objectPosition: "center 35%" }}
           autoPlay
           muted
           loop
           playsInline
-          poster="/img/hero_poster.jpg"
         >
-          <source src="/video/hero.mp4" type="video/mp4" />
+          <source src="/video/portfolio-hero.webm" type="video/webm" />
+          <source src="/video/portfolio-hero.mp4" type="video/mp4" />
         </video>
-        <div className="absolute inset-0 bg-gradient-to-b from-[#13201A]/70 via-[#13201A]/40 to-[#13201A]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#13201A]/60 via-[#13201A]/30 to-[#13201A]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#13201A]/50 via-transparent to-[#13201A]/50" />
       </div>
 
       {/* Juan portrait — right side, fades left into the dark bg */}
