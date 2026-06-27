@@ -127,7 +127,6 @@ function Hero() {
           loop
           playsInline
         >
-          <source src="/video/portfolio-hero.webm" type="video/webm" />
           <source src="/video/portfolio-hero.mp4" type="video/mp4" />
         </video>
         <div className="absolute inset-0 bg-gradient-to-b from-[#13201A]/60 via-[#13201A]/30 to-[#13201A]" />
