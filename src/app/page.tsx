@@ -115,20 +115,37 @@ export default function Page() {
    1. HERO
 ==================================================== */
 function Hero() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // The bare autoPlay attribute is unreliable here (the muted bg video
+  // intermittently stays at readyState 0 / paused on first load). Kick it
+  // explicitly on mount and again once it can play, mirroring the project
+  // videos which use the same .play() pattern and never stall.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const kick = () => video.play().catch(() => {});
+    kick();
+    video.addEventListener("canplay", kick);
+    return () => video.removeEventListener("canplay", kick);
+  }, []);
+
   return (
     <section className="relative min-h-screen flex flex-col justify-center px-6 md:px-12 lg:px-20 py-20 overflow-hidden">
       {/* video bg + scrim */}
       <div className="absolute inset-0 -z-10">
         <video
+          ref={videoRef}
           className="w-full h-full object-cover opacity-50"
           style={{ objectPosition: "center 35%" }}
           autoPlay
           muted
           loop
           playsInline
-        >
-          <source src="/video/portfolio-hero.mp4" type="video/mp4" />
-        </video>
+          preload="auto"
+          poster="/img/hero_poster.jpg"
+          src="/video/portfolio-hero.mp4"
+        />
         <div className="absolute inset-0 bg-gradient-to-b from-[#13201A]/60 via-[#13201A]/30 to-[#13201A]" />
         <div className="absolute inset-0 bg-gradient-to-r from-[#13201A]/50 via-transparent to-[#13201A]/50" />
       </div>
