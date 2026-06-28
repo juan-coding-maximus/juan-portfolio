@@ -152,20 +152,6 @@ function Hero() {
         <div className="absolute inset-0 bg-gradient-to-r from-[#13201A]/35 via-transparent to-[#13201A]/35" />
       </div>
 
-      {/* Juan portrait — right side, fades left into the dark bg */}
-      <div className="absolute inset-y-0 right-0 w-1/2 md:w-2/5 -z-10 hidden md:block">
-        <Image
-          src="/img/juan-usc.png"
-          alt=""
-          fill
-          className="object-cover object-top opacity-30"
-          sizes="40vw"
-          priority
-        />
-        {/* gradient fade from left so portrait bleeds into the dark naturally */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#13201A] via-[#13201A]/60 to-transparent" />
-      </div>
-
       {/* nav */}
       <div className="absolute top-12 left-6 right-6 md:top-6 md:left-12 md:right-12 flex justify-between items-center text-sm">
         <Image
