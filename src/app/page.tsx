@@ -136,18 +136,20 @@ function Hero() {
       <div className="absolute inset-0 -z-10">
         <video
           ref={videoRef}
-          className="w-full h-full object-cover opacity-50"
-          style={{ objectPosition: "center 35%" }}
+          className="w-full h-full object-cover"
+          style={{ objectPosition: "center 30%" }}
           autoPlay
           muted
           loop
           playsInline
           preload="auto"
-          poster="/img/hero_poster.jpg"
+          poster="/img/portfolio-hero-poster.jpg"
           src="/video/portfolio-hero.mp4"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#13201A]/60 via-[#13201A]/30 to-[#13201A]" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#13201A]/50 via-transparent to-[#13201A]/50" />
+        {/* scrim: video stays clearly visible through the middle; darken only
+            top (nav) and bottom (scroll cue / grounds into next section) */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#13201A]/75 via-[#13201A]/20 to-[#13201A]/95" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#13201A]/35 via-transparent to-[#13201A]/35" />
       </div>
 
       {/* Juan portrait — right side, fades left into the dark bg */}
@@ -183,7 +185,10 @@ function Hero() {
       </div>
 
       {/* headline */}
-      <div className="max-w-6xl mx-auto w-full text-center">
+      <div
+        className="max-w-6xl mx-auto w-full text-center"
+        style={{ textShadow: "0 2px 28px rgba(8,14,11,0.85), 0 1px 4px rgba(8,14,11,0.7)" }}
+      >
         <h1 className="font-display font-light leading-[0.95] text-[clamp(3rem,11vw,9rem)] tracking-tight">
           JUAN ARENAS
         </h1>
