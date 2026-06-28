@@ -131,7 +131,7 @@ function Hero() {
   }, []);
 
   return (
-    <section className="relative min-h-screen flex flex-col justify-center px-6 md:px-12 lg:px-20 py-20 overflow-hidden">
+    <section className="relative isolate min-h-screen flex flex-col justify-center px-6 md:px-12 lg:px-20 py-20 overflow-hidden">
       {/* video bg + scrim */}
       <div className="absolute inset-0 -z-10">
         <video
