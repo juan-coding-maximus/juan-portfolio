@@ -1,827 +1,416 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<base href="/eldepartamento/">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>El Departamento · Strategy Morning · Martes 30 de junio</title>
+<title>El Departamento · Investigación que acaba en decisiones</title>
+<meta name="description" content="Despacho de investigación y estrategia. Convertimos lo difícil de entender en una decisión que se puede defender. Investigación que acaba en decisiones.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<meta name="robots" content="noindex, nofollow">
-<meta property="og:type" content="website">
-<meta property="og:url" content="https://eldepartamento.com">
-<meta property="og:site_name" content="El Departamento">
-<meta property="og:title" content="El Departamento · Una invitación">
-<meta property="og:description" content="Has recibido una invitación para abrir esta propuesta.">
-<meta property="og:image" content="https://eldepartamento.com/og-invitation.png?v=2">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Una invitación de El Departamento">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="El Departamento · Una invitación">
-<meta name="twitter:description" content="Has recibido una invitación para abrir esta propuesta.">
-<meta name="twitter:image" content="https://eldepartamento.com/og-invitation.png?v=2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
 <style>
-  :root{
-    --paper:#F4F0E8; --ink:#16120C; --ink-soft:#4A4337;
-    --navy:#152138; --navy-soft:#27344f;
-    --blue:#2238D0; --red:#EC3B1A; --gold:#C98A22;
-    --line:#D8CFBE; --line-2:#C6BBA6;
-    --card:#FBF8F2; --maxw:1140px;
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  html{scroll-behavior:smooth}
-  body{background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;line-height:1.55;overflow-x:hidden}
-  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 32px}
-  .serif{font-family:'Fraunces',serif}
-  .mono{font-family:'Spline Sans Mono',monospace}
+  /* ---- h2 override: wider + smaller max so headings stay horizontal ---- */
+  .h2{font-size:clamp(24px,3.2vw,44px)}
+  .section-head{max-width:none}   /* override default 30ch constraint */
 
-  /* line-break quality: balanced display headings, no single-word widows in body copy.
-     Modern engines pick the breaks; on the narrow phone folds this kills hanging lines. */
-  h1,.hero h1,h2.big,.close h2,.qopen .small,.qopen .punch,.punch,.signal .punch,
-  .scase .q,.qrow .qt,.slot h4,.kicker,.priceline,.close .prep .pt,.me .box h2{text-wrap:balance}
-  .lead,.sub,.hero .sub,.qrow .body .inner,.slot p,.close .prep .pd,
-  .scase .qx,.me .box p,.close p{text-wrap:pretty}
-
-  /* progress bar */
-  #prog{position:fixed;top:0;left:0;height:3px;width:0;background:var(--red);z-index:80;transition:width .08s linear}
-
-  .topbar{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;justify-content:space-between;align-items:center;padding:14px 32px;background:rgba(244,240,232,.86);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
-  .topbar .lock{font-family:'Fraunces',serif;font-weight:600;font-size:15px}
-  .topbar .lock b{color:var(--red)}
-  .topbar .when{font-family:'Spline Sans Mono',monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
-  .topbar .when b{color:var(--red);font-weight:600}
-  .topbar .countdown{font-family:'Spline Sans Mono',monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
-
-  section{padding:104px 0;position:relative;border-bottom:1px solid var(--line)}
-  section.dark{background:var(--navy);color:var(--paper);border-bottom:1px solid var(--navy-soft)}
-  .eyebrow{font-family:'Spline Sans Mono',monospace;font-size:13px;letter-spacing:.22em;text-transform:uppercase;color:var(--red);display:flex;align-items:center;gap:10px;margin-bottom:26px}
-  .eyebrow::before{content:"";width:26px;height:1px;background:var(--red)}
-  .dark .eyebrow{color:var(--gold)} .dark .eyebrow::before{background:var(--gold)}
-  .num{font-family:'Spline Sans Mono',monospace;font-size:12px;color:var(--ink-soft);letter-spacing:.1em}
-
-  h2.big{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(33px,5.2vw,64px);line-height:1.02;letter-spacing:-.02em;max-width:20ch}
-  .lead{font-size:clamp(17px,1.9vw,20px);color:var(--ink-soft);max-width:62ch;margin-top:24px}
-  .dark .lead{color:#c8cee0}
-
-  /* HERO */
-  .hero{min-height:96vh;min-height:96dvh;display:flex;flex-direction:column;justify-content:center;padding-top:96px;background:var(--navy);color:var(--paper);border-bottom:1px solid var(--navy-soft)}
-  .hero .kick{font-family:'Spline Sans Mono',monospace;font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--gold);margin-bottom:30px}
-  .hero h1{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(40px,7.2vw,100px);line-height:.99;letter-spacing:-.025em;max-width:15ch}
-  .hero h1 .g{color:var(--gold)}
-  .hero .sub{margin-top:32px;font-size:clamp(17px,2vw,22px);max-width:54ch;color:#c8cee0;font-style:italic;font-family:'Fraunces',serif;font-weight:300}
-  .hero .meta{margin-top:44px;display:flex;gap:14px;flex-wrap:wrap}
-  .hero .pill,.close .pill{font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#c8cee0;border:1px solid var(--navy-soft);border-radius:100px;padding:9px 15px;display:flex;align-items:center;gap:8px}
-  .hero .pill b{color:var(--gold);font-weight:600}
-  .hero .firstbrief{margin-top:30px;font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.06em;color:#8893ab}
-  .hero .sub-note{margin-top:14px;font-size:clamp(13px,1.5vw,16px);color:#8893ab;font-family:'Spline Sans Mono',monospace;letter-spacing:.04em}
-  .pill-action{position:relative;cursor:pointer;text-decoration:none;color:inherit;transition:border-color .2s,background .2s}
-  .pill-action:hover{border-color:var(--gold);background:rgba(201,138,34,.1)}
-  .pill-tip{position:absolute;bottom:calc(100% + 7px);left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);font-family:'Spline Sans Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:5px 10px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .18s;z-index:10}
-  .pill-action:hover .pill-tip{opacity:1}
-
-  /* OPENING QUESTION */
-  .qopen{min-height:88vh;display:flex;align-items:center}
-  .qopen .small{font-family:'Fraunces',serif;font-weight:400;font-size:clamp(24px,3.4vw,40px);line-height:1.12;color:var(--ink-soft);max-width:22ch}
-  .qopen .punch{font-family:'Fraunces',serif;font-weight:600;font-size:clamp(30px,4.8vw,60px);line-height:1.04;letter-spacing:-.02em;max-width:20ch;margin-top:20px}
-  .qopen .ask{margin-top:34px;font-size:18px;color:var(--gold);font-style:italic;font-family:'Fraunces',serif;font-weight:500;max-width:50ch}
-
-  /* ANNOTATED HEADING (red-pencil margin note) */
-  .vos{position:relative;white-space:nowrap}
-  .annot{position:absolute;left:calc(100% + 6px);top:46%;transform:translateY(-50%);display:flex;align-items:center;gap:2px;pointer-events:none}
-  .annot .annot-arrow{width:clamp(48px,5vw,74px);height:auto;flex:none}
-  .annot .note{font-family:'Caveat',cursive;color:var(--red);font-weight:600;font-size:clamp(17px,2vw,25px);line-height:1.0;transform:rotate(-3deg);white-space:nowrap}
-  @media(max-width:760px){
-    .vos{white-space:normal}
-    .annot{position:static;transform:none;margin-top:12px;justify-content:flex-start}
-    .annot .note{white-space:normal}
-  }
-  .dare{font-family:'Fraunces',serif;font-style:italic;font-weight:500;font-size:clamp(15px,1.6vw,18px);line-height:1.2;color:var(--ink-soft);margin-top:46px}
-  .dare + .qs{margin-top:16px}
-
-  /* UNCOMFORTABLE QUESTIONS (accordion) */
-  .qs{margin-top:42px;display:flex;flex-direction:column;gap:0}
-  .qrow{border-top:1px solid var(--line);padding:0;cursor:pointer;transition:background .25s}
-  .qrow:last-child{border-bottom:1px solid var(--line)}
-  .qrow:hover{background:var(--card)}
-  .qrow .head{display:grid;grid-template-columns:54px 1fr 32px;gap:20px;align-items:center;padding:28px 0}
-  .qrow .ix{font-family:'Spline Sans Mono',monospace;font-size:13px;color:var(--red)}
-  .qrow .qt{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(19px,2.3vw,27px);line-height:1.18}
-  .qrow .pm{width:24px;height:24px;justify-self:end;position:relative}
-  .qrow .pm::before,.qrow .pm::after{content:"";position:absolute;background:var(--red);transition:transform .3s}
-  .qrow .pm::before{top:11px;left:2px;width:20px;height:2px}
-  .qrow .pm::after{top:2px;left:11px;width:2px;height:20px}
-  .qrow.open .pm::after{transform:scaleY(0)}
-  .qrow .body{max-height:0;overflow:hidden;transition:max-height .4s ease}
-  .qrow .body .inner{padding:0 0 30px 74px;font-size:16px;color:var(--ink-soft);max-width:66ch}
-  .qrow .body .inner b{color:var(--ink)}
-  .qrow .body .inner .mkt{margin-top:18px;display:flex;flex-direction:column;gap:9px}
-  .qrow .body .inner .mkt .row{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:baseline;padding-bottom:9px;border-bottom:1px solid var(--line)}
-  .qrow .body .inner .mkt .lbl{font-size:14.5px;color:var(--ink-soft)}
-  .qrow .body .inner .mkt .fig{font-family:'Spline Sans Mono',monospace;font-size:14px;font-weight:500;color:var(--navy);white-space:nowrap}
-  .qrow .body .inner .mkt .fig.you{color:var(--red)}
-
-  /* PRICE BAR CHART */
-  .pricechart{margin:22px 0 4px}
-  .pc-bars{display:flex;gap:8px;height:200px;border-bottom:1.5px solid var(--line-2)}
-  .pcbar{flex:1;min-width:0;display:flex;align-items:flex-end;background:rgba(21,33,56,.07);border-radius:4px 4px 0 0}
-  .pcfill{width:100%;height:0;background:var(--navy);border-radius:4px 4px 0 0;transition-property:height;transition-duration:.85s;transition-timing-function:cubic-bezier(.2,.8,.2,1)}
-  .qrow.open .pcfill{height:var(--h)}
-  .pcbar-y .pcfill{background:var(--red)}
-  .pcbar:nth-child(1) .pcfill{transition-delay:.05s}
-  .pcbar:nth-child(2) .pcfill{transition-delay:.22s}
-  .pcbar:nth-child(3) .pcfill{transition-delay:.38s}
-  .pcbar:nth-child(4) .pcfill{transition-delay:.54s}
-  .pcbar:nth-child(5) .pcfill{transition-delay:.78s}
-  .pc-xlabels{display:flex;gap:8px;margin-top:10px}
-  .pclbl{flex:1;min-width:0;font-family:'Spline Sans Mono',monospace;font-size:9.5px;letter-spacing:.03em;color:var(--ink-soft);line-height:1.5}
-  .pclbl span{display:block;font-weight:600;font-size:10px;color:var(--navy);margin-top:3px}
-  .pclbl-y,.pclbl-y span{color:var(--red)}
-  @media(max-width:680px){.pc-bars{gap:4px;height:150px}.pc-xlabels{gap:4px}.pclbl{font-size:7.5px}.pclbl span{font-size:8px}}
-  .qrow .body .inner .deflect{margin:18px 0 4px;display:flex;flex-direction:column;gap:0}
-  .qrow .body .inner .deflect .d{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--line)}
-  .qrow .body .inner .deflect .q2{font-weight:600;color:var(--ink);font-size:15px}
-  .qrow .body .inner .deflect .a2{font-family:'Fraunces',serif;font-style:italic;color:var(--red);font-size:16px;text-align:right}
-  @media(max-width:680px){.qrow .body .inner .deflect .d{grid-template-columns:1fr;gap:3px}.qrow .body .inner .deflect .a2{text-align:left}}
-  .qrow .body .inner .ul{font-weight:600;color:var(--ink);text-decoration:underline;text-decoration-color:var(--red);text-decoration-thickness:2px;text-underline-offset:3px}
-  .qrow .body .inner .statement{display:block;font-size:clamp(17px,2vw,21px);line-height:1.45;color:var(--ink-soft)}
-  .qrow .body .inner a.qlink{color:var(--blue);font-weight:500;text-decoration:underline;text-decoration-color:rgba(34,56,208,.45);text-underline-offset:2px;transition:color .2s,text-decoration-color .2s}
-  .qrow .body .inner a.qlink:hover{color:var(--red);text-decoration-color:var(--red)}
-  .qrow .body .inner .datofig{margin:4px 0 20px;border:1px solid var(--line);border-radius:12px;overflow:hidden;max-width:480px}
-  .qrow .body .inner .datofig img{display:block;width:100%;height:auto}
-  .qrow .body .inner .blk{margin-top:14px}
-  .nb{white-space:nowrap}
-  .srcs{margin-top:22px;border-top:1px dashed var(--line-2);padding-top:16px}
-  .srcs .sh{font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:12px}
-  .srcs a.src{display:block;font-family:'Spline Sans Mono',monospace;font-size:12.5px;line-height:1.45;color:var(--blue);text-decoration:none;width:fit-content;max-width:100%;border-bottom:1px solid rgba(34,56,208,.28);padding-bottom:1px;margin-bottom:11px;transition:color .2s,border-color .2s}
-  .srcs a.src:hover{color:var(--red);border-color:var(--red)}
-  .srcs a.src .mid{color:var(--line-2)}
-  .srcs a.src .meta{color:var(--ink-soft)}
-  .srcs a.src::after{content:"";display:inline-block;width:11px;height:11px;margin-left:7px;vertical-align:-1px;background-color:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'/%3E%3Cpolyline points='15 3 21 3 21 9'/%3E%3Cline x1='10' y1='14' x2='21' y2='3'/%3E%3C/svg%3E") no-repeat center / contain;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'/%3E%3Cpolyline points='15 3 21 3 21 9'/%3E%3Cline x1='10' y1='14' x2='21' y2='3'/%3E%3C/svg%3E") no-repeat center / contain}
-  .dark .srcs{border-color:var(--navy-soft)}
-  .dark .srcs .sh{color:#c8cee0}
-  .dark .srcs a.src{color:var(--gold);border-color:rgba(201,138,34,.45)}
-  .dark .srcs a.src:hover{color:#fff;border-color:#fff}
-  .dark .srcs a.src .meta{color:#8893ab}
-  .dark .srcs a.src .mid{color:#5b6781}
-  @media(max-width:680px){.qrow .head{grid-template-columns:30px 1fr 24px;gap:12px}.qrow .body .inner{padding-left:42px}}
-
-  /* HILO */
-  .hilo{min-height:80vh;display:flex;align-items:center;background:var(--navy);color:var(--paper);border-bottom:1px solid var(--navy-soft)}
-  .hilo-lead{font-family:'Fraunces',serif;font-weight:400;font-size:clamp(20px,2.4vw,28px);color:#8893ab;margin-bottom:28px;line-height:1.2}
-  .hilo-punch{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(32px,5.2vw,68px);line-height:1.06;letter-spacing:-.02em;color:var(--paper)}
-
-  /* SIGNAL (dark) — SLIDES IA */
-  .slide-ia{min-height:90vh;display:flex;align-items:center}
-  .slide-ia h2.big{max-width:24ch}
-  .ia-sub{font-family:'Fraunces',serif;font-weight:300;font-style:italic;font-size:clamp(17px,2vw,22px);color:#c8cee0;margin-top:14px;margin-bottom:44px;max-width:54ch}
-  .ia-chart{margin:0 0 38px}
-  .ia-chart-wrap{display:block}
-  .ia-chart-wrap svg{flex:1 1 auto;min-width:0;width:100%;height:auto;display:block}
-  .ia-side-legs{display:flex;flex-direction:column;gap:28px;flex:0 0 180px;padding-top:28px}
-  .ia-leg-hd{font-family:'Spline Sans Mono',monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:11px;padding-bottom:7px;border-bottom:1.5px solid;display:flex;align-items:center;gap:8px}
-  .ia-leg-up .ia-leg-hd{color:var(--gold);border-color:rgba(201,138,34,.35)}
-  .ia-leg-dn .ia-leg-hd{color:#EC3B1A;border-color:rgba(236,59,26,.35)}
-  .ia-leg-hd::before{content:"";display:inline-block;width:18px;height:2px;border-radius:1px;flex:none}
-  .ia-leg-up .ia-leg-hd::before{background:var(--gold)}
-  .ia-leg-dn .ia-leg-hd::before{background:#EC3B1A}
-  .ia-leg ul{list-style:none;display:flex;flex-direction:column;gap:5px}
-  .ia-leg li{font-family:'Spline Sans Mono',monospace;font-size:9.5px;letter-spacing:.03em;color:#8893ab;line-height:1.4;display:flex;align-items:center;gap:7px}
-  .ia-leg li::before{content:"";width:4px;height:4px;border-radius:50%;flex:none}
-  .ia-leg-up li::before{background:rgba(201,138,34,.55)}
-  .ia-leg-dn li::before{background:rgba(236,59,26,.55)}
-  @media(max-width:860px){.ia-chart-wrap{flex-direction:column}.ia-side-legs{flex-direction:row;flex:none;gap:24px;padding-top:0;width:100%}}
-  @media(max-width:540px){.ia-side-legs{flex-direction:column}}
-  .ia-copy{font-size:clamp(15px,1.7vw,17.5px);color:#c8cee0;max-width:62ch;line-height:1.68;margin-bottom:14px}
-  .ia-remate{font-family:'Fraunces',serif;font-weight:600;font-size:clamp(22px,3vw,36px);color:var(--paper);margin-top:36px;max-width:34ch;line-height:1.1}
-  /* two cited proofs */
-  .proofs{display:grid;grid-template-columns:1fr 1fr;gap:34px;margin-top:42px;max-width:760px}
-  .proof{border-left:3px solid var(--gold);padding:2px 0 2px 22px}
-  .proof .pfig{font-family:'Fraunces',serif;font-weight:600;font-size:clamp(42px,6.2vw,62px);line-height:1;color:var(--gold);letter-spacing:-.02em}
-  .proof .pclaim{font-size:clamp(14px,1.6vw,16.5px);color:#c8cee0;line-height:1.5;margin-top:12px;max-width:32ch}
-  @media(max-width:640px){.proofs{grid-template-columns:1fr;gap:26px}}
-  /* value ladder */
-  .vlad{margin-top:48px;max-width:620px}
-  .vlstep{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:center;padding:18px 0 18px 22px;border-top:1px solid rgba(200,206,224,.1);border-left-width:3px;border-left-style:solid}
-  .vlstep:last-child{border-bottom:1px solid rgba(200,206,224,.1)}
-  .vlstep .vln{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(20px,2.6vw,30px);line-height:1}
-  .vlstep .vlr{font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;text-align:right;white-space:nowrap}
-  .vlstep:nth-child(1){border-left-color:var(--gold)}.vlstep:nth-child(1) .vln{color:var(--gold)}.vlstep:nth-child(1) .vlr{color:rgba(201,138,34,.75)}
-  .vlstep:nth-child(2){border-left-color:rgba(200,206,224,.4)}.vlstep:nth-child(2) .vln{color:rgba(244,240,232,.82)}.vlstep:nth-child(2) .vlr{color:#8893ab}
-  .vlstep:nth-child(3){border-left-color:rgba(200,206,224,.18)}.vlstep:nth-child(3) .vln{color:rgba(244,240,232,.48)}.vlstep:nth-child(3) .vlr{color:#5b6781}
-  .vlstep:nth-child(4){border-left-color:rgba(200,206,224,.07)}.vlstep:nth-child(4) .vln{color:rgba(244,240,232,.22)}.vlstep:nth-child(4) .vlr{color:#3d4a60}
-  @media(max-width:680px){.vlstep{grid-template-columns:1fr;gap:4px;padding-left:14px}.vlstep .vlr{text-align:left}}
-
-  /* PRICE */
-  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:46px}
-  @media(max-width:820px){.cards{grid-template-columns:1fr}}
-  .dc{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:30px}
-  .dc .v{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(34px,4.2vw,52px);line-height:.95;letter-spacing:-.02em;color:var(--navy)}
-  .dc.sting{background:var(--navy);border-color:var(--navy)}
-  .dc.sting .v{color:var(--gold)} .dc.sting .k{color:#c8cee0}
-  .dc .k{font-size:14.5px;color:var(--ink-soft);margin-top:16px;line-height:1.45}
-  .priceline{margin-top:30px;font-family:'Fraunces',serif;font-weight:600;font-size:clamp(22px,3vw,34px);color:var(--red);max-width:24ch}
-
-  /* WHAT IT IS */
-  .what .eyebrow{font-size:14px;letter-spacing:.18em}
-  .what ul{list-style:none;margin-top:36px;display:flex;flex-direction:column;gap:0}
-  .what li{display:grid;grid-template-columns:30px 1fr;gap:18px;padding:20px 0;border-top:1px solid var(--line);font-size:clamp(16px,1.9vw,19px);align-items:start}
-  .what li:last-child{border-bottom:1px solid var(--line)}
-  .what li svg{flex:none;margin-top:4px}
-  .what .kicker{margin-top:34px;font-family:'Fraunces',serif;font-weight:600;font-size:clamp(22px,3vw,32px);color:var(--navy);max-width:24ch}
-
-  /* RULES */
-  .rules{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:34px;margin-top:14px}
-  .rules .rh{font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--red);margin-bottom:22px}
-  .rules .rgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-  @media(max-width:680px){.rules .rgrid{grid-template-columns:1fr}}
-  .rules .r{display:flex;gap:14px;align-items:baseline;font-size:15.5px}
-  .rules .r .n{font-family:'Fraunces',serif;font-weight:600;color:var(--red);font-size:20px;flex:none;width:24px}
-  .rules .r b{font-weight:600}
-
-  /* AGENDA / DYNAMICS */
-  .agenda{margin-top:14px}
-  .slot{display:grid;grid-template-columns:96px 1fr;gap:26px;padding:26px 0;border-top:1px solid var(--line);transition:background .25s;border-radius:10px}
-  .slot:last-child{border-bottom:1px solid var(--line)}
-  .slot:hover{background:var(--card)}
-  .slot .time{font-family:'Spline Sans Mono',monospace;font-size:13px;color:var(--red);letter-spacing:.04em}
-  .slot .time small{display:block;color:var(--line-2);font-size:10.5px;margin-top:6px;letter-spacing:.1em}
-  .slot .name{font-family:'Spline Sans Mono',monospace;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin-bottom:7px}
-  .slot h4{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(20px,2.5vw,28px);line-height:1.08;margin-bottom:8px}
-  .slot p{font-size:15px;color:var(--ink-soft);max-width:64ch;line-height:1.5}
-  @media(max-width:680px){.slot{grid-template-columns:1fr;gap:8px}}
-
-  /* URGENT (dark) */
-  .urgent ul{list-style:none;margin-top:40px;display:flex;flex-direction:column;gap:0}
-  .urgent li{display:grid;grid-template-columns:30px 1fr;gap:18px;padding:20px 0;border-top:1px solid var(--navy-soft);font-size:clamp(16px,1.9vw,19px);align-items:start;color:#d4d9e6}
-  .urgent li:last-child{border-bottom:1px solid var(--navy-soft)}
-  .urgent li svg{flex:none;margin-top:5px}
-  .urgent .kicker{margin-top:38px;font-family:'Fraunces',serif;font-weight:600;font-size:clamp(26px,3.8vw,46px);color:var(--gold);letter-spacing:-.01em}
-
-  /* WHY ME */
-  .me .box{background:var(--blue);color:#fff;border-radius:24px;padding:clamp(40px,6vw,72px)}
-  .me .box .eyebrow{color:#ffd9cf} .me .box .eyebrow::before{background:#ffd9cf}
-  .me .box h2{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(28px,4.4vw,52px);line-height:1.04;letter-spacing:-.02em;max-width:22ch}
-  .me .box p{margin-top:26px;font-size:clamp(16px,1.9vw,19px);color:#eef0ff;max-width:60ch;line-height:1.6}
-  .me .box p b{color:#fff}
-  .me .box .sign{margin-top:30px;font-family:'Fraunces',serif;font-weight:600;font-size:clamp(20px,2.8vw,28px);color:#fff}
-
-  /* CLOSE */
-  .close{text-align:center;background:var(--navy);color:var(--paper);border-bottom:none}
-  .close .eyebrow{justify-content:center;color:var(--gold);margin-bottom:22px}
-  .close .eyebrow::before{background:var(--gold)}
-  .close h2{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(32px,5.2vw,68px);line-height:1.04;letter-spacing:-.02em;max-width:20ch;margin:0 auto}
-  .close .g{color:var(--gold)}
-  .close .prep{margin:42px auto 0;max-width:60ch;background:var(--navy-soft);border:1px solid #3b4863;border-radius:18px;padding:clamp(32px,5vw,52px);text-align:left}
-  .close .prep .pt{font-family:'Fraunces',serif;font-weight:600;font-size:clamp(26px,3.8vw,42px);line-height:1.04;color:#fff;text-align:center;margin-bottom:30px}
-  .close .prep .preplist{display:flex;flex-direction:column;gap:20px}
-  .close .prep .pi{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:baseline}
-  .close .prep .pi .pn{font-family:'Fraunces',serif;font-weight:600;font-size:30px;color:var(--gold);line-height:1}
-  .close .prep .pi .pd{font-size:clamp(17px,2vw,20px);color:#d4d9e6;line-height:1.5}
-  .close .prep b{color:#fff}
-  .close .prep .pf{margin-top:20px;display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center;text-align:left;font-family:'Spline Sans Mono',monospace;font-size:13px;letter-spacing:.04em;color:#8893ab}
-  .close .prep .pf .upic{justify-self:center}
-  .close .mark{font-family:'Fraunces',serif;font-weight:700;font-size:24px;margin-top:46px}
-  .close .mark b{color:var(--gold)}
-  .close .stamp{margin-top:14px;font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#8893ab}
-
-  /* mobile fold tightening: the 104px section rhythm leaves dead air on a phone */
-  @media(max-width:680px){
-    section{padding:64px 0}
-    .hero{padding-top:84px}
-    .what .eyebrow[style*="76px"]{margin-top:46px}
-    .signal .scase{margin-top:32px}
-    .signal .punch{margin-top:30px}
-    .qs{margin-top:30px}
-  }
-
-  /* ===== SEALED-LETTER GATE ===== */
-  body.is-sealed{overflow:hidden}
-  #seal{position:fixed;inset:0;z-index:9999;font-family:'Inter',sans-serif;transition:opacity .5s ease}
-  #seal .panel{position:absolute;top:0;height:100%;width:50.5%;
-    background-image:radial-gradient(120% 80% at 50% 32%, #1b2942 0%, #152138 55%, #0e1730 100%);
-    transition:transform 1.4s cubic-bezier(.76,0,.24,1)}
-  #seal .panel.l{left:0}
-  #seal .panel.r{right:0}
-  #seal.open .panel.l{transform:translateX(-100%)}
-  #seal.open .panel.r{transform:translateX(100%)}
-
-  #seal .frame{position:absolute;inset:18px;z-index:3;pointer-events:none;transition:opacity .5s ease}
-  #seal .frame i{position:absolute;width:13px;height:13px;border:1.5px solid var(--gold)}
-  #seal .frame i.tl{top:-1px;left:-1px;border-right:0;border-bottom:0}
-  #seal .frame i.tr{top:-1px;right:-1px;border-left:0;border-bottom:0}
-  #seal .frame i.bl{bottom:-1px;left:-1px;border-right:0;border-top:0}
-  #seal .frame i.br{bottom:-1px;right:-1px;border-left:0;border-top:0}
-  #seal.open .frame{opacity:0}
-
-  #seal .content{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 28px;
-    transition:opacity .55s ease,transform .7s cubic-bezier(.2,.8,.2,1)}
-  #seal.open .content{opacity:0;transform:translateY(-14px)}
-  #seal .d-mark{font-family:'Fraunces',serif;font-weight:600;font-size:clamp(130px,18vw,200px);line-height:1;letter-spacing:-.02em;color:var(--paper);margin-bottom:18px}
-  #seal .d-mark .dot{color:var(--red)}
-  #seal .confidencial{font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.36em;text-transform:uppercase;color:rgba(244,240,232,.3);margin-bottom:52px}
-  #seal .field{border-bottom:1px solid rgba(244,240,232,.22);padding:8px 4px;transition:border-color .25s}
-  #seal .field:focus-within{border-color:var(--gold)}
-  #seal input{background:none;border:0;outline:none;color:var(--paper);font-family:'Spline Sans Mono',monospace;font-size:15px;letter-spacing:.16em;width:228px;text-align:center;caret-color:var(--gold)}
-  #seal .hint{font-family:'Spline Sans Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:rgba(244,240,232,.4);margin-top:18px;min-height:1em;transition:color .25s}
-  #seal.err .field{border-color:var(--red);animation:seal-shake .4s}
-  #seal.err .hint{color:var(--red)}
-  #seal .bloom{position:absolute;left:50%;top:calc(50% - 28px);width:8px;height:8px;border-radius:50%;z-index:2;opacity:0;transform:translate(-50%,-50%) scale(0);
-    background:radial-gradient(circle,rgba(246,232,194,.95) 0%,rgba(201,138,34,.6) 35%,rgba(201,138,34,0) 70%)}
-  #seal.open .bloom{animation:seal-bloom 1.5s ease-out .4s forwards}
-
-  @keyframes crack{to{transform:translateX(-50%) scaleY(1);opacity:.95}}
-  @keyframes seal-bloom{0%{transform:translate(-50%,-50%) scale(0);opacity:0}24%{opacity:1}100%{transform:translate(-50%,-50%) scale(72);opacity:0}}
-  @keyframes seal-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
-  @media(prefers-reduced-motion:reduce){
-    #seal .panel{transition:none}
-    #seal.open{opacity:0}
-    #seal.open .panel{transform:none}
-    #seal.open .wax{transform:none}
-  }
-
-  .reveal{opacity:0;transform:translateY(22px);transition:opacity .7s ease,transform .7s cubic-bezier(.2,.8,.2,1)}
-  .reveal.in{opacity:1;transform:none}
-
-  /* LA MAÑANA CERO */
-  .m0{min-height:85vh;display:flex;align-items:center;border-bottom:1px solid var(--line)}
-  .m0 h2.big{max-width:18ch}
-  .m0-propongo{font-family:'Spline Sans Mono',monospace;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:14px}
-  .m0-sub{font-family:'Fraunces',serif;font-weight:300;font-style:italic;font-size:clamp(18px,2.4vw,26px);color:var(--ink-soft);margin-top:22px;max-width:50ch;line-height:1.55}
-  .m0-meta{margin-top:44px;max-width:560px;border-top:1px solid var(--line)}
-  .m0-row{display:grid;grid-template-columns:110px 1fr;gap:24px;padding:18px 0;border-bottom:1px solid var(--line);align-items:center}
-  .m0-lbl{font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft)}
-  .m0-val{font-size:clamp(16px,1.9vw,19px);font-weight:500;color:var(--navy)}
-  .m0-cal-block{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
-  .m0-cal-icon{display:flex;flex-direction:column;align-items:center;width:44px;flex:none}
-  .m0-time{font-family:'Spline Sans Mono',monospace;font-size:clamp(28px,3.8vw,46px);font-weight:500;letter-spacing:-.02em;color:var(--navy);line-height:1}
-  .m0-add-cal{display:inline-flex;align-items:center;gap:7px;font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);text-decoration:none;border-bottom:1px solid var(--line);padding-bottom:2px;transition:color .2s,border-color .2s;margin-left:8px}
-  .m0-add-cal:hover{color:var(--navy);border-color:var(--navy)}
-  .m0-juan-link{display:inline-flex;align-items:center;gap:5px;color:var(--navy);text-decoration:none;font-weight:500;border-bottom:1px solid var(--line);padding-bottom:1px;transition:color .2s}
-  .m0-juan-link:hover{color:var(--red)}
-  .m0-remate{margin-top:52px;font-family:'Fraunces',serif;font-weight:600;font-size:clamp(22px,3.2vw,38px);line-height:1.15;color:var(--navy);max-width:36ch}
-  .m0-remate .arr{color:var(--ink-soft);font-weight:300;margin:0 6px;font-style:normal}
-  .m0-quote{margin-top:36px;padding-left:22px;border-left:3px solid var(--red);max-width:44ch}
-  .m0-quote q{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(20px,2.8vw,32px);line-height:1.18;color:var(--navy);font-style:italic;quotes:"\201C""\201D"}
-  .m0-quote .m0-att{display:block;margin-top:10px;font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft)}
+  /* RAZONES / claims stack */
+  .claims-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(18px,2.4vw,26px);margin-top:clamp(40px,6vw,64px)}
+  @media(max-width:860px){.claims-grid{grid-template-columns:1fr}}
+  .claim-card{background:var(--white);border:1px solid var(--line);border-radius:6px;padding:clamp(30px,3.4vw,42px);display:flex;flex-direction:column;min-height:286px;transition:transform .5s cubic-bezier(.2,.7,.2,1),box-shadow .5s,border-color .5s}
+  .claim-card:hover{transform:translateY(-3px);box-shadow:0 26px 60px -40px rgba(20,33,61,.5);border-color:var(--line-2)}
+  .claim-card .ct{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--amber-deep);margin-bottom:auto}
+  .claim-card .cb{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(27px,3vw,38px);line-height:1.02;letter-spacing:-.02em;margin:30px 0 16px}
+  .claim-card .cl{font-size:15.5px;color:var(--ink-soft);line-height:1.5}
+  .claim-card .cl b{color:var(--ink);font-weight:600}
+  .claim-card .cl a{color:inherit;text-decoration:underline;text-underline-offset:3px}
+  .claim-card .cl .ie-logo{height:13px;vertical-align:middle;display:inline;margin-left:4px;opacity:.8}
+  .claim-banner{margin-top:clamp(18px,2.4vw,26px);background:var(--ink);color:var(--paper);border-radius:6px;padding:clamp(36px,4.6vw,60px);display:grid;grid-template-columns:1.5fr 1fr;gap:clamp(24px,3vw,44px);align-items:center}
+  @media(max-width:760px){.claim-banner{grid-template-columns:1fr;gap:24px}}
+  .claim-banner h3{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(26px,3.4vw,42px);line-height:1.05;letter-spacing:-.02em;max-width:24ch}
+  .claim-banner h3 .em{color:var(--amber)}
+  .claim-banner .why{display:flex;flex-direction:column;gap:11px;font-size:14.5px;color:#8893ad}
+  .claim-banner .why span{padding-left:20px;position:relative}
+  .claim-banner .why span::before{content:"+";position:absolute;left:0;color:var(--amber);font-weight:700}
+  /* MANIFESTO 2x2 */
+  .manifesto-quad{display:grid;grid-template-columns:1fr 1fr;gap:clamp(16px,2vw,22px);margin-top:clamp(32px,4vw,48px)}
+  @media(max-width:640px){.manifesto-quad{grid-template-columns:1fr}}
+  .manifesto-q{border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:clamp(28px,3.2vw,42px)}
 </style>
 </head>
-<body><!-- GATE ARCHIVED -->
+<body>
 
-<!-- SEALED LETTER GATE -->
-<div id="seal" role="dialog" aria-label="Invitación">
-  <div class="panel l"></div>
-  <div class="panel r"></div>
-  <div class="bloom"></div>
-  <div class="frame"><i class="tl"></i><i class="tr"></i><i class="bl"></i><i class="br"></i></div>
-  <div class="content">
-    <div class="d-mark">D<span class="dot">.</span></div>
-    <div class="confidencial">Confidencial</div>
-    <form id="sealForm" autocomplete="off">
-      <div class="field">
-        <input id="sealInput" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Contraseña"/>
-      </div>
-      <div class="hint"></div>
-    </form>
+<!-- HEADER -->
+<header class="site-header" id="header">
+  <div class="container nav">
+    <a href="index.html" class="brand">El Departamento<span class="dot">.</span></a>
+    <nav class="nav-links">
+      <a href="#autoridad">Trayectoria</a>
+      <a href="#hacemos">Qué hacemos</a>
+      <a href="casos.html">Casos</a>
+      <a href="#equipo">Equipo</a>
+      <a href="#contacto" class="nav-cta">Hablemos</a>
+    </nav>
+    <button class="nav-toggle" aria-label="Menú">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
   </div>
-</div>
+</header>
 
-<div id="prog"></div>
-
-<div class="topbar">
-  <div class="lock">El Departamento<b>.</b></div>
-  <div class="when">Rebrand: la Mañana Cero &middot; <b id="cd">—</b></div>
-</div>
+<main>
 
 <!-- HERO -->
-<section class="hero" style="border-bottom:none">
-  <div class="wrap">
-    <h1 class="reveal">Vuestro mejor cliente de 2026 va a ser<br><span class="g">El Departamento.</span></h1>
-    <p class="sub reveal">El primer proyecto de El Departamento para El Departamento.</p>
-    <p class="sub-note reveal">El cliente es lo tercero. La empresa va primera.</p>
-    <div class="meta reveal">
-      <span class="pill pill-action" id="pill-cal"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C98A22" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg> Martes 30 Jun<span class="pill-tip">Añadir a mi calendario</span></span>
-      <span class="pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C98A22" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> 10 a 12h</span>
-      <a class="pill pill-action" href="https://juanarenas.bio" target="_blank" rel="noopener noreferrer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C98A22" stroke-width="2"><circle cx="12" cy="6" r="3.5"/><path d="M4 20v-1a8 8 0 0 1 16 0v1"/><path d="M10.5 11.5l1.5 5.5 1.5-5.5" stroke-width="1.5"/></svg> Juan Arenas <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#C98A22" stroke-width="2.5" style="margin-left:2px;flex:none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg><span class="pill-tip">Ver Portfolio de Juan</span></a>
+<section class="hero" id="top">
+  <div class="container">
+    <p class="eyebrow reveal">Investigación · Estrategia · Decisión</p>
+    <h1 class="display reveal d1" style="margin-top:26px">Investigación que acaba en <span class="em">decisiones</span>.</h1>
+    <p class="lead hero-sub reveal d2">Convertimos lo difícil de entender, un mercado, una marca, una persona, en la decisión que se toma el lunes y se defiende el martes.</p>
+    <div class="hero-actions reveal d2">
+      <a href="casos.html" class="btn btn-ink">Ver casos <span class="ar">→</span></a>
+      <a href="#contacto" class="btn btn-ghost">Plantear un proyecto</a>
+    </div>
+    <p class="hero-micro reveal d3">Trabajamos con quien tiene una decisión cara delante. Si solo necesitas un gráfico bonito, hay sitios más baratos.</p>
+    <hr class="hr hero-rule reveal">
+  </div>
+</section>
+
+<!-- AUTORIDAD: métricas + logos -->
+<section id="autoridad" style="padding-top:clamp(40px,5vw,60px)">
+  <div class="container">
+    <div class="metrics">
+      <div class="metric reveal"><div class="v">600</div><div class="k">estudios diseñados y dirigidos</div></div>
+      <div class="metric reveal d1"><div class="v">13 años</div><div class="k">independientes, desde 2013</div></div>
+      <div class="metric reveal d2"><div class="v">+200</div><div class="k">marcas asesoradas</div></div>
+      <div class="metric reveal d3"><div class="v" style="font-size:clamp(22px,5vw,64px);white-space:nowrap">Un siglo</div><div class="k">de experiencia conjunta</div></div>
+    </div>
+
+    <div class="about" style="margin-top:clamp(72px,9vw,120px)">
+      <div class="reveal">
+        <p class="eyebrow" style="margin-bottom:20px">Sobre nosotros</p>
+        <h2 class="h2">El Departamento</h2>
+      </div>
+      <div class="about-body reveal d1">
+        <p>Equipo desde antes de fundar el despacho en <b>2013</b>, tras más de una década juntos en una multinacional de investigación y consultoría de marcas. Convencidas: el <b>rigor técnico</b> y la claridad van de la mano.</p>
+      </div>
+    </div>
+
+    <div style="margin-top:clamp(56px,7vw,96px)">
+      <div class="reveal">
+        <p class="clientes-label">Orgullosos del Impacto en Nuestros Clientes.</p>
+        <p class="demo-note" style="margin-top:4px">logos reales de cliente</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="marquee reveal" id="marquee" aria-label="Clientes de El Departamento">
+    <div class="band b1" id="band1"></div>
+    <div class="band b2" id="band2"></div>
+    <div class="band b3" id="band3"></div>
+  </div>
+</section>
+
+<!-- QUÉ HACEMOS REALMENTE -->
+<section id="hacemos">
+  <div class="container">
+    <div class="reveal" style="max-width:62ch">
+      <p class="eyebrow"><span class="idx">01</span>Qué hacemos realmente</p>
+      <h2 class="h2" style="margin-top:24px">No solo hacemos encuestas. Investigamos el mercado a fondo, encontramos verdad, y entregamos decisiones de marca precisas y directas.</h2>
+      <p class="lead" style="margin-top:26px;font-size:18px">La investigación es el medio. El producto: qué decir, a quién, a qué precio y por qué canal.</p>
+      <p class="lead" style="margin-top:14px;font-size:16px;color:var(--ink-soft)">Así, cada euro de Marketing y Ventas se convierte en inversión con retorno medible, no en gasto con los dedos cruzados.</p>
+      <div style="margin-top:36px;display:flex;gap:14px;flex-wrap:wrap">
+        <a href="#metodo-investegia" class="btn btn-ink">Nuestro método <span class="ar">→</span></a>
+        <a href="casos.html" class="btn btn-ghost">Ver casos</a>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- OPENING QUESTION -->
-<section class="qopen">
-  <div class="wrap">
-    <div class="small reveal">La pregunta:</div>
-    <div class="punch reveal">¿Qué imagen de marca tiene El Departamento hoy?</div>
-  </div>
-</section>
-
-<!-- UNCOMFORTABLE QUESTIONS -->
-<section>
-  <div class="wrap">
-    <h2 class="big reveal">Tres datos sobre El Departamento</h2>
-    <p class="lead reveal">El Departamento cuida las marcas de las empresas líder de España y del mundo. Estos son los números de su marca, con fuentes.</p>
-    <div class="dare reveal">Abrid cada dato con valentía.</div>
-    <div class="qs reveal">
-      <div class="qrow">
-        <div class="head"><div class="ix">01</div><div class="qt">La marca se quedó en 2013. El oficio no.</div><div class="pm"></div></div>
-        <div class="body"><div class="inner">
-          <figure class="datofig"><img src="assets/croquetas-hipsters.png" alt="Meme: momia cubierta de polvo, 'CROQUETAS?' y '- HIPSTERS (2010-2015)'" loading="lazy"></figure>
-          El oficio es real, eso lo saben los que ya os conocen. Pero la web es un escaparate de 60 segundos para quien aún no os conoce, y ese escaparate se quedó en 2013, cuando lo de las croquetas y el hipster <a class="qlink" href="https://www.google.com/search?q=cu%C3%A1ndo+fue+la+era+de+los+hipsters+en+Espa%C3%B1a" target="_blank" rel="noopener noreferrer">ya era mainstream</a>.
-          <div class="blk">El oficio siguió creciendo trece años. La marca no. Y si el escaparate no invita a entrar, nadie llega a ver el oficio que hay dentro.</div></div></div>
+<!-- CASOS (2 teasers) -->
+<section id="casos-teaser" style="background:var(--paper-2)">
+  <div class="container">
+    <div class="section-head reveal" style="display:flex;justify-content:space-between;align-items:baseline;gap:24px;flex-wrap:wrap;margin-bottom:clamp(32px,5vw,56px)">
+      <div>
+        <p class="eyebrow"><span class="idx">02</span>Casos</p>
+        <h2 class="h2" style="margin-top:22px;max-width:32ch">Decisiones que cambiaron porque cambió lo que se sabía.</h2>
       </div>
-      <div class="qrow">
-        <div class="head"><div class="ix">02</div><div class="qt">600 estudios hechos. ¿Cuántos enseñamos?</div><div class="pm"></div></div>
-        <div class="body"><div class="inner">El comprador premium no compra promesas: compra pruebas. Y El Departamento, el estudio con más experiencia de la sala, no enseña ni una: ni en el-departamento.com, ni en LinkedIn. <b>Si no se ve, no existe.</b>
-          <div class="blk">La lógica en B2B de alto ticket es directa: el cliente decide <b>antes</b> de llamar, con lo que encuentra publicado. Y el contenido que más inclina esa decisión es el caso de éxito. El Departamento no tiene ninguno que enseñar.</div>
-          <div class="mkt">
-            <div class="row"><span class="lbl">La decisión de compra B2B, tomada antes de la primera llamada</span><span class="fig">≈80%</span></div>
-            <div class="row"><span class="lbl">Marketers B2B para los que el caso de éxito es su contenido más eficaz</span><span class="fig">69%</span></div>
+      <a href="casos.html" class="link-amber" style="white-space:nowrap">Todos los casos →</a>
+    </div>
+
+    <div class="cases-grid">
+      <a href="caso.html" class="case-card reveal">
+        <div>
+          <div class="meta-row">
+            <span class="tag dot">Gran consumo · Cerveza</span>
+            <span class="state">Caso público</span>
+            <span class="ph">muestra</span>
           </div>
-          <div class="srcs">
-            <a class="src" href="https://corporatevisions.com/blog/b2b-buying-behavior-statistics-trends/" target="_blank" rel="noopener noreferrer">B2B Buying Behavior in 2026: 57 Stats <span class="meta"><span class="mid">&middot;</span> Corporate Visions (datos Gartner) <span class="mid">&middot;</span> 2026</span></a>
-            <a class="src" href="https://sopro.io/resources/blog/b2b-buyer-statistics-and-insights/" target="_blank" rel="noopener noreferrer">68 B2B Buyer Statistics &amp; Insights <span class="meta"><span class="mid">&middot;</span> Sopro <span class="mid">&middot;</span> 2025</span></a>
-          </div>
-        </div></div>
-      </div>
-      <div class="qrow">
-        <div class="head"><div class="ix">03</div><div class="qt">¿Por qué cobramos un tercio del mercado?</div><div class="pm"></div></div>
-        <div class="body"><div class="inner">Juntad los dos datos de antes: un escaparate de 2013 y cero pruebas a la vista. El mercado no puede pagar por 100 años de oficio que no ve, así que pone tarifa de proveedor, no de autoridad. El precio es la primera señal que lee un comprador premium, antes de una sola diapositiva: un tercio de la tarifa por el mismo trabajo no dice "qué chollo", dice <b>"algo le falta"</b>.
-          <div class="pricechart">
-            <div class="pc-bars">
-              <div class="pcbar" style="--h:200px"><div class="pcfill"></div></div>
-              <div class="pcbar" style="--h:110px"><div class="pcfill"></div></div>
-              <div class="pcbar" style="--h:75px"><div class="pcfill"></div></div>
-              <div class="pcbar" style="--h:52px"><div class="pcfill"></div></div>
-              <div class="pcbar pcbar-y" style="--h:20px"><div class="pcfill"></div></div>
-            </div>
-            <div class="pc-xlabels">
-              <div class="pclbl">Multimercado<br>enterprise<span>150k–500k €+</span></div>
-              <div class="pclbl">Brand tracker<br>anual<span>25k–120k €+</span></div>
-              <div class="pclbl">Cuanti / cuali<br>a medida<span>25k–65k €</span></div>
-              <div class="pclbl">Encuesta B2B<br>a medida<span>15k–35k €+</span></div>
-              <div class="pclbl pclbl-y">El Departamento<br>hoy<span>9k–12k €</span></div>
-            </div>
-          </div>
-          <div class="blk"><b>Misma categoría, mismos clientes.</b> ¿Por qué un tercio del precio?</div>
-          <div class="srcs">
-            <a class="src" href="https://merren.io/blogs/how-much-does-market-research-cost/" target="_blank" rel="noopener noreferrer">How Much Does Market Research Cost (The Full Guide) <span class="meta"><span class="mid">&middot;</span> Ipsha Barooah <span class="mid">&middot;</span> 2026</span></a>
-            <a class="src" href="https://www.userintuition.ai/posts/brand-tracking-cost/" target="_blank" rel="noopener noreferrer">Brand Health Tracking Cost: A 2026 Pricing Breakdown <span class="meta"><span class="mid">&middot;</span> User Intuition <span class="mid">&middot;</span> 2026</span></a>
-            <a class="src" href="https://mainbrainresearch.com/how-much-does-market-research-cost-2025/" target="_blank" rel="noopener noreferrer">How Much Does Market Research Cost? A 2025 Guide <span class="meta"><span class="mid">&middot;</span> MainBrain Research <span class="mid">&middot;</span> 2025</span></a>
-            <a class="src" href="https://visionone.co.uk/research-pricing/" target="_blank" rel="noopener noreferrer">Research Pricing &amp; Cost Calculator <span class="meta"><span class="mid">&middot;</span> Vision One Research <span class="mid">&middot;</span> 2023</span></a>
-          </div>
-        </div></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- HILO -->
-<section class="hilo">
-  <div class="wrap">
-    <p class="hilo-lead reveal">Tres datos, un mismo hilo.</p>
-    <p class="hilo-punch reveal">No es falta de talento.<br>Es una marca desalineada<br>con su mercado.</p>
-  </div>
-</section>
-
-<!-- SLIDE IA 1: La IA comprime el suelo -->
-<section class="dark slide-ia">
-  <div class="wrap">
-    <div class="eyebrow reveal">La señal del mercado · 1 de 2</div>
-    <h2 class="big reveal">La IA comprime el suelo.</h2>
-    <p class="ia-sub reveal">Lo automatizable pierde precio. Lo estándar deja de defender margen.</p>
-    <div class="ia-chart reveal">
-      <div class="ia-chart-wrap">
-                <svg viewBox="0 0 480 295" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Trabajo automatizable: baja de 1-4k a 0">
-          <text transform="rotate(-90,14,148)" x="14" y="148" text-anchor="middle" font-family="'Spline Sans Mono',monospace" font-size="9" fill="rgba(200,206,224,.35)" letter-spacing="1.2">VALOR DE INVESTIGACIÓN (€)</text>
-          <line x1="68" y1="22" x2="68" y2="262" stroke="rgba(200,206,224,.22)" stroke-width="1"/>
-          <line x1="63" y1="262" x2="450" y2="262" stroke="rgba(200,206,224,.22)" stroke-width="1"/>
-          <text x="61" y="265" text-anchor="end" font-family="'Spline Sans Mono',monospace" font-size="9" fill="rgba(200,206,224,.38)">0</text>
-          <text x="61" y="218" text-anchor="end" font-family="'Spline Sans Mono',monospace" font-size="9" fill="rgba(200,206,224,.38)">5k</text>
-          <text x="61" y="171" text-anchor="end" font-family="'Spline Sans Mono',monospace" font-size="9" fill="rgba(200,206,224,.38)">10k</text>
-          <text x="61" y="124" text-anchor="end" font-family="'Spline Sans Mono',monospace" font-size="9" fill="rgba(200,206,224,.38)">15k</text>
-          <text x="61" y="77" text-anchor="end" font-family="'Spline Sans Mono',monospace" font-size="9" fill="rgba(200,206,224,.38)">20k</text>
-          <text x="61" y="30" text-anchor="end" font-family="'Spline Sans Mono',monospace" font-size="9" fill="rgba(200,206,224,.38)">25k</text>
-          <line x1="68" y1="257" x2="68" y2="267" stroke="rgba(200,206,224,.28)" stroke-width="1.5"/>
-          <line x1="259" y1="257" x2="259" y2="267" stroke="rgba(200,206,224,.28)" stroke-width="1.5"/>
-          <line x1="450" y1="257" x2="450" y2="267" stroke="rgba(200,206,224,.28)" stroke-width="1.5"/>
-          <text x="68" y="282" text-anchor="middle" font-family="'Spline Sans Mono',monospace" font-size="10.5" fill="rgba(200,206,224,.42)" letter-spacing=".5">Pre-ChatGPT</text>
-          <text x="259" y="282" text-anchor="middle" font-family="'Spline Sans Mono',monospace" font-size="10.5" fill="rgba(200,206,224,.42)" letter-spacing=".5">2026</text>
-          <text x="450" y="282" text-anchor="middle" font-family="'Spline Sans Mono',monospace" font-size="10.5" fill="rgba(200,206,224,.42)" letter-spacing=".5">Pronto</text>
-          <path d="M 68,239 C 175,244 330,259 450,261" stroke="#EC3B1A" stroke-width="2.5" stroke-linecap="round"/>
-          <circle cx="68" cy="239" r="4" fill="#EC3B1A"/>
-          <circle cx="450" cy="261" r="4" fill="#EC3B1A" opacity=".5"/>
-          <text x="72" y="236" font-family="'Spline Sans Mono',monospace" font-size="8" fill="rgba(236,59,26,.55)">1–4k€</text>
-          <text x="458" y="265" font-family="'Spline Sans Mono',monospace" font-size="8.5" fill="rgba(236,59,26,.6)">~0€</text>
-          <line x1="170" y1="40" x2="196" y2="40" stroke="#EC3B1A" stroke-width="2.5" stroke-linecap="round"/>
-          <text x="203" y="44" font-family="'Spline Sans Mono',monospace" font-size="11" fill="#EC3B1A" letter-spacing=".13em">AUTOMATIZABLE</text>
-          <circle cx="174" cy="60" r="3" fill="rgba(236,59,26,.55)"/>
-          <text x="183" y="64" font-family="'Spline Sans Mono',monospace" font-size="12" fill="#8893ab">desk research</text>
-          <circle cx="174" cy="78" r="3" fill="rgba(236,59,26,.55)"/>
-          <text x="183" y="82" font-family="'Spline Sans Mono',monospace" font-size="12" fill="#8893ab">síntesis de fuentes</text>
-          <circle cx="174" cy="96" r="3" fill="rgba(236,59,26,.55)"/>
-          <text x="183" y="100" font-family="'Spline Sans Mono',monospace" font-size="12" fill="#8893ab">reporting estándar</text>
-          <circle cx="174" cy="114" r="3" fill="rgba(236,59,26,.55)"/>
-          <text x="183" y="118" font-family="'Spline Sans Mono',monospace" font-size="12" fill="#8893ab">investigación secundaria</text>
-          <circle cx="174" cy="132" r="3" fill="rgba(236,59,26,.55)"/>
-          <text x="183" y="136" font-family="'Spline Sans Mono',monospace" font-size="12" fill="#8893ab">tabulación de datos</text>
-          <circle cx="174" cy="150" r="3" fill="rgba(236,59,26,.55)"/>
-          <text x="183" y="154" font-family="'Spline Sans Mono',monospace" font-size="12" fill="#8893ab">primeras lecturas</text>
-        </svg>
-      </div>
-    </div>
-    <p class="ia-copy reveal">La IA ya reduce tiempo y coste en partes crecientes del research: investigación secundaria, síntesis, reporting y primeras lecturas.</p>
-    <p class="ia-remate reveal">Cada vez se paga menos<br>lo reemplazable.</p>
-    <div class="srcs reveal" style="max-width:640px;margin-top:32px">
-      <a class="src" href="https://a16z.com/ai-market-research/" target="_blank" rel="noopener noreferrer">Faster, Smarter, Cheaper: AI Is Reinventing Market Research <span class="meta"><span class="mid">&middot;</span> a16z <span class="mid">&middot;</span> 2025</span></a>
-    </div>
-  </div>
-</section>
-
-<!-- SLIDE IA 2: El criterio sube de precio -->
-<section class="dark slide-ia" style="border-top:1px solid var(--navy-soft)">
-  <div class="wrap">
-    <div class="eyebrow reveal">La señal del mercado · 2 de 2</div>
-    <h2 class="big reveal">El criterio sube de precio.</h2>
-    <p class="ia-sub reveal">Cuando lo barato se vuelve gratis, lo que se paga es el juicio.</p>
-    <div class="ia-chart reveal">
-      <div class="ia-chart-wrap">
-                <svg viewBox="0 0 480 295" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Criterio visible: sube de 5k a 25k">
-          <text transform="rotate(-90,14,148)" x="14" y="148" text-anchor="middle" font-family="'Spline Sans Mono',monospace" font-size="9" fill="rgba(200,206,224,.35)" letter-spacing="1.2">VALOR DE INVESTIGACIÓN (€)</text>
-          <line x1="68" y1="22" x2="68" y2="262" stroke="rgba(200,206,224,.22)" stroke-width="1"/>
-          <line x1="63" y1="262" x2="450" y2="262" stroke="rgba(200,206,224,.22)" stroke-width="1"/>
-          <text x="61" y="265" text-anchor="end" font-family="'Spline Sans Mono',monospace" font-size="9" fill="rgba(200,206,224,.38)">0</text>
-          <text x="61" y="218" text-anchor="end" font-family="'Spline Sans Mono',monospace" font-size="9" fill="rgba(200,206,224,.38)">5k</text>
-          <text x="61" y="171" text-anchor="end" font-family="'Spline Sans Mono',monospace" font-size="9" fill="rgba(200,206,224,.38)">10k</text>
-          <text x="61" y="124" text-anchor="end" font-family="'Spline Sans Mono',monospace" font-size="9" fill="rgba(200,206,224,.38)">15k</text>
-          <text x="61" y="77" text-anchor="end" font-family="'Spline Sans Mono',monospace" font-size="9" fill="rgba(200,206,224,.38)">20k</text>
-          <text x="61" y="30" text-anchor="end" font-family="'Spline Sans Mono',monospace" font-size="9" fill="rgba(200,206,224,.38)">25k</text>
-          <line x1="68" y1="257" x2="68" y2="267" stroke="rgba(200,206,224,.28)" stroke-width="1.5"/>
-          <line x1="259" y1="257" x2="259" y2="267" stroke="rgba(200,206,224,.28)" stroke-width="1.5"/>
-          <line x1="450" y1="257" x2="450" y2="267" stroke="rgba(200,206,224,.28)" stroke-width="1.5"/>
-          <text x="68" y="282" text-anchor="middle" font-family="'Spline Sans Mono',monospace" font-size="10.5" fill="rgba(200,206,224,.42)" letter-spacing=".5">Pre-ChatGPT</text>
-          <text x="259" y="282" text-anchor="middle" font-family="'Spline Sans Mono',monospace" font-size="10.5" fill="rgba(200,206,224,.42)" letter-spacing=".5">2026</text>
-          <text x="450" y="282" text-anchor="middle" font-family="'Spline Sans Mono',monospace" font-size="10.5" fill="rgba(200,206,224,.42)" letter-spacing=".5">Pronto</text>
-          <path d="M 68,215 C 175,210 310,72 450,27" stroke="#C98A22" stroke-width="2.5" stroke-linecap="round"/>
-          <circle cx="68" cy="215" r="3.5" fill="#C98A22" opacity=".55"/>
-          <circle cx="450" cy="27" r="5" fill="#C98A22"/>
-          <text x="72" y="212" font-family="'Spline Sans Mono',monospace" font-size="8" fill="rgba(201,138,34,.55)">5k€</text>
-          <text x="458" y="31" font-family="'Spline Sans Mono',monospace" font-size="8.5" fill="rgba(201,138,34,.75)">25k€</text>
-          <line x1="80" y1="40" x2="106" y2="40" stroke="#C98A22" stroke-width="2.5" stroke-linecap="round"/>
-          <text x="113" y="44" font-family="'Spline Sans Mono',monospace" font-size="11" fill="#C98A22" letter-spacing=".13em">CRITERIO VISIBLE</text>
-          <circle cx="84" cy="60" r="3" fill="rgba(201,138,34,.55)"/>
-          <text x="93" y="64" font-family="'Spline Sans Mono',monospace" font-size="12" fill="#8893ab">criterio experto</text>
-          <circle cx="84" cy="78" r="3" fill="rgba(201,138,34,.55)"/>
-          <text x="93" y="82" font-family="'Spline Sans Mono',monospace" font-size="12" fill="#8893ab">lectura del mercado</text>
-          <circle cx="84" cy="96" r="3" fill="rgba(201,138,34,.55)"/>
-          <text x="93" y="100" font-family="'Spline Sans Mono',monospace" font-size="12" fill="#8893ab">diseño del estudio</text>
-          <circle cx="84" cy="114" r="3" fill="rgba(201,138,34,.55)"/>
-          <text x="93" y="118" font-family="'Spline Sans Mono',monospace" font-size="12" fill="#8893ab">seguridad para decidir</text>
-          <circle cx="84" cy="132" r="3" fill="rgba(201,138,34,.55)"/>
-          <text x="93" y="136" font-family="'Spline Sans Mono',monospace" font-size="12" fill="#8893ab">cuali+cuanti</text>
-          <circle cx="84" cy="150" r="3" fill="rgba(201,138,34,.55)"/>
-          <text x="93" y="154" font-family="'Spline Sans Mono',monospace" font-size="12" fill="#8893ab">Investegia</text>
-        </svg>
-      </div>
-    </div>
-    <p class="ia-copy reveal">En este mercado, la marca no es estética. Es una promesa de criterio, reputación y efectividad.</p>
-    <p class="ia-remate reveal">Una buena marca produce confianza visible, y esa confianza se traduce en tarifa.</p>
-    <div class="proofs reveal">
-      <div class="proof">
-        <div class="pfig">+38%</div>
-        <p class="pclaim">Paga de más quien percibe una marca como significativamente diferente.</p>
-      </div>
-      <div class="proof">
-        <div class="pfig">5-10%</div>
-        <p class="pclaim">El sobreprecio de las marcas B2B más fuertes: se paga por reducir el riesgo de decidir.</p>
-      </div>
-    </div>
-    <div class="srcs reveal" style="max-width:760px;margin-top:30px">
-      <div class="sh">Fuentes</div>
-      <a class="src" href="https://www.kantar.com/inspiration/brands/why-pricing-power-is-a-brands-greatest-asset" target="_blank" rel="noopener noreferrer">Why pricing power is a brand&rsquo;s greatest asset <span class="meta"><span class="mid">&middot;</span> Kantar BrandZ</span></a>
-      <a class="src" href="https://www.mckinsey.com/industries/industrials-and-electronics/our-insights/the-rising-value-of-industrial-brands" target="_blank" rel="noopener noreferrer">The rising value of industrial brands <span class="meta"><span class="mid">&middot;</span> McKinsey <span class="mid">&middot;</span> 2021</span></a>
-    </div>
-  </div>
-</section>
-
-<!-- LA MAÑANA CERO -->
-<section class="m0">
-  <div class="wrap">
-    <div class="m0-propongo reveal">propongo:</div>
-    <h2 class="big serif reveal">La Mañana Cero</h2>
-    <p class="m0-sub reveal">Vamos a diseccionar la marca de El Departamento con el mismo rigor que usáis para vuestros clientes.</p>
-    <div class="m0-meta reveal">
-      <div class="m0-row">
-        <span class="m0-lbl">Cuándo</span>
-        <div class="m0-cal-block">
-          <span class="m0-cal-icon">
-            <svg width="44" height="48" viewBox="0 0 44 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="0" y="6" width="44" height="42" rx="5" fill="var(--navy)"/>
-              <rect x="0" y="6" width="44" height="15" rx="5" fill="#EC3B1A"/>
-              <rect x="0" y="14" width="44" height="7" fill="#EC3B1A"/>
-              <text x="22" y="19" text-anchor="middle" font-family="'Spline Sans Mono',monospace" font-size="8" font-weight="600" fill="white" letter-spacing=".12em">MAR</text>
-              <text x="22" y="40" text-anchor="middle" font-family="'Fraunces',serif" font-size="20" font-weight="600" fill="white">30</text>
-              <rect x="11" y="0" width="4" height="12" rx="2" fill="var(--ink-soft)"/>
-              <rect x="29" y="0" width="4" height="12" rx="2" fill="var(--ink-soft)"/>
-            </svg>
-          </span>
-          <span class="m0-time">10:00–12:00</span>
-          <a class="m0-add-cal" href="/manana-cero.ics" download>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Añadir al calendario
-          </a>
+          <h3 class="h3">Por qué una marca líder estaba perdiendo a los jóvenes sin saberlo.</h3>
+          <p class="found">No fue una preferencia de producto: fue <b>un cambio de ritual</b> que el dato agregado escondía. Reorientó la campaña.</p>
         </div>
-      </div>
-      <div class="m0-row">
-        <span class="m0-lbl">Quién</span>
-        <span class="m0-val">Investegas + <a class="m0-juan-link" href="https://juanarenas.bio" target="_blank" rel="noopener noreferrer">Juan<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:4px;flex:none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a></span>
-      </div>
-    </div>
-    <p class="m0-remate reveal">Diagnóstico<span class="arr">→</span>Dirección<span class="arr">→</span>Ejecución</p>
-  </div>
-</section>
+        <span class="go">Leer el caso <span class="ar">→</span></span>
+      </a>
 
-<!-- WHAT IT IS -->
-<section class="what">
-  <div class="wrap">
-    <div class="eyebrow reveal">En qué consiste la mañana</div>
-    <h2 class="big reveal">Vuestro método, aplicado a vuestra marca.</h2>
-    <ul class="reveal">
-      <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2238D0" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg> Miramos la marca de El Departamento como la ve un CMO de Coca-Cola o Santander.</li>
-      <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2238D0" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg> Ponemos cifras a lo que vale El Departamento, y a lo que deja sobre la mesa.</li>
-      <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2238D0" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.2-8.6"/><path d="M21 3v6h-6"/></svg> Reposicionamos a El Departamento como reposiciona a sus clientes.</li>
-      <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2238D0" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg> Salimos con 3 casos elegidos + 3 de reserva y un borrador de posicionamiento.</li>
-    </ul>
-    <div class="eyebrow reveal" style="margin-top:76px">La mañana, minuto a minuto</div>
-    <h2 class="big reveal">Cuatro dinámicas. Ningún PowerPoint.</h2>
-    <p class="lead reveal">No vengo a presentar nada. Vengo a hacer preguntas para que El Departamento llegue a una conclusión propia.</p>
-
-    <div class="agenda reveal">
-      <div class="slot">
-        <div class="time">0:00<small>10 MIN</small></div>
-        <div><div class="name">Apertura</div><h4>Las reglas del juego</h4><p>Ponemos el marco y bajamos la guardia. Hoy El Departamento es un cliente más que entra por la puerta. Lo tratamos como tal.</p></div>
-      </div>
-      <div class="slot">
-        <div class="time">0:10<small>25 MIN</small></div>
-        <div><div class="name">Dinámica 1</div><h4>El cliente es El Departamento</h4><p>Si esta empresa llamara hoy: ¿cuál es su problema real y cuál es solo el síntoma? Diagnóstico en frío, sin soluciones todavía.</p></div>
-      </div>
-      <div class="slot">
-        <div class="time">0:35<small>25 MIN</small></div>
-        <div><div class="name">Dinámica 2</div><h4>El mapa de percepción</h4><p>En la pizarra, dos ejes: precio y autoridad percibida. Con post-its colocáis a Kantar, Ipsos, las boutiques premium... y a El Departamento. ¿Dónde estáis hoy, a un tercio de la tarifa, y dónde deberíais estar? La distancia entre esos dos post-its es la estrategia, y el dinero que hay sobre la mesa.</p></div>
-      </div>
-      <div class="slot">
-        <div class="time">1:00<small>25 MIN</small></div>
-        <div><div class="name">Dinámica 3</div><h4>Los tres casos</h4><p>De 600 estudios, elegimos 3 y los montamos como prueba: el reto del cliente, lo que investigasteis, el resultado con número. No salimos con buenas intenciones, salimos con los tres casos que cierran la próxima venta.</p></div>
-      </div>
-      <div class="slot">
-        <div class="time">1:25<small>20 MIN</small></div>
-        <div><div class="name">Dinámica 4</div><h4>Titular o firma</h4><p>Dos columnas: lo que ya no puede ser titular, y lo que sí debe liderar. Qué parte del carácter sigue viva al subir de categoría, y qué ya no es ingenio sino error de posicionamiento.</p></div>
-      </div>
-      <div class="slot">
-        <div class="time">1:45<small>15 MIN</small></div>
-        <div><div class="name">Cierre</div><h4>El siguiente paso, y el motor</h4><p>Salimos con los 3 casos elegidos, un primer borrador de posicionamiento y una idea concreta: un motor de IA sobre vuestros 200+ clientes dormidos que redacta, con base real, por qué merece la pena volver a hablar con cada uno. Lo que mejor sé construir, a medida para vosotras.</p></div>
-      </div>
+      <a href="caso.html" class="case-card reveal">
+        <div>
+          <div class="meta-row">
+            <span class="tag dot">Audio × Automoción</span>
+            <span class="state">Anonimizado</span>
+            <span class="ph">muestra</span>
+          </div>
+          <h3 class="h3">Spotify × Renault: el momento exacto para poner tu anuncio ganador.</h3>
+          <p class="found">La intención de compra de un coche fluctúa con el día. Para saber el momento exacto solo hacen falta <b>buenos datos</b>.</p>
+        </div>
+        <span class="go">Leer el caso <span class="ar">→</span></span>
+      </a>
     </div>
   </div>
 </section>
 
-<!-- CLOSE 1 · la transformación -->
-<section class="close" style="border-bottom:1px solid var(--navy-soft)">
-  <div class="wrap">
-    <div class="eyebrow reveal">2H de trabajo y...</div>
-    <h2 class="reveal">Dejamos de parecer<br>una <span class="g">versión menor</span><br>de lo que somos.</h2>
-    <div class="reveal" style="margin:34px auto 0;font-family:'Fraunces',serif;font-weight:500;font-style:italic;font-size:clamp(20px,2.8vw,30px);line-height:1.2;color:var(--gold);text-wrap:balance">Y el escaparate por fin enseña lo que hay dentro.</div>
+<!-- CÓMO PIENSAN (manifiesto) -->
+<section class="manifesto" id="manifiesto">
+  <div class="container">
+    <p class="eyebrow reveal"><span class="idx">03</span>Cómo pensamos</p>
+    <div class="manifesto-quad">
+      <div class="manifesto-q reveal">
+        <p class="manifesto-line">Un dato sin decisión es <span class="em">entretenimiento caro</span>.</p>
+      </div>
+      <div class="manifesto-q reveal d1">
+        <p class="manifesto-line">La pregunta correcta vale más que mil respuestas a la equivocada.</p>
+      </div>
+      <div class="manifesto-q reveal d2">
+        <p class="manifesto-line">Lo que la mayoría dice importa. Lo que dice la minoría que crece, <span class="em">decide</span>.</p>
+      </div>
+      <div class="manifesto-q reveal d3">
+        <p class="manifesto-line">Si no se lo puedes explicar a tu jefe en una frase, no lo has entendido.</p>
+      </div>
+    </div>
+    <p class="manifesto-foot reveal">Por eso no entregamos informes de archivar. Entregamos una decisión con dueño, fecha y argumento. El resto es bibliografía.</p>
   </div>
 </section>
 
-<!-- CLOSE 2 · el cierre de acción (ask + premio + firma) -->
-<section class="close">
-  <div class="wrap">
-    <div class="eyebrow reveal">Lo único que pido</div>
-    <h2 class="reveal">Venid con ganas<br>de <span class="g">investegia</span>.</h2>
-    <div class="reveal" style="margin:26px auto 0;font-family:'Fraunces',serif;font-weight:300;font-style:italic;font-size:clamp(17px,2vw,22px);line-height:1.3;color:#c8cee0;text-wrap:balance">Traed vuestros mejores casos, mejor por escrito.</div>
-    <div class="reveal" style="margin:42px auto 0;max-width:34ch;font-family:'Fraunces',serif;font-weight:600;font-size:clamp(22px,3.2vw,34px);line-height:1.16;color:var(--paper);text-wrap:balance">Al otro lado: la tarifa que ya <span class="g">merecéis</span> y la categoría que ya <span class="g">inventasteis</span>.</div>
-    <div class="mark reveal">El Departamento<b>.</b></div>
-    <div class="stamp reveal">Rebrand: la Mañana Cero &middot; Martes 30 de junio &middot; <span id="cd2">—</span></div>
-    <div class="reveal" style="margin-top:28px;display:flex;justify-content:center">
-      <a class="pill pill-action" href="https://juanarenas.bio" target="_blank" rel="noopener noreferrer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C98A22" stroke-width="2"><circle cx="12" cy="6" r="3.5"/><path d="M4 20v-1a8 8 0 0 1 16 0v1"/><path d="M10.5 11.5l1.5 5.5 1.5-5.5" stroke-width="1.5"/></svg> Juan Arenas <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#C98A22" stroke-width="2.5" style="margin-left:2px;flex:none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg><span class="pill-tip">Ver Portfolio de Juan</span></a>
+<!-- EL MÉTODO INVESTEGIA -->
+<section id="metodo-investegia">
+  <div class="container">
+    <div class="section-head reveal" style="margin-bottom:clamp(40px,6vw,72px)">
+      <p class="eyebrow"><span class="idx">04</span>El Método Investegia</p>
+      <h2 class="h2" style="margin-top:22px;max-width:36ch">De la pregunta de negocio a la decisión. Cuatro pasos, sin relleno.</h2>
+    </div>
+    <div class="phases">
+      <div class="phase reveal">
+        <div class="pn">01</div>
+        <h4>Entender cómo se comportan tus consumidores</h4>
+        <p>Diseño de estudio en campo con nuestros expertos en encuestas cuantitativas y entrevistas cualitativas.</p>
+      </div>
+      <div class="phase reveal d1">
+        <div class="pn">02</div>
+        <h4>Análisis: a quién hablar, con qué mensaje, a qué precio</h4>
+        <p>Perfiles sociológicos reales, no arquetipos anticuados. Territorio de marca, puntos de venta, momentos de decisión, canales y hasta qué celebrity les convencería mejor.</p>
+      </div>
+      <div class="phase reveal">
+        <div class="pn">03</div>
+        <h4>Convertir mil datos en una decisión clara</h4>
+        <p>Toda la investigación converge en un punto: la estrategia. Una recomendación clara, respaldada por el lenguaje de las entrevistas y la precisión estadística real.</p>
+      </div>
+      <div class="phase reveal d1">
+        <div class="pn">04</div>
+        <h4>Validar la campaña antes de invertir en ella</h4>
+        <p>Mensaje, packaging, precio... Validamos todo frente al mercado real antes de que comprometas la inversión.</p>
+      </div>
     </div>
   </div>
 </section>
+
+<!-- RAZONES PARA CREERNOS (claims) -->
+<section id="razones">
+  <div class="container">
+    <div class="section-head reveal" style="margin-bottom:clamp(40px,6vw,72px)">
+      <p class="eyebrow"><span class="idx">05</span>Razones para creernos</p>
+      <h2 class="h2" style="margin-top:22px;max-width:36ch">Todo lo que decimos es cierto, y se puede demostrar.</h2>
+    </div>
+    <div class="claims-grid">
+      <div class="claim-card reveal">
+        <div class="ct">La disciplina</div>
+        <div class="cb">Inventamos la <span class="amber">Investegia</span>.</div>
+        <div class="cl">Método propio: <b>investigación + estrategia</b>, creado desde dentro. <a href="libro.pdf" target="_blank">Hasta escribimos el libro</a>.</div>
+      </div>
+      <div class="claim-card reveal d1">
+        <div class="ct">La confianza</div>
+        <div class="cb">De Coca-Cola a Google.</div>
+        <div class="cl">Santander, Mahou, Ballantine's, Facebook, IE. <b>Las marcas más exigentes de España</b> nos eligen.<br>Y repiten.</div>
+      </div>
+      <div class="claim-card reveal d2">
+        <div class="ct">La autoridad</div>
+        <div class="cb">Formamos a los que investigan.</div>
+        <div class="cl">Impartimos el Máster de Investigación de Mercados en el <a href="https://www.ie.edu/business-school/programs/masters/master-in-market-research-consumer-behavior/" target="_blank"><b>Instituto de Empresa</b> <img src="logos/ie.png" alt="IE" class="ie-logo"></a>.</div>
+      </div>
+    </div>
+    <div class="claim-banner reveal">
+      <h3>Por tamaño, calidad, agilidad y trato, no hay <span class="em">mejor equipo de Investegia</span> en España.</h3>
+      <div class="why">
+        <span>Senior real, 5 socios combinan un siglo de experiencia</span>
+        <span>Guante blanco y agilidad</span>
+        <span>De la idea a la campaña validada</span>
+        <span>Una década apoyando a las marcas más exigentes del mundo</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- EQUIPO -->
+<section id="equipo" style="background:var(--paper-2)">
+  <div class="container">
+    <div class="section-head reveal" style="margin-bottom:clamp(40px,6vw,72px)">
+      <p class="eyebrow"><span class="idx">06</span>Equipo</p>
+      <h2 class="h2" style="margin-top:22px;max-width:38ch">Cinco socios que suman un siglo de experiencia.</h2>
+      <p class="lead" style="margin-top:22px;font-size:18px">Quien te vende el proyecto es quien lo dirige.</p>
+    </div>
+    <div class="team-grid">
+      <div class="member reveal">
+        <div class="por">JA</div>
+        <h4>Javier Arenas</h4>
+        <div class="role">Socio · Cuantitativa</div>
+        <ul class="creds">
+          <li>30 años en investigación de mercados</li>
+          <li>10+ años como profesor del Master en IE</li>
+          <li>Sociólogo</li>
+        </ul>
+      </div>
+      <div class="member reveal d1">
+        <div class="por">BD</div>
+        <h4>Beatriz Domínguez</h4>
+        <div class="role">Socia · Estrategia</div>
+        <ul class="creds">
+          <li>~20 años en investigación y estrategia</li>
+          <li>Docente de planificación estratégica</li>
+          <li>Socióloga + marketing</li>
+        </ul>
+      </div>
+      <div class="member reveal d2">
+        <div class="por">LC</div>
+        <h4>Lourdes Carmona</h4>
+        <div class="role">Socia · Análisis</div>
+        <ul class="creds">
+          <li>~20 años en análisis del consumidor</li>
+          <li>Especialista en estadística aplicada</li>
+          <li>Socióloga</li>
+        </ul>
+      </div>
+      <div class="member reveal">
+        <div class="por">CP</div>
+        <h4>Carolina Pallardó</h4>
+        <div class="role">Socia · Datos & Social</div>
+        <ul class="creds">
+          <li>15 años en investigación</li>
+          <li>Big data, redes y técnicas cuanti</li>
+          <li>Socióloga y politóloga</li>
+        </ul>
+      </div>
+      <div class="member reveal d1">
+        <div class="por">PC</div>
+        <h4>Paula Campos</h4>
+        <div class="role">Socia · Insight & Relato</div>
+        <ul class="creds">
+          <li>20 años cuanti + visualización</li>
+          <li>Convierte el dato en relato accionable</li>
+          <li>Publicista</li>
+        </ul>
+      </div>
+      <div class="member reveal d2" style="display:flex;flex-direction:column;justify-content:center;background:var(--ink);border-color:var(--ink)">
+        <h4 class="serif" style="color:var(--paper);font-size:24px">Investegia.</h4>
+        <p style="color:#9aa3bb;font-size:14.5px;margin-top:10px">Investigación + estrategia. La disciplina que inventamos, y sobre la que escribimos el libro.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA FINAL -->
+<section class="cta-final" id="contacto">
+  <div class="container">
+    <p class="eyebrow reveal" style="display:flex;justify-content:center">Hablemos</p>
+    <h2 class="h2 reveal d1" style="margin-top:24px">¿Tienes una decisión cara por delante?</h2>
+    <p class="lead reveal d1">Cuéntanos qué tienes que decidir. Te diremos si podemos quitarte la duda, y cómo. La primera conversación no se factura.</p>
+    <div class="acts reveal d2">
+      <a href="mailto:info@el-departamento.com" class="btn btn-amber">Plantear un proyecto <span class="ar">→</span></a>
+      <a href="casos.html" class="btn btn-ghost">Ver cómo trabajamos</a>
+    </div>
+    <p class="micro reveal d2">Madrid · Calle Soria 9 · +34 918 052 508</p>
+  </div>
+</section>
+
+</main>
+
+<!-- FOOTER -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <div class="brand">El Departamento<span class="dot">.</span></div>
+        <p>Investigación que acaba en decisiones. Despacho independiente de investigación y estrategia desde 2013.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Navegar</h5>
+        <a href="#hacemos">Qué hacemos</a>
+        <a href="casos.html">Casos</a>
+        <a href="#metodo-investegia">Método</a>
+        <a href="#equipo">Equipo</a>
+      </div>
+      <div class="footer-col">
+        <h5>Contacto</h5>
+        <a href="mailto:info@el-departamento.com">info@el-departamento.com</a>
+        <span>+34 918 052 508</span>
+        <span>Calle Soria 9, 2º · 28005 Madrid</span>
+      </div>
+    </div>
+    <div class="footer-base">
+      <span>© 2026 El Departamento · Investegia</span>
+      <span class="demo-note">Demo de reposicionamiento · logos, casos y cifras de equipo son contenido de muestra para ilustrar el formato.</span>
+    </div>
+  </div>
+</footer>
 
 <script>
-  // scroll reveal
-  const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.12});
+  const header=document.getElementById('header');
+  const onScroll=()=>header.classList.toggle('scrolled',window.scrollY>10);
+  onScroll();window.addEventListener('scroll',onScroll,{passive:true});
+
+  const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.14,rootMargin:'0px 0px -8% 0px'});
   document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
 
-  // progress bar
-  const prog=document.getElementById('prog');
-  addEventListener('scroll',()=>{const h=document.documentElement;const sc=(h.scrollTop)/(h.scrollHeight-h.clientHeight);prog.style.width=(sc*100)+'%';},{passive:true});
+  document.querySelector('.nav-toggle').addEventListener('click',()=>{document.getElementById('contacto').scrollIntoView({behavior:'smooth'})});
 
-  // accordion
-  document.querySelectorAll('.qrow').forEach(row=>{
-    const body=row.querySelector('.body');
-    row.addEventListener('click',()=>{
-      const open=row.classList.contains('open');
-      document.querySelectorAll('.qrow').forEach(r=>{r.classList.remove('open');r.querySelector('.body').style.maxHeight=null;});
-      if(!open){row.classList.add('open');body.style.maxHeight=body.scrollHeight+'px';}
-    });
+  const CLIENTES=[
+    {n:'Coca-Cola',logo:'cocacola'},{n:'Santander',logo:'santander'},{n:'¡HOLA!',logo:'hola'},
+    {n:'Mahou',logo:'mahou'},{n:'FEV',logo:'fev'},{n:'DYC',logo:'dyc'},
+    {n:'Cinco Jotas',logo:'cincojotas'},{n:'La Casera',logo:'la-casera'},{n:'Amstel',logo:'amstel'},
+    {n:'Airbnb',logo:'airbnb'},{n:'Yatekomo',logo:'yatekomo'},{n:'ABC',logo:'abc'},
+    {n:'Gallina Blanca',logo:'gallinablanca'},{n:'Famosa',logo:'famosa'},{n:'Beefeater',logo:'beefeater'},
+    {n:'Larios',logo:'larios'},{n:'Bankinter',logo:'bankinter'},{n:'PC Componentes',logo:'pccomponentes'},
+    {n:'Orange',logo:'orange'},{n:'Cupra',logo:'cupra'},{n:'Glovo',logo:'glovo'},
+    {n:"Ballantine's",logo:'ballantines'},{n:'Correos',logo:'correos'},{n:'IKEA',logo:'ikea'},
+    {n:'Renault',logo:'renault'},{n:'Ladrón de Manzanas',logo:'ladron'},{n:'Oxfam',logo:'oxfam'},
+    {n:'Jolca',logo:'jolca'},{n:'Sportium',logo:'sportium'},{n:'Caja Rural de Navarra',logo:'cajaruralnavarra'},
+    {n:'Heineken',logo:'heineken'},{n:'Spotify',logo:'spotify'},{n:'Contra el Cáncer',logo:'aecc'},
+    {n:'Cervezas Alhambra',logo:'alhambra'},{n:'Deoleo',logo:'deoleo'},{n:'Deliveroo',logo:'deliveroo'},
+    {n:'Twitter',logo:'twitter'},{n:'Sanitas',logo:'sanitas'},{n:'Solán de Cabras',logo:'solandecabras'},
+    {n:'Danone',logo:'danone'},{n:'Lactalis',logo:'lactalis'},{n:'Pascual',logo:'pascual'},
+    {n:'Mutua Madrileña',logo:'mutua'},{n:'Brugal',logo:'brugal'},{n:'Facebook',logo:'facebook'},
+    {n:'BBVA',logo:'bbva'},{n:'IE',logo:'ie'},{n:'Google',logo:'google'},
+    {n:'Fuerte Hoteles',logo:'fuertehoteles'},{n:'Quirónsalud',logo:'quironsalud'},{n:'Delaviuda',logo:'delaviuda'},
+    {n:'Osborne',logo:'osborne'},{n:'Nestlé',logo:'nestle'},{n:'Webedia',logo:'webedia'},
+    {n:'Plataforma de ONG',logo:'plataforma'}
+  ];
+  function cardHTML(c){
+    if(c.logo){return `<div class="client-card"><img src="logos/${c.logo}.png" alt="${c.n}" loading="lazy"></div>`;}
+    return `<div class="client-card"><span class="nm">${c.n}</span></div>`;
+  }
+  const bands=[document.getElementById('band1'),document.getElementById('band2'),document.getElementById('band3')];
+  const buckets=[[],[],[]];
+  CLIENTES.forEach((c,i)=>buckets[i%3].push(c));
+  bands.forEach((band,bi)=>{
+    const set=buckets[bi].map(cardHTML).join('');
+    band.innerHTML=set+set;
   });
-
-  // count up
-  const fmt=n=>String(n).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
-  const cio=new IntersectionObserver((es)=>{es.forEach(e=>{
-    if(!e.isIntersecting)return; const el=e.target; cio.unobserve(el);
-    const t=+el.dataset.target; const dur=1100; const t0=performance.now();
-    const step=now=>{const p=Math.min((now-t0)/dur,1);const v=Math.round((1-Math.pow(1-p,3))*t);el.textContent=fmt(v);if(p<1)requestAnimationFrame(step);};
-    requestAnimationFrame(step);
-  });},{threshold:.6});
-  document.querySelectorAll('.count').forEach(el=>cio.observe(el));
-
-  // countdown to Tue 30 Jun 2026, 10:00 Spain time (UTC+2 in summer)
-  (function(){
-    // 2026-06-30 10:00 CEST = UTC+2 → 08:00 UTC
-    const target=new Date(Date.UTC(2026,5,30,8,0,0));
-    function fmtCountdown(){
-      const now=new Date();
-      const diff=target-now;
-      if(diff<=0) return 'hoy · 10h';
-      const totalH=Math.floor(diff/3600000);
-      const days=Math.floor(totalH/24);
-      const hours=totalH%24;
-      if(days>0 && hours>0) return days+'d '+hours+'h';
-      if(days>0) return days+' días';
-      return hours+'h';
-    }
-    function upd(){
-      const txt=fmtCountdown();
-      const a=document.getElementById('cd'), b=document.getElementById('cd2');
-      if(a) a.textContent=txt;
-      if(b) b.textContent=txt;
-    }
-    upd();
-    setInterval(upd,60000);
-  })();
-
-  // ICS download
-  document.getElementById('pill-cal').addEventListener('click',function(){
-    var ics=[
-      'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//El Departamento//Strategy Morning//ES',
-      'BEGIN:VEVENT','UID:strategy-morning-20260630@eldepartamento',
-      'DTSTAMP:20260620T000000Z',
-      'DTSTART:20260630T080000Z','DTEND:20260630T100000Z',
-      'SUMMARY:Strategy Morning · El Departamento',
-      'DESCRIPTION:El primer proyecto de El Departamento para El Departamento.',
-      'LOCATION:Madrid','END:VEVENT','END:VCALENDAR'
-    ].join('\r\n');
-    var blob=new Blob([ics],{type:'text/calendar'});
-    var url=URL.createObjectURL(blob);
-    var a=document.createElement('a');a.href=url;a.download='strategy-morning.ics';
-    document.body.appendChild(a);a.click();document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  });
-
-  // sealed-letter gate: SHA-256 of the password (never the plaintext) ; ~3s reveal
-  (function(){
-    var DIGEST='1f936da00ecdf26fad045aecbcc2ae3343e89f8db39dd640091ce71bd1669137';
-    var seal=document.getElementById('seal');
-    if(!seal) return;
-    var form=document.getElementById('sealForm');
-    var input=document.getElementById('sealInput');
-    var hint=seal.querySelector('.hint');
-    var fails=0;
-    var reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
-    // The page must always open at the very top, not wherever the browser
-    // last restored the scroll — the proposal is a logical sequence.
-    try{ if('scrollRestoration' in history) history.scrollRestoration='manual'; }catch(e){}
-    window.scrollTo(0,0);
-    async function sha256(s){
-      var buf=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
-      return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
-    }
-    function unseal(){
-      window.scrollTo(0,0);
-      seal.classList.add('open');
-      setTimeout(function(){ seal.parentNode && seal.remove(); document.body.classList.remove('is-sealed'); }, reduce?380:3000);
-    }
-    function reject(){
-      fails++;
-      seal.classList.remove('err'); void seal.offsetWidth; seal.classList.add('err');
-      hint.textContent = 'Contraseña incorrecta. Inténtalo de nuevo.';
-      input.select();
-    }
-    form.addEventListener('submit', async function(e){
-      e.preventDefault();
-      var v=(input.value||'').trim().toLowerCase();
-      if(!v) return;
-      try{ var d=await sha256(v); (d===DIGEST) ? unseal() : reject(); }
-      catch(err){ reject(); }
-    });
-    // GATE ARCHIVED — auto-unseal
-    unseal();
-    // setTimeout(function(){ try{ input.focus(); }catch(e){} }, 80);
-  })();
 </script>
 </body>
 </html>
