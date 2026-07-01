@@ -100,9 +100,7 @@ export default function Page() {
       <CaseStudies />
       {/* 4. How I help */}
       <Capabilities />
-      {/* 5. How I think */}
-      <GTMFramework />
-      {/* 6. About + CTA */}
+      {/* 5. About + CTA */}
       <AskMyClone />
       <About />
       <CTA />
@@ -738,88 +736,7 @@ function Capabilities() {
 }
 
 /* ====================================================
-   6. GTM FRAMEWORK
-==================================================== */
-function GTMFramework() {
-  const phases = [
-    {
-      key: "Phase 0",
-      title: "Earn the first 100 users",
-      weeks: "Wk 1–4",
-      points: [
-        "Define a sharp ICP and target people actively trying to solve this now.",
-        "Manual outreach and concierge onboarding to capture the buyer's real language.",
-      ],
-    },
-    {
-      key: "Phase 1",
-      title: "Find the message that pulls",
-      weeks: "Wk 4–10",
-      points: [
-        "Test claims and proof points; in health, credibility beats cleverness.",
-        "Double down on the one channel showing pull before touching anything else.",
-      ],
-    },
-    {
-      key: "Phase 2",
-      title: "Build the repeatable system",
-      weeks: "Wk 10–20",
-      points: [
-        "Turn the winning journey into a system: capture → qualify → personalize → follow-up.",
-        "Layer in creator and UGC workflows only after the story already resonates.",
-      ],
-    },
-    {
-      key: "Phase 3",
-      title: "Scale what is proven",
-      weeks: "Wk 20+",
-      points: [
-        "Increase spend only behind channels that convert with healthy unit economics.",
-        "Keep compliance, ops, and reporting tight so scale compounds, not fragments.",
-      ],
-    },
-  ];
-
-  return (
-    <section className="px-6 md:px-12 lg:px-20 py-16 md:py-24 border-t border-[#F2EFE6]/10">
-      <div className="max-w-7xl mx-auto">
-        <Reveal>
-          <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-3">
-            How I think about business.
-          </h2>
-          <p className="text-[#F2EFE6]/60 mb-16 italic font-display text-lg">
-            A 0→1 GTM framework for a consumer health biotech startup.
-          </p>
-        </Reveal>
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {phases.map((p, i) => (
-            <Reveal key={i} delay={i * 80}>
-              <div className="rounded-2xl border border-[#284A3C] p-6 bg-[#0e1813] h-full">
-                <p className="text-[#C9A24B] text-xs tracking-widest uppercase">
-                  {p.key}
-                </p>
-                <p className="text-[#F2EFE6]/40 text-xs mb-3">{p.weeks}</p>
-                <h3 className="font-display text-xl mb-4">{p.title}</h3>
-                <ul className="space-y-3 text-sm text-[#F2EFE6]/70 leading-relaxed">
-                  {p.points.map((pt, j) => (
-                    <li key={j} className="flex gap-2">
-                      <span className="text-[#9FC4AE] shrink-0">·</span>
-                      <span>{pt}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-
-/* ====================================================
-   8. ASK MY CLONE
+   6. ASK MY CLONE
 ==================================================== */
 type Message = { role: "user" | "assistant"; content: string };
 
