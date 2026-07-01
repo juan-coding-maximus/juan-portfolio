@@ -181,9 +181,6 @@ function Hero() {
         <p className="mt-6 font-display italic text-[clamp(1rem,2.2vw,1.5rem)] text-[#C9A24B]">
           Sales leader for SoCal&apos;s most ambitious scientific ventures.
         </p>
-        <p className="mt-4 max-w-2xl mx-auto text-[#F2EFE6]/70 text-base">
-          AI-native marketing and sales operator for scientific ventures.
-        </p>
         <div className="mt-12 flex justify-center">
           <a href="#portfolio" className="text-[#F2EFE6]/40 hover:text-[#F2EFE6]/70 transition-colors" aria-label="Scroll down">
             <svg
