@@ -179,7 +179,7 @@ function Hero() {
           JUAN ARENAS
         </h1>
         <p className="mt-6 font-display italic text-[clamp(1rem,2.2vw,1.5rem)] text-[#C9A24B]">
-          Sales leader for SoCal&apos;s most ambitious scientific ventures.
+          I turn complex science into revenue.
         </p>
         <div className="mt-12 flex justify-center">
           <a href="#portfolio" className="text-[#F2EFE6]/40 hover:text-[#F2EFE6]/70 transition-colors" aria-label="Scroll down">
@@ -208,11 +208,11 @@ function Hero() {
 ==================================================== */
 function MetricWall() {
   const metrics = [
-    { n: <CountUp to={400} suffix="+" />, label: "creators pipelined", color: "gold" },
+    { n: <CountUp to={400} suffix="+" />, label: "creators activated", color: "gold" },
     { n: <CountUp to={30} prefix="+" suffix="%" />, label: "sponsor revenue growth", color: "" },
     { n: <CountUp to={2} suffix="×" />, label: "reach in 8 months", color: "" },
     { n: <CountUp to={10} suffix="+ hrs" />, label: "/week automated", color: "sage" },
-    { n: <CountUp to={100} suffix="%" />, label: "HIPAA compliant", color: "sage" },
+    { n: <CountUp to={0} />, label: "HIPAA incidents, ever", color: "sage" },
   ];
 
   return (
@@ -577,7 +577,7 @@ function CaseStudies() {
       title: "I joined a world‑class Alzheimer's center to get their science out of the journals and into the world, loud and clear.",
       body: (
         <>
-          Supporting the premier Alzheimer's Lab & Brain Health Clinic in Los Angeles. I led a cross‑functional marketing engine across content, email, social, and web, ensuring HIPAA‑compliant content and on‑brand delivery. I designed and executed multi‑channel campaigns that{" "}
+          Supporting a leading Alzheimer's Lab & Brain Health Clinic in Los Angeles. I led a cross‑functional marketing engine across content, email, social, and web, ensuring HIPAA‑compliant content and on‑brand delivery. I designed and executed multi‑channel campaigns that{" "}
           <strong className="text-[#C9A24B] font-medium">2x newsletter and social reach in 8 months</strong>
           , growing a pipeline of engaged patients and caregivers. I also launched and scaled a Spanish‑language newsletter, expanding the addressable LA market and improving engagement with our community.
         </>
@@ -589,7 +589,7 @@ function CaseStudies() {
       tag: "0→1 · OPERATIONS · GO-TO-MARKET",
       role: "Founding Operator",
       title: "I helped build a diagnostics startup from zero to revenue.",
-      body: "I came in when the idea was fresh: I gathered the founders' ideas, built the v1 deck, built the website, designed operational workflows, and warmed the B2B relationships with LA's longevity clinics. Both strategic and hands-on. A pleasure to work with these highly creative scientists.",
+      body: "I came in when the idea was fresh: I shaped the founders' vision into a v1 deck, built the website, designed operational workflows, and warmed the B2B relationships with LA's longevity clinics. Both strategic and hands-on. The kind of scientists worth betting on.",
       art: "Metaba Health — site / ops board",
     },
     {
@@ -598,9 +598,9 @@ function CaseStudies() {
       title: "I bootstrapped a personalized perfume company into 5 figures of revenue.",
       body: (
         <>
-          I did Toxicology research at University of Southern California and found that some perfume ingredients are endocrine disruptors, phthalates and toxic parabens. I started making my own cologne with all-natural essential oils. Grew this hobby into a startup that delivers a personalized perfume as a service. To date, I&apos;ve made over 200 different perfumes for 200 unique customers. Everyone deserves to feel their best,{" "}
+          I did Toxicology research at University of Southern California and found that some perfume ingredients are endocrine disruptors, phthalates and toxic parabens. I started making my own cologne with all-natural essential oils. Grew this hobby into a startup that delivers a personalized perfume as a service. To date, I&apos;ve made over 200 different perfumes for 200 unique customers. With{" "}
           <a href="https://youraurafragrance.com" target="_blank" rel="noopener noreferrer" className="text-[#C9A24B] hover:underline">Your Aura</a>
-          {" "}allows you to define your scent. Safe &amp; Scented. I&apos;m ever-grateful to{" "}
+          , anyone can design their own scent, safe by formulation. I&apos;m ever-grateful to{" "}
           <a href="https://www.linkedin.com/in/tommyknapp1/" target="_blank" rel="noopener noreferrer" className="text-[#C9A24B] hover:underline">Prof. Tommy Knapp</a>
           {" "}for helping me stay curious and pushing me to find better product-market fit.
         </>
@@ -611,13 +611,13 @@ function CaseStudies() {
       tag: "LEAD GENERATION · B2B · AI ORCHESTRATION",
       role: "Growth & Automation Lead",
       title: "I built an AI-native pipeline that engaged thousands of influencers.",
-      body: "Milieu Skin is the first personalized prebiotic skincare brand. Their product was awesome, but their marketing needed real volume. I came in with a Go-To-Market plan: engage tiktokers to create hundreds of videos with the product, and use the best-performing videos as Ads. The flow you see in this video reflects the mix of high-volume automation work, AI orchestration, and human touch when it matters. We reached hundreds of qualified inbound leads each week.",
+      body: "Milieu Skin is the first personalized prebiotic skincare brand. Their product was excellent; their marketing needed real volume. I came in with a Go-To-Market plan: engage tiktokers to create hundreds of videos with the product, and use the best-performing videos as Ads. The flow you see in this video reflects the mix of high-volume automation work, AI orchestration, and human touch when it matters. We reached hundreds of qualified inbound leads each week.",
       art: "n8n-video",
     },
     {
       tag: "PARTNERSHIPS · COMMUNITY · EVENTS",
       role: "B2B Partnerships Associate",
-      title: "I fostered partnerships for LA's Biotech nonprofit, growing revenue 30% YOY.",
+      title: "I grew partnerships for LA's Biotech nonprofit, lifting revenue 30% YoY.",
       body: "Biotech Connection LA brings life sciences industry and academia together across LA. I ran partnerships end to end: cold outreach to biotech companies and research groups, pre-event promotion to drive attendance, live interviews on event day, and post-event follow-ups to keep sponsors warm. Consistent communication drove a 30% lift in sponsorship revenue and brought bigger names like Amgen and USC Keck to our sponsors list.",
       art: "bcla-video",
     },
@@ -785,7 +785,7 @@ function GTMFramework() {
       <div className="max-w-7xl mx-auto">
         <Reveal>
           <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-3">
-            How I think of business.
+            How I think about business.
           </h2>
           <p className="text-[#F2EFE6]/60 mb-16 italic font-display text-lg">
             A 0→1 GTM framework for a consumer health biotech startup.
@@ -1203,7 +1203,7 @@ function CTA() {
       <div className="relative max-w-4xl mx-auto text-center">
         <Reveal>
           <h2 className="font-display text-[clamp(2.2rem,5vw,3.6rem)] leading-tight">
-            I&apos;m the Go To Market partner{" "}
+            I&apos;m the go-to-market operator{" "}
             <span className="italic text-[#9FC4AE]">your science needs.</span>
           </h2>
         </Reveal>

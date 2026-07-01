@@ -26,18 +26,18 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "Juan Arenas",
   description:
-    "AI-native GTM operator for scientific startups. I make complexity disappear — and I fight like it's my own company.",
+    "Go-to-market operator for scientific ventures. I turn complex science into revenue, and I build like it's my own company.",
   openGraph: {
     title: "Juan Arenas",
     description:
-      "AI-native GTM operator for scientific startups. I make complexity disappear — and I fight like it's my own company.",
+      "Go-to-market operator for scientific ventures. I turn complex science into revenue, and I build like it's my own company.",
     images: [{ url: "/img/og-image.jpg", width: 1200, height: 1600 }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Juan Arenas",
     description:
-      "AI-native GTM operator for scientific startups. I make complexity disappear — and I fight like it's my own company.",
+      "Go-to-market operator for scientific ventures. I turn complex science into revenue, and I build like it's my own company.",
     images: ["/img/og-image.jpg"],
   },
 };
