@@ -131,7 +131,7 @@ function Hero() {
   }, []);
 
   return (
-    <section className="relative isolate min-h-screen flex flex-col justify-center px-6 md:px-12 lg:px-20 py-20 overflow-hidden">
+    <section className="relative isolate min-h-screen flex flex-col justify-end px-6 md:px-12 lg:px-20 pt-20 pb-16 sm:pb-24 overflow-hidden">
       {/* video bg + scrim */}
       <div className="absolute inset-0 -z-10">
         <video
@@ -175,24 +175,13 @@ function Hero() {
         className="max-w-6xl mx-auto w-full text-center"
         style={{ textShadow: "0 2px 28px rgba(8,14,11,0.85), 0 1px 4px rgba(8,14,11,0.7)" }}
       >
-        <h1 className="font-display font-light leading-[0.95] text-[clamp(3rem,11vw,9rem)] tracking-tight">
+        <h1 className="font-display font-light leading-[0.95] text-[clamp(2.5rem,8vw,6.5rem)] tracking-tight">
           JUAN ARENAS
         </h1>
-        <div className="mt-12 sm:mt-8 font-display text-[clamp(1.6rem,4vw,3rem)] leading-[1.15] space-y-1">
-          <p>
-            Build the{" "}
-            <span className="italic text-[#C9A24B]">system.</span>
-          </p>
-          <p>
-            Build the{" "}
-            <span className="italic text-[#C9A24B]">pipeline.</span>
-          </p>
-          <p>
-            Build the{" "}
-            <span className="italic text-[#9FC4AE]">company.</span>
-          </p>
-        </div>
-        <p className="mt-8 max-w-2xl mx-auto text-[#F2EFE6]/70 text-lg">
+        <p className="mt-6 font-display italic text-[clamp(1rem,2.2vw,1.5rem)] text-[#C9A24B]">
+          Sales leader for SoCal&apos;s most ambitious scientific ventures.
+        </p>
+        <p className="mt-4 max-w-2xl mx-auto text-[#F2EFE6]/70 text-base">
           AI-native marketing and sales operator for scientific ventures.
         </p>
         <div className="mt-12 flex justify-center">
