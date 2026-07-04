@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       { source: "/eldepartamento", destination: "/eldepartamento/index.html" },
+      // Agency-of-agents portfolio (portfolio-agency.html in the agency repo),
+      // shipped as a static asset under public/stack/.
+      { source: "/stack", destination: "/stack/index.html" },
     ];
   },
 };
