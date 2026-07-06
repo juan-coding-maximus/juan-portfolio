@@ -210,7 +210,7 @@ function MetricWall() {
     { n: <CountUp to={30} prefix="+" suffix="%" />, label: "sponsor revenue growth", color: "" },
     { n: <CountUp to={2} suffix="×" />, label: "reach in 8 months", color: "" },
     { n: <CountUp to={10} suffix="+ hrs" />, label: "/week automated", color: "sage" },
-    { n: <CountUp to={0} />, label: "HIPAA incidents, ever", color: "sage" },
+    { n: <CountUp to={100} suffix="%" />, label: "HIPAA compliant", color: "sage" },
   ];
 
   return (
