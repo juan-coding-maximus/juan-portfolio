@@ -13,17 +13,24 @@
     --bg: #0F131C;
     --panel: #151B28;
     --panel-2: #1A2334;
+    --elevated: #2A3550;
     --line: rgba(160, 180, 218, .14);
     --line-soft: rgba(160, 180, 218, .08);
+    --line-2: rgba(174, 192, 230, .30);
     --ink: #E9EDF6;
     --mut: #909BB4;
-    --dim: #5D6880;
+    --dim: #7C88A8;
     --agent: #5CC8FF;   /* machine work */
     --human: #F0A63C;   /* human gates & taste */
     --script: #7ADFA0;  /* deterministic authority */
     --agent-dim: rgba(92, 200, 255, .12);
     --human-dim: rgba(240, 166, 60, .12);
     --script-dim: rgba(122, 223, 160, .12);
+    --edge-write: var(--agent);
+    --edge-read: var(--agent);
+    --edge-gate: var(--human);
+    --edge-script: var(--script);
+    --edge-host: var(--dim);
     --rail-w: 220px;
     --disp: 'Archivo', system-ui, sans-serif;
     --mono: 'IBM Plex Mono', ui-monospace, monospace;
@@ -31,7 +38,9 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html { scroll-behavior: smooth; }
   body {
-    background: var(--bg);
+    background:
+      radial-gradient(1100px 700px at 12% -8%, rgba(92,200,255,.05), transparent 60%),
+      var(--bg);
     color: var(--ink);
     font-family: var(--disp);
     font-size: 16px;
@@ -78,6 +87,7 @@
   h1 {
     font-stretch: 118%; font-weight: 810; letter-spacing: -.015em;
     font-size: clamp(38px, 5.2vw, 68px); line-height: 1.02; max-width: 17ch;
+    overflow-wrap: break-word;
   }
   h1 .hu { color: var(--human); }
   h1 .ag { color: var(--agent); }
@@ -89,7 +99,7 @@
 
   /* ---------- stats strip ---------- */
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line-soft); border: 1px solid var(--line-soft); border-radius: 12px; overflow: hidden; margin-top: 44px; }
-  .stats div { background: var(--panel); padding: 18px 20px; }
+  .stats div { background: var(--panel); padding: 18px 20px; min-width: 0; }
   .stats b { display: block; font-stretch: 115%; font-weight: 760; font-size: 26px; letter-spacing: -.01em; }
   .stats span { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; color: var(--mut); text-transform: uppercase; }
   .stats .k-h b { color: var(--human); } .stats .k-a b { color: var(--agent); } .stats .k-s b { color: var(--script); }
@@ -101,7 +111,7 @@
     background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
     padding: 12px 18px; min-width: 150px;
   }
-  .node .role { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+  .node .role { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--mut); }
   .node .name { font-weight: 640; font-size: 15px; }
   .node.human { border-color: rgba(240,166,60,.5); background: linear-gradient(180deg, var(--human-dim), var(--panel)); }
   .node.human .role { color: var(--human); }
@@ -120,7 +130,7 @@
     border: 1px solid var(--line); color: var(--mut); background: var(--bg); white-space: nowrap;
   }
   .chip.s { border-color: rgba(122,223,160,.4); color: var(--script); }
-  .aside-note { font-family: var(--mono); font-size: 11px; color: var(--dim); text-align: center; margin-top: 8px; }
+  .aside-note { font-family: var(--mono); font-size: 11px; color: var(--mut); text-align: center; margin-top: 8px; }
 
   /* ---------- department cards ---------- */
   .depts { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
@@ -140,7 +150,7 @@
   .layer { display: grid; grid-template-columns: 200px 1fr; gap: 26px; padding: 30px 0; border-top: 1px solid var(--line-soft); }
   .layer:last-of-type { border-bottom: 1px solid var(--line-soft); }
   .layer-label .t { font-stretch: 114%; font-weight: 720; font-size: 18px; }
-  .layer-label .d { font-family: var(--mono); font-size: 11px; color: var(--dim); margin-top: 6px; letter-spacing: .04em; }
+  .layer-label .d { font-family: var(--mono); font-size: 11px; color: var(--mut); margin-top: 6px; letter-spacing: .04em; }
   .tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 10px; }
   .tool {
     display: flex; align-items: center; gap: 13px; background: var(--panel);
@@ -155,7 +165,68 @@
     font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--agent);
   }
   .tool b { display: block; font-size: 14px; font-weight: 620; line-height: 1.25; }
-  .tool span { display: block; font-family: var(--mono); font-size: 10.5px; color: var(--dim); margin-top: 2px; }
+  .tool span { display: block; font-family: var(--mono); font-size: 10.5px; color: var(--mut); margin-top: 2px; }
+
+  /* ---------- stack: mind map ---------- */
+  .map-wrap {
+    margin-top: 48px; padding: 34px clamp(18px, 3vw, 40px) 30px; border-radius: 20px;
+    background: var(--elevated); border: 1px solid var(--line-2);
+    box-shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 24px 60px -24px rgba(0,0,0,.55);
+  }
+  .map-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+  .map-head h3 { font-stretch: 114%; font-weight: 750; font-size: 20px; }
+  .map-legend { display: flex; gap: 16px; flex-wrap: wrap; font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; color: var(--mut); }
+  .map-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .map-legend i { display: inline-block; width: 16px; height: 0; border-top: 2px solid; }
+  .map-legend .lw i { border-color: var(--edge-write); }
+  .map-legend .lr i { border-color: var(--edge-read); border-style: dashed; }
+  .map-legend .lg i { border-color: var(--edge-gate); }
+  .map-legend .ls i { border-color: var(--edge-script); border-top-width: 3px; }
+
+  .map { position: relative; width: 100%; aspect-ratio: 1260 / 820; }
+  .map-edges { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .map-edges path { fill: none; stroke-width: 1.6; opacity: .6; transition: opacity .25s, stroke-width .25s; }
+  .map-edges path.e-write { stroke: var(--edge-write); }
+  .map-edges path.e-read { stroke: var(--edge-read); stroke-dasharray: 5 5; }
+  .map-edges path.e-gate { stroke: var(--edge-gate); stroke-width: 2; }
+  .map-edges path.e-script { stroke: var(--edge-script); stroke-width: 2.4; }
+  .map-edges .mk-agent { fill: var(--edge-write); }
+  .map-edges .mk-human { fill: var(--edge-gate); }
+  .map-edges .mk-script { fill: var(--edge-script); }
+
+  .map-node {
+    position: absolute; transform: translate(-50%, -50%); appearance: none;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    width: 152px; min-height: 50px; padding: 8px 12px; text-align: center;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 11px;
+    transition: opacity .25s, filter .25s, border-color .2s, transform .15s;
+  }
+  .map-node:hover, .map-node:focus-visible { transform: translate(-50%, -52%); border-color: rgba(160,180,218,.4); }
+  .map-node .role { font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--mut); }
+  .map-node .name { font-weight: 640; font-size: 13.5px; line-height: 1.2; }
+  .map-node.human { border-color: rgba(240,166,60,.5); background: linear-gradient(180deg, var(--human-dim), var(--panel)); }
+  .map-node.human .role { color: var(--human); }
+  .map-node.script { border-color: rgba(122,223,160,.4); }
+  .map-node.script .role { color: var(--script); }
+  .map-node.gate {
+    border-color: rgba(240,166,60,.55); background: var(--human-dim);
+    box-shadow: 0 0 0 1px rgba(240,166,60,.18), 0 0 22px rgba(240,166,60,.12);
+  }
+  .map-node.gate .role { color: var(--human); }
+
+  .map.hovering .map-node, .map.hovering .map-edges path { opacity: .2; filter: grayscale(.6); }
+  .map-node.hl, .map-edges path.hl { opacity: 1 !important; filter: none !important; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .map-edges path { stroke-dasharray: 7 7; animation: edgeFlow 3.2s linear infinite; }
+    .map-edges path.e-read { animation-direction: reverse; }
+    @keyframes edgeFlow { to { stroke-dashoffset: -56; } }
+  }
+  @media (max-width: 900px) {
+    .map-wrap { display: none; }
+  }
+
+  .stack-inventory { margin-top: 64px; }
 
   /* ---------- flows (trace logs) ---------- */
   .flow-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: start; }
@@ -226,7 +297,7 @@
   .pager button { display: flex; align-items: center; gap: 10px; color: var(--mut); font-weight: 560; font-size: 14.5px; padding: 8px 4px; transition: color .2s; }
   .pager button:hover { color: var(--ink); }
   .pager .k { font-family: var(--mono); font-size: 10px; border: 1px solid var(--line); border-radius: 5px; padding: 2px 7px; color: var(--dim); }
-  .colophon { font-family: var(--mono); font-size: 10.5px; color: var(--dim); text-align: center; margin-top: 26px; letter-spacing: .04em; }
+  .colophon { font-family: var(--mono); font-size: 10.5px; color: var(--mut); text-align: center; margin-top: 26px; letter-spacing: .04em; }
 
   /* ---------- responsive ---------- */
   @media (max-width: 900px) {
@@ -253,8 +324,8 @@
   <div>
     <div class="brand"><b>JUAN ARENAS</b><span>an agency of agents · 2026</span></div>
     <nav aria-label="Pages" style="margin-top:34px">
-      <button data-go="0" class="on"><span class="n">01</span>The Agency</button>
-      <button data-go="1"><span class="n">02</span>The Stack</button>
+      <button data-go="0" class="on"><span class="n">01</span>The Stack</button>
+      <button data-go="1"><span class="n">02</span>The Agency</button>
       <button data-go="2"><span class="n">03</span>Two Flows</button>
       <button data-go="3"><span class="n">04</span>Ten Rules</button>
     </nav>
@@ -268,8 +339,136 @@
 
 <main>
 
-<!-- ============ 01 · THE AGENCY ============ -->
-<section class="page active" id="agency">
+<!-- ============ 01 · THE STACK ============ -->
+<section class="page active" id="stack">
+  <p class="eyebrow">The Stack · How it's actually wired</p>
+  <h1>Boring where it should be, <span class="ag">agentic</span> where it counts.</h1>
+  <p class="lede">Sixteen tools, four layers, and the wiring between them — drawn exactly as the agency's
+  own audit trail traces it. <strong>Every arrow below is sourced from a real hop</strong>; nothing is
+  drawn that hasn't actually run.</p>
+
+  <div class="stats">
+    <div class="k-a"><b>16</b><span>tools in the stack</span></div>
+    <div><b>4</b><span>layers, one job each</span></div>
+    <div class="k-h"><b>20</b><span>traced data-flow edges</span></div>
+    <div class="k-s"><b>1</b><span>source of truth per fact</span></div>
+  </div>
+
+  <div class="map-wrap">
+    <div class="map-head">
+      <h3>How the tools actually talk to each other</h3>
+      <div class="map-legend">
+        <span class="lw"><i></i>writes</span>
+        <span class="lr"><i></i>reads</span>
+        <span class="lg"><i></i>human gate</span>
+        <span class="ls"><i></i>script authority</span>
+      </div>
+    </div>
+    <div class="map" id="stackMap">
+      <svg class="map-edges" viewBox="0 0 1260 820" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <marker id="arrow-agent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-agent" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="arrow-human" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-human" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="arrow-script" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-script" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+        <path class="e-write" data-src="juan" data-dst="telegram" marker-end="url(#arrow-agent)" d="M100 95 C100 125,100 155,100 185"/>
+        <path class="e-write" data-src="juan" data-dst="ig" marker-end="url(#arrow-agent)" d="M100 95 C210 220,210 320,100 435"/>
+        <path class="e-write" data-src="telegram" data-dst="assistant" marker-end="url(#arrow-agent)" d="M176 210 C250 210,250 140,324 140"/>
+        <path class="e-write" data-src="assistant" data-dst="chief" marker-end="url(#arrow-agent)" d="M400 165 C400 195,400 220,400 245"/>
+        <path class="e-write" data-src="chief" data-dst="headjh" marker-end="url(#arrow-agent)" d="M476 270 C600 270,700 270,824 270"/>
+        <path class="e-read" data-src="supabase" data-dst="headjh" marker-end="url(#arrow-agent)" d="M1074 350 C1020 350,1020 290,976 270"/>
+        <path class="e-gate" data-src="headjh" data-dst="gatesend" marker-end="url(#arrow-human)" d="M824 270 C780 260,760 220,726 180"/>
+        <path class="e-gate" data-src="gatesend" data-dst="juan" marker-end="url(#arrow-human)" d="M574 180 C420 40,300 20,176 70"/>
+        <path class="e-write" data-src="scout" data-dst="supabase" marker-end="url(#arrow-agent)" d="M476 520 C700 520,850 400,1074 350"/>
+        <path class="e-gate" data-src="supabase" data-dst="gateswipe" marker-end="url(#arrow-human)" d="M1074 360 C950 400,850 440,726 460"/>
+        <path class="e-write" data-src="gateswipe" data-dst="ats" marker-end="url(#arrow-agent)" d="M726 460 C760 460,790 460,824 460"/>
+        <path class="e-read" data-src="latex" data-dst="ats" marker-end="url(#arrow-agent)" d="M1074 460 C1030 460,1020 460,976 460"/>
+        <path class="e-script" data-src="ats" data-dst="nofab" marker-end="url(#arrow-script)" d="M900 485 C900 505,900 515,900 535"/>
+        <path class="e-script" data-src="nofab" data-dst="outreach" marker-end="url(#arrow-script)" d="M900 585 C900 600,900 610,900 625"/>
+        <path class="e-gate" data-src="outreach" data-dst="gatesend" marker-end="url(#arrow-human)" d="M824 650 C700 600,650 400,650 205"/>
+        <path class="e-read" data-src="gmail" data-dst="emailop" marker-end="url(#arrow-agent)" d="M176 650 C230 650,270 650,324 650"/>
+        <path class="e-write" data-src="emailop" data-dst="supabase" marker-end="url(#arrow-agent)" d="M476 650 C700 650,900 500,1074 350"/>
+        <path class="e-script" data-src="supabase" data-dst="github" marker-end="url(#arrow-script)" d="M1150 375 C1150 450,1150 550,1150 625"/>
+        <path class="e-write" data-src="ig" data-dst="headlib" marker-end="url(#arrow-agent)" d="M176 460 C400 460,650 700,824 760"/>
+        <path class="e-write" data-src="headlib" data-dst="wiki" marker-end="url(#arrow-agent)" d="M976 760 C1010 760,1040 760,1074 760"/>
+      </svg>
+
+      <button class="map-node human" data-id="juan" style="left:7.94%;top:8.54%" title="Sends from his phone — any language, any hour"><span class="role">Human · gate</span><span class="name">Juan (phone)</span></button>
+      <button class="map-node" data-id="telegram" style="left:7.94%;top:25.61%" title="24/7 relay via a Hetzner-hosted bridge"><span class="role">Interface</span><span class="name">Telegram</span></button>
+      <button class="map-node" data-id="ig" style="left:7.94%;top:56.10%" title="Idea capture → Mastermind, via Meta's official API"><span class="role">Interface</span><span class="name">Instagram DM</span></button>
+      <button class="map-node" data-id="gmail" style="left:7.94%;top:79.27%" title="Recruiting inbox + receipts, scanned daily"><span class="role">Interface</span><span class="name">Gmail</span></button>
+
+      <button class="map-node" data-id="assistant" style="left:31.75%;top:17.07%" title="Captures intent, compiles a JSON brief, clarifies before it guesses"><span class="role">Orchestrator</span><span class="name">The Assistant</span></button>
+      <button class="map-node" data-id="chief" style="left:31.75%;top:32.93%" title="Routes the department and sets the cost tier, Haiku to Opus"><span class="role">Orchestrator</span><span class="name">Chief of Agents</span></button>
+      <button class="map-node" data-id="scout" style="left:31.75%;top:63.41%" title="Scans career pages & boards overnight, fit-scores, dedups"><span class="role">Cron · Haiku</span><span class="name">Scout</span></button>
+      <button class="map-node" data-id="emailop" style="left:31.75%;top:79.27%" title="Catches Gmail confirmations, advances the CRM stage"><span class="role">Daily agent</span><span class="name">Email operator</span></button>
+
+      <button class="map-node gate" data-id="gatesend" style="left:51.59%;top:21.95%" title="Anything outward stops here — silence means nothing happens"><span class="role">Human gate</span><span class="name">Gate · send</span></button>
+      <button class="map-node gate" data-id="gateswipe" style="left:51.59%;top:56.10%" title="A role enters the pipeline only on an explicit human swipe"><span class="role">Human gate</span><span class="name">Gate · swipe</span></button>
+
+      <button class="map-node" data-id="headjh" style="left:71.43%;top:32.93%" title="Reads the CRM, returns {status, data, gate_needed} — never sends"><span class="role">Head</span><span class="name">JobHunt</span></button>
+      <button class="map-node" data-id="ats" style="left:71.43%;top:56.10%" title="Tailors the master CV to the JD, recompiles the PDF"><span class="role">Agent</span><span class="name">ATS-Surgeon</span></button>
+      <button class="map-node script" data-id="nofab" style="left:71.43%;top:68.29%" title="Diffs every tailored line against the master — new fact detected, hard fail"><span class="role">Script</span><span class="name">no_fabrication.py</span></button>
+      <button class="map-node" data-id="outreach" style="left:71.43%;top:79.27%" title="Drafts a short recruiter note in house voice"><span class="role">Agent</span><span class="name">Outreach</span></button>
+      <button class="map-node" data-id="headlib" style="left:71.43%;top:92.68%" title="Council of agents researches, stress-tests, condenses ideas into canon"><span class="role">Head</span><span class="name">Library / Mastermind</span></button>
+
+      <button class="map-node script" data-id="supabase" style="left:91.27%;top:42.68%" title="JobHunt CRM + YourAura substrate + discover_queue, RLS on"><span class="role">Truth &amp; memory</span><span class="name">Supabase</span></button>
+      <button class="map-node script" data-id="latex" style="left:91.27%;top:56.10%" title="The single fact source for every tailored CV"><span class="role">Truth &amp; memory</span><span class="name">master.tex</span></button>
+      <button class="map-node script" data-id="github" style="left:91.27%;top:79.27%" title="Every stage change appends to the audit trail"><span class="role">Truth &amp; memory</span><span class="name">GitHub</span></button>
+      <button class="map-node script" data-id="wiki" style="left:91.27%;top:92.68%" title="Linted canon the whole agency reads"><span class="role">Truth &amp; memory</span><span class="name">Markdown wiki</span></button>
+    </div>
+  </div>
+
+  <div class="stack-inventory">
+  <div class="sec-head"><h2>The full inventory</h2><span class="tag">every tool, by layer</span></div>
+  <div style="margin-top:10px">
+    <div class="layer">
+      <div class="layer-label"><div class="t">Interfaces</div><div class="d">where the human lives — no new apps</div></div>
+      <div class="tools">
+        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#26A5E4" role="img" aria-label="Telegram"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg><span class="fb">T</span><div><b>Telegram</b><span>the Assistant, 24/7 on my phone</span></div></div>
+        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#EA4335" role="img" aria-label="Gmail"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg><span class="fb">G</span><div><b>Gmail</b><span>recruiting inbox + receipts, scanned daily</span></div></div>
+        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#FF0069" role="img" aria-label="Instagram"><path d="M7.0301.084c-1.2768.0602-2.1487.264-2.911.5634-.7888.3075-1.4575.72-2.1228 1.3877-.6652.6677-1.075 1.3368-1.3802 2.127-.2954.7638-.4956 1.6365-.552 2.914-.0564 1.2775-.0689 1.6882-.0626 4.947.0062 3.2586.0206 3.6671.0825 4.9473.061 1.2765.264 2.1482.5635 2.9107.308.7889.72 1.4573 1.388 2.1228.6679.6655 1.3365 1.0743 2.1285 1.38.7632.295 1.6361.4961 2.9134.552 1.2773.056 1.6884.069 4.9462.0627 3.2578-.0062 3.668-.0207 4.9478-.0814 1.28-.0607 2.147-.2652 2.9098-.5633.7889-.3086 1.4578-.72 2.1228-1.3881.665-.6682 1.0745-1.3378 1.3795-2.1284.2957-.7632.4966-1.636.552-2.9124.056-1.2809.0692-1.6898.063-4.948-.0063-3.2583-.021-3.6668-.0817-4.9465-.0607-1.2797-.264-2.1487-.5633-2.9117-.3084-.7889-.72-1.4568-1.3876-2.1228C21.2982 1.33 20.628.9208 19.8378.6165 19.074.321 18.2017.1197 16.9244.0645 15.6471.0093 15.236-.005 11.977.0014 8.718.0076 8.31.0215 7.0301.0839m.1402 21.6932c-1.17-.0509-1.8053-.2453-2.2287-.408-.5606-.216-.96-.4771-1.3819-.895-.422-.4178-.6811-.8186-.9-1.378-.1644-.4234-.3624-1.058-.4171-2.228-.0595-1.2645-.072-1.6442-.079-4.848-.007-3.2037.0053-3.583.0607-4.848.05-1.169.2456-1.805.408-2.2282.216-.5613.4762-.96.895-1.3816.4188-.4217.8184-.6814 1.3783-.9003.423-.1651 1.0575-.3614 2.227-.4171 1.2655-.06 1.6447-.072 4.848-.079 3.2033-.007 3.5835.005 4.8495.0608 1.169.0508 1.8053.2445 2.228.408.5608.216.96.4754 1.3816.895.4217.4194.6816.8176.9005 1.3787.1653.4217.3617 1.056.4169 2.2263.0602 1.2655.0739 1.645.0796 4.848.0058 3.203-.0055 3.5834-.061 4.848-.051 1.17-.245 1.8055-.408 2.2294-.216.5604-.4763.96-.8954 1.3814-.419.4215-.8181.6811-1.3783.9-.4224.1649-1.0577.3617-2.2262.4174-1.2656.0595-1.6448.072-4.8493.079-3.2045.007-3.5825-.006-4.848-.0608M16.953 5.5864A1.44 1.44 0 1 0 18.39 4.144a1.44 1.44 0 0 0-1.437 1.4424M5.8385 12.012c.0067 3.4032 2.7706 6.1557 6.173 6.1493 3.4026-.0065 6.157-2.7701 6.1506-6.1733-.0065-3.4032-2.771-6.1565-6.174-6.1498-3.403.0067-6.156 2.771-6.1496 6.1738M8 12.0077a4 4 0 1 1 4.008 3.9921A3.9996 3.9996 0 0 1 8 12.0077"/></svg><span class="fb">I</span><div><b>Instagram DM</b><span>idea capture → Mastermind, via Meta API</span></div></div>
+        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#7C3AED" role="img" aria-label="Obsidian"><path d="M19.355 18.538a68.967 68.959 0 0 0 1.858-2.954.81.81 0 0 0-.062-.9c-.516-.685-1.504-2.075-2.042-3.362-.553-1.321-.636-3.375-.64-4.377a1.707 1.707 0 0 0-.358-1.05l-3.198-4.064a3.744 3.744 0 0 1-.076.543c-.106.503-.307 1.004-.536 1.5-.134.29-.29.6-.446.914l-.31.626c-.516 1.068-.997 2.227-1.132 3.59-.124 1.26.046 2.73.815 4.481.128.011.257.025.386.044a6.363 6.363 0 0 1 3.326 1.505c.916.79 1.744 1.922 2.415 3.5zM8.199 22.569c.073.012.146.02.22.02.78.024 2.095.092 3.16.29.87.16 2.593.64 4.01 1.055 1.083.316 2.198-.548 2.355-1.664.114-.814.33-1.735.725-2.58l-.01.005c-.67-1.87-1.522-3.078-2.416-3.849a5.295 5.295 0 0 0-2.778-1.257c-1.54-.216-2.952.19-3.84.45.532 2.218.368 4.829-1.425 7.531zM5.533 9.938c-.023.1-.056.197-.098.29L2.82 16.059a1.602 1.602 0 0 0 .313 1.772l4.116 4.24c2.103-3.101 1.796-6.02.836-8.3-.728-1.73-1.832-3.081-2.55-3.831zM9.32 14.01c.615-.183 1.606-.465 2.745-.534-.683-1.725-.848-3.233-.716-4.577.154-1.552.7-2.847 1.235-3.95.113-.235.223-.454.328-.664.149-.297.288-.577.419-.86.217-.47.379-.885.46-1.27.08-.38.08-.72-.014-1.043-.095-.325-.297-.675-.68-1.06a1.6 1.6 0 0 0-1.475.36l-4.95 4.452a1.602 1.602 0 0 0-.513.952l-.427 2.83c.672.59 2.328 2.316 3.335 4.711.09.21.175.43.253.653z"/></svg><span class="fb">O</span><div><b>Obsidian</b><span>the knowledge graph, human view</span></div></div>
+      </div>
+    </div>
+    <div class="layer">
+      <div class="layer-label"><div class="t">Intelligence</div><div class="d">who does the work — tiered by cost</div></div>
+      <div class="tools">
+        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#D97757" role="img" aria-label="Claude"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg><span class="fb">C</span><div><b>Claude Code</b><span>Chief + Heads runtime, subagent org</span></div></div>
+        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#E9EDF6" role="img" aria-label="Anthropic"><path d="M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z"/></svg><span class="fb">A</span><div><b>Claude API</b><span>bridges, crons, evals · Opus→Haiku by task</span></div></div>
+        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#3776AB" role="img" aria-label="Python"><path d="M14.25.18l.9.2.73.26.59.3.45.32.34.34.25.34.16.33.1.3.04.26.02.2-.01.13V8.5l-.05.63-.13.55-.21.46-.26.38-.3.31-.33.25-.35.19-.35.14-.33.1-.3.07-.26.04-.21.02H8.77l-.69.05-.59.14-.5.22-.41.27-.33.32-.27.35-.2.36-.15.37-.1.35-.07.32-.04.27-.02.21v3.06H3.17l-.21-.03-.28-.07-.32-.12-.35-.18-.36-.26-.36-.36-.35-.46-.32-.59-.28-.73-.21-.88-.14-1.05-.05-1.23.06-1.22.16-1.04.24-.87.32-.71.36-.57.4-.44.42-.33.42-.24.4-.16.36-.1.32-.05.24-.01h.16l.06.01h8.16v-.83H6.18l-.01-2.75-.02-.37.05-.34.11-.31.17-.28.25-.26.31-.23.38-.2.44-.18.51-.15.58-.12.64-.1.71-.06.77-.04.84-.02 1.27.05zm-6.3 1.98l-.23.33-.08.41.08.41.23.34.33.22.41.09.41-.09.33-.22.23-.34.08-.41-.08-.41-.23-.33-.33-.22-.41-.09-.41.09zm13.09 3.95l.28.06.32.12.35.18.36.27.36.35.35.47.32.59.28.73.21.88.14 1.04.05 1.23-.06 1.23-.16 1.04-.24.86-.32.71-.36.57-.4.45-.42.33-.42.24-.4.16-.36.09-.32.05-.24.02-.16-.01h-8.22v.82h5.84l.01 2.76.02.36-.05.34-.11.31-.17.29-.25.25-.31.24-.38.2-.44.17-.51.15-.58.13-.64.09-.71.07-.77.04-.84.01-1.27-.04-1.07-.14-.9-.2-.73-.25-.59-.3-.45-.33-.34-.34-.25-.34-.16-.33-.1-.3-.04-.25-.02-.2.01-.13v-5.34l.05-.64.13-.54.21-.46.26-.38.3-.32.33-.24.35-.2.35-.14.33-.1.3-.06.26-.04.21-.02.13-.01h5.84l.69-.05.59-.14.5-.21.41-.28.33-.32.27-.35.2-.36.15-.36.1-.35.07-.32.04-.28.02-.21V6.07h2.09l.14.01zm-6.47 14.25l-.23.33-.08.41.08.41.23.33.33.23.41.08.41-.08.33-.23.23-.33.08-.41-.08-.41-.23-.33-.33-.23-.41-.08-.41.08z"/></svg><span class="fb">Py</span><div><b>Python</b><span>deterministic gates the model can't argue with</span></div></div>
+        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#E9EDF6" role="img" aria-label="Model Context Protocol"><path d="M13.85 0a4.16 4.16 0 0 0-2.95 1.217L1.456 10.66a.835.835 0 0 0 0 1.18.835.835 0 0 0 1.18 0l9.442-9.442a2.49 2.49 0 0 1 3.541 0 2.49 2.49 0 0 1 0 3.541L8.59 12.97l-.1.1a.835.835 0 0 0 0 1.18.835.835 0 0 0 1.18 0l.1-.098 7.03-7.034a2.49 2.49 0 0 1 3.542 0l.049.05a2.49 2.49 0 0 1 0 3.54l-8.54 8.54a1.96 1.96 0 0 0 0 2.755l1.753 1.753a.835.835 0 0 0 1.18 0 .835.835 0 0 0 0-1.18l-1.753-1.753a.266.266 0 0 1 0-.394l8.54-8.54a4.185 4.185 0 0 0 0-5.9l-.05-.05a4.16 4.16 0 0 0-2.95-1.218c-.2 0-.401.02-.6.048a4.17 4.17 0 0 0-1.17-3.552A4.16 4.16 0 0 0 13.85 0m0 3.333a.84.84 0 0 0-.59.245L6.275 10.56a4.186 4.186 0 0 0 0 5.902 4.186 4.186 0 0 0 5.902 0L19.16 9.48a.835.835 0 0 0 0-1.18.835.835 0 0 0-1.18 0l-6.985 6.984a2.49 2.49 0 0 1-3.54 0 2.49 2.49 0 0 1 0-3.54l6.983-6.985a.835.835 0 0 0 0-1.18.84.84 0 0 0-.59-.245"/></svg><span class="fb">M</span><div><b>MCP</b><span>Supabase · GitHub · Apollo · Canva · Drive</span></div></div>
+      </div>
+    </div>
+    <div class="layer">
+      <div class="layer-label"><div class="t">Truth &amp; memory</div><div class="d">one source per fact, all of it audited</div></div>
+      <div class="tools">
+        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#3FCF8E" role="img" aria-label="Supabase"><path d="M11.9 1.036c-.015-.986-1.26-1.41-1.874-.637L.764 12.05C-.33 13.427.65 15.455 2.409 15.455h9.579l.113 7.51c.014.985 1.259 1.408 1.873.636l9.262-11.653c1.093-1.375.113-3.403-1.645-3.403h-9.642z"/></svg><span class="fb">S</span><div><b>Supabase</b><span>JobHunt CRM + YourAura substrate, RLS on</span></div></div>
+        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#E9EDF6" role="img" aria-label="GitHub"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg><span class="fb">GH</span><div><b>GitHub</b><span>agency repo + submodules; git is the audit trail</span></div></div>
+        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#008080" role="img" aria-label="LaTeX"><path d="M2.176 2.814c.233.42.476.78.73 1.09.247-.013 1.132.456 1.312.523.508.282 1.063.63 1.567.966.505.337.96.662 1.272.9.156.12.278.218.352.286a.483.483 0 01.078.082.08.08 0 01.01.021.06.06 0 01-.004.047.057.057 0 01-.04.03.077.077 0 01-.028 0c-.057 0-.203-.163-.497-.415a23.474 23.474 0 00-2.759-1.827c-.504-.28-.956-.542-1.264-.613a2.322 2.322 0 00-.36-.025 2.706 2.706 0 00-.788.133c.494.414.91.716 1.28.949-.57-.182-1.182-.21-1.902.133.526.329.967.567 1.354.745 1.103.156 2.258.696 3.224 1.309.483.307.904.615 1.219.867.157.125.29.237.39.328.098.091.174.154.197.21.03.073-.019.104-.084.058-.032-.022-.088-.102-.184-.191a7.35 7.35 0 00-.384-.327c-.312-.25-.729-.552-1.209-.857-.893-.562-2.232-1.013-3.173-1.397-.602-.11-1.225-.06-1.906.39.449.2.837.349 1.182.463.812 0 1.892.365 2.935.922 1.042.556 2.04 1.214 2.523 1.774.066.077-.016.126-.074.07-.52-.495-1.463-1.204-2.498-1.756-.639-.337-2.153-1.01-2.886-1.01l.004.002c-.567.02-1.13.195-1.679.716.477.118.885.196 1.244.249-.44.088-.87.3-1.289.722.324.07.616.122.882.162-.328.159-.639.404-.923.78.373.03.703.042 1 .044-.36.166-.696.43-.996.85.533.027.98.025 1.364.003-.422.172-.812.464-1.145.968.662.01 1.188-.022 1.628-.076l-.006.002c.99-.073 2.297.127 2.962.847.052.057-.024.118-.072.074-.648-.58-1.493-.827-2.89-.921h-.002c-.543.149-1.046.446-1.46 1.074.536.008.982-.013 1.366-.05-.469.257-.873.644-1.139 1.306.483-.092.888-.19 1.237-.292-.363.265-.668.636-.873 1.194.324-.072.612-.146.871-.221a2.519 2.519 0 00-.513 1.095c.352-.13.655-.254.926-.377-.257.3-.453.681-.55 1.19.495-.199.899-.388 1.238-.568-.31.333-.543.76-.635 1.356a11.816 11.816 0 001.442-.744c-.433.362-.764.843-.879 1.587.788-.348 1.339-.663 1.767-.955-.184.372-.282.806-.235 1.348.762-.584 1.243-1.056 1.602-1.473-.024.269-.003.56.077.884.546-.939 1.089-1.212 1.65-1.526-.895.451-.762.79-.762 1.184.683-.72 1.635-1.482 1.927-1.96-.39.585-.547 1.14-.65 1.63-1.993 1.054-3.207 1.329-4.568 1.75.528.194 1.093.383.859.652l-.624.622c.399-.124.805-.3 1.158-.059-.035.327-.447.492-.8.683.621-.224.756-.172.92-.12.081.393-.203.603-.388.862 1.565-1.19 3.606-2.13 5.044-2.522 2.022-.681 4.63-1.389 5.339-3.115l.712-2.847-.004.004c-.111-.034-.246-.063-.35-.133a.651.651 0 01-.235-.297c-.252.065-.44.03-.56-.088-.117-.117-.167-.296-.203-.491-.203.041-.362.016-.467-.077-.116-.101-.17-.26-.198-.444l-.008-.039.037-.015a.842.842 0 00.302-.194.257.257 0 00.07-.225l-.006-.037.03-.016c.163-.093.345-.169.428-.28a.274.274 0 00.053-.21.88.88 0 00-.155-.357l-.027-.04.04-.027c.118-.09.244-.179.308-.26.032-.04.048-.076.047-.11 0-.033-.015-.07-.064-.117l-.098-.094.135.006c.213.01.395-.007.538-.053a.504.504 0 00.274-.197c-.007-.033-.02-.063-.02-.098a.484.484 0 01.967 0c0 .044-.015.084-.026.125.177.014.347.01.507-.06l.002.001.035-.013c.236-.085.334.045.72-.456-1.69-2.19-4.157-.635-4.977 1.622-.21.576-1.405.578-1.751 0-1.37-2.95-5.53-6.068-9.07-7.218zm.86 2.145c.906.293 1.913.782 2.77 1.328.43.273.813.543 1.114.779.301.236.566.473.62.575.054.102 0 .14-.082.06-.081-.078-.303-.32-.6-.553-.298-.234-.68-.505-1.106-.777-.775-.49-1.982-.958-2.716-1.412zm-1.7 2.7c1.116.014 2.35.447 3.434.997.541.275 1.023.567 1.395.83.372.263.672.524.734.657.061.134-.02.13-.087.055a4.401 4.401 0 00-.704-.626 11.47 11.47 0 00-1.385-.826C3.76 8.264 2.439 7.82 1.336 7.66zm14.916.772a.381.381 0 100 .762.381.381 0 000-.762zM1.7 8.478c.822.072 1.72.368 2.534.75 1.086.509 2.035 1.158 2.434 1.667.035.045-.014.131-.08.062-.428-.44-1.322-1.131-2.397-1.635-.913-.421-2.282-.87-3.262-.78.251-.03.497-.088.771-.064zm16.339.01c-.366.475-.53.423-.703.464.094.43.35.586.585.77l-.06.012c2.315-.447 4.186-.286 6.139-.236l-5.961-1.01zm-.178 1.246h-.002l-.004.016.006-.016zm-.625-.757c-.183.074-.373.076-.563.059a.477.477 0 01-.42.26.483.483 0 01-.435-.278.609.609 0 01-.274.188c-.139.045-.308.057-.493.055.02.035.054.068.055.104a.273.273 0 01-.069.174c-.073.092-.189.17-.295.248.087.141.137.26.149.362a.39.39 0 01-.07.284c-.106.14-.288.21-.439.293a.374.374 0 01-.09.268.89.89 0 01-.297.198c.027.156.074.283.154.354.086.076.211.103.425.047l.055-.014.01.055c.033.207.088.385.187.483.1.099.244.135.503.055l.049-.015.016.048c.05.142.12.223.209.282.087.06.247.112.358.147.798-.869 1.525-1.772 1.884-2.86-.225-.177-.506-.338-.609-.797zm-16.23.386c1.165-.08 2.283.196 3.202.626.92.43 1.658.939 1.974 1.307.075.087-.019.12-.072.072a8.187 8.187 0 00-1.947-1.29c-.904-.414-2.193-.644-3.157-.715zm.864.802c.61.02 1.24.155 1.806.352.756.262 1.421.614 1.747.98.045.05-.007.127-.074.069-.349-.304-.961-.693-1.706-.951-.574-.195-1.613-.369-2.268-.397.197-.022.292-.06.495-.053zm1.05 1.788c.423.034.886.133 1.341.407.043.026.049.136-.049.09-.856-.402-1.326-.49-2.457-.31.386-.128.74-.221 1.164-.187zm-.04.788c.4-.035.784-.002 1.297.204.044.018.08.126-.033.094-.857-.243-1.167-.328-2.287.104.28-.229.622-.366 1.023-.402zm1.285.687c.317-.023.635-.026.934.006.052.006.055.105-.006.102a7.87 7.87 0 00-1.837.115c-.243.046-.423.043-1.405.458.287-.233.794-.452 1.385-.56a8.91 8.91 0 01.93-.12zm1.28.49c.099.003.062.104.006.103-.728-.01-1.304.132-1.875.295a9.78 9.78 0 00-1.318.525c.283-.23.713-.457 1.291-.622.579-.166 1.248-.326 1.896-.302zm.528.398c.036-.005.105.084.018.1-.73.137-1.244.267-1.794.454-.216.074-.58.207-1.243.587.26-.269.656-.492 1.213-.68.558-.19 1.196-.37 1.806-.46zm.311.507c.075-.012.097.087.02.102-1.217.241-1.76.556-2.54 1.144.504-.523 1.297-1.051 2.52-1.246zm.595.448c.087-.013.11.087.021.1-.872.13-1.477.553-2.255 1.33.295-.493 1.004-1.24 2.234-1.43zm.372.39c.046-.006.114.073.023.1a2.634 2.634 0 00-.669.3c-.182.118-.3.2-.597.507.111-.245.296-.434.542-.59.247-.157.509-.293.7-.317z"/></svg><span class="fb">TeX</span><div><b>LaTeX</b><span>master CV — the single fact source for JobHunt</span></div></div>
+        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#E9EDF6" role="img" aria-label="Markdown"><path d="M22.27 19.385H1.73A1.73 1.73 0 010 17.655V6.345a1.73 1.73 0 011.73-1.73h20.54A1.73 1.73 0 0124 6.345v11.308a1.73 1.73 0 01-1.73 1.731zM5.769 15.923v-4.5l2.308 2.885 2.307-2.885v4.5h2.308V8.078h-2.308l-2.307 2.885-2.308-2.885H3.46v7.847zM21.232 12h-2.309V8.077h-2.307V12h-2.308l3.461 4.039z"/></svg><span class="fb">md</span><div><b>Markdown wiki</b><span>linted canon; agents read what I read</span></div></div>
+      </div>
+    </div>
+    <div class="layer">
+      <div class="layer-label"><div class="t">Always-on</div><div class="d">runs without my laptop awake</div></div>
+      <div class="tools">
+        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#E9EDF6" role="img" aria-label="Hetzner"><path d="M0 0v24h24V0H0zm4.602 4.025h2.244c.509 0 .716.215.716.717v5.64h8.883v-5.64c0-.509.215-.717.717-.717h2.229c.5 0 .71.23.724.717v14.516c0 .509-.215.717-.717.717h-2.23c-.51 0-.717-.215-.717-.717v-5.735H7.562v5.735c0 .516-.215.717-.716.717H4.602c-.51 0-.717-.208-.717-.717V4.742c0-.509.207-.717.717-.717z"/></svg><span class="fb">H</span><div><b>Hetzner</b><span>24/7 host for the Telegram + DM bridges</span></div></div>
+        <div class="tool"><span class="fb" style="display:flex">*/5</span><div><b>Cron routines</b><span>discovery, freshness checks, morning brief</span></div></div>
+        <div class="tool"><span class="fb" style="display:flex">Ap</span><div><b>Apollo.io</b><span>company + contact enrichment</span></div></div>
+        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#4285F4" role="img" aria-label="Google Drive"><path d="M12.01 1.485c-2.082 0-3.754.02-3.743.047.01.02 1.708 3.001 3.774 6.62l3.76 6.574h3.76c2.081 0 3.753-.02 3.742-.047-.005-.02-1.708-3.001-3.775-6.62l-3.76-6.574zm-4.76 1.73a789.828 789.861 0 0 0-3.63 6.319L0 15.868l1.89 3.298 1.885 3.297 3.62-6.335 3.618-6.33-1.88-3.287C8.1 4.704 7.255 3.22 7.25 3.214zm2.259 12.653-.203.348c-.114.198-.96 1.672-1.88 3.287a423.93 423.948 0 0 1-1.698 2.97c-.01.026 3.24.042 7.222.042h7.244l1.796-3.157c.992-1.734 1.85-3.23 1.906-3.323l.104-.167h-7.249z"/></svg><span class="fb">Dr</span><div><b>Drive + Canva</b><span>managed connectors for docs &amp; assets</span></div></div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <div class="pager">
+    <span></span>
+    <button data-go="1">Next · The Agency <span class="k">→</span></button>
+  </div>
+</section>
+
+<!-- ============ 02 · THE AGENCY ============ -->
+<section class="page" id="agency">
   <p class="eyebrow">Portfolio · What I built</p>
   <h1><span class="hu">One human.</span><br><span class="ag">Fifteen agents.</span><br>Zero unsupervised sends.</h1>
   <p class="lede">I run a working AI agency: autonomous agents that discover work, do it well, and hand
@@ -351,62 +550,10 @@
   </div>
 
   <div class="pager">
-    <span></span>
-    <button data-go="1">Next · The Stack <span class="k">→</span></button>
-  </div>
-  <p class="colophon">built with Claude Code, inside the agency it describes</p>
-</section>
-
-<!-- ============ 02 · THE STACK ============ -->
-<section class="page" id="stack">
-  <p class="eyebrow">The Stack · Four layers</p>
-  <h1>Boring where it should be, <span class="ag">agentic</span> where it counts.</h1>
-  <p class="lede">Every tool earns its place. Interfaces meet me where I already am; intelligence is routed
-  by cost tier; truth lives in exactly one place per fact; and the whole thing runs 24/7 without my laptop.</p>
-
-  <div style="margin-top:56px">
-    <div class="layer">
-      <div class="layer-label"><div class="t">Interfaces</div><div class="d">where the human lives — no new apps</div></div>
-      <div class="tools">
-        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#26A5E4" role="img" aria-label="Telegram"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg><span class="fb">T</span><div><b>Telegram</b><span>the Assistant, 24/7 on my phone</span></div></div>
-        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#EA4335" role="img" aria-label="Gmail"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg><span class="fb">G</span><div><b>Gmail</b><span>recruiting inbox + receipts, scanned daily</span></div></div>
-        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#FF0069" role="img" aria-label="Instagram"><path d="M7.0301.084c-1.2768.0602-2.1487.264-2.911.5634-.7888.3075-1.4575.72-2.1228 1.3877-.6652.6677-1.075 1.3368-1.3802 2.127-.2954.7638-.4956 1.6365-.552 2.914-.0564 1.2775-.0689 1.6882-.0626 4.947.0062 3.2586.0206 3.6671.0825 4.9473.061 1.2765.264 2.1482.5635 2.9107.308.7889.72 1.4573 1.388 2.1228.6679.6655 1.3365 1.0743 2.1285 1.38.7632.295 1.6361.4961 2.9134.552 1.2773.056 1.6884.069 4.9462.0627 3.2578-.0062 3.668-.0207 4.9478-.0814 1.28-.0607 2.147-.2652 2.9098-.5633.7889-.3086 1.4578-.72 2.1228-1.3881.665-.6682 1.0745-1.3378 1.3795-2.1284.2957-.7632.4966-1.636.552-2.9124.056-1.2809.0692-1.6898.063-4.948-.0063-3.2583-.021-3.6668-.0817-4.9465-.0607-1.2797-.264-2.1487-.5633-2.9117-.3084-.7889-.72-1.4568-1.3876-2.1228C21.2982 1.33 20.628.9208 19.8378.6165 19.074.321 18.2017.1197 16.9244.0645 15.6471.0093 15.236-.005 11.977.0014 8.718.0076 8.31.0215 7.0301.0839m.1402 21.6932c-1.17-.0509-1.8053-.2453-2.2287-.408-.5606-.216-.96-.4771-1.3819-.895-.422-.4178-.6811-.8186-.9-1.378-.1644-.4234-.3624-1.058-.4171-2.228-.0595-1.2645-.072-1.6442-.079-4.848-.007-3.2037.0053-3.583.0607-4.848.05-1.169.2456-1.805.408-2.2282.216-.5613.4762-.96.895-1.3816.4188-.4217.8184-.6814 1.3783-.9003.423-.1651 1.0575-.3614 2.227-.4171 1.2655-.06 1.6447-.072 4.848-.079 3.2033-.007 3.5835.005 4.8495.0608 1.169.0508 1.8053.2445 2.228.408.5608.216.96.4754 1.3816.895.4217.4194.6816.8176.9005 1.3787.1653.4217.3617 1.056.4169 2.2263.0602 1.2655.0739 1.645.0796 4.848.0058 3.203-.0055 3.5834-.061 4.848-.051 1.17-.245 1.8055-.408 2.2294-.216.5604-.4763.96-.8954 1.3814-.419.4215-.8181.6811-1.3783.9-.4224.1649-1.0577.3617-2.2262.4174-1.2656.0595-1.6448.072-4.8493.079-3.2045.007-3.5825-.006-4.848-.0608M16.953 5.5864A1.44 1.44 0 1 0 18.39 4.144a1.44 1.44 0 0 0-1.437 1.4424M5.8385 12.012c.0067 3.4032 2.7706 6.1557 6.173 6.1493 3.4026-.0065 6.157-2.7701 6.1506-6.1733-.0065-3.4032-2.771-6.1565-6.174-6.1498-3.403.0067-6.156 2.771-6.1496 6.1738M8 12.0077a4 4 0 1 1 4.008 3.9921A3.9996 3.9996 0 0 1 8 12.0077"/></svg><span class="fb">I</span><div><b>Instagram DM</b><span>idea capture → Mastermind, via Meta API</span></div></div>
-        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#7C3AED" role="img" aria-label="Obsidian"><path d="M19.355 18.538a68.967 68.959 0 0 0 1.858-2.954.81.81 0 0 0-.062-.9c-.516-.685-1.504-2.075-2.042-3.362-.553-1.321-.636-3.375-.64-4.377a1.707 1.707 0 0 0-.358-1.05l-3.198-4.064a3.744 3.744 0 0 1-.076.543c-.106.503-.307 1.004-.536 1.5-.134.29-.29.6-.446.914l-.31.626c-.516 1.068-.997 2.227-1.132 3.59-.124 1.26.046 2.73.815 4.481.128.011.257.025.386.044a6.363 6.363 0 0 1 3.326 1.505c.916.79 1.744 1.922 2.415 3.5zM8.199 22.569c.073.012.146.02.22.02.78.024 2.095.092 3.16.29.87.16 2.593.64 4.01 1.055 1.083.316 2.198-.548 2.355-1.664.114-.814.33-1.735.725-2.58l-.01.005c-.67-1.87-1.522-3.078-2.416-3.849a5.295 5.295 0 0 0-2.778-1.257c-1.54-.216-2.952.19-3.84.45.532 2.218.368 4.829-1.425 7.531zM5.533 9.938c-.023.1-.056.197-.098.29L2.82 16.059a1.602 1.602 0 0 0 .313 1.772l4.116 4.24c2.103-3.101 1.796-6.02.836-8.3-.728-1.73-1.832-3.081-2.55-3.831zM9.32 14.01c.615-.183 1.606-.465 2.745-.534-.683-1.725-.848-3.233-.716-4.577.154-1.552.7-2.847 1.235-3.95.113-.235.223-.454.328-.664.149-.297.288-.577.419-.86.217-.47.379-.885.46-1.27.08-.38.08-.72-.014-1.043-.095-.325-.297-.675-.68-1.06a1.6 1.6 0 0 0-1.475.36l-4.95 4.452a1.602 1.602 0 0 0-.513.952l-.427 2.83c.672.59 2.328 2.316 3.335 4.711.09.21.175.43.253.653z"/></svg><span class="fb">O</span><div><b>Obsidian</b><span>the knowledge graph, human view</span></div></div>
-      </div>
-    </div>
-    <div class="layer">
-      <div class="layer-label"><div class="t">Intelligence</div><div class="d">who does the work — tiered by cost</div></div>
-      <div class="tools">
-        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#D97757" role="img" aria-label="Claude"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg><span class="fb">C</span><div><b>Claude Code</b><span>Chief + Heads runtime, subagent org</span></div></div>
-        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#E9EDF6" role="img" aria-label="Anthropic"><path d="M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z"/></svg><span class="fb">A</span><div><b>Claude API</b><span>bridges, crons, evals · Opus→Haiku by task</span></div></div>
-        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#3776AB" role="img" aria-label="Python"><path d="M14.25.18l.9.2.73.26.59.3.45.32.34.34.25.34.16.33.1.3.04.26.02.2-.01.13V8.5l-.05.63-.13.55-.21.46-.26.38-.3.31-.33.25-.35.19-.35.14-.33.1-.3.07-.26.04-.21.02H8.77l-.69.05-.59.14-.5.22-.41.27-.33.32-.27.35-.2.36-.15.37-.1.35-.07.32-.04.27-.02.21v3.06H3.17l-.21-.03-.28-.07-.32-.12-.35-.18-.36-.26-.36-.36-.35-.46-.32-.59-.28-.73-.21-.88-.14-1.05-.05-1.23.06-1.22.16-1.04.24-.87.32-.71.36-.57.4-.44.42-.33.42-.24.4-.16.36-.1.32-.05.24-.01h.16l.06.01h8.16v-.83H6.18l-.01-2.75-.02-.37.05-.34.11-.31.17-.28.25-.26.31-.23.38-.2.44-.18.51-.15.58-.12.64-.1.71-.06.77-.04.84-.02 1.27.05zm-6.3 1.98l-.23.33-.08.41.08.41.23.34.33.22.41.09.41-.09.33-.22.23-.34.08-.41-.08-.41-.23-.33-.33-.22-.41-.09-.41.09zm13.09 3.95l.28.06.32.12.35.18.36.27.36.35.35.47.32.59.28.73.21.88.14 1.04.05 1.23-.06 1.23-.16 1.04-.24.86-.32.71-.36.57-.4.45-.42.33-.42.24-.4.16-.36.09-.32.05-.24.02-.16-.01h-8.22v.82h5.84l.01 2.76.02.36-.05.34-.11.31-.17.29-.25.25-.31.24-.38.2-.44.17-.51.15-.58.13-.64.09-.71.07-.77.04-.84.01-1.27-.04-1.07-.14-.9-.2-.73-.25-.59-.3-.45-.33-.34-.34-.25-.34-.16-.33-.1-.3-.04-.25-.02-.2.01-.13v-5.34l.05-.64.13-.54.21-.46.26-.38.3-.32.33-.24.35-.2.35-.14.33-.1.3-.06.26-.04.21-.02.13-.01h5.84l.69-.05.59-.14.5-.21.41-.28.33-.32.27-.35.2-.36.15-.36.1-.35.07-.32.04-.28.02-.21V6.07h2.09l.14.01zm-6.47 14.25l-.23.33-.08.41.08.41.23.33.33.23.41.08.41-.08.33-.23.23-.33.08-.41-.08-.41-.23-.33-.33-.23-.41-.08-.41.08z"/></svg><span class="fb">Py</span><div><b>Python</b><span>deterministic gates the model can't argue with</span></div></div>
-        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#E9EDF6" role="img" aria-label="Model Context Protocol"><path d="M13.85 0a4.16 4.16 0 0 0-2.95 1.217L1.456 10.66a.835.835 0 0 0 0 1.18.835.835 0 0 0 1.18 0l9.442-9.442a2.49 2.49 0 0 1 3.541 0 2.49 2.49 0 0 1 0 3.541L8.59 12.97l-.1.1a.835.835 0 0 0 0 1.18.835.835 0 0 0 1.18 0l.1-.098 7.03-7.034a2.49 2.49 0 0 1 3.542 0l.049.05a2.49 2.49 0 0 1 0 3.54l-8.54 8.54a1.96 1.96 0 0 0 0 2.755l1.753 1.753a.835.835 0 0 0 1.18 0 .835.835 0 0 0 0-1.18l-1.753-1.753a.266.266 0 0 1 0-.394l8.54-8.54a4.185 4.185 0 0 0 0-5.9l-.05-.05a4.16 4.16 0 0 0-2.95-1.218c-.2 0-.401.02-.6.048a4.17 4.17 0 0 0-1.17-3.552A4.16 4.16 0 0 0 13.85 0m0 3.333a.84.84 0 0 0-.59.245L6.275 10.56a4.186 4.186 0 0 0 0 5.902 4.186 4.186 0 0 0 5.902 0L19.16 9.48a.835.835 0 0 0 0-1.18.835.835 0 0 0-1.18 0l-6.985 6.984a2.49 2.49 0 0 1-3.54 0 2.49 2.49 0 0 1 0-3.54l6.983-6.985a.835.835 0 0 0 0-1.18.84.84 0 0 0-.59-.245"/></svg><span class="fb">M</span><div><b>MCP</b><span>Supabase · GitHub · Apollo · Canva · Drive</span></div></div>
-      </div>
-    </div>
-    <div class="layer">
-      <div class="layer-label"><div class="t">Truth &amp; memory</div><div class="d">one source per fact, all of it audited</div></div>
-      <div class="tools">
-        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#3FCF8E" role="img" aria-label="Supabase"><path d="M11.9 1.036c-.015-.986-1.26-1.41-1.874-.637L.764 12.05C-.33 13.427.65 15.455 2.409 15.455h9.579l.113 7.51c.014.985 1.259 1.408 1.873.636l9.262-11.653c1.093-1.375.113-3.403-1.645-3.403h-9.642z"/></svg><span class="fb">S</span><div><b>Supabase</b><span>JobHunt CRM + YourAura substrate, RLS on</span></div></div>
-        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#E9EDF6" role="img" aria-label="GitHub"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg><span class="fb">GH</span><div><b>GitHub</b><span>agency repo + submodules; git is the audit trail</span></div></div>
-        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#008080" role="img" aria-label="LaTeX"><path d="M2.176 2.814c.233.42.476.78.73 1.09.247-.013 1.132.456 1.312.523.508.282 1.063.63 1.567.966.505.337.96.662 1.272.9.156.12.278.218.352.286a.483.483 0 01.078.082.08.08 0 01.01.021.06.06 0 01-.004.047.057.057 0 01-.04.03.077.077 0 01-.028 0c-.057 0-.203-.163-.497-.415a23.474 23.474 0 00-2.759-1.827c-.504-.28-.956-.542-1.264-.613a2.322 2.322 0 00-.36-.025 2.706 2.706 0 00-.788.133c.494.414.91.716 1.28.949-.57-.182-1.182-.21-1.902.133.526.329.967.567 1.354.745 1.103.156 2.258.696 3.224 1.309.483.307.904.615 1.219.867.157.125.29.237.39.328.098.091.174.154.197.21.03.073-.019.104-.084.058-.032-.022-.088-.102-.184-.191a7.35 7.35 0 00-.384-.327c-.312-.25-.729-.552-1.209-.857-.893-.562-2.232-1.013-3.173-1.397-.602-.11-1.225-.06-1.906.39.449.2.837.349 1.182.463.812 0 1.892.365 2.935.922 1.042.556 2.04 1.214 2.523 1.774.066.077-.016.126-.074.07-.52-.495-1.463-1.204-2.498-1.756-.639-.337-2.153-1.01-2.886-1.01l.004.002c-.567.02-1.13.195-1.679.716.477.118.885.196 1.244.249-.44.088-.87.3-1.289.722.324.07.616.122.882.162-.328.159-.639.404-.923.78.373.03.703.042 1 .044-.36.166-.696.43-.996.85.533.027.98.025 1.364.003-.422.172-.812.464-1.145.968.662.01 1.188-.022 1.628-.076l-.006.002c.99-.073 2.297.127 2.962.847.052.057-.024.118-.072.074-.648-.58-1.493-.827-2.89-.921h-.002c-.543.149-1.046.446-1.46 1.074.536.008.982-.013 1.366-.05-.469.257-.873.644-1.139 1.306.483-.092.888-.19 1.237-.292-.363.265-.668.636-.873 1.194.324-.072.612-.146.871-.221a2.519 2.519 0 00-.513 1.095c.352-.13.655-.254.926-.377-.257.3-.453.681-.55 1.19.495-.199.899-.388 1.238-.568-.31.333-.543.76-.635 1.356a11.816 11.816 0 001.442-.744c-.433.362-.764.843-.879 1.587.788-.348 1.339-.663 1.767-.955-.184.372-.282.806-.235 1.348.762-.584 1.243-1.056 1.602-1.473-.024.269-.003.56.077.884.546-.939 1.089-1.212 1.65-1.526-.895.451-.762.79-.762 1.184.683-.72 1.635-1.482 1.927-1.96-.39.585-.547 1.14-.65 1.63-1.993 1.054-3.207 1.329-4.568 1.75.528.194 1.093.383.859.652l-.624.622c.399-.124.805-.3 1.158-.059-.035.327-.447.492-.8.683.621-.224.756-.172.92-.12.081.393-.203.603-.388.862 1.565-1.19 3.606-2.13 5.044-2.522 2.022-.681 4.63-1.389 5.339-3.115l.712-2.847-.004.004c-.111-.034-.246-.063-.35-.133a.651.651 0 01-.235-.297c-.252.065-.44.03-.56-.088-.117-.117-.167-.296-.203-.491-.203.041-.362.016-.467-.077-.116-.101-.17-.26-.198-.444l-.008-.039.037-.015a.842.842 0 00.302-.194.257.257 0 00.07-.225l-.006-.037.03-.016c.163-.093.345-.169.428-.28a.274.274 0 00.053-.21.88.88 0 00-.155-.357l-.027-.04.04-.027c.118-.09.244-.179.308-.26.032-.04.048-.076.047-.11 0-.033-.015-.07-.064-.117l-.098-.094.135.006c.213.01.395-.007.538-.053a.504.504 0 00.274-.197c-.007-.033-.02-.063-.02-.098a.484.484 0 01.967 0c0 .044-.015.084-.026.125.177.014.347.01.507-.06l.002.001.035-.013c.236-.085.334.045.72-.456-1.69-2.19-4.157-.635-4.977 1.622-.21.576-1.405.578-1.751 0-1.37-2.95-5.53-6.068-9.07-7.218zm.86 2.145c.906.293 1.913.782 2.77 1.328.43.273.813.543 1.114.779.301.236.566.473.62.575.054.102 0 .14-.082.06-.081-.078-.303-.32-.6-.553-.298-.234-.68-.505-1.106-.777-.775-.49-1.982-.958-2.716-1.412zm-1.7 2.7c1.116.014 2.35.447 3.434.997.541.275 1.023.567 1.395.83.372.263.672.524.734.657.061.134-.02.13-.087.055a4.401 4.401 0 00-.704-.626 11.47 11.47 0 00-1.385-.826C3.76 8.264 2.439 7.82 1.336 7.66zm14.916.772a.381.381 0 100 .762.381.381 0 000-.762zM1.7 8.478c.822.072 1.72.368 2.534.75 1.086.509 2.035 1.158 2.434 1.667.035.045-.014.131-.08.062-.428-.44-1.322-1.131-2.397-1.635-.913-.421-2.282-.87-3.262-.78.251-.03.497-.088.771-.064zm16.339.01c-.366.475-.53.423-.703.464.094.43.35.586.585.77l-.06.012c2.315-.447 4.186-.286 6.139-.236l-5.961-1.01zm-.178 1.246h-.002l-.004.016.006-.016zm-.625-.757c-.183.074-.373.076-.563.059a.477.477 0 01-.42.26.483.483 0 01-.435-.278.609.609 0 01-.274.188c-.139.045-.308.057-.493.055.02.035.054.068.055.104a.273.273 0 01-.069.174c-.073.092-.189.17-.295.248.087.141.137.26.149.362a.39.39 0 01-.07.284c-.106.14-.288.21-.439.293a.374.374 0 01-.09.268.89.89 0 01-.297.198c.027.156.074.283.154.354.086.076.211.103.425.047l.055-.014.01.055c.033.207.088.385.187.483.1.099.244.135.503.055l.049-.015.016.048c.05.142.12.223.209.282.087.06.247.112.358.147.798-.869 1.525-1.772 1.884-2.86-.225-.177-.506-.338-.609-.797zm-16.23.386c1.165-.08 2.283.196 3.202.626.92.43 1.658.939 1.974 1.307.075.087-.019.12-.072.072a8.187 8.187 0 00-1.947-1.29c-.904-.414-2.193-.644-3.157-.715zm.864.802c.61.02 1.24.155 1.806.352.756.262 1.421.614 1.747.98.045.05-.007.127-.074.069-.349-.304-.961-.693-1.706-.951-.574-.195-1.613-.369-2.268-.397.197-.022.292-.06.495-.053zm1.05 1.788c.423.034.886.133 1.341.407.043.026.049.136-.049.09-.856-.402-1.326-.49-2.457-.31.386-.128.74-.221 1.164-.187zm-.04.788c.4-.035.784-.002 1.297.204.044.018.08.126-.033.094-.857-.243-1.167-.328-2.287.104.28-.229.622-.366 1.023-.402zm1.285.687c.317-.023.635-.026.934.006.052.006.055.105-.006.102a7.87 7.87 0 00-1.837.115c-.243.046-.423.043-1.405.458.287-.233.794-.452 1.385-.56a8.91 8.91 0 01.93-.12zm1.28.49c.099.003.062.104.006.103-.728-.01-1.304.132-1.875.295a9.78 9.78 0 00-1.318.525c.283-.23.713-.457 1.291-.622.579-.166 1.248-.326 1.896-.302zm.528.398c.036-.005.105.084.018.1-.73.137-1.244.267-1.794.454-.216.074-.58.207-1.243.587.26-.269.656-.492 1.213-.68.558-.19 1.196-.37 1.806-.46zm.311.507c.075-.012.097.087.02.102-1.217.241-1.76.556-2.54 1.144.504-.523 1.297-1.051 2.52-1.246zm.595.448c.087-.013.11.087.021.1-.872.13-1.477.553-2.255 1.33.295-.493 1.004-1.24 2.234-1.43zm.372.39c.046-.006.114.073.023.1a2.634 2.634 0 00-.669.3c-.182.118-.3.2-.597.507.111-.245.296-.434.542-.59.247-.157.509-.293.7-.317z"/></svg><span class="fb">TeX</span><div><b>LaTeX</b><span>master CV — the single fact source for JobHunt</span></div></div>
-        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#E9EDF6" role="img" aria-label="Markdown"><path d="M22.27 19.385H1.73A1.73 1.73 0 010 17.655V6.345a1.73 1.73 0 011.73-1.73h20.54A1.73 1.73 0 0124 6.345v11.308a1.73 1.73 0 01-1.73 1.731zM5.769 15.923v-4.5l2.308 2.885 2.307-2.885v4.5h2.308V8.078h-2.308l-2.307 2.885-2.308-2.885H3.46v7.847zM21.232 12h-2.309V8.077h-2.307V12h-2.308l3.461 4.039z"/></svg><span class="fb">md</span><div><b>Markdown wiki</b><span>linted canon; agents read what I read</span></div></div>
-      </div>
-    </div>
-    <div class="layer">
-      <div class="layer-label"><div class="t">Always-on</div><div class="d">runs without my laptop awake</div></div>
-      <div class="tools">
-        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#E9EDF6" role="img" aria-label="Hetzner"><path d="M0 0v24h24V0H0zm4.602 4.025h2.244c.509 0 .716.215.716.717v5.64h8.883v-5.64c0-.509.215-.717.717-.717h2.229c.5 0 .71.23.724.717v14.516c0 .509-.215.717-.717.717h-2.23c-.51 0-.717-.215-.717-.717v-5.735H7.562v5.735c0 .516-.215.717-.716.717H4.602c-.51 0-.717-.208-.717-.717V4.742c0-.509.207-.717.717-.717z"/></svg><span class="fb">H</span><div><b>Hetzner</b><span>24/7 host for the Telegram + DM bridges</span></div></div>
-        <div class="tool"><span class="fb" style="display:flex">*/5</span><div><b>Cron routines</b><span>discovery, freshness checks, morning brief</span></div></div>
-        <div class="tool"><span class="fb" style="display:flex">Ap</span><div><b>Apollo.io</b><span>company + contact enrichment</span></div></div>
-        <div class="tool"><svg viewBox="0 0 24 24" width="26" height="26" fill="#4285F4" role="img" aria-label="Google Drive"><path d="M12.01 1.485c-2.082 0-3.754.02-3.743.047.01.02 1.708 3.001 3.774 6.62l3.76 6.574h3.76c2.081 0 3.753-.02 3.742-.047-.005-.02-1.708-3.001-3.775-6.62l-3.76-6.574zm-4.76 1.73a789.828 789.861 0 0 0-3.63 6.319L0 15.868l1.89 3.298 1.885 3.297 3.62-6.335 3.618-6.33-1.88-3.287C8.1 4.704 7.255 3.22 7.25 3.214zm2.259 12.653-.203.348c-.114.198-.96 1.672-1.88 3.287a423.93 423.948 0 0 1-1.698 2.97c-.01.026 3.24.042 7.222.042h7.244l1.796-3.157c.992-1.734 1.85-3.23 1.906-3.323l.104-.167h-7.249z"/></svg><span class="fb">Dr</span><div><b>Drive + Canva</b><span>managed connectors for docs &amp; assets</span></div></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="pager">
-    <button data-go="0"><span class="k">←</span> The Agency</button>
+    <button data-go="0"><span class="k">←</span> The Stack</button>
     <button data-go="2">Next · Two Flows <span class="k">→</span></button>
   </div>
+  <p class="colophon">built with Claude Code, inside the agency it describes</p>
 </section>
 
 <!-- ============ 03 · TWO FLOWS ============ -->
@@ -467,7 +614,7 @@
   </div>
 
   <div class="pager">
-    <button data-go="1"><span class="k">←</span> The Stack</button>
+    <button data-go="1"><span class="k">←</span> The Agency</button>
     <button data-go="3">Next · Ten Rules <span class="k">→</span></button>
   </div>
 </section>
@@ -537,6 +684,44 @@
       if (fb) fb.style.display = 'flex';
     });
   });
+
+  // mind map: hover/focus highlights a node's real wiring; click pins it
+  const map = document.getElementById('stackMap');
+  if (map) {
+    const mapNodes = [...map.querySelectorAll('.map-node')];
+    const mapEdges = [...map.querySelectorAll('.map-edges path')];
+    let pinned = null;
+
+    function highlight(id) {
+      const related = new Set([id]);
+      mapEdges.forEach(e => {
+        if (e.dataset.src === id || e.dataset.dst === id) {
+          e.classList.add('hl');
+          related.add(e.dataset.src);
+          related.add(e.dataset.dst);
+        }
+      });
+      mapNodes.forEach(n => { if (related.has(n.dataset.id)) n.classList.add('hl'); });
+      map.classList.add('hovering');
+    }
+
+    function clearHighlight() {
+      map.classList.remove('hovering');
+      mapNodes.forEach(n => n.classList.remove('hl'));
+      mapEdges.forEach(e => e.classList.remove('hl'));
+    }
+
+    mapNodes.forEach(n => {
+      n.addEventListener('mouseenter', () => { if (!pinned) highlight(n.dataset.id); });
+      n.addEventListener('mouseleave', () => { if (!pinned) clearHighlight(); });
+      n.addEventListener('focus', () => { if (!pinned) highlight(n.dataset.id); });
+      n.addEventListener('blur', () => { if (!pinned) clearHighlight(); });
+      n.addEventListener('click', () => {
+        if (pinned === n.dataset.id) { pinned = null; clearHighlight(); }
+        else { pinned = n.dataset.id; clearHighlight(); highlight(pinned); }
+      });
+    });
+  }
 </script>
 </body>
 </html>
