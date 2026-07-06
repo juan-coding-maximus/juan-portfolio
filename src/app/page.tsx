@@ -1120,8 +1120,8 @@ function CTA() {
       <div className="relative max-w-4xl mx-auto text-center">
         <Reveal>
           <h2 className="font-display text-[clamp(2.2rem,5vw,3.6rem)] leading-tight">
-            I&apos;m the go-to-market operator{" "}
-            <span className="italic text-[#9FC4AE]">your science needs.</span>
+            I turn complex science{" "}
+            <span className="italic text-[#9FC4AE]">into revenue.</span>
           </h2>
         </Reveal>
         <Reveal delay={120}>
