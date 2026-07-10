@@ -204,14 +204,43 @@ function Hero() {
 /* ====================================================
    2. METRIC WALL
 ==================================================== */
-function MetricWall() {
-  const metrics = [
-    { n: <CountUp to={400} suffix="+" />, label: "creators activated", color: "gold" },
-    { n: <CountUp to={30} prefix="+" suffix="%" />, label: "sponsor revenue growth", color: "" },
-    { n: <CountUp to={2} suffix="×" />, label: "reach in 8 months", color: "" },
-    { n: <CountUp to={100} suffix="%" />, label: "HIPAA compliant", color: "sage" },
-  ];
+function MetricLogo({ src, alt }: { src: string; alt: string }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt={alt} className="mt-4 h-8 w-auto object-contain" />
+  );
+}
 
+function Metric({
+  n,
+  label,
+  color,
+}: {
+  n: React.ReactNode;
+  label: string;
+  color: string;
+}) {
+  return (
+    <div>
+      <div
+        className={`font-display text-[clamp(2rem,4vw,3.2rem)] leading-none ${
+          color === "gold"
+            ? "text-[#C9A24B]"
+            : color === "sage"
+            ? "text-[#9FC4AE]"
+            : "text-[#F2EFE6]"
+        }`}
+      >
+        {n}
+      </div>
+      <div className="mt-3 text-xs uppercase tracking-widest text-[#F2EFE6]/50">
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function MetricWall() {
   return (
     <section id="portfolio" className="px-6 md:px-12 lg:px-20 py-20 border-t border-[#F2EFE6]/10">
       <div className="max-w-7xl mx-auto">
@@ -220,25 +249,24 @@ function MetricWall() {
             Outcomes
           </p>
         </Reveal>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-          {metrics.map((m, i) => (
-            <Reveal key={i} delay={i * 80}>
-              <div
-                className={`font-display text-[clamp(2rem,4vw,3.2rem)] leading-none ${
-                  m.color === "gold"
-                    ? "text-[#C9A24B]"
-                    : m.color === "sage"
-                    ? "text-[#9FC4AE]"
-                    : "text-[#F2EFE6]"
-                }`}
-              >
-                {m.n}
-              </div>
-              <div className="mt-3 text-xs uppercase tracking-widest text-[#F2EFE6]/50">
-                {m.label}
-              </div>
-            </Reveal>
-          ))}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+          <Reveal delay={0}>
+            <Metric n={<CountUp to={400} suffix="+" />} label="creators activated" color="gold" />
+            <MetricLogo src="/img/logos/superbiome.png" alt="Milieu Skin Microbiome" />
+          </Reveal>
+
+          <Reveal delay={80}>
+            <Metric n={<CountUp to={30} prefix="+" suffix="%" />} label="sponsor revenue growth" color="" />
+            <MetricLogo src="/img/logos/biotech-connection.png" alt="Biotech Connection LA" />
+          </Reveal>
+
+          <Reveal delay={160}>
+            <div className="grid grid-cols-2 gap-6">
+              <Metric n={<CountUp to={2} suffix="×" />} label="reach in 8 months" color="" />
+              <Metric n={<CountUp to={100} suffix="%" />} label="HIPAA compliant" color="sage" />
+            </div>
+            <MetricLogo src="/img/logos/usc-brain.png" alt="USC Center for Personalized Brain Health" />
+          </Reveal>
         </div>
       </div>
     </section>
