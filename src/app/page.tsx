@@ -439,7 +439,7 @@ function MetabaVideo() {
         playsInline
         preload="none"
         className="w-full h-full object-cover"
-        style={{ objectPosition: "center 65%" }}
+        style={{ objectPosition: "center 65%", transform: "scale(1.01)" }}
       >
         <source src="/video/metaba.mp4" type="video/mp4" />
       </video>
