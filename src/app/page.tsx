@@ -869,7 +869,7 @@ function Capabilities() {
       num: "05",
       icon: "pin",
       title: "A deployable network",
-      desc: "Trusted LA design, merch, and SEO/AIO/GEO talent on day one, no hiring cycle.",
+      desc: "Principal investigators, clinicians, clinic directors, SEO & GEO specialists, and active-ingredient + supplement manufacturers, on call from day one.",
     },
   ];
 
