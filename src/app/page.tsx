@@ -863,7 +863,7 @@ function Capabilities() {
       num: "04",
       icon: "link",
       title: "B2B pipeline & partnerships",
-      desc: "Outbound, KOL, and sponsor motions that move qualified opportunities.",
+      desc: "I bring real contacts across LA biotech, longevity clinics, and university labs, and I turn outreach into qualified pipeline.",
     },
     {
       num: "05",
