@@ -591,6 +591,28 @@ function SuitIcon() {
   );
 }
 
+function CaseBullet({ children }: { children: React.ReactNode }) {
+  return (
+    <li className="flex gap-3">
+      <svg
+        width="13"
+        height="13"
+        viewBox="0 0 14 14"
+        fill="none"
+        stroke="#C9A24B"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="mt-[0.4em] shrink-0"
+        aria-hidden="true"
+      >
+        <polyline points="4 2 10 7 4 12" />
+      </svg>
+      <span>{children}</span>
+    </li>
+  );
+}
+
 function CaseStudies() {
   const cases: {
     tag: string; title: string; body: React.ReactNode; result?: string;
@@ -601,11 +623,18 @@ function CaseStudies() {
       role: "Marketing & Revenue Operations Lead",
       title: "I joined a world‑class Alzheimer's center to get their science out of the journals and into the world, loud and clear.",
       body: (
-        <>
-          Supporting a leading Alzheimer's Lab & Brain Health Clinic in Los Angeles. I led a cross‑functional marketing engine across content, email, social, and web, ensuring HIPAA‑compliant content and on‑brand delivery. I designed and executed multi‑channel campaigns that{" "}
-          <strong className="text-[#C9A24B] font-medium">2x newsletter and social reach in 8 months</strong>
-          , growing a pipeline of engaged patients and caregivers. I also launched and scaled a Spanish‑language newsletter, expanding the addressable LA market and improving engagement with our community.
-        </>
+        <ul className="space-y-3">
+          <CaseBullet>
+            Led the cross‑functional marketing engine of an Alzheimer&apos;s Lab &amp; Brain Health Clinic: content, email, social, and web, all HIPAA‑compliant and on‑brand.
+          </CaseBullet>
+          <CaseBullet>
+            <strong className="text-[#C9A24B] font-medium">2× newsletter and social reach in 8 months</strong>
+            , growing a pipeline of engaged patients and caregivers.
+          </CaseBullet>
+          <CaseBullet>
+            Launched and scaled a Spanish‑language newsletter, expanding the addressable LA market.
+          </CaseBullet>
+        </ul>
       ),
       art: "cpbh-video",
       newsletters: true,
@@ -614,7 +643,20 @@ function CaseStudies() {
       tag: "0→1 · OPERATIONS · GO-TO-MARKET",
       role: "Founding Operator",
       title: "I helped build a diagnostics startup from zero to revenue.",
-      body: "I came in when the idea was fresh: I shaped the founders' vision into a v1 deck, built the website, designed operational workflows, and warmed the B2B relationships with LA's longevity clinics. Both strategic and hands-on. The kind of scientists worth betting on.",
+      body: (
+        <ul className="space-y-3">
+          <CaseBullet>
+            Shaped the founders&apos; vision into a v1 deck and built the website.
+          </CaseBullet>
+          <CaseBullet>
+            Designed the operational workflows behind the diagnostics service, strategic and hands-on.
+          </CaseBullet>
+          <CaseBullet>
+            Warmed B2B relationships with LA&apos;s longevity clinics,{" "}
+            <strong className="text-[#C9A24B] font-medium">zero to first revenue</strong>.
+          </CaseBullet>
+        </ul>
+      ),
       art: "Metaba Health — site / ops board",
     },
     {
@@ -623,11 +665,26 @@ function CaseStudies() {
       title: "I bootstrapped a personalized perfume company into 5 figures of revenue.",
       body: (
         <>
-          I did Toxicology research at University of Southern California and found that some perfume ingredients are endocrine disruptors, phthalates and toxic parabens. I started making my own cologne with all-natural essential oils. Grew this hobby into a startup that delivers a personalized perfume as a service. To date, I&apos;ve made over 200 different perfumes for 200 unique customers. With{" "}
-          <a href="https://youraurafragrance.com" target="_blank" rel="noopener noreferrer" className="text-[#C9A24B] hover:underline">Your Aura</a>
-          , anyone can design their own scent, safe by formulation. I&apos;m ever-grateful to{" "}
-          <a href="https://www.linkedin.com/in/tommyknapp1/" target="_blank" rel="noopener noreferrer" className="text-[#C9A24B] hover:underline">Prof. Tommy Knapp</a>
-          {" "}for helping me stay curious and pushing me to find better product-market fit.
+          <ul className="space-y-3">
+            <CaseBullet>
+              Toxicology research at USC showed me some perfume ingredients are endocrine disruptors, so I started formulating my own cologne with all-natural essential oils.
+            </CaseBullet>
+            <CaseBullet>
+              Grew the hobby into a startup delivering personalized perfume as a service:{" "}
+              <strong className="text-[#C9A24B] font-medium">5 figures of revenue</strong>.
+            </CaseBullet>
+            <CaseBullet>
+              <strong className="text-[#C9A24B] font-medium">200+ unique perfumes for 200 unique customers</strong>
+              ; with{" "}
+              <a href="https://youraurafragrance.com" target="_blank" rel="noopener noreferrer" className="text-[#C9A24B] hover:underline">Your Aura</a>
+              , anyone can design their own scent, safe by formulation.
+            </CaseBullet>
+          </ul>
+          <p className="mt-4 text-sm italic text-[#F2EFE6]/50">
+            Ever-grateful to{" "}
+            <a href="https://www.linkedin.com/in/tommyknapp1/" target="_blank" rel="noopener noreferrer" className="text-[#C9A24B]/80 hover:underline">Prof. Tommy Knapp</a>
+            {" "}for keeping me curious and pushing me toward better product-market fit.
+          </p>
         </>
       ),
       art: "aura-collage",
@@ -636,14 +693,39 @@ function CaseStudies() {
       tag: "LEAD GENERATION · B2B · AI ORCHESTRATION",
       role: "Growth & Automation Lead",
       title: "I built an AI-native pipeline that engaged thousands of influencers.",
-      body: "Milieu Skin is the first personalized prebiotic skincare brand. Their product was excellent; their marketing needed real volume. I came in with a Go-To-Market plan: engage tiktokers to create hundreds of videos with the product, and use the best-performing videos as Ads. The flow you see in this video reflects the mix of high-volume automation work, AI orchestration, and human touch when it matters. We reached hundreds of qualified inbound leads each week.",
+      body: (
+        <ul className="space-y-3">
+          <CaseBullet>
+            Go-to-market plan for Milieu Skin, the first personalized prebiotic skincare brand: activate TikTokers to create hundreds of product videos, promote the best performers as ads.
+          </CaseBullet>
+          <CaseBullet>
+            Built the flow in this video: high-volume automation, AI orchestration, human touch when it matters.
+          </CaseBullet>
+          <CaseBullet>
+            <strong className="text-[#C9A24B] font-medium">Hundreds of qualified inbound leads each week</strong>.
+          </CaseBullet>
+        </ul>
+      ),
       art: "n8n-video",
     },
     {
       tag: "PARTNERSHIPS · COMMUNITY · EVENTS",
       role: "B2B Partnerships Associate",
       title: "I grew partnerships for LA's Biotech nonprofit, lifting revenue 30% YoY.",
-      body: "Biotech Connection LA brings life sciences industry and academia together across LA. I ran partnerships end to end: cold outreach to biotech companies and research groups, pre-event promotion to drive attendance, live interviews on event day, and post-event follow-ups to keep sponsors warm. Consistent communication drove a 30% lift in sponsorship revenue and brought bigger names like Amgen and USC Keck to our sponsors list.",
+      body: (
+        <ul className="space-y-3">
+          <CaseBullet>
+            Ran partnerships end to end for Biotech Connection LA: cold outreach, pre-event promotion, live event-day interviews, post-event follow-ups.
+          </CaseBullet>
+          <CaseBullet>
+            <strong className="text-[#C9A24B] font-medium">30% lift in sponsorship revenue YoY</strong>
+            {" "}through consistent sponsor communication.
+          </CaseBullet>
+          <CaseBullet>
+            Brought bigger names, Amgen and USC Keck, onto the sponsor list.
+          </CaseBullet>
+        </ul>
+      ),
       art: "bcla-video",
     },
   ];
@@ -675,7 +757,7 @@ function CaseStudies() {
                     <h3 className="font-display text-2xl md:text-3xl leading-snug mb-5">
                       {c.title}
                     </h3>
-                    <p className="text-[#F2EFE6]/70 leading-relaxed mb-5">{c.body}</p>
+                    <div className="text-[#F2EFE6]/70 leading-relaxed mb-5">{c.body}</div>
                     {c.result && <p className="text-[#9FC4AE] italic">{c.result}</p>}
                   </div>
                   <div className={i % 2 ? "lg:order-1" : ""}>
@@ -703,28 +785,92 @@ function CaseStudies() {
 /* ====================================================
    5. CAPABILITIES
 ==================================================== */
+function CapIcon({ shape }: { shape: string }) {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {shape === "flask" && (
+        <>
+          <path d="M10 3h4" />
+          <path d="M10 3v6L4.5 18.5A2 2 0 0 0 6.3 21h11.4a2 2 0 0 0 1.8-2.5L14 9V3" />
+          <path d="M7.5 15h9" />
+        </>
+      )}
+      {shape === "nodes" && (
+        <>
+          <circle cx="5" cy="6" r="2.5" />
+          <circle cx="19" cy="6" r="2.5" />
+          <circle cx="12" cy="18" r="2.5" />
+          <path d="M7.5 6h9" />
+          <path d="M6.2 8.2l4.6 7.6" />
+          <path d="M17.8 8.2l-4.6 7.6" />
+        </>
+      )}
+      {shape === "trajectory" && (
+        <>
+          <path d="M3 20c5 0 10-3 15-12" />
+          <path d="M13 7h5.5v5.5" />
+          <circle cx="3.5" cy="20" r="1.5" />
+        </>
+      )}
+      {shape === "link" && (
+        <>
+          <path d="M9 15l6-6" />
+          <path d="M11 6.5l2-2a4 4 0 0 1 5.7 5.7l-2 2" />
+          <path d="M13 17.5l-2 2a4 4 0 0 1-5.7-5.7l2-2" />
+        </>
+      )}
+      {shape === "pin" && (
+        <>
+          <path d="M12 21s-6.5-5.4-6.5-10.5a6.5 6.5 0 0 1 13 0C18.5 15.6 12 21 12 21z" />
+          <circle cx="12" cy="10.5" r="2.5" />
+        </>
+      )}
+    </svg>
+  );
+}
+
 function Capabilities() {
-  const caps: [string, string][] = [
-    [
-      "0→1 GTM",
-      "Find your first customers, prove what works, then make the motion repeatable.",
-    ],
-    [
-      "AI automation",
-      "Build AI-driven workflows that qualify, personalize, and follow up while you sleep.",
-    ],
-    [
-      "Regulated marketing",
-      "Ship HIPAA-compliant campaigns fast, without breaking the rules that matter.",
-    ],
-    [
-      "B2B sales & pipeline",
-      "Stand up outbound, KOL, and account motion that actually moves qualified opportunities.",
-    ],
-    [
-      "A deployable network",
-      "Bring in trusted LA-based design, merch, and SEO/AIO/GEO talent on day one, no hiring cycle.",
-    ],
+  const caps: { num: string; icon: string; title: string; desc: string }[] = [
+    {
+      num: "01",
+      icon: "flask",
+      title: "Science-fluent growth",
+      desc: "I speak lab and clinic. HIPAA-compliant campaigns that ship fast without breaking the rules that matter.",
+    },
+    {
+      num: "02",
+      icon: "nodes",
+      title: "AI-native operations",
+      desc: "Workflows that qualify, personalize, and follow up while you sleep. I build the engine, not just the ads.",
+    },
+    {
+      num: "03",
+      icon: "trajectory",
+      title: "0→1 go-to-market",
+      desc: "Find your first customers, prove what works, then make the motion repeatable.",
+    },
+    {
+      num: "04",
+      icon: "link",
+      title: "B2B pipeline & partnerships",
+      desc: "Outbound, KOL, and sponsor motions that move qualified opportunities.",
+    },
+    {
+      num: "05",
+      icon: "pin",
+      title: "A deployable network",
+      desc: "Trusted LA design, merch, and SEO/AIO/GEO talent on day one, no hiring cycle.",
+    },
   ];
 
   return (
@@ -734,11 +880,13 @@ function Capabilities() {
           <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-3">
             How I help your team.
           </h2>
-          <div className="mb-8 md:mb-12" />
+          <p className="font-display italic text-lg text-[#F2EFE6]/55 mb-8 md:mb-12">
+            The route from complex science to revenue, end to end.
+          </p>
         </Reveal>
         {/* Olympic rings layout: 3 on top, 2 offset below (lg+). Mobile: 1-col, sm: 2-col */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-5">
-          {caps.map(([title, desc], i) => {
+          {caps.map((cap, i) => {
             const colClass =
               i === 3 ? "lg:col-start-2 lg:col-span-2" :
               i === 4 ? "lg:col-start-4 lg:col-span-2" :
@@ -746,11 +894,19 @@ function Capabilities() {
             return (
               <Reveal key={i} delay={i * 60} className={colClass}>
                 <div className="group rounded-2xl border border-[#284A3C] p-6 bg-[#0e1813] hover:bg-[#284A3C] transition-colors h-full">
+                  <div className="flex items-start justify-between mb-4">
+                    <span className="text-[#C9A24B] group-hover:text-[#F2EFE6] transition-colors">
+                      <CapIcon shape={cap.icon} />
+                    </span>
+                    <span className="font-display text-sm text-[#F2EFE6]/35 group-hover:text-[#F2EFE6]/60 transition-colors">
+                      {cap.num}
+                    </span>
+                  </div>
                   <p className="font-display text-xl text-[#C9A24B] group-hover:text-[#F2EFE6] mb-2 transition-colors">
-                    {title}
+                    {cap.title}
                   </p>
                   <p className="text-sm text-[#F2EFE6]/70 group-hover:text-[#F2EFE6]/90 leading-relaxed transition-colors">
-                    {desc}
+                    {cap.desc}
                   </p>
                 </div>
               </Reveal>
