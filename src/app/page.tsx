@@ -209,7 +209,6 @@ function MetricWall() {
     { n: <CountUp to={400} suffix="+" />, label: "creators activated", color: "gold" },
     { n: <CountUp to={30} prefix="+" suffix="%" />, label: "sponsor revenue growth", color: "" },
     { n: <CountUp to={2} suffix="×" />, label: "reach in 8 months", color: "" },
-    { n: <CountUp to={10} suffix="+ hrs" />, label: "/week automated", color: "sage" },
     { n: <CountUp to={100} suffix="%" />, label: "HIPAA compliant", color: "sage" },
   ];
 
@@ -221,7 +220,7 @@ function MetricWall() {
             Outcomes
           </p>
         </Reveal>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           {metrics.map((m, i) => (
             <Reveal key={i} delay={i * 80}>
               <div
