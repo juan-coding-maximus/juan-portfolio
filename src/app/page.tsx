@@ -857,7 +857,7 @@ function Capabilities() {
       num: "03",
       icon: "trajectory",
       title: "0→1 go-to-market",
-      desc: "Find your first customers, prove what works, then make the motion repeatable.",
+      desc: "I use my experience to test the market, find the winning strategy, and generate increasing revenue.",
     },
     {
       num: "04",
