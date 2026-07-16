@@ -728,7 +728,7 @@ function CaseStudies() {
           <CaseBullet>
             Ran outbound end to end for Biotech Connection LA across email, phone, and LinkedIn:{" "}
             <strong className="text-[#C9A24B] font-medium">200+ biotech and pharma accounts and 20+ KOLs</strong>
-            , on a CRM I built myself, with zero dropped contacts.
+            , every one tracked from first touch to close on a CRM I built myself.
           </CaseBullet>
           <CaseBullet>
             Designed and sold the sponsor packages myself, refining tiers and pricing from market feedback:{" "}
