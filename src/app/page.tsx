@@ -117,7 +117,7 @@ function Hero() {
 
   // Start the hero video partway in, skipping the first few seconds. Set to 0 to revert
   // to a normal start-from-zero.
-  const HERO_START_SECONDS = 5;
+  const HERO_START_SECONDS = 6;
 
   // The bare autoPlay attribute is unreliable here (the muted bg video
   // intermittently stays at readyState 0 / paused on first load). Kick it
