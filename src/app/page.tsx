@@ -53,7 +53,7 @@ function CountUp({
   return (
     <span ref={ref}>
       {prefix}
-      {n}
+      {n.toLocaleString("en-US")}
       {suffix}
     </span>
   );
@@ -177,7 +177,7 @@ function Hero() {
           JUAN ARENAS
         </h1>
         <p className="mt-6 font-display italic text-[clamp(1rem,2.2vw,1.5rem)] text-[#C9A24B]">
-          I turn complex science into revenue.
+          Cold contact to closed deal.
         </p>
         <div className="mt-12 flex justify-center">
           <a href="#portfolio" className="text-[#F2EFE6]/40 hover:text-[#F2EFE6]/70 transition-colors" aria-label="Scroll down">
@@ -204,10 +204,12 @@ function Hero() {
 /* ====================================================
    2. METRIC WALL
 ==================================================== */
-function MetricLogo({ src, alt }: { src: string; alt: string }) {
+// The Your Aura mark is a tall lockup (wreath over wordmark); at the shared h-8
+// it reads as a smudge, so it gets its own height to sit at the same optical weight.
+function MetricLogo({ src, alt, tall = false }: { src: string; alt: string; tall?: boolean }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt={alt} className="mt-4 h-8 w-auto object-contain" />
+    <img src={src} alt={alt} className={`mt-4 w-auto object-contain ${tall ? "h-14" : "h-8"}`} />
   );
 }
 
@@ -251,21 +253,24 @@ function MetricWall() {
         </Reveal>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
           <Reveal delay={0}>
-            <Metric n={<CountUp to={400} suffix="+" />} label="creators activated" color="gold" />
-            <MetricLogo src="/img/logos/superbiome.png" alt="Milieu Skin Microbiome" />
+            <Metric n={<CountUp to={200} suffix="+" />} label="accounts owned, cold to close" color="gold" />
+            <MetricLogo src="/img/logos/biotech-connection.png" alt="Biotech Connection LA" />
           </Reveal>
 
           <Reveal delay={80}>
-            <Metric n={<CountUp to={30} prefix="+" suffix="%" />} label="sponsor revenue growth" color="" />
-            <MetricLogo src="/img/logos/biotech-connection.png" alt="Biotech Connection LA" />
+            <div className="grid grid-cols-2 gap-6">
+              <Metric n={<CountUp to={5000} suffix="+" />} label="prospects engaged" color="" />
+              <Metric n={<CountUp to={100} suffix="%" />} label="follow-up coverage" color="sage" />
+            </div>
+            <MetricLogo src="/img/logos/superbiome.png" alt="Milieu Skin Microbiome" />
           </Reveal>
 
           <Reveal delay={160}>
             <div className="grid grid-cols-2 gap-6">
-              <Metric n={<CountUp to={2} suffix="×" />} label="reach in 8 months" color="" />
-              <Metric n={<CountUp to={100} suffix="%" />} label="HIPAA compliant" color="sage" />
+              <Metric n={<CountUp to={20} prefix="$" suffix="k+" />} label="closed as founder" color="" />
+              <Metric n={<CountUp to={30} suffix="%" />} label="repeat rate" color="sage" />
             </div>
-            <MetricLogo src="/img/logos/usc-brain.png" alt="USC Center for Personalized Brain Health" />
+            <MetricLogo src="/img/logos/aura-white.png" alt="Your Aura Fragrance" tall />
           </Reveal>
         </div>
       </div>
@@ -620,7 +625,7 @@ function CaseStudies() {
   }[] = [
     {
       tag: "HIPAA COMPLIANT MARKETING",
-      role: "Marketing & Revenue Operations Lead",
+      role: "Revenue Ops & Marketing Lead",
       title: "I joined a world‑class Alzheimer's center to get their science out of the journals and into the world, loud and clear.",
       body: (
         <ul className="space-y-3">
@@ -640,20 +645,22 @@ function CaseStudies() {
       newsletters: true,
     },
     {
-      tag: "0→1 · OPERATIONS · GO-TO-MARKET",
-      role: "Founding Operator",
-      title: "I helped build a diagnostics startup from zero to revenue.",
+      tag: "COLD CALLING · NO BRAND · FIRST CLOSE",
+      role: "Founding Go-To-Market Operator",
+      title: "I cold-called dermatologists for a company that didn't exist yet, and closed the first clients.",
       body: (
         <ul className="space-y-3">
           <CaseBullet>
-            Shaped the founders&apos; vision into a v1 deck and built the website.
+            Called dermatologists and clinic decision-makers across Los Angeles with{" "}
+            <strong className="text-[#C9A24B] font-medium">zero brand recognition behind me</strong>
+            , booking the meetings that became standing relationships at several LA clinics.
           </CaseBullet>
           <CaseBullet>
-            Designed the operational workflows behind the diagnostics service, strategic and hands-on.
+            Built the website before anyone asked, then the outbound pipeline into dermatology, concierge, and longevity clinics.
           </CaseBullet>
           <CaseBullet>
-            Warmed B2B relationships with LA&apos;s longevity clinics,{" "}
-            <strong className="text-[#C9A24B] font-medium">zero to first revenue</strong>.
+            Warmed the first leads and{" "}
+            <strong className="text-[#C9A24B] font-medium">closed the first paying clients</strong>.
           </CaseBullet>
         </ul>
       ),
@@ -690,39 +697,45 @@ function CaseStudies() {
       art: "aura-collage",
     },
     {
-      tag: "LEAD GENERATION · B2B · AI ORCHESTRATION",
-      role: "Growth & Automation Lead",
-      title: "I built an AI-native pipeline that engaged thousands of influencers.",
+      tag: "PROSPECTING AT VOLUME · AI ORCHESTRATION",
+      role: "Clinical Sales & AI Automation Lead",
+      title: "I worked 40,000 accounts down to the 5,000 worth calling.",
       body: (
         <ul className="space-y-3">
           <CaseBullet>
-            Go-to-market plan for Milieu Skin, the first personalized prebiotic skincare brand: activate TikTokers to create hundreds of product videos, promote the best performers as ads.
+            Reviewed{" "}
+            <strong className="text-[#C9A24B] font-medium">40,000+ accounts to engage 5,000+ high-intent prospects</strong>
+            , sharpening the ideal customer profile until the list was worth working.
           </CaseBullet>
           <CaseBullet>
-            Built the flow in this video: high-volume automation, AI orchestration, human touch when it matters.
+            Set and closed VIP partnerships with doctors and aestheticians on 1-on-1 calls, anchored on scientific credibility and clear expectations.
           </CaseBullet>
           <CaseBullet>
-            <strong className="text-[#C9A24B] font-medium">Hundreds of qualified inbound leads each week</strong>.
+            Built the flow in this video with n8n, Supabase, and Claude Code:{" "}
+            <strong className="text-[#C9A24B] font-medium">10+ hrs/week of admin gone, 100% follow-up coverage</strong>
+            . I automate everything that isn&apos;t selling.
           </CaseBullet>
         </ul>
       ),
       art: "n8n-video",
     },
     {
-      tag: "PARTNERSHIPS · COMMUNITY · EVENTS",
-      role: "B2B Partnerships Associate",
-      title: "I grew partnerships for LA's Biotech nonprofit, lifting revenue 30% YoY.",
+      tag: "BUSINESS DEVELOPMENT · OUTBOUND · CLOSING",
+      role: "Business Developer",
+      title: "I owned 200+ accounts as a business developer, cold contact to close.",
       body: (
         <ul className="space-y-3">
           <CaseBullet>
-            Ran partnerships end to end for Biotech Connection LA: cold outreach, pre-event promotion, live event-day interviews, post-event follow-ups.
+            Ran outbound end to end for Biotech Connection LA across email, phone, and LinkedIn:{" "}
+            <strong className="text-[#C9A24B] font-medium">200+ biotech and pharma accounts and 20+ KOLs</strong>
+            , on a CRM I built myself, with zero dropped contacts.
           </CaseBullet>
           <CaseBullet>
-            <strong className="text-[#C9A24B] font-medium">30% lift in sponsorship revenue YoY</strong>
-            {" "}through consistent sponsor communication.
+            Designed and sold the sponsor packages myself, refining tiers and pricing from market feedback:{" "}
+            <strong className="text-[#C9A24B] font-medium">30% lift in sponsorship revenue YoY</strong>.
           </CaseBullet>
           <CaseBullet>
-            Brought bigger names, Amgen and USC Keck, onto the sponsor list.
+            Closed Amgen and USC Keck onto the sponsor list, and filled 100-attendee events from cold outreach.
           </CaseBullet>
         </ul>
       ),
@@ -843,27 +856,27 @@ function Capabilities() {
   const caps: { num: string; icon: string; title: string; desc: string }[] = [
     {
       num: "01",
-      icon: "flask",
-      title: "Science-fluent growth",
-      desc: "I speak lab and clinic. HIPAA-compliant campaigns that ship fast without breaking the rules that matter.",
+      icon: "link",
+      title: "Business development, cold to close",
+      desc: "Research the account, cold-source the decision-maker, book the meeting, close or move on. I have run this motion on 200+ accounts with zero dropped contacts.",
     },
     {
       num: "02",
       icon: "nodes",
       title: "AI-native operations",
-      desc: "Workflows that qualify, personalize, and follow up while you sleep. I build the engine, not just the ads.",
+      desc: "Workflows that qualify, personalize, and follow up while you sleep. I automate everything that isn't selling, so the hours go into dials.",
     },
     {
       num: "03",
-      icon: "trajectory",
-      title: "0→1 go-to-market",
-      desc: "I use my experience to test the market, find the winning strategy, and generate increasing revenue.",
+      icon: "flask",
+      title: "Science-fluent selling",
+      desc: "I speak lab and clinic. I have spent two years selling things buyers had to be convinced they needed, to the most skeptical rooms there are.",
     },
     {
       num: "04",
-      icon: "link",
-      title: "B2B pipeline & partnerships",
-      desc: "I bring real contacts across LA biotech, longevity clinics, and university labs, and I turn outreach into qualified pipeline.",
+      icon: "trajectory",
+      title: "0→1 go-to-market",
+      desc: "I use my experience to test the market, find the winning strategy, and generate increasing revenue.",
     },
     {
       num: "05",
@@ -1215,14 +1228,14 @@ function About() {
             </h2>
             <p className="text-[#F2EFE6] text-lg font-medium leading-relaxed mb-4">
               My background is researching pharmacology; my day‑to‑day is
-              delivering growth.
+              booking meetings and closing business.
             </p>
             <p className="text-[#F2EFE6]/75 leading-relaxed mb-4">
               I started in the lab and moved toward where decisions get made.
               <br />
-              Over time I went from Alzheimer&apos;s and toxicology research into
-              sales and marketing work, closer to real decisions, real teams,
-              and real outcomes.
+              Over time I went from Alzheimer&apos;s and toxicology research onto
+              the phone, because someone had to build the outbound motion and I
+              turned out to be good at it.
             </p>
             <p className="text-[#F2EFE6]/75 leading-relaxed mb-4">
               I like connecting operators and leadership to push for the few
@@ -1303,8 +1316,8 @@ function CTA() {
       <div className="relative max-w-4xl mx-auto text-center">
         <Reveal>
           <h2 className="font-display text-[clamp(2.2rem,5vw,3.6rem)] leading-tight">
-            I turn complex science{" "}
-            <span className="italic text-[#9FC4AE]">into revenue.</span>
+            I turn cold outreach{" "}
+            <span className="italic text-[#9FC4AE]">into closed business.</span>
           </h2>
         </Reveal>
         <Reveal delay={120}>
