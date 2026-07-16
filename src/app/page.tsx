@@ -115,6 +115,10 @@ export default function Page() {
 function Hero() {
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  // Start the hero video partway in, skipping the first few seconds. Set to 0 to revert
+  // to a normal start-from-zero.
+  const HERO_START_SECONDS = 5;
+
   // The bare autoPlay attribute is unreliable here (the muted bg video
   // intermittently stays at readyState 0 / paused on first load). Kick it
   // explicitly on mount and again once it can play, mirroring the project
@@ -122,10 +126,22 @@ function Hero() {
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    const kick = () => video.play().catch(() => {});
+    // Seek to the start offset once (only while still before it, so repeated
+    // canplay/buffering events don't yank playback back).
+    const seekToStart = () => {
+      if (HERO_START_SECONDS > 0 && video.currentTime < HERO_START_SECONDS) {
+        try { video.currentTime = HERO_START_SECONDS; } catch {}
+      }
+    };
+    const kick = () => { seekToStart(); video.play().catch(() => {}); };
+    seekToStart();
     kick();
+    video.addEventListener("loadedmetadata", seekToStart);
     video.addEventListener("canplay", kick);
-    return () => video.removeEventListener("canplay", kick);
+    return () => {
+      video.removeEventListener("canplay", kick);
+      video.removeEventListener("loadedmetadata", seekToStart);
+    };
   }, []);
 
   return (
@@ -624,25 +640,49 @@ function CaseStudies() {
     art: string; newsletters?: boolean; role?: string;
   }[] = [
     {
-      tag: "HIPAA COMPLIANT MARKETING",
-      role: "Revenue Ops & Marketing Lead",
-      title: "I joined a world‑class Alzheimer's center to get their science out of the journals and into the world, loud and clear.",
+      tag: "BUSINESS DEVELOPMENT · OUTBOUND · CLOSING",
+      role: "Business Developer",
+      title: "I owned 200+ accounts as a business developer, cold contact to close.",
       body: (
         <ul className="space-y-3">
           <CaseBullet>
-            Led the cross‑functional marketing engine of an Alzheimer&apos;s Lab &amp; Brain Health Clinic: content, email, social, and web, all HIPAA‑compliant and on‑brand.
+            Ran outbound end to end for Biotech Connection LA across email, phone, and LinkedIn:{" "}
+            <strong className="text-[#C9A24B] font-medium">200+ biotech and pharma accounts and 20+ KOLs</strong>
+            , every one tracked from first touch to close on a CRM I built myself.
           </CaseBullet>
           <CaseBullet>
-            <strong className="text-[#C9A24B] font-medium">2× newsletter and social reach in 8 months</strong>
-            , growing a pipeline of engaged patients and caregivers.
+            Designed and sold the sponsor packages myself, refining tiers and pricing from market feedback:{" "}
+            <strong className="text-[#C9A24B] font-medium">30% lift in sponsorship revenue YoY</strong>.
           </CaseBullet>
           <CaseBullet>
-            Launched and scaled a Spanish‑language newsletter, expanding the addressable LA market.
+            Closed Amgen and USC Keck onto the sponsor list, and filled 100-attendee events from cold outreach.
           </CaseBullet>
         </ul>
       ),
-      art: "cpbh-video",
-      newsletters: true,
+      art: "bcla-video",
+    },
+    {
+      tag: "PROSPECTING AT VOLUME · AI ORCHESTRATION",
+      role: "Clinical Sales & AI Automation Lead",
+      title: "I worked 40,000 accounts down to the 5,000 worth calling.",
+      body: (
+        <ul className="space-y-3">
+          <CaseBullet>
+            Reviewed{" "}
+            <strong className="text-[#C9A24B] font-medium">40,000+ accounts to engage 5,000+ high-intent prospects</strong>
+            , sharpening the ideal customer profile until the list was worth working.
+          </CaseBullet>
+          <CaseBullet>
+            Set and closed VIP partnerships with doctors and aestheticians on 1-on-1 calls, anchored on scientific credibility and clear expectations.
+          </CaseBullet>
+          <CaseBullet>
+            Built the flow in this video with n8n, Supabase, and Claude Code:{" "}
+            <strong className="text-[#C9A24B] font-medium">10+ hrs/week of admin gone, 100% follow-up coverage</strong>
+            . I automate everything that isn&apos;t selling.
+          </CaseBullet>
+        </ul>
+      ),
+      art: "n8n-video",
     },
     {
       tag: "COLD CALLING · NO BRAND · FIRST CLOSE",
@@ -697,49 +737,25 @@ function CaseStudies() {
       art: "aura-collage",
     },
     {
-      tag: "PROSPECTING AT VOLUME · AI ORCHESTRATION",
-      role: "Clinical Sales & AI Automation Lead",
-      title: "I worked 40,000 accounts down to the 5,000 worth calling.",
+      tag: "HIPAA COMPLIANT MARKETING",
+      role: "Revenue Ops & Marketing Lead",
+      title: "I joined a world‑class Alzheimer's center to get their science out of the journals and into the world, loud and clear.",
       body: (
         <ul className="space-y-3">
           <CaseBullet>
-            Reviewed{" "}
-            <strong className="text-[#C9A24B] font-medium">40,000+ accounts to engage 5,000+ high-intent prospects</strong>
-            , sharpening the ideal customer profile until the list was worth working.
+            Led the cross‑functional marketing engine of an Alzheimer&apos;s Lab &amp; Brain Health Clinic: content, email, social, and web, all HIPAA‑compliant and on‑brand.
           </CaseBullet>
           <CaseBullet>
-            Set and closed VIP partnerships with doctors and aestheticians on 1-on-1 calls, anchored on scientific credibility and clear expectations.
+            <strong className="text-[#C9A24B] font-medium">2× newsletter and social reach in 8 months</strong>
+            , growing a pipeline of engaged patients and caregivers.
           </CaseBullet>
           <CaseBullet>
-            Built the flow in this video with n8n, Supabase, and Claude Code:{" "}
-            <strong className="text-[#C9A24B] font-medium">10+ hrs/week of admin gone, 100% follow-up coverage</strong>
-            . I automate everything that isn&apos;t selling.
+            Launched and scaled a Spanish‑language newsletter, expanding the addressable LA market.
           </CaseBullet>
         </ul>
       ),
-      art: "n8n-video",
-    },
-    {
-      tag: "BUSINESS DEVELOPMENT · OUTBOUND · CLOSING",
-      role: "Business Developer",
-      title: "I owned 200+ accounts as a business developer, cold contact to close.",
-      body: (
-        <ul className="space-y-3">
-          <CaseBullet>
-            Ran outbound end to end for Biotech Connection LA across email, phone, and LinkedIn:{" "}
-            <strong className="text-[#C9A24B] font-medium">200+ biotech and pharma accounts and 20+ KOLs</strong>
-            , every one tracked from first touch to close on a CRM I built myself.
-          </CaseBullet>
-          <CaseBullet>
-            Designed and sold the sponsor packages myself, refining tiers and pricing from market feedback:{" "}
-            <strong className="text-[#C9A24B] font-medium">30% lift in sponsorship revenue YoY</strong>.
-          </CaseBullet>
-          <CaseBullet>
-            Closed Amgen and USC Keck onto the sponsor list, and filled 100-attendee events from cold outreach.
-          </CaseBullet>
-        </ul>
-      ),
-      art: "bcla-video",
+      art: "cpbh-video",
+      newsletters: true,
     },
   ];
 
