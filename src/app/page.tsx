@@ -858,7 +858,7 @@ function Capabilities() {
       num: "01",
       icon: "link",
       title: "Business development, cold to close",
-      desc: "Research the account, cold-source the decision-maker, book the meeting, close or move on. I have run this motion on 200+ accounts with zero dropped contacts.",
+      desc: "Research the account, cold-source the decision-maker, book the meeting, close or move on. I have run this motion on 200+ accounts, every one tracked to a decision.",
     },
     {
       num: "02",
