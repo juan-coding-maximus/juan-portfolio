@@ -172,17 +172,26 @@ export type CadenceRow = {
   fit_inputs_total: number | null;
   last_visit: string | null;
   last_inbound: string | null;
+  never_visited: boolean;
   visit_days_overdue: number | null;
   email_days_overdue: number | null;
   origin: Origin;
 };
 
-/** Cadence nudges. Suggestions only, never tasks. Nothing here has a status. */
+/**
+ * Cadence nudges. Suggestions only, never tasks. Nothing here has a status.
+ *
+ * Includes NEVER-VISITED accounts alongside overdue ones. Filtering on
+ * visit_days_overdue > 0 alone silently hid every new prospect, because a store
+ * you have never walked into has no overdue count to compute. Right now those
+ * are the entire work queue, so hiding them emptied the one screen that is
+ * supposed to say what to do today.
+ */
 export async function listCadenceDue(limit = 40): Promise<Result<CadenceRow>> {
   return query<CadenceRow>("nb_v_cadence_due", {
     select: "*",
-    "visit_days_overdue": "gt.0",
-    order: "tier.asc,visit_days_overdue.desc",
+    or: "(never_visited.is.true,visit_days_overdue.gt.0)",
+    order: "tier.asc,never_visited.desc,visit_days_overdue.desc.nullslast",
     limit,
   });
 }

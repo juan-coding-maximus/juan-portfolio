@@ -90,7 +90,7 @@ export default async function Today() {
             <Empty>
               {!isConfigured()
                 ? "No data source configured."
-                : "Nothing overdue. No visits are logged yet, so cadence has nothing to measure against."}
+                : "Nothing due. Every account has been touched within its cadence."}
             </Empty>
           ) : (
             <ul className="divide-y divide-[#EDEBE3] overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
@@ -104,7 +104,7 @@ export default async function Today() {
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[14px] font-medium">{c.name}</div>
                       <div className="mt-0.5 flex items-center gap-2 text-[12px] text-[#8A928C]">
-                        <span>last visit {daysAgo(c.last_visit)}</span>
+                        <span>{c.never_visited ? "never visited" : `last visit ${daysAgo(c.last_visit)}`}</span>
                         <span aria-hidden>·</span>
                         <Confidence
                           value={c.fit_confidence}
@@ -114,7 +114,7 @@ export default async function Today() {
                       </div>
                     </div>
                     <div className="shrink-0 text-right text-[12.5px] text-[#A0762C]">
-                      {c.visit_days_overdue}d over
+                      {c.never_visited ? "first visit" : `${c.visit_days_overdue}d over`}
                     </div>
                   </Link>
                 </li>
