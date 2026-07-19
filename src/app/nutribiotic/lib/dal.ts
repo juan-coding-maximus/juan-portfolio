@@ -125,7 +125,7 @@ async function query<T extends { origin?: Origin }>(
 export const workspaceMode = cache(async (): Promise<Mode> => {
   await verifySession();
   if (!isConfigured()) return "empty";
-  const res = await query<{ origin: Origin }>("accounts", { select: "origin", limit: 1 });
+  const res = await query<{ origin: Origin }>("nb_accounts", { select: "origin", limit: 1 });
   return res.mode;
 });
 
@@ -155,7 +155,7 @@ export type TierRow = {
  * confidently-ranked pile of noise as a work queue.
  */
 export async function listAccounts(limit = 500): Promise<Result<TierRow>> {
-  return query<TierRow>("v_account_tier", {
+  return query<TierRow>("nb_v_account_tier", {
     select: "*",
     order: "tier.asc,fit_confidence.desc,fit.desc",
     limit,
@@ -179,7 +179,7 @@ export type CadenceRow = {
 
 /** Cadence nudges. Suggestions only, never tasks. Nothing here has a status. */
 export async function listCadenceDue(limit = 40): Promise<Result<CadenceRow>> {
-  return query<CadenceRow>("v_cadence_due", {
+  return query<CadenceRow>("nb_v_cadence_due", {
     select: "*",
     "visit_days_overdue": "gt.0",
     order: "tier.asc,visit_days_overdue.desc",
@@ -202,7 +202,7 @@ export type StaleDeal = {
 
 /** Feeds the weekly review ritual: what has gone quiet and needs killing or reviving. */
 export async function listStaleDeals(limit = 50): Promise<Result<StaleDeal>> {
-  return query<StaleDeal>("v_pipeline_stale", {
+  return query<StaleDeal>("nb_v_pipeline_stale", {
     select: "*",
     order: "next_step_days_overdue.desc.nullslast",
     limit,
@@ -220,7 +220,7 @@ export type Deal = {
 };
 
 export async function listDeals(limit = 300): Promise<Result<Deal>> {
-  return query<Deal>("deals", { select: "*", order: "next_step_date.asc.nullslast", limit });
+  return query<Deal>("nb_deals", { select: "*", order: "next_step_date.asc.nullslast", limit });
 }
 
 export type Account = {
@@ -245,7 +245,7 @@ export type Account = {
 };
 
 export async function getAccount(id: string): Promise<Result<Account>> {
-  return query<Account>("accounts", { select: "*", id: `eq.${id}`, limit: 1 });
+  return query<Account>("nb_accounts", { select: "*", id: `eq.${id}`, limit: 1 });
 }
 
 export type Activity = {
@@ -260,7 +260,7 @@ export type Activity = {
 };
 
 export async function listActivities(accountId: string, limit = 60): Promise<Result<Activity>> {
-  return query<Activity>("activities", {
+  return query<Activity>("nb_activities", {
     select: "*",
     account_id: `eq.${accountId}`,
     order: "at.desc",
@@ -280,7 +280,7 @@ export type SupportIssue = {
 };
 
 export async function listSupportIssues(limit = 100): Promise<Result<SupportIssue>> {
-  return query<SupportIssue>("support_issues", {
+  return query<SupportIssue>("nb_support_issues", {
     select: "*",
     order: "raised_at.desc",
     limit,
@@ -300,7 +300,7 @@ export type Draft = {
 };
 
 export async function listDrafts(limit = 100): Promise<Result<Draft>> {
-  return query<Draft>("outbound_drafts", {
+  return query<Draft>("nb_outbound_drafts", {
     select: "*",
     status: "eq.pending",
     order: "created_at.desc",
@@ -318,7 +318,7 @@ export type RevenueMonth = {
 };
 
 export async function revenueByMonth(): Promise<Result<RevenueMonth>> {
-  return query<RevenueMonth>("v_kpi_revenue_monthly", { select: "*", order: "month.desc", limit: 24 });
+  return query<RevenueMonth>("nb_v_kpi_revenue_monthly", { select: "*", order: "month.desc", limit: 24 });
 }
 
 export type Reactivation = {
@@ -330,7 +330,7 @@ export type Reactivation = {
 };
 
 export async function reactivation(): Promise<Result<Reactivation>> {
-  return query<Reactivation>("v_kpi_reactivation", { select: "*" });
+  return query<Reactivation>("nb_v_kpi_reactivation", { select: "*" });
 }
 
 export type LeadingDay = {
@@ -347,5 +347,5 @@ export type LeadingDay = {
 };
 
 export async function leadingDaily(days = 30): Promise<Result<LeadingDay>> {
-  return query<LeadingDay>("v_kpi_leading_daily", { select: "*", order: "day.desc", limit: days });
+  return query<LeadingDay>("nb_v_kpi_leading_daily", { select: "*", order: "day.desc", limit: days });
 }
