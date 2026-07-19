@@ -8,7 +8,7 @@
  */
 
 import Link from "next/link";
-import { listCadenceDue, listStaleDeals, leadingDaily } from "./lib/dal";
+import { isConfigured, listCadenceDue, listStaleDeals, leadingDaily } from "./lib/dal";
 import { Card, Confidence, Empty, Ico, PageHead, TierChip, daysAgo } from "./lib/ui";
 
 export const dynamic = "force-dynamic";
@@ -88,9 +88,9 @@ export default async function Today() {
           </h2>
           {cadence.data.length === 0 ? (
             <Empty>
-              {cadence.mode === "empty"
-                ? "No data source configured yet."
-                : "Nothing is overdue. That is either very good or the activity log has gone quiet."}
+              {!isConfigured()
+                ? "No data source configured."
+                : "Nothing overdue. No visits are logged yet, so cadence has nothing to measure against."}
             </Empty>
           ) : (
             <ul className="divide-y divide-[#EDEBE3] overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
@@ -130,9 +130,9 @@ export default async function Today() {
           </h2>
           {stale.data.length === 0 ? (
             <Empty>
-              {stale.mode === "empty"
-                ? "No data source configured yet."
-                : "No stale deals. Every open deal has a next step with a future date."}
+              {!isConfigured()
+                ? "No data source configured."
+                : "No deals yet. One appears here after you log a real conversation."}
             </Empty>
           ) : (
             <ul className="divide-y divide-[#EDEBE3] overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { workspaceMode } from "./lib/dal";
+import { isConfigured, workspaceMode } from "./lib/dal";
 import { hasValidSession } from "./lib/session";
 import { Ico } from "./lib/ui";
 
@@ -58,7 +58,11 @@ export default async function NutribioticLayout({
           </div>
         )}
 
-        {mode === "empty" && (
+        {/* Only shown when the backend is genuinely unwired. An empty RESULT is
+            not the same as an empty SYSTEM, and saying "not configured" over a
+            working tool that simply has nothing logged yet trains the user to
+            distrust the banner. */}
+        {!isConfigured() && (
           <div className="border-b border-[#D8D4C8] bg-[#EFEDE4] px-4 py-2 text-center text-[13px] text-[#5B6560]">
             No data source configured. Nothing is being shown, and nothing is being guessed.
           </div>

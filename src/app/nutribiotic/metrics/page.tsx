@@ -13,7 +13,7 @@
  * origin cannot be stated is not reported as fact.
  */
 
-import { leadingDaily, reactivation, revenueByMonth } from "../lib/dal";
+import { isConfigured, leadingDaily, reactivation, revenueByMonth } from "../lib/dal";
 import { Card, Empty, PageHead, Stat, money } from "../lib/ui";
 
 export const dynamic = "force-dynamic";
@@ -47,14 +47,26 @@ export default async function Metrics() {
     { visits: 0, replies: 0, samples: 0, trainings: 0 },
   );
 
-  if (rev.mode === "empty" && react.mode === "empty" && leading.mode === "empty") {
+  // TWO DIFFERENT NOTHINGS, and conflating them is a lie.
+  //
+  //   unconfigured -> we CANNOT show numbers. The tool is not wired up.
+  //   configured but zero -> we CAN, and the honest answer is zero because
+  //                          nothing has been sold or logged yet.
+  //
+  // The first version showed "No data source configured" for both, which told
+  // Juan his tool was broken while it was working correctly. A metrics page that
+  // cries broken on a legitimately quiet week is a metrics page nobody believes
+  // on a busy one.
+  if (!isConfigured()) {
     return (
       <>
         <PageHead title="Metrics" />
-        <Empty>No data source configured yet. Nothing is being shown and nothing is estimated.</Empty>
+        <Empty>No data source configured. Nothing is being shown and nothing is estimated.</Empty>
       </>
     );
   }
+
+  const nothingLogged = rev.data.length === 0 && leading.data.length === 0;
 
   return (
     <>
@@ -62,6 +74,17 @@ export default async function Metrics() {
         title="Metrics"
         sub="Leading indicators are reviewed daily and are yours to control. Lagging indicators are reviewed weekly and reflect work done about 90 days ago. They are kept apart on purpose."
       />
+
+      {nothingLogged && (
+        <Card className="mb-6 border-l-[3px] border-l-[#C9A24B]">
+          <div className="text-[14px] font-semibold">Everything below is genuinely zero</div>
+          <p className="mt-1.5 max-w-[70ch] text-[13.5px] leading-relaxed text-[#5B6560]">
+            No visits, calls, samples, or orders have been logged yet, so these are real zeros
+            rather than missing data. They start moving the first time you log a visit from the
+            Today screen.
+          </p>
+        </Card>
+      )}
 
       <section className="mb-8">
         <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8A928C]">

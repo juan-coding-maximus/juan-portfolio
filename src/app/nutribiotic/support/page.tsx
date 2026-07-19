@@ -9,7 +9,7 @@
  */
 
 import Link from "next/link";
-import { listSupportIssues } from "../lib/dal";
+import { listSupportIssues , isConfigured } from "../lib/dal";
 import { Empty, PageHead, daysAgo } from "../lib/ui";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +33,7 @@ export default async function Support() {
 
       {res.data.length === 0 ? (
         <Empty>
-          {res.mode === "empty" ? "No data source configured yet." : "No issues logged."}
+          {!isConfigured() ? "No data source configured." : "No issues logged. Nothing to forward to HQ."}
         </Empty>
       ) : (
         <>

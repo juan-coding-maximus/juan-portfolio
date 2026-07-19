@@ -1,15 +1,18 @@
 /**
- * Accounts. All 463, ranked.
+ * Accounts. Every prospect in the territory, ranked.
  *
- * DEFAULT SORT IS (tier, confidence desc), NOT fit desc. That is a deliberate
- * mitigation rather than a preference: at seed most fit scores rest on one or two
- * measured inputs out of three, and a list sorted purely by value would present
- * a confidently-ranked pile of noise as a work queue. Sorting by confidence
- * inside a tier puts the accounts we actually KNOW something about at the top.
+ * DEFAULT SORT IS (tier, confidence desc), NOT fit desc. Most fit scores currently
+ * rest on one or two measured inputs out of three, and a list sorted purely by
+ * value would present a confidently-ranked pile of noise as a work queue.
+ *
+ * Scores are also shrunk toward a neutral prior in proportion to what is
+ * unmeasured, so a barely-known account cannot inherit the optimism of its single
+ * lucky input. Before that was added, researching an account LOWERED its rank,
+ * which is the exact opposite of the behavior this list should encourage.
  */
 
 import Link from "next/link";
-import { listAccounts } from "../lib/dal";
+import { listAccounts , isConfigured } from "../lib/dal";
 import { Confidence, Empty, PageHead, TierChip } from "../lib/ui";
 
 export const dynamic = "force-dynamic";
@@ -34,9 +37,9 @@ export default async function Accounts() {
 
       {rows.length === 0 ? (
         <Empty>
-          {res.mode === "empty"
-            ? "No data source configured yet. Nothing is being shown and nothing is being guessed."
-            : "No accounts."}
+          {!isConfigured()
+            ? "No data source configured."
+            : "No accounts yet. Load prospects to get started."}
         </Empty>
       ) : (
         <>

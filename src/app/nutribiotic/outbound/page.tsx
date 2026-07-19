@@ -8,7 +8,7 @@
  * independently, so the two guards fail separately.
  */
 
-import { listDrafts } from "../lib/dal";
+import { listDrafts , isConfigured } from "../lib/dal";
 import { Card, Empty, PageHead, daysAgo } from "../lib/ui";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +36,7 @@ export default async function Outbound() {
 
       {res.data.length === 0 ? (
         <Empty>
-          {res.mode === "empty" ? "No data source configured yet." : "No drafts waiting."}
+          {!isConfigured() ? "No data source configured." : "No drafts waiting on you."}
         </Empty>
       ) : (
         <ul className="flex flex-col gap-3">

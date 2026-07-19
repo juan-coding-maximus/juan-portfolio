@@ -10,7 +10,7 @@
 import Link from "next/link";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { listDeals, listStaleDeals } from "../lib/dal";
+import { listDeals, listStaleDeals , isConfigured } from "../lib/dal";
 import { Card, Empty, PageHead } from "../lib/ui";
 
 export const dynamic = "force-dynamic";
@@ -55,7 +55,9 @@ export default async function Pipeline() {
 
       {deals.data.length === 0 ? (
         <Empty>
-          {deals.mode === "empty" ? "No data source configured yet." : "No open deals."}
+          {!isConfigured()
+            ? "No data source configured."
+            : "No open deals yet. A deal appears here once you log a real conversation."}
         </Empty>
       ) : (
         <>
