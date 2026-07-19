@@ -28,12 +28,26 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const ok = await verifyToken(req.cookies.get(COOKIE)?.value);
-  if (!ok) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/nutribiotic/gate";
-    url.search = "";
-    return NextResponse.redirect(url);
+  // THE GATE IS OFF WHEN NB_PIN IS UNSET.
+  //
+  // Juan turned it off deliberately on 2026-07-18 to remove friction while the
+  // OS is being built out. Consequence, stated plainly rather than buried:
+  // anyone with the URL can read this page, and it holds real business data on
+  // real prospects. The noindex/noarchive headers below keep it out of search
+  // results, but they are not access control.
+  //
+  // To turn the gate back on: set NB_PIN in the environment. Nothing else needs
+  // to change, here or in the DAL.
+  const gateEnabled = Boolean(process.env.NB_PIN);
+
+  if (gateEnabled) {
+    const ok = await verifyToken(req.cookies.get(COOKIE)?.value);
+    if (!ok) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/nutribiotic/gate";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
   }
 
   const res = NextResponse.next();

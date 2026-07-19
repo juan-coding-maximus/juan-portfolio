@@ -91,7 +91,15 @@ export async function verifyToken(token: string | undefined): Promise<boolean> {
   return Number.isFinite(exp) && Date.now() < exp;
 }
 
+/** True when the gate is switched off entirely (NB_PIN unset). */
+export function gateEnabled(): boolean {
+  return Boolean(process.env.NB_PIN);
+}
+
 export async function hasValidSession(): Promise<boolean> {
+  // Gate off: everyone is "authenticated". Single switch, checked in one place,
+  // so there is no second code path to forget about when it goes back on.
+  if (!gateEnabled()) return true;
   const jar = await cookies(); // async in Next 16
   return verifyToken(jar.get(COOKIE)?.value);
 }

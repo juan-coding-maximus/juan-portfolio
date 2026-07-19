@@ -43,27 +43,18 @@ export default async function NutribioticLayout({
   const synthetic = mode === "synthetic";
 
   return (
-    <div
-      className="min-h-screen bg-[#F7F6F1] text-[#14201B]"
-      style={
-        synthetic
-          ? {
-              // Hazard frame. Mode-level rather than per-row: row badges get
-              // visually banked out within a week, but a striped viewport edge
-              // survives familiarity AND survives a cropped screenshot, which is
-              // how a number actually escapes into a conversation.
-              boxShadow: "inset 0 0 0 6px transparent",
-              backgroundImage:
-                "repeating-linear-gradient(45deg,#E8A33D 0 14px,#14201B 14px 28px)",
-              padding: 6,
-            }
-          : undefined
-      }
-    >
+    <div className="min-h-screen bg-[#F7F6F1] text-[#14201B]">
       <div className="min-h-screen bg-[#F7F6F1]">
+        {/* Synthetic-data signal, redesigned 2026-07-18.
+            The hazard tape was correct in substance and ugly in practice, and an
+            ugly warning gets ignored or removed, which is worse than a quiet one
+            that survives. This keeps the guarantee (mode-level, not a per-row
+            badge, still impossible to miss on a cropped screenshot because it
+            sits above the content) and drops the stripes. */}
         {synthetic && (
-          <div className="bg-[#E8A33D] px-4 py-2 text-center text-[13px] font-semibold uppercase tracking-[0.14em] text-[#14201B]">
-            Synthetic data · not real accounts · nothing here may be sent, exported, or reported
+          <div className="flex items-center justify-center gap-2 border-b border-[#E5D9BF] bg-[#FBF6E9] px-4 py-1.5 text-[12px] text-[#8A6D2F]">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#C9A24B]" aria-hidden />
+            Sample data. Not real accounts, and nothing here can be sent or reported.
           </div>
         )}
 
@@ -97,14 +88,8 @@ export default async function NutribioticLayout({
               ))}
             </nav>
 
-            <form action="/nutribiotic/api/auth" method="post" className="mt-10">
-              <Link
-                href="/nutribiotic/gate"
-                className="text-[12px] text-[#8A928C] underline-offset-2 hover:underline"
-              >
-                Lock
-              </Link>
-            </form>
+            {/* No lock link: the PIN gate is off (NB_PIN unset). Set NB_PIN to
+                turn it back on and this returns with it. */}
           </aside>
 
           <main className="min-w-0 flex-1 px-5 py-7 md:px-9">{children}</main>
