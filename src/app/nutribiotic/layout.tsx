@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { isConfigured, workspaceMode } from "./lib/dal";
+import { ModalProvider } from "./lib/modal";
 import { hasValidSession } from "./lib/session";
 import { Ico } from "./lib/ui";
 
@@ -44,6 +45,7 @@ export default async function NutribioticLayout({
 
   return (
     <div className="min-h-screen bg-[#F7F6F1] text-[#14201B]">
+      <ModalProvider>
       <div className="min-h-screen bg-[#F7F6F1]">
         {/* Synthetic-data signal, redesigned 2026-07-18.
             The hazard tape was correct in substance and ugly in practice, and an
@@ -99,6 +101,7 @@ export default async function NutribioticLayout({
           <main className="min-w-0 flex-1 px-5 py-7 md:px-9">{children}</main>
         </div>
       </div>
+      </ModalProvider>
     </div>
   );
 }

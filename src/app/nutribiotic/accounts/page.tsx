@@ -11,8 +11,8 @@
  * which is the exact opposite of the behavior this list should encourage.
  */
 
-import Link from "next/link";
 import { listAccounts , isConfigured } from "../lib/dal";
+import { AccountLink } from "../lib/modal";
 import { Confidence, Empty, PageHead, TierChip } from "../lib/ui";
 
 export const dynamic = "force-dynamic";
@@ -79,12 +79,12 @@ export default async function Accounts() {
                         <TierChip tier={r.tier} />
                       </td>
                       <td className="px-4 py-2.5">
-                        <Link
-                          href={`/nutribiotic/account/${r.account_id}`}
+                        <AccountLink
+                          id={r.account_id}
                           className="font-medium underline-offset-2 hover:underline"
                         >
                           {r.name}
-                        </Link>
+                        </AccountLink>
                       </td>
                       <td className="px-4 py-2.5 text-[#5B6560]">{r.lifecycle}</td>
                       {/* Low-confidence scores are visually demoted so a weak

@@ -7,17 +7,19 @@
  * gets eaten when the day gets busy.
  */
 
-import Link from "next/link";
-import { isConfigured, listCadenceDue, listStaleDeals, leadingDaily } from "./lib/dal";
+import { isConfigured, listCadenceDue, listStaleDeals, leadingDaily, listCalendarProposals } from "./lib/dal";
+import { AccountLink } from "./lib/modal";
+import { CalendarProposalRow, TouchpointCapture } from "./lib/touchpoint-ui";
 import { Card, Confidence, Empty, Ico, PageHead, TierChip, daysAgo } from "./lib/ui";
 
 export const dynamic = "force-dynamic";
 
 export default async function Today() {
-  const [cadence, stale, leading] = await Promise.all([
+  const [cadence, stale, leading, proposals] = await Promise.all([
     listCadenceDue(12),
     listStaleDeals(8),
     leadingDaily(7),
+    listCalendarProposals(),
   ]);
 
   const week = leading.data.reduce(
@@ -80,11 +82,30 @@ export default async function Today() {
         </Card>
       </section>
 
+      {/* Touchpoint capture. Everything below this line is either what you're
+          about to do, or a proposal waiting on your yes. */}
+      <section className="mb-7">
+        <TouchpointCapture />
+      </section>
+
+      {proposals.data.length > 0 && (
+        <section className="mb-7">
+          <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8A928C]">
+            Follow-ups to confirm
+          </h2>
+          <ul className="divide-y divide-[#EDEBE3] overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
+            {proposals.data.map((p) => (
+              <CalendarProposalRow key={p.id} proposal={p} />
+            ))}
+          </ul>
+        </section>
+      )}
+
       <div className="grid gap-7 lg:grid-cols-2">
-        {/* Cadence: who is overdue for a touch. */}
+        {/* Cadence: who is due for a touch. */}
         <section>
           <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8A928C]">
-            Overdue for a touch
+            Due for a touch
           </h2>
           {cadence.data.length === 0 ? (
             <Empty>
@@ -96,8 +117,8 @@ export default async function Today() {
             <ul className="divide-y divide-[#EDEBE3] overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
               {cadence.data.map((c) => (
                 <li key={c.account_id}>
-                  <Link
-                    href={`/nutribiotic/account/${c.account_id}`}
+                  <AccountLink
+                    id={c.account_id}
                     className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[#FAF9F5]"
                   >
                     <TierChip tier={c.tier} />
@@ -114,9 +135,9 @@ export default async function Today() {
                       </div>
                     </div>
                     <div className="shrink-0 text-right text-[12.5px] text-[#A0762C]">
-                      {c.never_visited ? "first visit" : `${c.visit_days_overdue}d over`}
+                      {c.never_visited ? "first visit" : `${c.visit_days_overdue}d`}
                     </div>
-                  </Link>
+                  </AccountLink>
                 </li>
               ))}
             </ul>
@@ -138,8 +159,8 @@ export default async function Today() {
             <ul className="divide-y divide-[#EDEBE3] overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
               {stale.data.map((d) => (
                 <li key={d.deal_id}>
-                  <Link
-                    href={`/nutribiotic/account/${d.account_id}`}
+                  <AccountLink
+                    id={d.account_id}
                     className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[#FAF9F5]"
                   >
                     <TierChip tier={d.tier} />
@@ -151,10 +172,10 @@ export default async function Today() {
                     </div>
                     <div className="shrink-0 text-right text-[12.5px] text-[#A0762C]">
                       {d.next_step_days_overdue != null && d.next_step_days_overdue > 0
-                        ? `${d.next_step_days_overdue}d late`
+                        ? `${d.next_step_days_overdue}d since next step`
                         : `${d.days_since_activity ?? "?"}d silent`}
                     </div>
-                  </Link>
+                  </AccountLink>
                 </li>
               ))}
             </ul>

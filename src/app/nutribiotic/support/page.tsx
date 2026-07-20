@@ -8,8 +8,8 @@
  * goes stale in service of a process he does not own.
  */
 
-import Link from "next/link";
 import { listSupportIssues , isConfigured } from "../lib/dal";
+import { AccountLink } from "../lib/modal";
 import { Empty, PageHead, daysAgo } from "../lib/ui";
 
 export const dynamic = "force-dynamic";
@@ -61,12 +61,12 @@ export default async function Support() {
                       {daysAgo(i.raised_at)}
                     </td>
                     <td className="px-4 py-2.5">
-                      <Link
-                        href={`/nutribiotic/account/${i.account_id}`}
+                      <AccountLink
+                        id={i.account_id}
                         className="underline-offset-2 hover:underline"
                       >
                         {i.account_id}
-                      </Link>
+                      </AccountLink>
                     </td>
                     <td className="px-4 py-2.5 text-[#5B6560]">{i.issue_type.replace(/_/g, " ")}</td>
                     <td className="max-w-[38ch] truncate px-4 py-2.5">{i.summary}</td>

@@ -115,6 +115,55 @@ async function query<T extends { origin?: Origin }>(
 }
 
 /**
+ * The write half of the one door. Same gate, same key, same table namespace as
+ * `query()`. Every write this app makes is Juan's own field data (an activity
+ * he logged, a contact detail he stated, a calendar proposal he is about to
+ * approve), never a fabricated fact, so there is no origin-mixing concern here
+ * the way there is on reads: every row this writes is `origin: 'manual'`.
+ */
+async function mutate<T>(
+  table: string,
+  method: "POST" | "PATCH",
+  body: unknown,
+  opts: QueryOpts = {},
+): Promise<T[]> {
+  await verifySession();
+
+  if (!isConfigured()) {
+    throw new Error(`Cannot write to "${table}": no data source configured.`);
+  }
+
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(opts)) {
+    if (v !== undefined) params.set(k, String(v));
+  }
+
+  const res = await fetch(`${SB_URL}/rest/v1/${table}?${params}`, {
+    method,
+    headers: {
+      apikey: SB_KEY,
+      Authorization: `Bearer ${SB_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Supabase ${table} ${method} -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  }
+
+  return (await res.json()) as T[];
+}
+
+/** Our own id shape throughout this schema: '<prefix>_<6 hex>'. */
+function randId(prefix: string): string {
+  const bytes = new Uint8Array(3);
+  crypto.getRandomValues(bytes);
+  return `${prefix}_${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/**
  * Whether the workspace as a whole is showing synthetic data.
  *
  * Drives the app-wide chrome. Deliberately a WORKSPACE-level question rather
@@ -240,6 +289,11 @@ export type Account = {
   city: string | null;
   postal: string | null;
   phone: string | null;
+  website: string | null;
+  email: string | null;
+  instagram_url: string | null;
+  facebook_url: string | null;
+  linkedin_url: string | null;
   lifecycle: string;
   last_order_at: string | null;
   lifetime_revenue: number | null;
@@ -255,6 +309,29 @@ export type Account = {
 
 export async function getAccount(id: string): Promise<Result<Account>> {
   return query<Account>("nb_accounts", { select: "*", id: `eq.${id}`, limit: 1 });
+}
+
+export type Contact = {
+  id: string;
+  account_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  title: string | null;
+  role_tag: string | null;
+  is_decision_maker: boolean;
+  email: string | null;
+  phone: string | null;
+  linkedin_url: string | null;
+  origin: Origin;
+};
+
+/** Named people at an account: owner, manager, director, buyer. */
+export async function listContacts(accountId: string): Promise<Result<Contact>> {
+  return query<Contact>("nb_contacts", {
+    select: "*",
+    account_id: `eq.${accountId}`,
+    order: "is_decision_maker.desc,last_name.asc",
+  });
 }
 
 export type Activity = {
@@ -357,4 +434,141 @@ export type LeadingDay = {
 
 export async function leadingDaily(days = 30): Promise<Result<LeadingDay>> {
   return query<LeadingDay>("nb_v_kpi_leading_daily", { select: "*", order: "day.desc", limit: days });
+}
+
+// ---------------------------------------------------------------------------
+// Writes. All Juan's own data: a note he typed, a detail he stated. Nothing
+// here is fabricated, so every row lands as origin: 'manual'.
+// ---------------------------------------------------------------------------
+
+export type NewActivity = {
+  account_id: string;
+  contact_id?: string | null;
+  kind: string;
+  direction: string;
+  outcome?: string | null;
+  detail?: string | null;
+};
+
+export async function insertActivity(input: NewActivity): Promise<Activity> {
+  const [row] = await mutate<Activity>("nb_activities", "POST", {
+    ...input,
+    actor: "juan",
+    origin: "manual",
+  });
+  return row;
+}
+
+export type NewContact = {
+  account_id: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  title?: string | null;
+  role_tag?: string | null;
+  is_decision_maker?: boolean;
+  email?: string | null;
+  phone?: string | null;
+  linkedin_url?: string | null;
+};
+
+export async function insertContact(input: NewContact): Promise<Contact> {
+  const [row] = await mutate<Contact>("nb_contacts", "POST", {
+    id: randId("c"),
+    origin: "manual",
+    ...input,
+  });
+  return row;
+}
+
+/** Fills blanks only. Never overwrites a field that already holds a value, so
+ * a touchpoint parse can never clobber a detail entered a different way. */
+export async function patchContact(id: string, patch: Partial<NewContact>): Promise<Contact> {
+  const [row] = await mutate<Contact>("nb_contacts", "PATCH", patch, { id: `eq.${id}` });
+  return row;
+}
+
+export type Touchpoint = {
+  id: string;
+  account_id: string | null;
+  raw_text: string;
+  status: string;
+  account_match_confidence: string | null;
+  activity_id: number | null;
+  parsed: unknown;
+  origin: Origin;
+  created_at: string;
+};
+
+export async function insertTouchpoint(input: {
+  account_id: string | null;
+  raw_text: string;
+  status: string;
+  account_match_confidence?: string | null;
+  activity_id?: number | null;
+  parsed?: unknown;
+}): Promise<Touchpoint> {
+  const [row] = await mutate<Touchpoint>("nb_touchpoints", "POST", {
+    id: randId("t"),
+    origin: "manual",
+    ...input,
+  });
+  return row;
+}
+
+export type CalendarProposal = {
+  id: string;
+  touchpoint_id: string | null;
+  account_id: string | null;
+  account_name?: string;
+  kind: "meeting" | "reminder" | "visit";
+  title: string;
+  starts_at: string | null;
+  duration_minutes: number;
+  notes: string | null;
+  status: "pending" | "approved" | "dismissed" | "created";
+  gcal_event_id: string | null;
+  origin: Origin;
+  created_at: string;
+};
+
+export async function insertCalendarProposal(input: {
+  touchpoint_id: string | null;
+  account_id: string | null;
+  kind: "meeting" | "reminder" | "visit";
+  title: string;
+  starts_at: string | null;
+  duration_minutes?: number;
+  notes?: string | null;
+}): Promise<CalendarProposal> {
+  const [row] = await mutate<CalendarProposal>("nb_calendar_proposals", "POST", {
+    id: randId("cp"),
+    status: "pending",
+    origin: "manual",
+    ...input,
+  });
+  return row;
+}
+
+/** Pending follow-ups, oldest-starting first. This is the human gate: nothing
+ * here has touched Google Calendar yet. */
+export async function listCalendarProposals(limit = 20): Promise<Result<CalendarProposal>> {
+  return query<CalendarProposal>("nb_calendar_proposals", {
+    select: "*",
+    status: "eq.pending",
+    order: "starts_at.asc.nullslast,created_at.asc",
+    limit,
+  });
+}
+
+export async function setCalendarProposalStatus(
+  id: string,
+  status: "approved" | "dismissed",
+): Promise<CalendarProposal> {
+  const [row] = await mutate<CalendarProposal>(
+    "nb_calendar_proposals",
+    "PATCH",
+    { status, decided_at: new Date().toISOString() },
+    { id: `eq.${id}` },
+  );
+  return row;
 }

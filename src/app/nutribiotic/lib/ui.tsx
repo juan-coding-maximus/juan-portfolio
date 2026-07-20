@@ -22,6 +22,18 @@ const ICONS: Record<string, ReactNode> = {
   wand: <><path d="M3 13 11 5M9.6 3.4l.5 1.3 1.3.5-1.3.5-.5 1.3-.5-1.3-1.3-.5 1.3-.5zM13 8.4l.35.9.9.35-.9.35-.35.9-.35-.9-.9-.35.9-.35z" /></>,
   alert: <><path d="M8 2.6 14.2 13H1.8L8 2.6Z" /><path d="M8 6.6v3M8 11.4h.01" /></>,
   check: <><path d="m3 8.4 3.2 3.2L13 4.8" /></>,
+  close: <><path d="m3.6 3.6 8.8 8.8M12.4 3.6l-8.8 8.8" /></>,
+  mail: <><path d="M2.4 4.2h11.2v7.6H2.4z" /><path d="m2.4 4.6 5.6 4 5.6-4" /></>,
+  globe: <><circle cx="8" cy="8" r="6.2" /><path d="M1.8 8h12.4M8 1.8c2.1 1.9 2.1 10.5 0 12.4M8 1.8c-2.1 1.9-2.1 10.5 0 12.4" /></>,
+  instagram: (
+    <>
+      <rect x="2.4" y="2.4" width="11.2" height="11.2" rx="3" />
+      <circle cx="8" cy="8" r="3.1" />
+      <circle cx="11.5" cy="4.5" r="0.55" fill="currentColor" stroke="none" />
+    </>
+  ),
+  facebook: <><rect x="2.4" y="2.4" width="11.2" height="11.2" rx="2.4" /><path d="M9.6 13V8.3h1.5l.3-1.9H9.6V5.2c0-.6.2-.9.9-.9h.9V2.5c-.2 0-.9-.1-1.5-.1-1.6 0-2.6.9-2.6 2.7v1.3H5.9v1.9h1.4V13" /></>,
+  linkedin: <><rect x="2.4" y="2.4" width="11.2" height="11.2" rx="2.4" /><circle cx="5.4" cy="5.5" r="0.85" fill="currentColor" stroke="none" /><path d="M5.4 7.6V12M8.3 12V9.3c0-1.1.9-1.7 1.8-1.7s1.7.6 1.7 1.7V12M8.3 7.6V12" /></>,
 };
 
 export function Ico({ name, size = 16 }: { name: string; size?: number }) {
@@ -153,6 +165,36 @@ export function daysAgo(iso: string | null): string {
   if (d < 60) return `${d}d ago`;
   if (d < 730) return `${Math.round(d / 30)}mo ago`;
   return `${Math.round(d / 365)}y ago`;
+}
+
+/**
+ * The one phone number on a profile that matters: dial-ready at a glance from
+ * the car. Digit groups are visibly larger than the "+1" and the dashes so the
+ * number itself is what the eye lands on, not the punctuation around it.
+ */
+export function PhoneDisplay({ value }: { value: string | null }) {
+  if (!value) return <span className="text-[13.5px] text-[#8A928C]">not known</span>;
+
+  const m = value.match(/^\+1(\d{3})(\d{3})(\d{4})$/);
+  if (!m) {
+    return (
+      <span className="font-[family-name:var(--font-fraunces)] text-[17px] font-bold text-[#14201B]">{value}</span>
+    );
+  }
+  const [, area, mid, last] = m;
+  return (
+    <a
+      href={`tel:${value}`}
+      className="font-[family-name:var(--font-fraunces)] font-bold text-[#14201B] transition-opacity hover:opacity-80"
+    >
+      <span className="text-[13px]">+1</span>{" "}
+      <span className="text-[23px] tracking-tight tabular-nums">{area}</span>
+      <span className="mx-[3px] text-[13px]">-</span>
+      <span className="text-[23px] tracking-tight tabular-nums">{mid}</span>
+      <span className="mx-[3px] text-[13px]">-</span>
+      <span className="text-[23px] tracking-tight tabular-nums">{last}</span>
+    </a>
+  );
 }
 
 export function money(n: number | null | undefined): string {

@@ -7,10 +7,10 @@
  * advance cites evidence; this screen makes the criterion legible while working.
  */
 
-import Link from "next/link";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { listDeals, listStaleDeals , isConfigured } from "../lib/dal";
+import { AccountLink } from "../lib/modal";
 import { Card, Empty, PageHead } from "../lib/ui";
 
 export const dynamic = "force-dynamic";
@@ -81,17 +81,21 @@ export default async function Pipeline() {
                   <ul className="mt-3 flex flex-col gap-1">
                     {items.slice(0, 6).map((d) => (
                       <li key={d.id}>
-                        <Link
-                          href={`/nutribiotic/account/${d.account_id}`}
+                        <AccountLink
+                          id={d.account_id}
                           className="flex items-baseline justify-between gap-2 rounded px-1.5 py-1 text-[13px] transition-colors hover:bg-[#F4F2EA]"
                         >
                           <span className="min-w-0 flex-1 truncate">
                             {d.next_step ?? "no next step"}
                           </span>
                           {staleIds.has(d.id) && (
-                            <span className="shrink-0 text-[11px] text-[#A0762C]">late</span>
+                            <span
+                              className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#A0762C]"
+                              title="flagged for weekly review"
+                              aria-label="flagged for weekly review"
+                            />
                           )}
-                        </Link>
+                        </AccountLink>
                       </li>
                     ))}
                     {items.length > 6 && (
@@ -120,18 +124,18 @@ export default async function Pipeline() {
               <ul className="divide-y divide-[#EDEBE3] overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
                 {stale.data.map((s) => (
                   <li key={s.deal_id}>
-                    <Link
-                      href={`/nutribiotic/account/${s.account_id}`}
+                    <AccountLink
+                      id={s.account_id}
                       className="flex items-center gap-3 px-4 py-2.5 text-[13.5px] transition-colors hover:bg-[#FAF9F5]"
                     >
                       <span className="min-w-0 flex-1 truncate font-medium">{s.account_name}</span>
                       <span className="w-[92px] shrink-0 text-[12px] text-[#8A928C]">{s.stage}</span>
                       <span className="shrink-0 text-[12px] text-[#A0762C]">
                         {s.next_step_days_overdue != null && s.next_step_days_overdue > 0
-                          ? `${s.next_step_days_overdue}d late`
+                          ? `${s.next_step_days_overdue}d since next step`
                           : `${s.days_since_activity ?? "?"}d silent`}
                       </span>
-                    </Link>
+                    </AccountLink>
                   </li>
                 ))}
               </ul>
