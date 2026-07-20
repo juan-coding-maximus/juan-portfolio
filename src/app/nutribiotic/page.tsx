@@ -10,7 +10,7 @@
 import Link from "next/link";
 import { isConfigured, listCadenceDue, listStaleDeals, leadingDaily, listCalendarProposals } from "./lib/dal";
 import { AccountLink } from "./lib/modal";
-import { CalendarProposalRow, TouchpointCapture } from "./lib/touchpoint-ui";
+import { CalendarProposalRow, RecordVisit, TouchpointCapture } from "./lib/touchpoint-ui";
 import { Card, Confidence, Empty, Ico, PageHead, TierChip, daysAgo } from "./lib/ui";
 
 export const dynamic = "force-dynamic";
@@ -87,6 +87,7 @@ export default async function Today() {
           about to do, or a proposal waiting on your yes. */}
       <section className="mb-7">
         <TouchpointCapture />
+        <RecordVisit />
       </section>
 
       {proposals.data.length > 0 && (

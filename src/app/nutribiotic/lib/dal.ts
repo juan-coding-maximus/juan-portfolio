@@ -559,3 +559,84 @@ export async function setCalendarProposalStatus(
   );
   return row;
 }
+
+// ---------------------------------------------------------------------------
+// Voice-recorded visits. A rep taps Record instead of typing; the audio lands
+// in storage and rides the exact same recordTouchpoint() extraction once the
+// Mac-side transcriber (bridges/nutribiotic/visits.py, sharing bridges/lib/stt.py
+// with the JobHunt meetings recorder) has produced text. See migration 0012.
+// ---------------------------------------------------------------------------
+
+const VISIT_AUDIO_BUCKET = "nb-visit-audio";
+
+export type VisitRecording = {
+  id: string;
+  account_id_hint: string | null;
+  audio_path: string;
+  status: "uploaded" | "transcribed" | "processed" | "error";
+  transcript: string | null;
+  touchpoint_id: string | null;
+  error: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  created_at: string;
+};
+
+/** Uploads raw audio bytes to the private visit-audio bucket. Returns the storage path. */
+export async function uploadVisitAudio(bytes: ArrayBuffer, contentType: string, ext: string): Promise<string> {
+  if (!isConfigured()) throw new Error("Cannot upload audio: no data source configured.");
+  const path = `${new Date().toISOString().slice(0, 10)}/${Date.now().toString(36)}${Math.random()
+    .toString(36)
+    .slice(2, 6)}.${ext}`;
+
+  const res = await fetch(`${SB_URL}/storage/v1/object/${VISIT_AUDIO_BUCKET}/${path}`, {
+    method: "POST",
+    headers: {
+      apikey: SB_KEY,
+      Authorization: `Bearer ${SB_KEY}`,
+      "Content-Type": contentType,
+    },
+    body: bytes,
+  });
+  if (!res.ok) {
+    throw new Error(`Storage upload -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  }
+  return path;
+}
+
+export async function insertVisitRecording(input: {
+  account_id_hint: string | null;
+  audio_path: string;
+  started_at: string | null;
+  ended_at: string | null;
+}): Promise<VisitRecording> {
+  const [row] = await mutate<VisitRecording>("nb_visit_recordings", "POST", {
+    id: randId("vr"),
+    status: "uploaded",
+    ...input,
+  });
+  return row;
+}
+
+/** Not origin-tagged data (a processing-status row, not a CRM fact), so this bypasses
+ * query()'s origin machinery and fetches directly. */
+export async function getVisitRecording(id: string): Promise<VisitRecording | null> {
+  if (!isConfigured()) return null;
+  const res = await fetch(`${SB_URL}/rest/v1/nb_visit_recordings?select=*&id=eq.${id}&limit=1`, {
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Accept: "application/json" },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(`Supabase nb_visit_recordings -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  }
+  const rows = (await res.json()) as VisitRecording[];
+  return rows[0] ?? null;
+}
+
+export async function patchVisitRecording(
+  id: string,
+  patch: Partial<Pick<VisitRecording, "status" | "transcript" | "touchpoint_id" | "error">>,
+): Promise<VisitRecording> {
+  const [row] = await mutate<VisitRecording>("nb_visit_recordings", "PATCH", patch, { id: `eq.${id}` });
+  return row;
+}

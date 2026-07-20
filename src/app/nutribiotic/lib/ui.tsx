@@ -34,6 +34,8 @@ const ICONS: Record<string, ReactNode> = {
   ),
   facebook: <><rect x="2.4" y="2.4" width="11.2" height="11.2" rx="2.4" /><path d="M9.6 13V8.3h1.5l.3-1.9H9.6V5.2c0-.6.2-.9.9-.9h.9V2.5c-.2 0-.9-.1-1.5-.1-1.6 0-2.6.9-2.6 2.7v1.3H5.9v1.9h1.4V13" /></>,
   linkedin: <><rect x="2.4" y="2.4" width="11.2" height="11.2" rx="2.4" /><circle cx="5.4" cy="5.5" r="0.85" fill="currentColor" stroke="none" /><path d="M5.4 7.6V12M8.3 12V9.3c0-1.1.9-1.7 1.8-1.7s1.7.6 1.7 1.7V12M8.3 7.6V12" /></>,
+  mic: <><rect x="5.6" y="1.8" width="4.8" height="8" rx="2.4" /><path d="M3.2 7.6a4.8 4.8 0 0 0 9.6 0M8 12.4v1.8M5.8 14.2h4.4" /></>,
+  stop: <><rect x="3.2" y="3.2" width="9.6" height="9.6" rx="1.6" /></>,
 };
 
 export function Ico({ name, size = 16 }: { name: string; size?: number }) {

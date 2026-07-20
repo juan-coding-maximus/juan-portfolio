@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { decideCalendarProposal } from "./calendar-actions";
 import { recordTouchpoint, type RecordTouchpointResult } from "./touchpoint";
 import { Card, Ico } from "./ui";
@@ -144,5 +144,152 @@ export function CalendarProposalRow({ proposal }: { proposal: ProposalRowData })
         </button>
       </div>
     </li>
+  );
+}
+
+function mtMimeType(): string {
+  if (typeof MediaRecorder === "undefined") return "";
+  for (const m of ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"]) {
+    if (MediaRecorder.isTypeSupported(m)) return m;
+  }
+  return "";
+}
+
+function fmtTimer(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/**
+ * Voice capture, same fields as TouchpointCapture just spoken instead of
+ * typed: it uploads audio and files an nb_visit_recordings row (see
+ * dal.ts / migration 0012). bridges/nutribiotic/visits.py transcribes it on
+ * the Mac (reusing bridges/lib/stt.py, the JobHunt meetings recorder's own
+ * transcription module) and hands the text to /api/visits/transcript, which
+ * runs it through the exact same recordTouchpoint() extraction a typed note
+ * uses. Nothing here parses anything; this is capture only.
+ */
+export function RecordVisit({ accountIdHint }: { accountIdHint?: string | null }) {
+  const [state, setState] = useState<"idle" | "recording" | "uploading" | "done" | "error">("idle");
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [message, setMessage] = useState<string | null>(null);
+  const recRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const t0Ref = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  async function finish() {
+    if (timerRef.current) clearInterval(timerRef.current);
+    const startedAt = new Date(t0Ref.current).toISOString();
+    const endedAt = new Date().toISOString();
+    const mime = recRef.current?.mimeType || "audio/webm";
+    const blob = new Blob(chunksRef.current, { type: mime });
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    recRef.current = null;
+    streamRef.current = null;
+    chunksRef.current = [];
+
+    if (blob.size < 1000) {
+      setState("error");
+      setMessage("Recording was empty.");
+      return;
+    }
+
+    setState("uploading");
+    try {
+      const form = new FormData();
+      form.set("audio", blob, "visit");
+      form.set("started_at", startedAt);
+      form.set("ended_at", endedAt);
+      if (accountIdHint) form.set("account_id_hint", accountIdHint);
+      const res = await fetch("/nutribiotic/api/visits/upload", { method: "POST", body: form });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Upload failed.");
+      setState("done");
+      setMessage(
+        "Filed. The Mac transcribes it and runs it through the same parse a typed note gets, check back here for any follow-up to approve.",
+      );
+    } catch (err) {
+      setState("error");
+      setMessage(err instanceof Error ? err.message : "Upload failed.");
+    }
+  }
+
+  async function start() {
+    setMessage(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = mtMimeType();
+      const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      chunksRef.current = [];
+      t0Ref.current = Date.now();
+      rec.ondataavailable = (e) => {
+        if (e.data && e.data.size) chunksRef.current.push(e.data);
+      };
+      rec.onstop = finish;
+      recRef.current = rec;
+      streamRef.current = stream;
+      rec.start(1000);
+      setState("recording");
+      setElapsedMs(0);
+      timerRef.current = setInterval(() => setElapsedMs(Date.now() - t0Ref.current), 1000);
+    } catch {
+      setState("error");
+      setMessage("Microphone unavailable or permission denied.");
+    }
+  }
+
+  function stop() {
+    recRef.current?.stop();
+  }
+
+  const recording = state === "recording";
+
+  return (
+    <Card className="mt-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
+          <Ico name="mic" size={13} />
+          Or record the visit
+        </div>
+        {recording && <span className="text-[12.5px] tabular-nums text-[#8A6D2F]">{fmtTimer(elapsedMs)}</span>}
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-3">
+        <p className="max-w-[46ch] text-[11.5px] leading-snug text-[#8A928C]">
+          Recording others can require their consent. Tell whoever is in the room, and record only where you are
+          permitted. Audio is transcribed then deleted, only the text stays.
+        </p>
+        {recording ? (
+          <button
+            onClick={stop}
+            className="flex shrink-0 items-center gap-1.5 rounded-md bg-[#8A2E2E] px-3.5 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90"
+          >
+            <Ico name="stop" size={12} />
+            Stop
+          </button>
+        ) : (
+          <button
+            onClick={start}
+            disabled={state === "uploading"}
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-[#E2DFD5] px-3.5 py-2 text-[13px] font-medium text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] disabled:opacity-40"
+          >
+            <Ico name="mic" size={13} />
+            {state === "uploading" ? "Filing..." : "Record a visit"}
+          </button>
+        )}
+      </div>
+      {message && (
+        <div
+          className={`mt-3 rounded-md border px-3 py-2.5 text-[13px] leading-relaxed ${
+            state === "error"
+              ? "border-[#E5D9BF] bg-[#FBF6E9] text-[#8A6D2F]"
+              : "border-[#E2DFD5] bg-[#FAF9F5] text-[#3D4A44]"
+          }`}
+        >
+          {message}
+        </div>
+      )}
+    </Card>
   );
 }
