@@ -4,18 +4,17 @@
  * THE ONLY PLACE THIS APP TOUCHES SUPABASE. No page, no component, and no action
  * constructs a client of its own.
  *
- * Two reasons, both from Next 16's own docs shipped in node_modules:
+ * Per Next 16's `02-guides/data-security.md`: one data-fetching approach, one
+ * door, one place to audit.
  *
- *  1. `02-guides/authentication.md` recommends centralizing authorization in a
- *     DAL and warns that Proxy must NOT be the gate (it runs on every route
- *     including prefetches, so it may only read the cookie). `verifySession()`
- *     here, wrapped in React `cache()`, is the real gate and runs at the top of
- *     every query.
- *  2. `02-guides/data-security.md` warns against mixing data-fetching approaches.
- *     One door means one place to audit.
+ * ACCESS: open, by decision 2026-07-20. The PIN gate was removed outright (not
+ * just switched off) — anyone with the URL can read these pages. The noindex/
+ * no-frame headers in proxy.ts keep it out of search results, but they are not
+ * access control. If a gate is ever wanted again, rebuild it here in the DAL
+ * first (per Next's authentication guide), never in Proxy alone.
  *
  * KEY HANDLING: this holds the SERVICE-ROLE key, server-side only. The anon key
- * is never shipped to the browser at all. With a single PIN user, browser-side
+ * is never shipped to the browser at all. For a single-user tool, browser-side
  * RLS buys nothing, and a publishable key sitting on a public domain would be
  * pure liability. Consequence, accepted deliberately: no browser Realtime. The
  * route page polls instead.
@@ -29,8 +28,6 @@
 
 import "server-only";
 import { cache } from "react";
-import { redirect } from "next/navigation";
-import { hasValidSession } from "./session";
 
 const SB_URL = process.env.NB_SUPABASE_URL ?? "";
 const SB_KEY = process.env.NB_SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -61,24 +58,12 @@ export class MixedOriginError extends Error {
 
 export const isConfigured = (): boolean => Boolean(SB_URL && SB_KEY);
 
-/**
- * The real authorization gate. Called at the top of every query below.
- * `cache()` memoizes it for the duration of one render pass, per the Next 16
- * auth guide, so 8 queries on a page do not repeat the check 8 times.
- */
-export const verifySession = cache(async (): Promise<true> => {
-  if (!(await hasValidSession())) redirect("/nutribiotic/gate");
-  return true;
-});
-
 type QueryOpts = Record<string, string | number | undefined>;
 
 async function query<T extends { origin?: Origin }>(
   table: string,
   opts: QueryOpts = {},
 ): Promise<Result<T>> {
-  await verifySession();
-
   if (!isConfigured()) {
     // Degrade honestly. An unconfigured backend returns nothing; it never
     // fabricates a plausible-looking empty state that implies real emptiness.
@@ -115,11 +100,11 @@ async function query<T extends { origin?: Origin }>(
 }
 
 /**
- * The write half of the one door. Same gate, same key, same table namespace as
- * `query()`. Every write this app makes is Juan's own field data (an activity
- * he logged, a contact detail he stated, a calendar proposal he is about to
- * approve), never a fabricated fact, so there is no origin-mixing concern here
- * the way there is on reads: every row this writes is `origin: 'manual'`.
+ * The write half of the one door. Same key, same table namespace as `query()`.
+ * Every write this app makes is Juan's own field data (an activity he logged,
+ * a contact detail he stated, a calendar proposal he is about to approve),
+ * never a fabricated fact, so there is no origin-mixing concern here the way
+ * there is on reads: every row this writes is `origin: 'manual'`.
  */
 async function mutate<T>(
   table: string,
@@ -127,8 +112,6 @@ async function mutate<T>(
   body: unknown,
   opts: QueryOpts = {},
 ): Promise<T[]> {
-  await verifySession();
-
   if (!isConfigured()) {
     throw new Error(`Cannot write to "${table}": no data source configured.`);
   }
@@ -172,7 +155,6 @@ function randId(prefix: string): string {
  * screenshot, which is how these numbers actually escape into a conversation.
  */
 export const workspaceMode = cache(async (): Promise<Mode> => {
-  await verifySession();
   if (!isConfigured()) return "empty";
   const res = await query<{ origin: Origin }>("nb_accounts", { select: "origin", limit: 1 });
   return res.mode;

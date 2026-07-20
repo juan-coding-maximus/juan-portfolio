@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { isConfigured, workspaceMode } from "./lib/dal";
+import { isConfigured, listDrafts, workspaceMode } from "./lib/dal";
 import { ModalProvider } from "./lib/modal";
-import { hasValidSession } from "./lib/session";
 import { Ico } from "./lib/ui";
 
 export const metadata: Metadata = {
@@ -10,38 +9,34 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-// Every read is request-time and gated; nothing here may be statically cached.
+// Every read is request-time; nothing here may be statically cached.
 export const dynamic = "force-dynamic";
 
-const NAV = [
-  { href: "/nutribiotic", label: "Today", icon: "today" as const },
-  { href: "/nutribiotic/pipeline", label: "Pipeline", icon: "pipeline" as const },
-  { href: "/nutribiotic/accounts", label: "Accounts", icon: "accounts" as const },
-  { href: "/nutribiotic/route", label: "Route", icon: "route" as const },
-  { href: "/nutribiotic/outbound", label: "Outbound", icon: "outbound" as const },
-  { href: "/nutribiotic/support", label: "Support", icon: "support" as const },
-  { href: "/nutribiotic/metrics", label: "Metrics", icon: "metrics" as const },
+/* Nav consolidation, 2026-07-20. Seven tabs -> four. Pipeline merged into
+   Territory (it is a view over the same accounts, and with a pre-first-visit
+   territory a separate board was empty ceremony). Route and Support keep their
+   pages but leave the nav until their phases ship: a permanent nav item whose
+   screen says "not built" or holds a twice-a-month log is nav noise. They are
+   reachable from Today. Outbound is the approval gate, so it appears exactly
+   when something is waiting on a human and not before. Nav that grows as
+   phases land beats nav that promises them. */
+const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>["name"] }[] = [
+  { href: "/nutribiotic", label: "Today", icon: "today" },
+  { href: "/nutribiotic/accounts", label: "Territory", icon: "accounts" },
+  { href: "/nutribiotic/metrics", label: "Metrics", icon: "metrics" },
 ];
 
 export default async function NutribioticLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  // The layout must NOT be the gate.
-  //
-  // The gate page renders as a child of this layout, so any redirect-on-failure
-  // here bounces the gate to itself forever. (It did exactly that: /nutribiotic/gate
-  // returned a 307 to /nutribiotic/gate.) So this checks the session WITHOUT
-  // redirecting, and renders the unauthenticated view bare.
-  //
-  // Security is unaffected. The real gate is verifySession() inside the DAL, which
-  // runs at the top of every query, so a page rendered without this chrome still
-  // cannot read a single row.
-  if (!(await hasValidSession())) {
-    return <div className="min-h-screen bg-[#F7F6F1] text-[#14201B]">{children}</div>;
-  }
-
   const mode = await workspaceMode();
   const synthetic = mode === "synthetic";
+
+  const drafts = isConfigured() ? await listDrafts(1) : { data: [] };
+  const nav = [...NAV];
+  if (drafts.data.length > 0) {
+    nav.splice(2, 0, { href: "/nutribiotic/outbound", label: "Outbound", icon: "outbound" });
+  }
 
   return (
     <div className="min-h-screen bg-[#F7F6F1] text-[#14201B]">
@@ -82,7 +77,7 @@ export default async function NutribioticLayout({
             </div>
 
             <nav className="flex flex-col gap-0.5">
-              {NAV.map((n) => (
+              {nav.map((n) => (
                 <Link
                   key={n.href}
                   href={n.href}
@@ -94,8 +89,6 @@ export default async function NutribioticLayout({
               ))}
             </nav>
 
-            {/* No lock link: the PIN gate is off (NB_PIN unset). Set NB_PIN to
-                turn it back on and this returns with it. */}
           </aside>
 
           <main className="min-w-0 flex-1 px-5 py-7 md:px-9">{children}</main>

@@ -7,6 +7,7 @@
  * gets eaten when the day gets busy.
  */
 
+import Link from "next/link";
 import { isConfigured, listCadenceDue, listStaleDeals, leadingDaily, listCalendarProposals } from "./lib/dal";
 import { AccountLink } from "./lib/modal";
 import { CalendarProposalRow, TouchpointCapture } from "./lib/touchpoint-ui";
@@ -182,6 +183,19 @@ export default async function Today() {
           )}
         </section>
       </div>
+
+      {/* Route and Support left the nav in the 2026-07-20 consolidation but
+          keep their pages; this is their doorway until their phases ship. */}
+      <p className="mt-8 text-[12.5px] text-[#8A928C]">
+        Also here:{" "}
+        <Link href="/nutribiotic/route" className="underline underline-offset-2 hover:text-[#14201B]">
+          Route
+        </Link>{" "}
+        (planner, phase 7) ·{" "}
+        <Link href="/nutribiotic/support" className="underline underline-offset-2 hover:text-[#14201B]">
+          Support log
+        </Link>
+      </p>
     </>
   );
 }
