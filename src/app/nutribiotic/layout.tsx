@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { isConfigured, listDrafts, workspaceMode } from "./lib/dal";
-import { hasValidSession } from "./lib/session";
 import { Ico } from "./lib/ui";
 
 export const metadata: Metadata = {
@@ -9,7 +8,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-// Every read is request-time and gated; nothing here may be statically cached.
+// Every read is request-time; nothing here may be statically cached.
 export const dynamic = "force-dynamic";
 
 /* Nav consolidation, 2026-07-20. Seven tabs -> four. Pipeline merged into
@@ -29,20 +28,6 @@ const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>
 export default async function NutribioticLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  // The layout must NOT be the gate.
-  //
-  // The gate page renders as a child of this layout, so any redirect-on-failure
-  // here bounces the gate to itself forever. (It did exactly that: /nutribiotic/gate
-  // returned a 307 to /nutribiotic/gate.) So this checks the session WITHOUT
-  // redirecting, and renders the unauthenticated view bare.
-  //
-  // Security is unaffected. The real gate is verifySession() inside the DAL, which
-  // runs at the top of every query, so a page rendered without this chrome still
-  // cannot read a single row.
-  if (!(await hasValidSession())) {
-    return <div className="min-h-screen bg-[#F7F6F1] text-[#14201B]">{children}</div>;
-  }
-
   const mode = await workspaceMode();
   const synthetic = mode === "synthetic";
 
@@ -102,8 +87,6 @@ export default async function NutribioticLayout({
               ))}
             </nav>
 
-            {/* No lock link: the PIN gate is off (NB_PIN unset). Set NB_PIN to
-                turn it back on and this returns with it. */}
           </aside>
 
           <main className="min-w-0 flex-1 px-5 py-7 md:px-9">{children}</main>
