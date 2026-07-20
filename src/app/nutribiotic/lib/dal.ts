@@ -91,10 +91,15 @@ async function query<T extends { origin?: Origin }>(
   const data = (await res.json()) as T[];
   const origins = [...new Set(data.map((r) => r.origin).filter(Boolean))] as Origin[];
 
-  if (origins.length > 1) throw new MixedOriginError(table, origins);
+  // The guarantee this guards is specifically synthetic-vs-real (a synthetic row
+  // reading as real because it sits next to one). It is not a rule against real
+  // data having more than one real origin: 'enriched' (the seeded/researched
+  // accounts) and 'manual' (what Juan logs by hand, e.g. a touchpoint) are both
+  // real, and a daily rollup view legitimately returns rows in both.
+  if (origins.includes("synthetic") && origins.length > 1) throw new MixedOriginError(table, origins);
 
   const mode: Mode =
-    origins.length === 0 ? "empty" : origins[0] === "synthetic" ? "synthetic" : "real";
+    origins.length === 0 ? "empty" : origins.includes("synthetic") ? "synthetic" : "real";
 
   return { mode, data, origins };
 }
