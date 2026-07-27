@@ -640,3 +640,191 @@ export async function patchVisitRecording(
   const [row] = await mutate<VisitRecording>("nb_visit_recordings", "PATCH", patch, { id: `eq.${id}` });
   return row;
 }
+
+// ---------------------------------------------------------------------------
+// Import review · the human gate between a CSV and the territory
+//
+// bridges/nutribiotic/import_data.py writes proposals here and refuses to go
+// further; bridges/nutribiotic/promote_import.py applies only what has already
+// been decided. This is the screen in between, and without it the decision had
+// nowhere to be made and the import path dead-ended.
+//
+// Import rows carry no `origin` column, and correctly so: a proposal is not yet
+// a fact about the territory, it is a claim from a file. So these bypass
+// query()'s origin machinery the same way getVisitRecording does.
+// ---------------------------------------------------------------------------
+
+export type ImportDecision = "pending" | "merge" | "create" | "reject" | "duplicate";
+
+export type ImportRow = {
+  id: number;
+  batch_id: string;
+  raw: Record<string, string>;
+  match_account_id: string | null;
+  match_score: number | null;
+  match_basis: { hint?: string; why?: string } & Record<string, unknown>;
+  decision: ImportDecision;
+  decided_at: string | null;
+  decided_by: string | null;
+  applied_at: string | null;
+  applied_account_id: string | null;
+  applied_note: string | null;
+};
+
+export type ImportBatch = {
+  id: string;
+  source: string;
+  filename: string | null;
+  row_count: number | null;
+  loaded_at: string;
+};
+
+async function raw<T>(path: string): Promise<T[]> {
+  if (!isConfigured()) return [];
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Accept: "application/json" },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(`Supabase ${path} -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  }
+  return (await res.json()) as T[];
+}
+
+export async function listImportBatches(): Promise<ImportBatch[]> {
+  return raw<ImportBatch>("nb_import_batches?select=*&order=loaded_at.desc&limit=50");
+}
+
+/**
+ * The review queue. Undecided rows first, because they are the only ones that
+ * need a human; within those, the matcher's least confident calls lead, since a
+ * decisive phone match needs a glance and an ambiguous one needs thought.
+ */
+export async function listImportRows(batchId?: string, limit = 400): Promise<ImportRow[]> {
+  const scope = batchId ? `&batch_id=eq.${encodeURIComponent(batchId)}` : "";
+  return raw<ImportRow>(
+    `nb_import_rows?select=*${scope}&order=decision.asc,match_score.asc.nullsfirst&limit=${limit}`,
+  );
+}
+
+export async function countPendingImports(): Promise<number> {
+  const rows = await raw<{ id: number }>(
+    "nb_import_rows?select=id&decision=eq.pending&limit=1000",
+  );
+  return rows.length;
+}
+
+/**
+ * Record a decision. DOES NOT APPLY IT.
+ *
+ * The write here is exactly one column plus its audit stamps. Nothing reaches
+ * nb_accounts until promote_import.py runs, which keeps the destructive step
+ * (a merge that fuses two stores' histories) behind a deliberate command rather
+ * than behind a button that could be clicked by accident on a phone in a car.
+ */
+export async function setImportDecision(
+  id: number,
+  decision: ImportDecision,
+): Promise<void> {
+  await mutate<ImportRow>(
+    "nb_import_rows",
+    "PATCH",
+    {
+      decision,
+      decided_at: decision === "pending" ? null : new Date().toISOString(),
+      decided_by: decision === "pending" ? null : "juan",
+    },
+    { id: `eq.${id}`, applied_at: "is.null" },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Region search · st_dwithin over nb_accounts.geo (see migration 0014)
+// ---------------------------------------------------------------------------
+
+export type NearbyAccount = {
+  id: string;
+  name: string;
+  dba: string | null;
+  channel: string;
+  street: string | null;
+  city: string | null;
+  state: string | null;
+  postal: string | null;
+  lat: number | null;
+  lng: number | null;
+  phone: string | null;
+  website: string | null;
+  lifecycle: string;
+  last_order_at: string | null;
+  expected_reorder_at: string | null;
+  do_not_visit: boolean;
+  quirks: string | null;
+  origin: Origin;
+  distance_m: number;
+  tier: "A" | "B" | "C" | "D" | null;
+  fit: number | null;
+  engagement: number | null;
+};
+
+/**
+ * The trip regions. Coordinates are city centres, and the radius is a travel
+ * envelope rather than a claim about a boundary: 25km from downtown Santa Cruz
+ * covers Capitola, Soquel, Aptos and Scotts Valley, which is one working day's
+ * driving. San Francisco is tighter because the city is dense and the bridge is
+ * the real cost.
+ */
+export const REGIONS = {
+  "santa-cruz": { label: "Santa Cruz", lat: 36.9741, lng: -122.0308, radiusM: 25000 },
+  "san-francisco": { label: "San Francisco", lat: 37.7749, lng: -122.4194, radiusM: 20000 },
+} as const;
+
+export type RegionKey = keyof typeof REGIONS;
+
+export function isRegionKey(v: string | undefined): v is RegionKey {
+  return v !== undefined && Object.prototype.hasOwnProperty.call(REGIONS, v);
+}
+
+/**
+ * Accounts within a region, nearest first.
+ *
+ * An account with no coordinates does not appear here at all. That is
+ * deliberate and is the read-side half of geocode.py's refusal to write
+ * approximate pins: a store missing from the list is visibly missing and
+ * prompts a fix, whereas one placed at a postal centroid quietly reorders the
+ * day and sends Juan to the wrong block.
+ */
+export async function listAccountsInRegion(region: RegionKey): Promise<Result<NearbyAccount>> {
+  const r = REGIONS[region];
+  return query<NearbyAccount>("rpc/nb_accounts_near", {
+    p_lat: r.lat,
+    p_lng: r.lng,
+    p_radius_m: r.radiusM,
+  });
+}
+
+/** How many accounts each region can actually route, for the picker. */
+export async function regionCounts(): Promise<Record<RegionKey, number>> {
+  const keys = Object.keys(REGIONS) as RegionKey[];
+  const counts = await Promise.all(
+    keys.map(async (k) => {
+      try {
+        return (await listAccountsInRegion(k)).data.length;
+      } catch {
+        return 0;
+      }
+    }),
+  );
+  return Object.fromEntries(keys.map((k, i) => [k, counts[i]])) as Record<RegionKey, number>;
+}
+
+/**
+ * How many accounts cannot appear in ANY region view because they have no
+ * coordinates. Surfaced next to a region list so a short list reads as
+ * "incomplete data" rather than "small territory", which is the difference
+ * between fixing an address and planning half a day.
+ */
+export async function countWithoutCoordinates(): Promise<number> {
+  const rows = await raw<{ id: string }>("nb_accounts?select=id&lat=is.null&limit=5000");
+  return rows.length;
+}

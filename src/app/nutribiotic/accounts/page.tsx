@@ -19,9 +19,20 @@
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { listAccounts, listDeals, listStaleDeals, isConfigured } from "../lib/dal";
+import Link from "next/link";
+import {
+  REGIONS,
+  isRegionKey,
+  listAccounts,
+  listAccountsInRegion,
+  countWithoutCoordinates,
+  listDeals,
+  listStaleDeals,
+  isConfigured,
+  type RegionKey,
+} from "../lib/dal";
 import { AccountLink } from "../lib/modal";
-import { Card, Confidence, Empty, PageHead, TierChip } from "../lib/ui";
+import { Card, Confidence, Empty, Ico, PageHead, TierChip } from "../lib/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +52,14 @@ async function loadCriteria(): Promise<Criterion[]> {
 
 const ORDER = ["identified", "contacted", "discovery", "sampled", "trial", "stocked", "reordered"];
 
-export default async function Territory() {
+export default async function Territory({
+  searchParams,
+}: {
+  searchParams: Promise<{ region?: string }>;
+}) {
+  const sp = await searchParams;
+  const region: RegionKey | null = isRegionKey(sp.region) ? sp.region : null;
+
   const [accounts, deals, stale, criteria] = await Promise.all([
     listAccounts(),
     listDeals(),
@@ -49,6 +67,17 @@ export default async function Territory() {
     loadCriteria(),
   ]);
   const rows = accounts.data;
+
+  /* Region view. Same accounts, a different question: not "who is worth the most"
+     but "who can I physically reach on this trip". So it is ordered by distance
+     rather than by tier, and tier rides along as a column.
+
+     Accounts without coordinates are ABSENT here, not sorted last. That is the
+     read-side consequence of geocode.py refusing to write approximate pins, and
+     the count of them is shown explicitly, because a silently short list is the
+     failure mode that would send Juan out with half a day planned. */
+  const near = region ? await listAccountsInRegion(region) : null;
+  const ungeocoded = region ? await countWithoutCoordinates() : 0;
 
   const byTier = { A: 0, B: 0, C: 0, D: 0 } as Record<string, number>;
   let lowConf = 0;
@@ -69,8 +98,42 @@ export default async function Territory() {
     <>
       <PageHead
         title="Territory"
-        sub="Sorted by tier, then by how much we actually know. An account we know nothing about does not get to sit at the top of the list because its one measured input happened to be high."
+        sub={
+          region
+            ? `Accounts within ${(REGIONS[region].radiusM / 1000).toFixed(0)}km of ${REGIONS[region].label}, nearest first. This is a trip list, so it is ordered by drive rather than by rank.`
+            : "Sorted by tier, then by how much we actually know. An account we know nothing about does not get to sit at the top of the list because its one measured input happened to be high."
+        }
       />
+
+      {/* Region presets. Not a general geographic filter: these are the two
+          places with a trip planned, and a picker that offered every city would
+          be a configuration screen rather than a shortcut. */}
+      <div className="mb-5 flex flex-wrap gap-1.5">
+        <Link
+          href="/nutribiotic/accounts"
+          className={`rounded-md border px-2.5 py-1 text-[12.5px] ${
+            !region
+              ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
+              : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
+          }`}
+        >
+          All accounts
+        </Link>
+        {(Object.keys(REGIONS) as RegionKey[]).map((k) => (
+          <Link
+            key={k}
+            href={`/nutribiotic/accounts?region=${k}`}
+            className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] ${
+              region === k
+                ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
+                : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
+            }`}
+          >
+            <Ico name="pin" size={13} />
+            {REGIONS[k].label}
+          </Link>
+        ))}
+      </div>
 
       {/* The pipeline, only once it exists. A stage is an observable fact about
           the buyer, not a feeling about the deal; advancing one requires citing
@@ -130,7 +193,81 @@ export default async function Territory() {
         </section>
       )}
 
-      {rows.length === 0 ? (
+      {region ? (
+        <>
+          {ungeocoded > 0 && (
+            <p className="mb-4 flex items-start gap-1.5 text-[13px] text-[#A0762C]">
+              <Ico name="alert" size={14} />
+              <span>
+                {ungeocoded} account{ungeocoded === 1 ? " has" : "s have"} no coordinates and cannot
+                appear in any region. Run{" "}
+                <code className="rounded bg-[#F3EFE3] px-1 py-0.5 text-[12.5px]">
+                  python3 bridges/nutribiotic/geocode.py --write
+                </code>{" "}
+                to place them. They are missing here rather than guessed at.
+              </span>
+            </p>
+          )}
+
+          {(near?.data.length ?? 0) === 0 ? (
+            <Empty>
+              No accounts within {(REGIONS[region].radiusM / 1000).toFixed(0)}km of{" "}
+              {REGIONS[region].label}
+              {ungeocoded > 0
+                ? ". Every account still lacking coordinates is excluded, so geocode first before concluding the region is empty."
+                : ". Import the region's accounts, then geocode them."}
+            </Empty>
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
+              <table className="w-full text-[13.5px]">
+                <thead>
+                  <tr className="border-b border-[#E2DFD5] text-left text-[11px] uppercase tracking-[0.12em] text-[#8A928C]">
+                    <th className="px-4 py-2.5 font-medium">Tier</th>
+                    <th className="px-4 py-2.5 font-medium">Account</th>
+                    <th className="px-4 py-2.5 font-medium">City</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Distance</th>
+                    <th className="px-4 py-2.5 font-medium">State</th>
+                    <th className="px-4 py-2.5 font-medium">Reorder due</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#EDEBE3]">
+                  {near!.data.map((a) => (
+                    <tr
+                      key={a.id}
+                      className={`transition-colors hover:bg-[#FAF9F5] ${
+                        a.do_not_visit ? "opacity-45" : ""
+                      }`}
+                    >
+                      <td className="px-4 py-2.5">
+                        <TierChip tier={a.tier} />
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <AccountLink
+                          id={a.id}
+                          className="font-medium underline-offset-2 hover:underline"
+                        >
+                          {a.name}
+                        </AccountLink>
+                        {a.do_not_visit && (
+                          <span className="ml-2 text-[11.5px] text-[#A0762C]">do not visit</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-[#5B6560]">{a.city ?? "-"}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-[#5B6560]">
+                        {(a.distance_m / 1000).toFixed(1)} km
+                      </td>
+                      <td className="px-4 py-2.5 text-[#5B6560]">{a.lifecycle}</td>
+                      <td className="px-4 py-2.5 text-[#5B6560]">
+                        {a.expected_reorder_at ?? "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      ) : rows.length === 0 ? (
         <Empty>
           {!isConfigured()
             ? "No data source configured."

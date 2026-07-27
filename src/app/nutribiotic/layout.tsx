@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { isConfigured, listDrafts, workspaceMode } from "./lib/dal";
+import { countPendingImports, isConfigured, listDrafts, workspaceMode } from "./lib/dal";
 import { ModalProvider } from "./lib/modal";
 import { Ico } from "./lib/ui";
 
@@ -36,6 +36,15 @@ export default async function NutribioticLayout({
   const nav = [...NAV];
   if (drafts.data.length > 0) {
     nav.splice(2, 0, { href: "/nutribiotic/outbound", label: "Outbound", icon: "outbound" });
+  }
+
+  /* Review appears on the same rule as Outbound: exactly when something is
+     waiting on a human, and not before. An import is episodic (a HubSpot export,
+     a legacy spreadsheet), so a permanent tab would sit empty for weeks and
+     train the eye to skip it, which is the opposite of what a gate needs. */
+  const pendingImports = isConfigured() ? await countPendingImports() : 0;
+  if (pendingImports > 0) {
+    nav.splice(2, 0, { href: "/nutribiotic/review", label: "Review", icon: "review" });
   }
 
   return (
