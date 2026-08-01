@@ -856,13 +856,20 @@ export type MapAccount = {
  * same reason listAccountsInRegion excludes it, and an account owned by someone
  * else never appears on Juan's map no matter how well it is geocoded.
  *
- * tier is not a column on nb_accounts (0004's nb_v_account_tier computes it
- * from the fit/engagement scores), so it is fetched separately and joined
+ * The map's "tier" is POTENTIAL (nb_v_account_potential: store type, chain
+ * size, lifetime spend), not the fit x engagement tier the accounts list and
+ * cadence screens use. Deliberately: fit x engagement collapses every
+ * unresearched, unvisited account near zero, which is correct for ROUTE
+ * PRIORITY but reads as "everything is a D" on a map whose job is to show
+ * which unvisited stores are worth driving to. Potential is measured from
+ * facts (store type, locations, spend) that do not require a visit yet.
+ *
+ * tier is not a column on nb_accounts, so it is fetched separately and joined
  * here rather than embedded in the query() call above, which only ever reads
  * one table.
  */
 export async function listOwnerAccounts(ownerName = "Juan Arenas Martin"): Promise<Result<MapAccount>> {
-  const [result, tiers] = await Promise.all([
+  const [result, grades] = await Promise.all([
     query<Omit<MapAccount, "tier">>("nb_accounts", {
       select:
         "id,name,street,city,state,postal,lat,lng,phone,channel,lifecycle,do_not_visit,hubspot_company_id,origin",
@@ -871,9 +878,11 @@ export async function listOwnerAccounts(ownerName = "Juan Arenas Martin"): Promi
       order: "name.asc",
       limit: 1000,
     }),
-    raw<{ account_id: string; tier: Tier }>("nb_v_account_tier?select=account_id,tier&limit=1000"),
+    raw<{ account_id: string; potential_grade: Tier }>(
+      "nb_v_account_potential?select=account_id,potential_grade&limit=1000",
+    ),
   ]);
-  const tierById = new Map(tiers.map((t) => [t.account_id, t.tier]));
+  const tierById = new Map(grades.map((t) => [t.account_id, t.potential_grade]));
   return {
     ...result,
     data: result.data.map((a) => ({ ...a, tier: tierById.get(a.id) ?? null })),

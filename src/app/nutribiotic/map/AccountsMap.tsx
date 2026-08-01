@@ -196,7 +196,7 @@ export function AccountsMap({ accounts }: { accounts: MapAccount[] }) {
                   </div>
                 )}
                 <div className="mt-1 flex items-center gap-2 text-[11.5px] uppercase tracking-[0.1em] text-[#8A928C]">
-                  {selected.tier && <span>tier {selected.tier}</span>}
+                  {selected.tier && <span>potential {selected.tier}</span>}
                   <span>{selected.channel}</span>
                   <span>·</span>
                   <span>{selected.lifecycle}</span>
