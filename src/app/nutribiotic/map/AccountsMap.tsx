@@ -18,7 +18,7 @@ import { AccountLink } from "../lib/modal";
 
 const CONTAINER_STYLE = { width: "100%", height: "100%" };
 
-const TIERS: Tier[] = ["A", "B", "C", "D"];
+const TIERS: Tier[] = ["A", "B", "C", "D", "E", "F", "G"];
 
 // Portal 148711228 is EU-hosted, so the record host is app-eu1, not the
 // app.hubspot.com in every generic doc example. Same URL shape already used
@@ -53,7 +53,7 @@ export function AccountsMap({ accounts }: { accounts: MapAccount[] }) {
   const mapRef = useRef<google.maps.Map | null>(null);
 
   const tierCounts = useMemo(() => {
-    const counts: Record<Tier, number> = { A: 0, B: 0, C: 0, D: 0 };
+    const counts: Record<Tier, number> = { A: 0, B: 0, C: 0, D: 0, E: 0, F: 0, G: 0 };
     for (const a of accounts) if (a.tier) counts[a.tier] += 1;
     return counts;
   }, [accounts]);

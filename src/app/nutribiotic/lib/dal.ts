@@ -829,7 +829,12 @@ export async function countWithoutCoordinates(): Promise<number> {
   return rows.length;
 }
 
-export type Tier = "A" | "B" | "C" | "D";
+// A-G, matching HQ's own potential scale in HubSpot (potential__cloned_).
+// Was A-D while the OS computed its own grade from a 0-100 score; since
+// 0021 the letter comes straight from nb_accounts.potential_hq, and a
+// narrower type silently dropped every E, F and G account out of the map's
+// tier filter while still drawing its pin.
+export type Tier = "A" | "B" | "C" | "D" | "E" | "F" | "G";
 
 export type MapAccount = {
   id: string;
