@@ -23,6 +23,7 @@ export const dynamic = "force-dynamic";
 const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>["name"] }[] = [
   { href: "/nutribiotic", label: "Today", icon: "today" },
   { href: "/nutribiotic/accounts", label: "Territory", icon: "accounts" },
+  { href: "/nutribiotic/map", label: "Map", icon: "pin" },
   /* Plan earns its nav slot on the rule above: it holds the approved SoCal month
      and the briefed field days, content Juan opens every driving day. It is the
      static plan, not the phase-7 planner (which stays out of nav at ./route). */

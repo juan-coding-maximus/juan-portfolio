@@ -828,3 +828,45 @@ export async function countWithoutCoordinates(): Promise<number> {
   const rows = await raw<{ id: string }>("nb_accounts?select=id&lat=is.null&limit=5000");
   return rows.length;
 }
+
+export type MapAccount = {
+  id: string;
+  name: string;
+  street: string | null;
+  city: string | null;
+  state: string | null;
+  postal: string | null;
+  lat: number;
+  lng: number;
+  phone: string | null;
+  channel: string;
+  lifecycle: string;
+  do_not_visit: boolean;
+  origin: Origin;
+};
+
+/**
+ * Every account owned by `ownerName` in HubSpot that ALSO has a Places-verified
+ * pin (see geocode.py's corroboration rule). Both conditions are real filters,
+ * not display filters: an account with no coordinates is excluded here for the
+ * same reason listAccountsInRegion excludes it, and an account owned by someone
+ * else never appears on Juan's map no matter how well it is geocoded.
+ */
+export async function listOwnerAccounts(ownerName = "Juan Arenas Martin"): Promise<Result<MapAccount>> {
+  return query<MapAccount>("nb_accounts", {
+    select:
+      "id,name,street,city,state,postal,lat,lng,phone,channel,lifecycle,do_not_visit,origin",
+    owner_name: `eq.${ownerName}`,
+    lat: "not.is.null",
+    order: "name.asc",
+    limit: 1000,
+  });
+}
+
+/** How many of ownerName's accounts exist locally but have no verified pin yet. */
+export async function countOwnerWithoutCoordinates(ownerName = "Juan Arenas Martin"): Promise<number> {
+  const rows = await raw<{ id: string }>(
+    `nb_accounts?select=id&owner_name=eq.${encodeURIComponent(ownerName)}&lat=is.null&limit=5000`,
+  );
+  return rows.length;
+}
