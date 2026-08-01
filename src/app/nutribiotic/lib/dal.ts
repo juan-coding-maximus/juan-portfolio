@@ -829,6 +829,8 @@ export async function countWithoutCoordinates(): Promise<number> {
   return rows.length;
 }
 
+export type Tier = "A" | "B" | "C" | "D";
+
 export type MapAccount = {
   id: string;
   name: string;
@@ -842,6 +844,8 @@ export type MapAccount = {
   channel: string;
   lifecycle: string;
   do_not_visit: boolean;
+  hubspot_company_id: string | null;
+  tier: Tier | null;
   origin: Origin;
 };
 
@@ -851,16 +855,29 @@ export type MapAccount = {
  * not display filters: an account with no coordinates is excluded here for the
  * same reason listAccountsInRegion excludes it, and an account owned by someone
  * else never appears on Juan's map no matter how well it is geocoded.
+ *
+ * tier is not a column on nb_accounts (0004's nb_v_account_tier computes it
+ * from the fit/engagement scores), so it is fetched separately and joined
+ * here rather than embedded in the query() call above, which only ever reads
+ * one table.
  */
 export async function listOwnerAccounts(ownerName = "Juan Arenas Martin"): Promise<Result<MapAccount>> {
-  return query<MapAccount>("nb_accounts", {
-    select:
-      "id,name,street,city,state,postal,lat,lng,phone,channel,lifecycle,do_not_visit,origin",
-    owner_name: `eq.${ownerName}`,
-    lat: "not.is.null",
-    order: "name.asc",
-    limit: 1000,
-  });
+  const [result, tiers] = await Promise.all([
+    query<Omit<MapAccount, "tier">>("nb_accounts", {
+      select:
+        "id,name,street,city,state,postal,lat,lng,phone,channel,lifecycle,do_not_visit,hubspot_company_id,origin",
+      owner_name: `eq.${ownerName}`,
+      lat: "not.is.null",
+      order: "name.asc",
+      limit: 1000,
+    }),
+    raw<{ account_id: string; tier: Tier }>("nb_v_account_tier?select=account_id,tier&limit=1000"),
+  ]);
+  const tierById = new Map(tiers.map((t) => [t.account_id, t.tier]));
+  return {
+    ...result,
+    data: result.data.map((a) => ({ ...a, tier: tierById.get(a.id) ?? null })),
+  };
 }
 
 /** How many of ownerName's accounts exist locally but have no verified pin yet. */

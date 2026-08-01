@@ -11,12 +11,21 @@
  * secrecy. See SETUP.md for how it was created.
  */
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GoogleMap, MarkerF, InfoWindowF, useLoadScript } from "@react-google-maps/api";
-import type { MapAccount } from "../lib/dal";
+import type { MapAccount, Tier } from "../lib/dal";
 import { AccountLink } from "../lib/modal";
 
 const CONTAINER_STYLE = { width: "100%", height: "100%" };
+
+const TIERS: Tier[] = ["A", "B", "C", "D"];
+
+// Portal 148711228 is EU-hosted, so the record host is app-eu1, not the
+// app.hubspot.com in every generic doc example. Same URL shape already used
+// for company deep-links in bridges/nutribiotic/portal_duplicates.py. 0-2 is
+// HubSpot's own object type id for companies, not something this app assigns.
+const HUBSPOT_COMPANY_URL = (hubspotId: string) =>
+  `https://app-eu1.hubspot.com/contacts/148711228/record/0-2/${hubspotId}`;
 
 // Muted / desaturated, so the map reads as one system with the rest of the
 // editorial UI rather than Google's default saturated red-blue-green.
@@ -38,18 +47,51 @@ export function AccountsMap({ accounts }: { accounts: MapAccount[] }) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const { isLoaded, loadError } = useLoadScript({ googleMapsApiKey: apiKey ?? "" });
   const [selected, setSelected] = useState<MapAccount | null>(null);
+  // Empty set reads as "no filter", not "nothing matches" -- the default view
+  // is every pin, same as the map before tiers existed on it.
+  const [activeTiers, setActiveTiers] = useState<Set<Tier>>(new Set());
   const mapRef = useRef<google.maps.Map | null>(null);
 
-  const onLoad = useCallback(
-    (map: google.maps.Map) => {
-      mapRef.current = map;
-      if (accounts.length === 0) return;
-      const bounds = new google.maps.LatLngBounds();
-      for (const a of accounts) bounds.extend({ lat: a.lat, lng: a.lng });
-      map.fitBounds(bounds, 48);
-    },
-    [accounts],
+  const tierCounts = useMemo(() => {
+    const counts: Record<Tier, number> = { A: 0, B: 0, C: 0, D: 0 };
+    for (const a of accounts) if (a.tier) counts[a.tier] += 1;
+    return counts;
+  }, [accounts]);
+
+  const filtered = useMemo(
+    () => (activeTiers.size === 0 ? accounts : accounts.filter((a) => a.tier && activeTiers.has(a.tier))),
+    [accounts, activeTiers],
   );
+
+  function toggleTier(t: Tier) {
+    setSelected(null);
+    setActiveTiers((prev) => {
+      const next = new Set(prev);
+      if (next.has(t)) next.delete(t);
+      else next.add(t);
+      return next;
+    });
+  }
+
+  const [mapReady, setMapReady] = useState(false);
+  const onLoad = useCallback((map: google.maps.Map) => {
+    mapRef.current = map;
+    setMapReady(true);
+  }, []);
+
+  // Refits on the map becoming ready AND whenever the FILTERED set changes
+  // after that, so narrowing to one tier re-centers on those pins instead of
+  // leaving the viewport framed for a set that is mostly no longer shown.
+  // mapReady is in the dependency list because mapRef.current mutating does
+  // NOT itself trigger a re-render, so without it this effect's first run
+  // (while the map is still loading) would find a null ref and never retry.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || filtered.length === 0) return;
+    const bounds = new google.maps.LatLngBounds();
+    for (const a of filtered) bounds.extend({ lat: a.lat, lng: a.lng });
+    map.fitBounds(bounds, 48);
+  }, [filtered, mapReady]);
 
   if (!apiKey) {
     return (
@@ -82,56 +124,109 @@ export function AccountsMap({ accounts }: { accounts: MapAccount[] }) {
   }
 
   return (
-    <GoogleMap
-      mapContainerStyle={CONTAINER_STYLE}
-      onLoad={onLoad}
-      options={{
-        styles: MAP_STYLE,
-        disableDefaultUI: true,
-        zoomControl: true,
-        streetViewControl: false,
-        fullscreenControl: true,
-      }}
-    >
-      {accounts.map((a) => (
-        <MarkerF
-          key={a.id}
-          position={{ lat: a.lat, lng: a.lng }}
-          opacity={a.do_not_visit ? 0.45 : 1}
-          onClick={() => setSelected(a)}
-        />
-      ))}
-
-      {selected && (
-        <InfoWindowF
-          position={{ lat: selected.lat, lng: selected.lng }}
-          onCloseClick={() => setSelected(null)}
-        >
-          <div className="min-w-[180px] max-w-[240px] p-1 text-[13px] text-[#14201B]">
-            <div className="font-semibold">{selected.name}</div>
-            {selected.street && (
-              <div className="mt-0.5 text-[12px] text-[#5B6560]">
-                {selected.street}
-                {selected.city ? `, ${selected.city}` : ""}
-              </div>
-            )}
-            <div className="mt-1 flex items-center gap-2 text-[11.5px] uppercase tracking-[0.1em] text-[#8A928C]">
-              <span>{selected.channel}</span>
-              <span>·</span>
-              <span>{selected.lifecycle}</span>
-            </div>
-            {selected.do_not_visit && (
-              <div className="mt-1 text-[11.5px] text-[#A0762C]">do not visit</div>
-            )}
-            <AccountLink
-              id={selected.id}
-              className="mt-2 inline-block text-[12.5px] font-medium underline-offset-2 hover:underline"
+    <div className="flex h-full flex-col">
+      {/* Tier filter, multi-select. Empty selection means unfiltered rather
+          than empty, so clicking a letter narrows and clicking it again
+          widens back out -- there is no separate "all" button to hunt for. */}
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-[#E2DFD5] bg-white px-3 py-2">
+        {TIERS.map((t) => {
+          const active = activeTiers.has(t);
+          return (
+            <button
+              key={t}
+              type="button"
+              onClick={() => toggleTier(t)}
+              aria-pressed={active}
+              className={`rounded-md border px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
+                active
+                  ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
+                  : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
+              }`}
             >
-              View account
-            </AccountLink>
-          </div>
-        </InfoWindowF>
-      )}
-    </GoogleMap>
+              {t} <span className="tabular-nums opacity-70">{tierCounts[t]}</span>
+            </button>
+          );
+        })}
+        {activeTiers.size > 0 && (
+          <button
+            type="button"
+            onClick={() => setActiveTiers(new Set())}
+            className="rounded-md px-2 py-1 text-[12.5px] text-[#8A928C] underline-offset-2 hover:text-[#3D4A44] hover:underline"
+          >
+            clear
+          </button>
+        )}
+        <span className="ml-auto text-[12px] text-[#8A928C]">
+          {filtered.length} of {accounts.length}
+        </span>
+      </div>
+
+      <div className="min-h-0 flex-1">
+        <GoogleMap
+          mapContainerStyle={CONTAINER_STYLE}
+          onLoad={onLoad}
+          options={{
+            styles: MAP_STYLE,
+            disableDefaultUI: true,
+            zoomControl: true,
+            streetViewControl: false,
+            fullscreenControl: true,
+          }}
+        >
+          {filtered.map((a) => (
+            <MarkerF
+              key={a.id}
+              position={{ lat: a.lat, lng: a.lng }}
+              opacity={a.do_not_visit ? 0.45 : 1}
+              onClick={() => setSelected(a)}
+            />
+          ))}
+
+          {selected && (
+            <InfoWindowF
+              position={{ lat: selected.lat, lng: selected.lng }}
+              onCloseClick={() => setSelected(null)}
+            >
+              <div className="min-w-[180px] max-w-[240px] p-1 text-[13px] text-[#14201B]">
+                <div className="font-semibold">{selected.name}</div>
+                {selected.street && (
+                  <div className="mt-0.5 text-[12px] text-[#5B6560]">
+                    {selected.street}
+                    {selected.city ? `, ${selected.city}` : ""}
+                  </div>
+                )}
+                <div className="mt-1 flex items-center gap-2 text-[11.5px] uppercase tracking-[0.1em] text-[#8A928C]">
+                  {selected.tier && <span>tier {selected.tier}</span>}
+                  <span>{selected.channel}</span>
+                  <span>·</span>
+                  <span>{selected.lifecycle}</span>
+                </div>
+                {selected.do_not_visit && (
+                  <div className="mt-1 text-[11.5px] text-[#A0762C]">do not visit</div>
+                )}
+                <div className="mt-2 flex items-center gap-3">
+                  <AccountLink
+                    id={selected.id}
+                    className="text-[12.5px] font-medium underline-offset-2 hover:underline"
+                  >
+                    View account
+                  </AccountLink>
+                  {selected.hubspot_company_id && (
+                    <a
+                      href={HUBSPOT_COMPANY_URL(selected.hubspot_company_id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[12.5px] font-medium text-[#8A928C] underline-offset-2 hover:text-[#3D4A44] hover:underline"
+                    >
+                      View in HubSpot
+                    </a>
+                  )}
+                </div>
+              </div>
+            </InfoWindowF>
+          )}
+        </GoogleMap>
+      </div>
+    </div>
   );
 }
