@@ -1,7 +1,8 @@
 /**
  * Goals ladder data. DERIVED, not the source of truth.
- * The canonical file is agency/nutribiotic/playbook/GOALS.md; edit there and
- * mirror here. Targets flagged `proposed` are drafts awaiting Juan's ratification
+ * The canonical file is ../playbook/content/GOALS.md (rendered at
+ * /nutribiotic/playbook/goals); edit there and mirror here. Targets flagged
+ * `proposed` are drafts awaiting Juan's ratification
  * at a QBR; nothing below is a measured fact unless listed under BASELINES.
  */
 

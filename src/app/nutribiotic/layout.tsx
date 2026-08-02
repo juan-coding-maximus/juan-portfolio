@@ -33,6 +33,9 @@ const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>
      in one, VP in four) and the six SMART goals it decomposes into, content
      meant to be seen every day, not a promise of a future phase. */
   { href: "/nutribiotic/goals", label: "Goals", icon: "flag" },
+  /* Playbook is the shelf those goals produce: the strategy docs rendered from
+     the repo's own markdown, so the site and the files can never disagree. */
+  { href: "/nutribiotic/playbook", label: "Playbook", icon: "book" },
 ];
 
 export default async function NutribioticLayout({

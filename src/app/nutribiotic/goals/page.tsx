@@ -7,6 +7,7 @@
  * goals under it, the measured baselines they are judged against.
  */
 
+import Link from "next/link";
 import { PageHead, Card, Ico } from "../lib/ui";
 import { NORTH_STAR, BASELINES, GOALS, ARC, CADENCE } from "./data";
 
@@ -131,8 +132,15 @@ export default function GoalsPage() {
       </Card>
 
       <p className="mt-6 max-w-[70ch] text-[12.5px] leading-relaxed text-[#8A928C]">
-        Source of truth: nutribiotic/playbook/GOALS.md in the repo, mirrored to the Desktop bundle
-        at 09-playbook/. Edit there; this page follows.
+        This tab is the designed summary. The full ladder, with baseline sources and the SMART
+        breakdown per goal, is{" "}
+        <Link
+          href="/nutribiotic/playbook/goals"
+          className="font-medium text-[#2C6A46] underline decoration-[#2C6A46]/40 underline-offset-2 hover:decoration-[#2C6A46]"
+        >
+          GOALS.md on the Playbook shelf
+        </Link>
+        , the source of truth this page mirrors.
       </p>
     </>
   );
