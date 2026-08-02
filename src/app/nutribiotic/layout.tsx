@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { countPendingImports, isConfigured, listDrafts, workspaceMode } from "./lib/dal";
+import { isConfigured, listDrafts, workspaceMode } from "./lib/dal";
 import { ModalProvider } from "./lib/modal";
 import { Ico } from "./lib/ui";
 
@@ -12,22 +12,24 @@ export const metadata: Metadata = {
 // Every read is request-time; nothing here may be statically cached.
 export const dynamic = "force-dynamic";
 
-/* Nav consolidation, 2026-07-20. Seven tabs -> four. Pipeline merged into
-   Territory (it is a view over the same accounts, and with a pre-first-visit
-   territory a separate board was empty ceremony). Route and Support keep their
-   pages but leave the nav until their phases ship: a permanent nav item whose
-   screen says "not built" or holds a twice-a-month log is nav noise. They are
-   reachable from Today. Outbound is the approval gate, so it appears exactly
-   when something is waiting on a human and not before. Nav that grows as
-   phases land beats nav that promises them. */
+/* Nav consolidation, 2026-07-20; Today retired in favor of Plan, 2026-08-02.
+   Plan is home now: it carries the daily touchpoint capture and work queues
+   Today used to hold, plus the itinerary, so a separate landing tab was two
+   places doing one job. Pipeline merged into Clients (it is a view over the
+   same accounts, and with a pre-first-visit territory a separate board was
+   empty ceremony). Route and Support keep their pages but leave the nav until
+   their phases ship: a permanent nav item whose screen says "not built" or
+   holds a twice-a-month log is nav noise. They are reachable from Plan.
+   Outbound is the approval gate, so it appears exactly when something is
+   waiting on a human and not before. Nav that grows as phases land beats nav
+   that promises them. */
 const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>["name"] }[] = [
-  { href: "/nutribiotic", label: "Today", icon: "today" },
-  { href: "/nutribiotic/accounts", label: "Territory", icon: "accounts" },
-  { href: "/nutribiotic/map", label: "Map", icon: "pin" },
-  /* Plan earns its nav slot on the rule above: it holds the approved SoCal month
-     and the briefed field days, content Juan opens every driving day. It is the
-     static plan, not the phase-7 planner (which stays out of nav at ./route). */
+  /* Plan is the static approved month plus the daily capture, the screen Juan
+     opens first every driving day. Not the phase-7 planner (which stays out
+     of nav at ./route). */
   { href: "/nutribiotic/plan", label: "Plan", icon: "route" },
+  { href: "/nutribiotic/clients", label: "Clients", icon: "accounts" },
+  { href: "/nutribiotic/map", label: "Map", icon: "pin" },
   { href: "/nutribiotic/metrics", label: "Metrics", icon: "metrics" },
   /* Goals earns its slot on the same rule: it is the standing ladder (Director
      in one, VP in four) and the six SMART goals it decomposes into, content
@@ -50,14 +52,9 @@ export default async function NutribioticLayout({
     nav.splice(2, 0, { href: "/nutribiotic/outbound", label: "Outbound", icon: "outbound" });
   }
 
-  /* Review appears on the same rule as Outbound: exactly when something is
-     waiting on a human, and not before. An import is episodic (a HubSpot export,
-     a legacy spreadsheet), so a permanent tab would sit empty for weeks and
-     train the eye to skip it, which is the opposite of what a gate needs. */
-  const pendingImports = isConfigured() ? await countPendingImports() : 0;
-  if (pendingImports > 0) {
-    nav.splice(2, 0, { href: "/nutribiotic/review", label: "Review", icon: "review" });
-  }
+  /* Review left the nav for good, 2026-08-02: the page stays reachable at
+     /nutribiotic/review for an occasional import cleanup, same treatment as
+     Route/Support, but it never surfaces here regardless of pending count. */
 
   return (
     <div className="min-h-screen bg-[#F7F6F1] text-[#14201B]">

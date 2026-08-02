@@ -1,5 +1,7 @@
 /**
- * Plan. The SoCal month, sized to the Santa Cruz benchmark day.
+ * Plan. Home screen, replacing Today (2026-08-02). The SoCal month, sized to
+ * the Santa Cruz benchmark day, with the daily capture and work queues that
+ * used to live on Today folded in above it.
  *
  * This is NOT the phase-7 route planner (see ../route): no Supabase, no drag
  * ordering, no ETA engine. It is the static monthly plan Juan approved on
@@ -10,10 +12,13 @@
  * he reads a day as a mind map and taps to drive to the next stop.
  */
 
-import Link from "next/link";
-import { PageHead, Card, Ico } from "../lib/ui";
+import { isConfigured, listCadenceDue, listStaleDeals, listCalendarProposals } from "../lib/dal";
+import { AccountLink } from "../lib/modal";
+import { CalendarProposalRow, RecordVisit, TouchpointCapture } from "../lib/touchpoint-ui";
+import { Card, Confidence, Empty, Ico, PageHead, TierChip, daysAgo } from "../lib/ui";
 import { MONTH_PLAN } from "./data";
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "Plan · NutriBiotic OS" };
 
 function Flag({ text }: { text: string }) {
@@ -31,7 +36,13 @@ function Flag({ text }: { text: string }) {
   );
 }
 
-export default function PlanPage() {
+export default async function PlanPage() {
+  const [cadence, stale, proposals] = await Promise.all([
+    listCadenceDue(12),
+    listStaleDeals(8),
+    listCalendarProposals(),
+  ]);
+
   return (
     <>
       <PageHead
@@ -39,24 +50,26 @@ export default function PlanPage() {
         sub="The 62 active SoCal accounts in 8 field days plus one flex. Benchmark: the ten-stop Santa Cruz day. Clusters two hours out are sleep-aways."
       />
 
-      {/* Tomorrow's briefed day gets top billing; the month follows. */}
-      <Link
-        href="/nutribiotic/plan/sf"
-        className="mb-6 flex items-center justify-between gap-3 rounded-lg border border-[#14201B] bg-[#14201B] p-5 text-[#F7F6F1] transition-opacity hover:opacity-90"
-      >
-        <div>
-          <div className="text-[11px] uppercase tracking-[0.14em] text-[#A8B3AC]">
-            Briefed and ready · Thursday 30 July
-          </div>
-          <div className="mt-1 font-[family-name:var(--font-fraunces)] text-[19px] font-semibold tracking-tight">
-            San Francisco and the Peninsula
-          </div>
-          <div className="mt-0.5 text-[13px] text-[#C9D2CC]">
-            Six stops, counterclockwise loop. Open the day brief.
-          </div>
-        </div>
-        <Ico name="route" size={22} />
-      </Link>
+      {/* Touchpoint capture. What you dictate here becomes an activity log entry
+          and contact detail right away; any follow-up it hears waits below for
+          your approval before it touches the calendar. */}
+      <section className="mb-7">
+        <TouchpointCapture />
+        <RecordVisit />
+      </section>
+
+      {proposals.data.length > 0 && (
+        <section className="mb-7">
+          <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8A928C]">
+            Follow-ups to confirm
+          </h2>
+          <ul className="divide-y divide-[#EDEBE3] overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
+            {proposals.data.map((p) => (
+              <CalendarProposalRow key={p.id} proposal={p} />
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="flex flex-col gap-5">
         {MONTH_PLAN.map((d) => (
@@ -108,6 +121,88 @@ export default function PlanPage() {
         permanently closed at the address on file. Stop order within a day is nearest-neighbor
         by rooftop coordinates, not live traffic.
       </p>
+
+      <div className="mt-8 grid gap-7 lg:grid-cols-2">
+        {/* Cadence: who is due for a touch. Folded in from Today, 2026-08-02. */}
+        <section>
+          <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8A928C]">
+            Due for a touch
+          </h2>
+          {cadence.data.length === 0 ? (
+            <Empty>
+              {!isConfigured()
+                ? "No data source configured."
+                : "Nothing due. Every account has been touched within its cadence."}
+            </Empty>
+          ) : (
+            <ul className="divide-y divide-[#EDEBE3] overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
+              {cadence.data.map((c) => (
+                <li key={c.account_id}>
+                  <AccountLink
+                    id={c.account_id}
+                    className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[#FAF9F5]"
+                  >
+                    <TierChip tier={c.tier} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[14px] font-medium">{c.name}</div>
+                      <div className="mt-0.5 flex items-center gap-2 text-[12px] text-[#8A928C]">
+                        <span>{c.never_visited ? "never visited" : `last visit ${daysAgo(c.last_visit)}`}</span>
+                        <span aria-hidden>·</span>
+                        <Confidence
+                          value={c.fit_confidence}
+                          known={c.fit_inputs_known}
+                          total={c.fit_inputs_total}
+                        />
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right text-[12.5px] text-[#A0762C]">
+                      {c.never_visited ? "first visit" : `${c.visit_days_overdue}d`}
+                    </div>
+                  </AccountLink>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {/* Pipeline loop: what has gone quiet. Folded in from Today, 2026-08-02. */}
+        <section>
+          <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8A928C]">
+            Gone quiet
+          </h2>
+          {stale.data.length === 0 ? (
+            <Empty>
+              {!isConfigured()
+                ? "No data source configured."
+                : "No deals yet. One appears here after you log a real conversation."}
+            </Empty>
+          ) : (
+            <ul className="divide-y divide-[#EDEBE3] overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
+              {stale.data.map((d) => (
+                <li key={d.deal_id}>
+                  <AccountLink
+                    id={d.account_id}
+                    className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[#FAF9F5]"
+                  >
+                    <TierChip tier={d.tier} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[14px] font-medium">{d.account_name}</div>
+                      <div className="mt-0.5 truncate text-[12px] text-[#8A928C]">
+                        {d.stage} · {d.next_step ?? "no next step"}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right text-[12.5px] text-[#A0762C]">
+                      {d.next_step_days_overdue != null && d.next_step_days_overdue > 0
+                        ? `${d.next_step_days_overdue}d since next step`
+                        : `${d.days_since_activity ?? "?"}d silent`}
+                    </div>
+                  </AccountLink>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
     </>
   );
 }

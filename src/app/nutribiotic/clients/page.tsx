@@ -1,5 +1,5 @@
 /**
- * Territory. Every prospect in the territory, ranked, with the pipeline over it.
+ * Clients. Every prospect in the territory, ranked, with the pipeline over it.
  *
  * This absorbed the old Pipeline tab (2026-07-20). A pipeline is a view over
  * the same accounts, and while the territory is pre-first-visit a separate
@@ -48,7 +48,7 @@ async function loadCriteria(): Promise<Criterion[]> {
 
 const ORDER = ["identified", "contacted", "discovery", "sampled", "trial", "stocked", "reordered"];
 
-export default async function Territory({
+export default async function Clients({
   searchParams,
 }: {
   searchParams: Promise<{ area?: string }>;
@@ -86,7 +86,7 @@ export default async function Territory({
   return (
     <>
       <PageHead
-        title="Territory"
+        title="Clients"
         sub={
           area
             ? `${area.label}. ${area.brief ?? ""}`.trim()
@@ -103,7 +103,7 @@ export default async function Territory({
           say 31 above a list of 30 with no way to tell which was lying. */}
       <div className="mb-5 flex flex-wrap gap-1.5">
         <Link
-          href="/nutribiotic/accounts"
+          href="/nutribiotic/clients"
           className={`rounded-md border px-2.5 py-1 text-[12.5px] transition-colors ${
             !area
               ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
@@ -117,7 +117,7 @@ export default async function Territory({
           return (
             <Link
               key={a.id}
-              href={`/nutribiotic/accounts?area=${a.id}`}
+              href={`/nutribiotic/clients?area=${a.id}`}
               title={a.brief ?? undefined}
               className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] transition-colors ${
                 on

@@ -57,7 +57,7 @@ export function TouchpointCapture() {
         >
           {result.ok ? (
             result.needsAccount ? (
-              <>Logged, but couldn&apos;t confidently match an account. Add it by hand from the Accounts screen for now.</>
+              <>Logged, but couldn&apos;t confidently match an account. Add it by hand from the Clients screen for now.</>
             ) : (
               <>
                 Logged to <span className="font-medium">{result.accountName}</span>: {result.summary}
