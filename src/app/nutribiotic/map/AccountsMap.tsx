@@ -139,14 +139,19 @@ export function AccountsMap({
     const bounds = new google.maps.LatLngBounds();
     for (const a of filtered) bounds.extend({ lat: a.lat, lng: a.lng });
 
-    /* DEFERRED TO THE NEXT FRAME, because onLoad fires before the flex container has
-       been given its height. fitBounds against a zero-height box solves for a zoom
-       that fits 500km of California into no pixels at all, which is how the map came
-       up showing Denver and Dallas. Measuring after layout is the whole fix. */
-    const raf = requestAnimationFrame(() => {
-      map.fitBounds(bounds, 48);
-    });
-    return () => cancelAnimationFrame(raf);
+    /* FIT TWICE, AND NEVER CANCEL THE SECOND. The immediate call is the one that
+       normally wins. The deferred one exists because on first mount onLoad fires
+       before the flex container has its height, and fitting against a zero-height box
+       solves for a zoom that fits 500km of California into no pixels.
+
+       It is a setTimeout rather than a requestAnimationFrame with a cleanup, which is
+       what this was first: any re-render between the schedule and the frame ran the
+       cleanup and cancelled the fit, so selecting an area re-filtered the pins and then
+       left the viewport exactly where it was. A fit that sometimes does not happen is
+       worse than one frame of the old view. */
+    map.fitBounds(bounds, 48);
+    const t = setTimeout(() => map.fitBounds(bounds, 48), 60);
+    return () => clearTimeout(t);
   }, [filtered, mapReady]);
 
   if (!apiKey) {
