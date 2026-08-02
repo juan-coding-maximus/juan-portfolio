@@ -180,6 +180,8 @@ export type TierRow = {
   engagement: number;
   tier: "A" | "B" | "C" | "D";
   origin: Origin;
+  area: string | null;
+  hubspot_owner_id: string | null;
 };
 
 /**
@@ -190,12 +192,22 @@ export type TierRow = {
  * two measured inputs, and a list sorted purely by value would present a
  * confidently-ranked pile of noise as a work queue.
  */
-export async function listAccounts(limit = 500): Promise<Result<TierRow>> {
-  return query<TierRow>("nb_v_account_tier", {
+export async function listAccounts(
+  opts: { area?: string | null; limit?: number } = {},
+): Promise<Result<TierRow>> {
+  /* SCOPED TO JUAN'S BOOK, and this is a correction rather than a feature. The page
+     is titled "Territory" and was showing all 459 CA accounts: 118 of them are in
+     another rep's book and 68 are unowned prospects nobody has sold to. A count that
+     includes accounts you do not carry is not a territory, and it made every tier
+     total on the page wrong by 68%. */
+  const params: Record<string, string | number> = {
     select: "*",
+    hubspot_owner_id: `eq.${JUAN_OWNER_ID}`,
     order: "tier.asc,fit_confidence.desc,fit.desc",
-    limit,
-  });
+    limit: opts.limit ?? 500,
+  };
+  if (opts.area) params.area = `eq.${opts.area}`;
+  return query<TierRow>("nb_v_account_tier", params);
 }
 
 export type CadenceRow = {
@@ -768,62 +780,56 @@ export type NearbyAccount = {
 };
 
 /**
- * The trip regions. Coordinates are city centres, and the radius is a travel
- * envelope rather than a claim about a boundary: 25km from downtown Santa Cruz
- * covers Capitola, Soquel, Aptos and Scotts Valley, which is one working day's
- * driving. San Francisco is tighter because the city is dense and the bridge is
- * the real cost.
+ * Juan's HubSpot owner id. The territory is defined by this and by nothing else:
+ * not a city list, not a spreadsheet tab, not a name pattern. It is the same field
+ * HubSpot routes on, so this app and the portal cannot disagree about who is in it.
  */
-export const REGIONS = {
-  "santa-cruz": { label: "Santa Cruz", lat: 36.9741, lng: -122.0308, radiusM: 25000 },
-  "san-francisco": { label: "San Francisco", lat: 37.7749, lng: -122.4194, radiusM: 20000 },
-} as const;
+export const JUAN_OWNER_ID = "36242368";
 
-export type RegionKey = keyof typeof REGIONS;
-
-export function isRegionKey(v: string | undefined): v is RegionKey {
-  return v !== undefined && Object.prototype.hasOwnProperty.call(REGIONS, v);
-}
+export type TerritoryArea = {
+  id: string;
+  label: string;
+  color: string;
+  display_order: number;
+  named_by_human: boolean;
+  needs_review: boolean;
+  brief: string | null;
+  account_count: number;
+  boundary: { type: "MultiPolygon"; coordinates: number[][][][] } | null;
+};
 
 /**
- * Accounts within a region, nearest first.
+ * The territory areas, and the frontiers drawn on the map.
  *
- * An account with no coordinates does not appear here at all. That is
- * deliberate and is the read-side half of geocode.py's refusal to write
- * approximate pins: a store missing from the list is visibly missing and
- * prompts a fix, whereas one placed at a postal centroid quietly reorders the
- * day and sends Juan to the wrong block.
+ * REPLACED TWO RADIUS CIRCLES on 2026-08-02. The old picker offered "within 25km of
+ * Santa Cruz" and "within 20km of San Francisco", which is the other rep's book, and a
+ * radius is the wrong shape for the question anyway: 25km from downtown LA is four
+ * different selling days, and 25km from Indio is empty desert. Juan divided the map
+ * himself along the lines he drives.
+ *
+ * THE BOUNDARY IS DERIVED FROM THE ASSIGNMENT, never drawn by hand. assign_areas.py
+ * computes it by Voronoi tessellation over the assigned accounts, dissolved per area,
+ * so the coloured region on the map is the assignment rule extended to every point in
+ * the plane. A pin can never sit inside a colour that is not its own area, and there
+ * are no gaps. Two hand-maintained copies of one fact would drift, and the first
+ * symptom is a rep driving to a store the map says is in a day he is not working.
  */
-export async function listAccountsInRegion(region: RegionKey): Promise<Result<NearbyAccount>> {
-  const r = REGIONS[region];
-  return query<NearbyAccount>("rpc/nb_accounts_near", {
-    p_lat: r.lat,
-    p_lng: r.lng,
-    p_radius_m: r.radiusM,
-  });
-}
-
-/** How many accounts each region can actually route, for the picker. */
-export async function regionCounts(): Promise<Record<RegionKey, number>> {
-  const keys = Object.keys(REGIONS) as RegionKey[];
-  const counts = await Promise.all(
-    keys.map(async (k) => {
-      try {
-        return (await listAccountsInRegion(k)).data.length;
-      } catch {
-        return 0;
-      }
-    }),
+export async function listAreas(): Promise<TerritoryArea[]> {
+  const rows = await raw<TerritoryArea>(
+    "nb_territory_areas?select=*&order=display_order.asc",
   );
-  return Object.fromEntries(keys.map((k, i) => [k, counts[i]])) as Record<RegionKey, number>;
+  return rows;
 }
 
 /**
- * How many accounts cannot appear in ANY region view because they have no
- * coordinates. Surfaced next to a region list so a short list reads as
- * "incomplete data" rather than "small territory", which is the difference
- * between fixing an address and planning half a day.
+ * Accounts in one area, ranked. Ordered by tier rather than by distance: an area is
+ * already a day's drive, so within it the question goes back to "who is worth the
+ * call" rather than "what is nearest".
  */
+export async function listAccountsInArea(area: string): Promise<Result<TierRow>> {
+  return listAccounts({ area });
+}
+
 export async function countWithoutCoordinates(): Promise<number> {
   const rows = await raw<{ id: string }>("nb_accounts?select=id&lat=is.null&limit=5000");
   return rows.length;
@@ -852,6 +858,7 @@ export type MapAccount = {
   hubspot_company_id: string | null;
   tier: Tier | null;
   origin: Origin;
+  area: string | null;
 };
 
 /**
@@ -877,7 +884,7 @@ export async function listOwnerAccounts(ownerName = "Juan Arenas Martin"): Promi
   const [result, grades] = await Promise.all([
     query<Omit<MapAccount, "tier">>("nb_accounts", {
       select:
-        "id,name,street,city,state,postal,lat,lng,phone,channel,lifecycle,do_not_visit,hubspot_company_id,origin",
+        "id,name,street,city,state,postal,lat,lng,phone,channel,lifecycle,do_not_visit,hubspot_company_id,origin,area",
       owner_name: `eq.${ownerName}`,
       lat: "not.is.null",
       order: "name.asc",

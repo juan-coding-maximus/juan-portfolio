@@ -8,23 +8,24 @@
  * listOwnerAccounts() and geocode.py's corroboration rule.
  */
 
-import { countOwnerWithoutCoordinates, isConfigured, listOwnerAccounts } from "../lib/dal";
+import { countOwnerWithoutCoordinates, isConfigured, listAreas, listOwnerAccounts } from "../lib/dal";
 import { Empty, Ico, PageHead } from "../lib/ui";
 import { AccountsMap } from "./AccountsMap";
 
 export const dynamic = "force-dynamic";
 
 export default async function MapPage() {
-  const [accounts, ungeocoded] = await Promise.all([
+  const [accounts, ungeocoded, areas] = await Promise.all([
     listOwnerAccounts(),
     countOwnerWithoutCoordinates(),
+    listAreas(),
   ]);
 
   return (
     <>
       <PageHead
         title="Map"
-        sub="Every account assigned to Juan in HubSpot with a Places-verified address. An account missing here is missing an address on file or an unverified one, never an approximate guess."
+        sub="Every account assigned to Juan in HubSpot with a Places-verified address, coloured by territory area. An account missing here is missing an address on file or has an unverified one, never an approximate guess."
       />
 
       {ungeocoded > 0 && (
@@ -51,7 +52,7 @@ export default async function MapPage() {
         <>
           <div className="mb-3 text-[12.5px] text-[#5B6560]">{accounts.data.length} accounts</div>
           <div className="h-[calc(100vh-260px)] min-h-[420px] overflow-hidden rounded-lg border border-[#E2DFD5]">
-            <AccountsMap accounts={accounts.data} />
+            <AccountsMap accounts={accounts.data} areas={areas} />
           </div>
         </>
       )}

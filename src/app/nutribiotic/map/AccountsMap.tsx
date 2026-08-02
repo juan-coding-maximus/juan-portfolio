@@ -12,8 +12,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GoogleMap, MarkerF, InfoWindowF, useLoadScript } from "@react-google-maps/api";
-import type { MapAccount, Tier } from "../lib/dal";
+import { GoogleMap, MarkerF, InfoWindowF, PolygonF, useLoadScript } from "@react-google-maps/api";
+import type { MapAccount, TerritoryArea, Tier } from "../lib/dal";
 import { AccountLink } from "../lib/modal";
 
 const CONTAINER_STYLE = { width: "100%", height: "100%" };
@@ -43,14 +43,38 @@ const MAP_STYLE: google.maps.MapTypeStyle[] = [
   { featureType: "water", elementType: "geometry", stylers: [{ color: "#dde4e0" }] },
 ];
 
-export function AccountsMap({ accounts }: { accounts: MapAccount[] }) {
+export function AccountsMap({
+  accounts,
+  areas,
+}: {
+  accounts: MapAccount[];
+  areas: TerritoryArea[];
+}) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const { isLoaded, loadError } = useLoadScript({ googleMapsApiKey: apiKey ?? "" });
   const [selected, setSelected] = useState<MapAccount | null>(null);
   // Empty set reads as "no filter", not "nothing matches" -- the default view
   // is every pin, same as the map before tiers existed on it.
   const [activeTiers, setActiveTiers] = useState<Set<Tier>>(new Set());
+  // Same convention as the tier filter: empty means unfiltered, so a chip narrows
+  // on click and widens again on the second click.
+  const [activeAreas, setActiveAreas] = useState<Set<string>>(new Set());
   const mapRef = useRef<google.maps.Map | null>(null);
+
+  const areaById = useMemo(() => new Map(areas.map((a) => [a.id, a])), [areas]);
+
+  /* THE FRONTIERS. Each area's boundary was derived from the assignment by Voronoi
+     dissolve (assign_areas.py), so the fill under a pin is always that pin's own area
+     and the regions tile with no gaps. Drawn UNDER the markers, at low opacity, with
+     a stronger stroke: the point is to read the division at a glance, not to compete
+     with the pins for attention.
+
+     clickable is off. A polygon covering half the state would otherwise swallow every
+     click meant for a marker sitting on top of it. */
+  const shownAreas = useMemo(
+    () => areas.filter((a) => a.boundary && (activeAreas.size === 0 || activeAreas.has(a.id))),
+    [areas, activeAreas],
+  );
 
   const tierCounts = useMemo(() => {
     const counts: Record<Tier, number> = { A: 0, B: 0, C: 0, D: 0, E: 0, F: 0, G: 0 };
@@ -58,10 +82,34 @@ export function AccountsMap({ accounts }: { accounts: MapAccount[] }) {
     return counts;
   }, [accounts]);
 
+  const areaCounts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const a of accounts) if (a.area) c[a.area] = (c[a.area] ?? 0) + 1;
+    return c;
+  }, [accounts]);
+
+  /* Tier and area narrow INDEPENDENTLY and combine with AND. Picking "A" and
+     "San Diego" asks for the A accounts in San Diego, which is a question worth
+     asking; making one filter reset the other would make it unaskable. */
   const filtered = useMemo(
-    () => (activeTiers.size === 0 ? accounts : accounts.filter((a) => a.tier && activeTiers.has(a.tier))),
-    [accounts, activeTiers],
+    () =>
+      accounts.filter(
+        (a) =>
+          (activeTiers.size === 0 || (a.tier !== null && activeTiers.has(a.tier))) &&
+          (activeAreas.size === 0 || (a.area !== null && activeAreas.has(a.area))),
+      ),
+    [accounts, activeTiers, activeAreas],
   );
+
+  function toggleArea(id: string) {
+    setSelected(null);
+    setActiveAreas((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   function toggleTier(t: Tier) {
     setSelected(null);
@@ -125,6 +173,47 @@ export function AccountsMap({ accounts }: { accounts: MapAccount[] }) {
 
   return (
     <div className="flex h-full flex-col">
+      {/* Area filter. Each chip carries its area's colour, and that same colour fills
+          the area's frontier on the map, so the control and the region it controls are
+          visibly one thing. */}
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-[#E2DFD5] bg-white px-3 py-2">
+        {areas.map((a) => {
+          const active = activeAreas.has(a.id);
+          return (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => toggleArea(a.id)}
+              aria-pressed={active}
+              title={a.brief ?? undefined}
+              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] transition-colors ${
+                active ? "text-[#F7F6F1]" : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
+              }`}
+              style={active ? { background: a.color, borderColor: a.color } : undefined}
+            >
+              <span
+                aria-hidden
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ background: active ? "#F7F6F1" : a.color }}
+              />
+              {a.label}
+              <span className={`tabular-nums ${active ? "opacity-70" : "text-[#8A928C]"}`}>
+                {areaCounts[a.id] ?? 0}
+              </span>
+            </button>
+          );
+        })}
+        {activeAreas.size > 0 && (
+          <button
+            type="button"
+            onClick={() => setActiveAreas(new Set())}
+            className="rounded-md px-2 py-1 text-[12.5px] text-[#8A928C] underline-offset-2 hover:text-[#3D4A44] hover:underline"
+          >
+            clear
+          </button>
+        )}
+      </div>
+
       {/* Tier filter, multi-select. Empty selection means unfiltered rather
           than empty, so clicking a letter narrows and clicking it again
           widens back out -- there is no separate "all" button to hunt for. */}
@@ -173,12 +262,39 @@ export function AccountsMap({ accounts }: { accounts: MapAccount[] }) {
             fullscreenControl: true,
           }}
         >
+          {shownAreas.map((a) => (
+            <PolygonF
+              key={a.id}
+              paths={a.boundary!.coordinates.map((poly) =>
+                poly[0].map(([lng, lat]) => ({ lat, lng })),
+              )}
+              options={{
+                fillColor: a.color,
+                fillOpacity: 0.1,
+                strokeColor: a.color,
+                strokeOpacity: 0.55,
+                strokeWeight: 1.5,
+                clickable: false,
+                zIndex: 1,
+              }}
+            />
+          ))}
+
           {filtered.map((a) => (
             <MarkerF
               key={a.id}
               position={{ lat: a.lat, lng: a.lng }}
               opacity={a.do_not_visit ? 0.45 : 1}
               onClick={() => setSelected(a)}
+              zIndex={2}
+              icon={{
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 6,
+                fillColor: (a.area && areaById.get(a.area)?.color) || "#5B6560",
+                fillOpacity: 1,
+                strokeColor: "#F7F6F1",
+                strokeWeight: 1.5,
+              }}
             />
           ))}
 
@@ -197,6 +313,7 @@ export function AccountsMap({ accounts }: { accounts: MapAccount[] }) {
                 )}
                 <div className="mt-1 flex items-center gap-2 text-[11.5px] uppercase tracking-[0.1em] text-[#8A928C]">
                   {selected.tier && <span>potential {selected.tier}</span>}
+                  {selected.area && <span>{areaById.get(selected.area)?.label ?? selected.area}</span>}
                   <span>{selected.channel}</span>
                   <span>·</span>
                   <span>{selected.lifecycle}</span>

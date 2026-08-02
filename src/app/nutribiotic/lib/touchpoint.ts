@@ -169,7 +169,9 @@ export async function recordTouchpoint(
   if (!text) return { ok: false, error: "Nothing to record." };
   if (!client) return { ok: false, error: "ANTHROPIC_API_KEY is not configured on this deployment." };
 
-  const accountsRes = await listAccounts(500);
+  // Juan's book only, which listAccounts() now enforces. Matching a spoken store name
+  // against the other rep's accounts could file a touchpoint into his book.
+  const accountsRes = await listAccounts({ limit: 500 });
   const candidates = accountsRes.data.map((a) => ({ id: a.account_id, name: a.name, city: null as string | null }));
   if (candidates.length === 0) {
     return { ok: false, error: "No accounts to match against yet." };
