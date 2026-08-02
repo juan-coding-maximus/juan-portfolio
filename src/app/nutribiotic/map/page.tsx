@@ -51,7 +51,12 @@ export default async function MapPage() {
       ) : (
         <>
           <div className="mb-3 text-[12.5px] text-[#5B6560]">{accounts.data.length} accounts</div>
-          <div className="h-[calc(100vh-310px)] min-h-[420px] overflow-hidden rounded-lg border border-[#E2DFD5]">
+          {/* THE FILTER ROWS LIVE INSIDE THIS BOX, so its height is not the map's height:
+              the area and tier rows take ~128px off the top. At the old 420px floor that
+              left the map 292px tall, and fitBounds correctly solved for a zoom that fits
+              500km of California into 292px, which is why the map opened showing Nevada
+              and Texas. The floor has to clear the chrome before it is a map. */}
+          <div className="h-[calc(100vh-240px)] min-h-[640px] overflow-hidden rounded-lg border border-[#E2DFD5]">
             <AccountsMap accounts={accounts.data} areas={areas} />
           </div>
         </>
