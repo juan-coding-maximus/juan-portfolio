@@ -127,32 +127,34 @@ export function AccountsMap({
     setMapReady(true);
   }, []);
 
-  // Refits on the map becoming ready AND whenever the FILTERED set changes
-  // after that, so narrowing to one tier re-centers on those pins instead of
-  // leaving the viewport framed for a set that is mostly no longer shown.
-  // mapReady is in the dependency list because mapRef.current mutating does
-  // NOT itself trigger a re-render, so without it this effect's first run
-  // (while the map is still loading) would find a null ref and never retry.
-  useEffect(() => {
+  /* THE VIEWPORT FIT, AND WHY IT HANGS OFF `idle` RATHER THAN AN EFFECT.
+     Written twice as a plain effect first, and both versions lost the same way: the
+     fit is imperative, so anything that re-renders the map after it (a polygon set
+     changing, a marker remount) puts the viewport back and nothing retries. Selecting
+     San Diego filtered the pins correctly and left the camera over Nevada.
+
+     `idle` fires after the map has settled, whatever settled it, so a fit that gets
+     undone is simply redone. The signature guard is what stops that from being an
+     infinite loop: fitBounds itself causes an idle, and on that pass the signature
+     already matches and the handler does nothing. */
+  const fitKey = useMemo(() => filtered.map((a) => a.id).join(","), [filtered]);
+  const fittedRef = useRef("");
+
+  const fitToPins = useCallback(() => {
     const map = mapRef.current;
-    if (!map || filtered.length === 0) return;
+    if (!map || filtered.length === 0 || fittedRef.current === fitKey) return;
     const bounds = new google.maps.LatLngBounds();
     for (const a of filtered) bounds.extend({ lat: a.lat, lng: a.lng });
-
-    /* FIT TWICE, AND NEVER CANCEL THE SECOND. The immediate call is the one that
-       normally wins. The deferred one exists because on first mount onLoad fires
-       before the flex container has its height, and fitting against a zero-height box
-       solves for a zoom that fits 500km of California into no pixels.
-
-       It is a setTimeout rather than a requestAnimationFrame with a cleanup, which is
-       what this was first: any re-render between the schedule and the frame ran the
-       cleanup and cancelled the fit, so selecting an area re-filtered the pins and then
-       left the viewport exactly where it was. A fit that sometimes does not happen is
-       worse than one frame of the old view. */
     map.fitBounds(bounds, 48);
-    const t = setTimeout(() => map.fitBounds(bounds, 48), 60);
-    return () => clearTimeout(t);
-  }, [filtered, mapReady]);
+    fittedRef.current = fitKey;
+  }, [filtered, fitKey]);
+
+  // A new filter means the previous fit no longer describes what is on screen, so the
+  // guard is cleared and the next idle re-frames.
+  useEffect(() => {
+    fittedRef.current = "";
+    fitToPins();
+  }, [fitKey, mapReady, fitToPins]);
 
   if (!apiKey) {
     return (
@@ -267,6 +269,7 @@ export function AccountsMap({
         <GoogleMap
           mapContainerStyle={CONTAINER_STYLE}
           onLoad={onLoad}
+          onIdle={fitToPins}
           options={{
             styles: MAP_STYLE,
             disableDefaultUI: true,
