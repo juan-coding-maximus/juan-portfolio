@@ -6,7 +6,7 @@ ride-alongs and judgment, not into explaining where files live.
 
 ## What a new hire receives on day 1
 
-1. **Their territory bundle**: the dossier export run for their owner id, on their laptop. One folder, phone-readable account pages, the master table, route plans. (`onboarding/stack.md`, step 1.)
+1. **Their territory bundle**: the dossier export run for their owner id, on their laptop. One folder, phone-readable account pages, the master table, route plans. ([`onboarding/stack.md`](onboarding/stack.md), step 1.)
 2. **Sales OS access** scoped to their book.
 3. **The three playbooks**: sales, seasonal marketing, in-store program.
 4. **GOALS.md**, so they see the system they are joining and where it is headed.

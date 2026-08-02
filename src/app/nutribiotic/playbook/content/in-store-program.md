@@ -5,7 +5,7 @@ rule mirrors the marketing playbook: **no tactic scales until its pilot showed i
 number.** Store selection always starts from the OS: potential grade, lifecycle,
 and whether the door is on a route we already drive.
 
-Targets below are `proposed` until confirmed in GOALS.md.
+Targets below are `proposed` until confirmed in [GOALS.md](GOALS.md).
 
 ## 1. Endcap and seasonal shelf promos
 

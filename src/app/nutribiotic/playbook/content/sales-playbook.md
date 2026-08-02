@@ -48,7 +48,7 @@ was tried, what worked. No imported objection scripts from the internet.
 - **Sales OS** (`juanarenas.bio/nutribiotic`): Today, Territory, Map, Plan, Metrics, Goals.
 - **Desktop bundle** (`~/Desktop/NutriBiotic/`): the whole territory as files, phone-readable account pages, rebuilt on demand.
 - **HubSpot portal 148711228**: shared with another rep; everything written there is scoped to Juan's book, twice.
-- The stack behind these is documented for the next hire in `onboarding/stack.md`.
+- The stack behind these is documented for the next hire in [`onboarding/stack.md`](onboarding/stack.md).
 
 ## Changelog
 

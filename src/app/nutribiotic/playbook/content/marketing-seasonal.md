@@ -6,7 +6,7 @@ The measure is always the same: featured-product order lift in the campaign wind
 versus the account's own baseline, read from `nb_order_lines`. That measurement
 needs zero new tooling; the OS already holds the data.
 
-Targets and dates below are `proposed` until confirmed in GOALS.md.
+Targets and dates below are `proposed` until confirmed in [GOALS.md](GOALS.md).
 
 ## The wheel
 
@@ -31,7 +31,7 @@ creation:
 3. **Email nurture feed**: a 3-touch sequence for the segment that buys (or should buy) the featured line: education, social proof, offer. Segments come from `nb_order_lines` (who buys what), never from a bought list.
 4. **Social**: a 6-post window calendar: 2 educational, 2 product, 1 in-store/field, 1 offer.
 
-Plus the physical legs, specced in `in-store-program.md`:
+Plus the physical legs, specced in [`in-store-program.md`](in-store-program.md):
 - Endcap or shelf-talker tie-in in pilot stores.
 - Monthly mailed discount brochure buy when the window and the theme line up.
 

@@ -23,10 +23,10 @@ Rules of the shelf:
 
 | File | What it is |
 | --- | --- |
-| `GOALS.md` | The goal ladder. Director in one, VP in four, and the six Year-1 goals in SMART form. |
-| `sales-playbook.md` | How to work the territory: visit loop, cadence, grading, objection notes. |
-| `marketing-seasonal.md` | The seasonal wheel: immune in fall, mental clarity at finals, electrolytes in summer, and the channel calendar. |
-| `in-store-program.md` | Endcaps, brochure buys, manager merch, staff knowledge. Each tactic with its cost and its measure. |
-| `onboarding/` | The new-hire kit and the stack-repackaging guide (new territory in days, not months). |
-| `hiring/` | The 4-month hiring plan and role scorecard. |
-| `qbr/` | Quarterly business reviews. The promotion case is built here, one quarter at a time. |
+| [`GOALS.md`](GOALS.md) | The goal ladder. Director in one, VP in four, and the six Year-1 goals in SMART form. |
+| [`sales-playbook.md`](sales-playbook.md) | How to work the territory: visit loop, cadence, grading, objection notes. |
+| [`marketing-seasonal.md`](marketing-seasonal.md) | The seasonal wheel: immune in fall, mental clarity at finals, electrolytes in summer, and the channel calendar. |
+| [`in-store-program.md`](in-store-program.md) | Endcaps, brochure buys, manager merch, staff knowledge. Each tactic with its cost and its measure. |
+| [`onboarding/`](onboarding/README.md) | The new-hire kit and the [stack-repackaging guide](onboarding/stack.md) (new territory in days, not months). |
+| [`hiring/`](hiring/README.md) | The 4-month hiring plan and role scorecard. |
+| [`qbr/`](qbr/README.md) | Quarterly business reviews. The promotion case is built here, one quarter at a time. |

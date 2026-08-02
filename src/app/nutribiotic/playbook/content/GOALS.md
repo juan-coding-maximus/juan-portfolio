@@ -39,21 +39,21 @@ The day job, done visibly well. This is the first line of the Director case.
 ### G2 · Ship Sales Playbook v1
 - **S** A written, field-tested playbook another rep could run without Juan in the room: visit loop, cadence rules, grading, objection handling, tools.
 - **M** `proposed` v1 complete by 2026-09-30 with every section marked field-tested or TODO, no untested advice presented as proven. v2 after the first hire uses it.
-- **A** The skeleton exists (`sales-playbook.md`) and every field day generates material.
+- **A** The skeleton exists ([`sales-playbook.md`](sales-playbook.md)) and every field day generates material.
 - **R** The playbook is the difference between a good rep and a Director who scales reps.
 - **T** v1 2026-09-30, v2 within 60 days of the first hire's start.
 
 ### G3 · Run the seasonal marketing engine
 - **S** A repeating seasonal wheel across website, newsletter, email nurture, and social: immune in fall, mental clarity at college finals, electrolytes in summer.
 - **M** `proposed` Fall immune campaign live across all four channels by 2026-10-01; finals mental-clarity by 2026-11-15; summer electrolytes by 2027-05-15. Each campaign gets a before/after order-lift readout from `nb_order_lines`, no campaign closes without its ROI number.
-- **A** The calendar and channel templates are in `marketing-seasonal.md`; the OS already holds the order data the measurement needs.
+- **A** The calendar and channel templates are in [`marketing-seasonal.md`](marketing-seasonal.md); the OS already holds the order data the measurement needs.
 - **R** Marketing plus field sales under one motion is the Commercialization part of the VP title.
 - **T** Campaign dates above; the wheel repeats annually with a written retro each cycle.
 
 ### G4 · Build the in-store program
 - **S** Endcap promos, seasonal specials, monthly mailed brochure buys, manager merch (tumblers, pins, free product), and staff knowledge one-pagers.
 - **M** `proposed` Endcap pilot in 5 stores by 2026-11-30 with per-store order lift measured. One brochure placement bought and its window tracked. Merch kits in the hands of 20 store managers by 2026-12-31.
-- **A** Tactics and their measures are specced in `in-store-program.md`; store relationships come from G1's visit loop.
+- **A** Tactics and their measures are specced in [`in-store-program.md`](in-store-program.md); store relationships come from G1's visit loop.
 - **R** In-store presence is what turns a reactivated account into a growing one.
 - **T** Pilot dates above; scale decisions at the Q2 QBR, on ROI, not on vibes.
 
@@ -68,7 +68,7 @@ The legacy goal. Infrastructure over immediacy, stated as a deliverable.
 ### G6 · Hire, onboard, and build the promotion case
 - **S** Hire the first additional rep, onboard them on the playbook and stack, and keep a quarterly written evidence file (QBR) that builds the Director case.
 - **M** `proposed` Role scorecard by 2026-09-15, offer signed by 2026-12-02 (the 4-month mark), new hire running their territory solo within 2 weeks of start. QBR written every quarter, first one 2026-11-01. Director conversation held with the evidence file by 2027-06-30.
-- **A** Hiring plan in `hiring/`, onboarding kit in `onboarding/`, QBR template in `qbr/`.
+- **A** Hiring plan in [`hiring/`](hiring/README.md), onboarding kit in [`onboarding/`](onboarding/README.md), QBR template in [`qbr/`](qbr/README.md).
 - **R** Managing a rep who succeeds on your system is the difference between claiming Director and demonstrating it.
 - **T** Dates above; the promotion conversation is calendar-driven, not mood-driven.
 
