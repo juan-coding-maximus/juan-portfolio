@@ -37,6 +37,7 @@ const ICONS: Record<string, ReactNode> = {
   mic: <><rect x="5.6" y="1.8" width="4.8" height="8" rx="2.4" /><path d="M3.2 7.6a4.8 4.8 0 0 0 9.6 0M8 12.4v1.8M5.8 14.2h4.4" /></>,
   stop: <><rect x="3.2" y="3.2" width="9.6" height="9.6" rx="1.6" /></>,
   review: <><path d="M3.4 2.6h9.2v10.8H3.4z" /><path d="M5.8 6.2h4.4M5.8 8.6h4.4M5.8 11h2.6" /></>,
+  flag: <><path d="M3.8 14.2V2.2" /><path d="M3.8 2.8h8.4l-1.9 2.8 1.9 2.8H3.8" /></>,
 };
 
 export function Ico({ name, size = 16 }: { name: string; size?: number }) {

@@ -29,6 +29,10 @@ const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>
      static plan, not the phase-7 planner (which stays out of nav at ./route). */
   { href: "/nutribiotic/plan", label: "Plan", icon: "route" },
   { href: "/nutribiotic/metrics", label: "Metrics", icon: "metrics" },
+  /* Goals earns its slot on the same rule: it is the standing ladder (Director
+     in one, VP in four) and the six SMART goals it decomposes into, content
+     meant to be seen every day, not a promise of a future phase. */
+  { href: "/nutribiotic/goals", label: "Goals", icon: "flag" },
 ];
 
 export default async function NutribioticLayout({
