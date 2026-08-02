@@ -51,7 +51,7 @@ export default async function MapPage() {
       ) : (
         <>
           <div className="mb-3 text-[12.5px] text-[#5B6560]">{accounts.data.length} accounts</div>
-          <div className="h-[calc(100vh-260px)] min-h-[420px] overflow-hidden rounded-lg border border-[#E2DFD5]">
+          <div className="h-[calc(100vh-310px)] min-h-[420px] overflow-hidden rounded-lg border border-[#E2DFD5]">
             <AccountsMap accounts={accounts.data} areas={areas} />
           </div>
         </>

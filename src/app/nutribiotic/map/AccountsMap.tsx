@@ -138,7 +138,15 @@ export function AccountsMap({
     if (!map || filtered.length === 0) return;
     const bounds = new google.maps.LatLngBounds();
     for (const a of filtered) bounds.extend({ lat: a.lat, lng: a.lng });
-    map.fitBounds(bounds, 48);
+
+    /* DEFERRED TO THE NEXT FRAME, because onLoad fires before the flex container has
+       been given its height. fitBounds against a zero-height box solves for a zoom
+       that fits 500km of California into no pixels at all, which is how the map came
+       up showing Denver and Dallas. Measuring after layout is the whole fix. */
+    const raf = requestAnimationFrame(() => {
+      map.fitBounds(bounds, 48);
+    });
+    return () => cancelAnimationFrame(raf);
   }, [filtered, mapReady]);
 
   if (!apiKey) {
