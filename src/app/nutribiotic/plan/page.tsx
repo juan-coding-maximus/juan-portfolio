@@ -12,11 +12,18 @@
  * he reads a day as a mind map and taps to drive to the next stop.
  */
 
-import { isConfigured, listCadenceDue, listStaleDeals, listCalendarProposals } from "../lib/dal";
+import {
+  getCurrentRoutePlan,
+  isConfigured,
+  listCadenceDue,
+  listStaleDeals,
+  listCalendarProposals,
+} from "../lib/dal";
 import { AccountLink } from "../lib/modal";
 import { CalendarProposalRow, RecordVisit, TouchpointCapture } from "../lib/touchpoint-ui";
 import { Card, Confidence, Empty, Ico, PageHead, TierChip, daysAgo } from "../lib/ui";
 import { MONTH_PLAN } from "./data";
+import { WeekPlan } from "./week";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Plan · NutriBiotic OS" };
@@ -37,18 +44,41 @@ function Flag({ text }: { text: string }) {
 }
 
 export default async function PlanPage() {
-  const [cadence, stale, proposals] = await Promise.all([
+  const [cadence, stale, proposals, week] = await Promise.all([
     listCadenceDue(12),
     listStaleDeals(8),
     listCalendarProposals(),
+    getCurrentRoutePlan(),
   ]);
 
   return (
     <>
       <PageHead
         title="Plan"
-        sub="The 62 active SoCal accounts in 8 field days plus one flex. Benchmark: the ten-stop Santa Cruz day. Clusters two hours out are sleep-aways."
+        sub="The committed week first, read live from the route tables. The approved month sits under it as the standing shape of the territory."
       />
+
+      {/* The dated week. Live from nb_route_plans; see week.tsx for why it is
+          not a generated array like MONTH_PLAN below. */}
+      {week ? (
+        <WeekPlan plan={week} />
+      ) : (
+        <section className="mb-9">
+          <Empty>
+            {!isConfigured()
+              ? "No data source configured, so no week can be shown."
+              : "No route plan in nb_route_plans yet. Build one with bridges/nutribiotic/plan_week.py."}
+          </Empty>
+        </section>
+      )}
+
+      <h2 className="mb-3 font-[family-name:var(--font-fraunces)] text-[19px] font-semibold tracking-tight">
+        The month behind it
+      </h2>
+      <p className="mb-4 max-w-[76ch] text-[12.5px] leading-relaxed text-[#5B6560]">
+        The 62 active SoCal accounts in 8 field days plus one flex, approved 28 July. Benchmark: the
+        ten-stop Santa Cruz day. Clusters two hours out are sleep-aways.
+      </p>
 
       <div className="flex flex-col gap-5">
         {MONTH_PLAN.map((d) => (

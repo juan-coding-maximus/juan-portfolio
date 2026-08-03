@@ -908,3 +908,130 @@ export async function countOwnerWithoutCoordinates(ownerName = "Juan Arenas Mart
   );
   return rows.length;
 }
+
+// ---------------------------------------------------------------------------
+// Route plans (phase 5 · nb_route_plans / nb_route_days / nb_route_stops)
+//
+// WHY THIS IS A LIVE READ AND NOT A GENERATED data.ts.
+//
+// The month plan below it on the Plan screen was hand-transcribed into a
+// TypeScript array and committed. That array carries named businesses, street
+// addresses and phone numbers belonging to NutriBiotic's customers, and this
+// repository is PUBLIC. nutribiotic/AGENTS.md HARD RULE 9 says customer lists
+// and phone numbers are never committed to git; the standing month array
+// predates that being noticed and is flagged, but nothing new is added to it.
+//
+// So the dated week is served from the employer's own database at request time.
+// Same data on screen, none of it in a commit, and as a bonus the screen can no
+// longer disagree with nb_route_stops, which is the actual source of truth.
+// ---------------------------------------------------------------------------
+
+/** A non-account point Juan pinned by hand (nb_route_stops.account_id is NOT NULL,
+ *  and minting an account row for a fixed waypoint would auto-create a record a
+ *  human never approved). They live in nb_route_days.directions_cache. */
+export type PinnedWaypoint = {
+  name: string;
+  street: string;
+  city: string;
+  postal: string;
+  phone: string;
+  lat: number;
+  lng: number;
+  locked_time: string;
+  hours: string;
+  note: string;
+};
+
+export type RouteStopRow = {
+  seq: number;
+  priority_band: number;
+  eta: string;
+  etd: string;
+  drive_seconds: number | null;
+  drive_meters: number | null;
+  dwell_minutes: number;
+  window_open: string | null;
+  window_close: string | null;
+  nb_accounts: {
+    id: string;
+    name: string;
+    street: string | null;
+    city: string | null;
+    phone: string | null;
+    last_order_at: string | null;
+    lifetime_revenue: number | null;
+    places_status: string | null;
+  } | null;
+};
+
+export type RouteDayRow = {
+  id: string;
+  date: string;
+  kind: string;
+  cluster_id: string | null;
+  depart_at: string | null;
+  return_by: string | null;
+  directions_cache: { pinned_waypoints?: PinnedWaypoint[] } | null;
+  nb_route_stops: RouteStopRow[];
+};
+
+/** The per-stop field brief, snapshotted into nb_route_plans.config at plan time. */
+export type StopBrief = {
+  maps_address: string;
+  contacts: string[];
+  opener: string;
+  hours: string | null;
+  hours_note: string;
+  pin_source: string;
+  corridors: string[];
+  traffic_multiplier: number;
+  tier: string | null;
+  lifecycle: string | null;
+};
+
+export type RoutePlan = {
+  id: string;
+  week_start: string;
+  status: string;
+  config: {
+    dwell_minutes?: number;
+    stops_per_day_max?: number;
+    drive_times?: string;
+    home_base?: { address?: string };
+    sequencing?: string;
+    not_routed?: { name: string; was: string; why: string }[];
+    data_flags?: { name: string; day: string; flag: string }[];
+    field_brief?: Record<string, StopBrief>;
+    day_notes?: Record<string, { label: string; note: string;
+      return_drive_minutes: number; return_drive_miles: number }>;
+  } | null;
+  days: RouteDayRow[];
+};
+
+/**
+ * The most recent route plan whose week has not finished. Returns null rather
+ * than an empty shell when nothing is planned, so the screen can say so plainly
+ * instead of rendering a convincing blank week.
+ */
+export async function getCurrentRoutePlan(): Promise<RoutePlan | null> {
+  if (!isConfigured()) return null;
+
+  const plans = await raw<{ id: string; week_start: string; status: string; config: RoutePlan["config"] }>(
+    "nb_route_plans?select=id,week_start,status,config&order=week_start.desc&limit=1",
+  );
+  if (plans.length === 0) return null;
+
+  const days = await raw<RouteDayRow>(
+    `nb_route_days?plan_id=eq.${plans[0].id}&order=date.asc` +
+      "&select=id,date,kind,cluster_id,depart_at,return_by,directions_cache," +
+      "nb_route_stops(seq,priority_band,eta,etd,drive_seconds,drive_meters,dwell_minutes," +
+      "window_open,window_close," +
+      "nb_accounts(id,name,street,city,phone,last_order_at,lifetime_revenue,places_status))",
+  );
+
+  // PostgREST does not order an embedded resource for us. An out-of-order day is
+  // the one bug that would be invisible on screen and wrong in the field.
+  for (const d of days) d.nb_route_stops.sort((a, b) => a.seq - b.seq);
+
+  return { ...plans[0], days };
+}
