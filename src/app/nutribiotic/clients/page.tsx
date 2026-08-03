@@ -69,10 +69,8 @@ export default async function Clients({
   const rows = accounts.data;
 
   const byTier = { A: 0, B: 0, C: 0, D: 0 } as Record<string, number>;
-  let lowConf = 0;
   for (const r of rows) {
     byTier[r.tier] = (byTier[r.tier] ?? 0) + 1;
-    if ((r.fit_confidence ?? 0) < 0.5) lowConf += 1;
   }
 
   const byStage = new Map<string, typeof deals.data>();
@@ -224,11 +222,6 @@ export default async function Clients({
                 {byTier[t] ?? 0}
               </span>
             ))}
-            {lowConf > 0 && (
-              <span className="text-[#A0762C]">
-                {lowConf} scored below the confidence floor, barred from route band 1
-              </span>
-            )}
           </div>
 
           <div className="overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">

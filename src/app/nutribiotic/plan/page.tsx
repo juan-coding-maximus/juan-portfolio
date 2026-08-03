@@ -50,27 +50,6 @@ export default async function PlanPage() {
         sub="The 62 active SoCal accounts in 8 field days plus one flex. Benchmark: the ten-stop Santa Cruz day. Clusters two hours out are sleep-aways."
       />
 
-      {/* Touchpoint capture. What you dictate here becomes an activity log entry
-          and contact detail right away; any follow-up it hears waits below for
-          your approval before it touches the calendar. */}
-      <section className="mb-7">
-        <TouchpointCapture />
-        <RecordVisit />
-      </section>
-
-      {proposals.data.length > 0 && (
-        <section className="mb-7">
-          <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8A928C]">
-            Follow-ups to confirm
-          </h2>
-          <ul className="divide-y divide-[#EDEBE3] overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
-            {proposals.data.map((p) => (
-              <CalendarProposalRow key={p.id} proposal={p} />
-            ))}
-          </ul>
-        </section>
-      )}
-
       <div className="flex flex-col gap-5">
         {MONTH_PLAN.map((d) => (
           <Card key={d.id} className="p-0 overflow-hidden">
@@ -203,6 +182,28 @@ export default async function PlanPage() {
           )}
         </section>
       </div>
+
+      {/* Touchpoint capture. What you dictate here becomes an activity log entry
+          and contact detail right away; any follow-up it hears waits below for
+          your approval before it touches the calendar. Sits last: everything
+          above is what you're about to do, this is the record of what you did. */}
+      <section className="mt-8">
+        <TouchpointCapture />
+        <RecordVisit />
+      </section>
+
+      {proposals.data.length > 0 && (
+        <section className="mt-7">
+          <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8A928C]">
+            Follow-ups to confirm
+          </h2>
+          <ul className="divide-y divide-[#EDEBE3] overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
+            {proposals.data.map((p) => (
+              <CalendarProposalRow key={p.id} proposal={p} />
+            ))}
+          </ul>
+        </section>
+      )}
     </>
   );
 }
