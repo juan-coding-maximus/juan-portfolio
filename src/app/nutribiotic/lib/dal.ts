@@ -961,6 +961,9 @@ export type RouteStopRow = {
     last_order_at: string | null;
     lifetime_revenue: number | null;
     places_status: string | null;
+    lat: number | null;
+    lng: number | null;
+    hubspot_company_id: string | null;
   } | null;
 };
 
@@ -971,6 +974,8 @@ export type RouteDayRow = {
   cluster_id: string | null;
   depart_at: string | null;
   return_by: string | null;
+  start_lat: number | null;
+  start_lng: number | null;
   directions_cache: { pinned_waypoints?: PinnedWaypoint[] } | null;
   nb_route_stops: RouteStopRow[];
 };
@@ -1023,10 +1028,10 @@ export async function getCurrentRoutePlan(): Promise<RoutePlan | null> {
 
   const days = await raw<RouteDayRow>(
     `nb_route_days?plan_id=eq.${plans[0].id}&order=date.asc` +
-      "&select=id,date,kind,cluster_id,depart_at,return_by,directions_cache," +
+      "&select=id,date,kind,cluster_id,depart_at,return_by,start_lat,start_lng,directions_cache," +
       "nb_route_stops(seq,priority_band,eta,etd,drive_seconds,drive_meters,dwell_minutes," +
       "window_open,window_close," +
-      "nb_accounts(id,name,street,city,phone,last_order_at,lifetime_revenue,places_status))",
+      "nb_accounts(id,name,street,city,phone,last_order_at,lifetime_revenue,places_status,lat,lng,hubspot_company_id))",
   );
 
   // PostgREST does not order an embedded resource for us. An out-of-order day is

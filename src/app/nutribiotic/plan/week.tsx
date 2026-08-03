@@ -19,6 +19,12 @@ import { Card, Ico } from "../lib/ui";
 
 const LA = "America/Los_Angeles";
 
+// Portal 148711228 is EU-hosted, so the record host is app-eu1. Same URL
+// shape as map/AccountsMap.tsx's HUBSPOT_COMPANY_URL; kept local here rather
+// than shared because that file is a client component with no exports.
+const HUBSPOT_COMPANY_URL = (hubspotId: string) =>
+  `https://app-eu1.hubspot.com/contacts/148711228/record/0-2/${hubspotId}`;
+
 function hhmm(iso: string | null): string {
   if (!iso) return "";
   return new Date(iso).toLocaleTimeString("en-US", {
@@ -98,6 +104,85 @@ function WaypointRow({ wp, seq }: { wp: PinnedWaypoint; seq: number }) {
   );
 }
 
+type MapPoint = { lat: number; lng: number; kind: "home" | "stop" | "waypoint" };
+
+// A rough shape, not a real map: no tiles, no roads, just relative position
+// and visit order so a day's route reads at a glance before the stop-by-stop
+// list. Longitude is cosine-corrected by the day's mean latitude so LA's
+// east-west stretch doesn't render diagonal.
+function RouteMiniMap({ points }: { points: MapPoint[] }) {
+  if (points.length < 2) return null;
+
+  const meanLat = points.reduce((s, p) => s + p.lat, 0) / points.length;
+  const cos = Math.cos((meanLat * Math.PI) / 180);
+  const xy = points.map((p) => ({ x: p.lng * cos, y: -p.lat }));
+
+  const W = 100, H = 40, pad = 6;
+  const minX = Math.min(...xy.map((p) => p.x));
+  const maxX = Math.max(...xy.map((p) => p.x));
+  const minY = Math.min(...xy.map((p) => p.y));
+  const maxY = Math.max(...xy.map((p) => p.y));
+  const spanX = maxX - minX || 1;
+  const spanY = maxY - minY || 1;
+  const scale = Math.min((W - pad * 2) / spanX, (H - pad * 2) / spanY);
+  const offX = (W - spanX * scale) / 2;
+  const offY = (H - spanY * scale) / 2;
+  const sx = (x: number) => (x - minX) * scale + offX;
+  const sy = (y: number) => (y - minY) * scale + offY;
+
+  const path = xy.map((p, i) => `${i === 0 ? "M" : "L"} ${sx(p.x).toFixed(1)} ${sy(p.y).toFixed(1)}`).join(" ");
+
+  return (
+    <div className="border-b border-[#EEECE3] bg-[#FBFAF6] px-5 py-3">
+      <svg viewBox={`0 0 ${W} ${H}`} className="h-[60px] w-full max-w-[360px]" preserveAspectRatio="xMidYMid meet">
+        <path d={path} fill="none" stroke="#C7CFC8" strokeWidth={0.7} strokeDasharray="1.6 1.3" />
+        {xy.map((p, i) => {
+          const cx = sx(p.x);
+          const cy = sy(p.y);
+          const kind = points[i].kind;
+          return kind === "home" ? (
+            <rect key={i} x={cx - 1.5} y={cy - 1.5} width={3} height={3} fill="#3C4680" />
+          ) : (
+            <circle key={i} cx={cx} cy={cy} r={kind === "waypoint" ? 1.2 : 1.5}
+              fill={kind === "waypoint" ? "#9C4A1C" : "#2C6A46"} />
+          );
+        })}
+      </svg>
+      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10.5px] text-[#A9AFA9]">
+        <span className="inline-flex items-center gap-1"><span className="inline-block h-1.5 w-1.5 bg-[#3C4680]" />home</span>
+        <span className="inline-flex items-center gap-1"><span className="inline-block h-1.5 w-1.5 rounded-full bg-[#2C6A46]" />stop</span>
+        <span className="inline-flex items-center gap-1"><span className="inline-block h-1.5 w-1.5 rounded-full bg-[#9C4A1C]" />pinned</span>
+        <span>Schematic shape and order only, not a real map.</span>
+      </div>
+    </div>
+  );
+}
+
+function ProfileLinks({ accountId, hubspotId }: { accountId: string; hubspotId: string | null }) {
+  return (
+    <div className="mt-1 flex items-center gap-3 text-[12px]">
+      <AccountLink
+        id={accountId}
+        className="font-medium text-[#3C4A42] underline-offset-2 hover:underline"
+      >
+        OS profile
+      </AccountLink>
+      {hubspotId ? (
+        <a
+          href={HUBSPOT_COMPANY_URL(hubspotId)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-[#8A928C] underline-offset-2 hover:text-[#3C4A42] hover:underline"
+        >
+          HubSpot
+        </a>
+      ) : (
+        <span className="text-[#A9AFA9]">not linked in HubSpot</span>
+      )}
+    </div>
+  );
+}
+
 function StopRow({
   stop, brief,
 }: { stop: RouteDayRow["nb_route_stops"][number]; brief?: StopBrief }) {
@@ -128,6 +213,8 @@ function StopRow({
             {brief?.corridors?.length ? ` · x${brief.traffic_multiplier} ${brief.corridors.join(", ")}` : ""}
           </span>
         </div>
+
+        <ProfileLinks accountId={a.id} hubspotId={a.hubspot_company_id} />
 
         {brief?.contacts?.length ? (
           <div className="mt-1 text-[12.5px] leading-relaxed text-[#5B6560]">
@@ -196,19 +283,33 @@ export function WeekPlan({ plan }: { plan: RoutePlan }) {
             : -1;
 
           const rows: React.ReactNode[] = [];
+          const points: MapPoint[] = [];
+          const home = d.start_lat != null && d.start_lng != null
+            ? { lat: d.start_lat, lng: d.start_lng, kind: "home" as const }
+            : null;
+          if (home) points.push(home);
+
           d.nb_route_stops.forEach((s, i) => {
             if (i === afterIdx) {
-              wps.forEach((wp, k) =>
-                rows.push(<WaypointRow key={`wp-${k}`} wp={wp} seq={i + k + 1} />));
+              wps.forEach((wp, k) => {
+                rows.push(<WaypointRow key={`wp-${k}`} wp={wp} seq={i + k + 1} />);
+                points.push({ lat: wp.lat, lng: wp.lng, kind: "waypoint" });
+              });
             }
             rows.push(
               <StopRow key={s.seq} stop={s} brief={brief[s.nb_accounts?.id ?? ""]} />,
             );
+            if (s.nb_accounts?.lat != null && s.nb_accounts?.lng != null) {
+              points.push({ lat: s.nb_accounts.lat, lng: s.nb_accounts.lng, kind: "stop" });
+            }
           });
           if (afterIdx === -1 && wps.length > 0) {
-            wps.forEach((wp, k) =>
-              rows.push(<WaypointRow key={`wp-tail-${k}`} wp={wp} seq={d.nb_route_stops.length + k + 1} />));
+            wps.forEach((wp, k) => {
+              rows.push(<WaypointRow key={`wp-tail-${k}`} wp={wp} seq={d.nb_route_stops.length + k + 1} />);
+              points.push({ lat: wp.lat, lng: wp.lng, kind: "waypoint" });
+            });
           }
+          if (home) points.push(home);
 
           return (
             <Card key={d.id} className="p-0 overflow-hidden">
@@ -230,6 +331,8 @@ export function WeekPlan({ plan }: { plan: RoutePlan }) {
                   </div>
                 )}
               </div>
+
+              <RouteMiniMap points={points} />
 
               <ul className="divide-y divide-[#EEECE3]">{rows}</ul>
 
