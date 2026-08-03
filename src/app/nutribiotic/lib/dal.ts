@@ -980,9 +980,17 @@ export type RouteDayRow = {
   nb_route_stops: RouteStopRow[];
 };
 
-/** The per-stop field brief, snapshotted into nb_route_plans.config at plan time. */
+/**
+ * The per-stop field brief, snapshotted into nb_route_plans.config at plan time.
+ *
+ * `contacts` is the ONE field on here that is re-read live rather than trusted
+ * from the snapshot: see getCurrentRoutePlan below. Everything else (the opener,
+ * the corrected pin, the corridor multiplier) describes a decision made when the
+ * week was planned and would be wrong to silently restate.
+ */
 export type StopBrief = {
   maps_address: string;
+  /** LIVE from nb_contacts at request time, not the plan-time snapshot. */
   contacts: string[];
   opener: string;
   hours: string | null;
@@ -1038,5 +1046,55 @@ export async function getCurrentRoutePlan(): Promise<RoutePlan | null> {
   // the one bug that would be invisible on screen and wrong in the field.
   for (const d of days) d.nb_route_stops.sort((a, b) => a.seq - b.seq);
 
-  return { ...plans[0], days };
+  const plan = { ...plans[0], days };
+
+  /* WHO YOU ARE SELLING TO IS READ LIVE, not taken from the snapshot.
+   *
+   * config.field_brief is written once by plan_week.py when the week is built.
+   * That is right for the openers and the pin corrections, which record a
+   * decision. It is wrong for contacts: a name found on Monday would sit
+   * invisible behind a Sunday snapshot for the rest of the week, and the screen
+   * would show "no contact" over a database row that says otherwise. The week
+   * plan is the one screen read while standing outside the store, so it gets the
+   * current answer, not the one that was current on Sunday.
+   *
+   * Audited 2026-08-02 before the "No contact on file" placeholder was removed:
+   * all 49 stops on wk_2026_32 matched live nb_contacts exactly, 31 of them
+   * genuinely contact-less. The snapshot was accurate; it just had no guarantee
+   * of staying that way. Formatting matches plan_week.py so the CSV/markdown
+   * exports and this screen read identically.
+   */
+  const stopIds = [
+    ...new Set(days.flatMap((d) => d.nb_route_stops.map((s) => s.nb_accounts?.id).filter(Boolean))),
+  ] as string[];
+
+  if (plan.config?.field_brief && stopIds.length > 0) {
+    const live = await raw<{
+      account_id: string;
+      first_name: string | null;
+      last_name: string | null;
+      title: string | null;
+    }>(
+      `nb_contacts?account_id=in.(${stopIds.join(",")})` +
+        "&select=account_id,first_name,last_name,title,is_decision_maker" +
+        "&order=is_decision_maker.desc,last_name.asc",
+    );
+
+    const byAccount = new Map<string, string[]>();
+    for (const c of live) {
+      const name = `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim();
+      // A row with neither name is not a person we can ask for; it is not a
+      // finding either. Dropped rather than rendered as a bare title.
+      if (!name) continue;
+      const label = c.title ? `${name} · ${c.title}` : name;
+      byAccount.set(c.account_id, [...(byAccount.get(c.account_id) ?? []), label]);
+    }
+
+    for (const id of stopIds) {
+      const brief = plan.config.field_brief[id];
+      if (brief) brief.contacts = byAccount.get(id) ?? [];
+    }
+  }
+
+  return plan;
 }

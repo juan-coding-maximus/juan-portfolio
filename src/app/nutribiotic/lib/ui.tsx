@@ -77,17 +77,43 @@ export function Card({ children, className = "" }: { children: ReactNode; classN
   );
 }
 
-export function TierChip({ tier }: { tier: string | null }) {
+/**
+ * A grade letter, ALWAYS carrying the scale it was measured on.
+ *
+ * TWO DIFFERENT LETTERS EXIST IN THIS OS and they answer different questions.
+ * Juan, 2026-08-02: an account read "C" in HubSpot and "A" here, which looks
+ * like a sync bug and is not one. Verified the same day against all 273 live
+ * company records: nb_accounts.potential_hq equals HubSpot's potential__cloned_
+ * on 273 of 273, zero drift. What differs is the QUESTION:
+ *
+ *   scale="os"  nb_v_account_tier.tier, A-D. Fit x engagement, computed by
+ *               score.py. "Is this account worth the drive this week."
+ *   scale="hq"  nb_accounts.potential_hq, A-G, mirrored from HubSpot and owned
+ *               there (hubspot_fields.json marks it mirror:true). "How big could
+ *               this account ever be, on HQ's own scale."
+ *
+ * A large dormant grocery account is OS tier A (big lifetime spend, long overdue)
+ * and HQ potential C on the same day. Both are right. 214 of the 273 accounts
+ * disagree by design, so an unlabelled letter beside another unlabelled letter is
+ * not a small ambiguity, it is the common case. Hence: no bare letter without its
+ * scale, anywhere. (No account named here: this repo is public, and AGENTS.md
+ * HARD RULE 9 keeps the employer's customer names out of git.)
+ */
+export function TierChip({ tier, scale = "os" }: { tier: string | null; scale?: "os" | "hq" }) {
   const t = tier ?? "?";
-  // One accent. Tier reads from the letter, not from a color code, so the list
-  // stays legible to anyone and survives being printed.
+  // One accent. The grade reads from the letter, not from a color code, so the
+  // list stays legible to anyone and survives being printed.
   const strong = t === "A";
   return (
     <span
       className={`inline-flex h-[21px] w-[21px] items-center justify-center rounded text-[12px] font-semibold ${
         strong ? "bg-[#14201B] text-[#F7F6F1]" : "bg-[#ECEAE1] text-[#3D4A44]"
       }`}
-      title={`Tier ${t}`}
+      title={
+        scale === "hq"
+          ? `HQ potential ${t} (A-G, HubSpot's own grade, mirrored)`
+          : `OS tier ${t} (A-D, fit x engagement). Not HQ's potential grade.`
+      }
     >
       {t}
     </span>

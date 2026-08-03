@@ -199,7 +199,12 @@ function StopRow({
           <AccountLink id={a.id} className="text-[14px] font-medium leading-snug hover:underline">
             {stop.seq}. {a.name}
           </AccountLink>
-          <Chip tone="band">Band {stop.priority_band}{brief?.tier ? ` · ${brief.tier}` : ""}</Chip>
+          {/* "Band 1 · A" used to read as the same letter HubSpot shows on the
+              company record, which is a different scale entirely. Says which one
+              now. See TierChip in lib/ui.tsx for why both letters are correct. */}
+          <Chip tone="band">
+            Band {stop.priority_band}{brief?.tier ? ` · OS tier ${brief.tier}` : ""}
+          </Chip>
           {a.places_status === "CLOSED_PERMANENTLY" && <Chip tone="warn">Call first</Chip>}
           {!hours && <Chip tone="warn">Hours unknown</Chip>}
         </div>
@@ -216,16 +221,18 @@ function StopRow({
 
         <ProfileLinks accountId={a.id} hubspotId={a.hubspot_company_id} />
 
+        {/* No contact is rendered as NOTHING, not as an apology. The snapshot in
+            nb_route_plans.config.field_brief was audited against live nb_contacts
+            on 2026-08-02: every stop that shows no name here genuinely has no row,
+            so the line said "I don't know" 31 times without adding a fact. Where a
+            name IS worth chasing, the opener below says so in words tied to that
+            account. A blank is still a finding; it is just not a paragraph. */}
         {brief?.contacts?.length ? (
           <div className="mt-1 text-[12.5px] leading-relaxed text-[#5B6560]">
             <span className="text-[#8A928C]">Selling to </span>
             {brief.contacts.join("; ")}
           </div>
-        ) : (
-          <div className="mt-1 text-[12.5px] text-[#A0762C]">
-            No contact on file. Get a name before you leave.
-          </div>
-        )}
+        ) : null}
 
         {brief?.opener && (
           <div className="mt-1.5 flex gap-1.5 text-[12.5px] leading-relaxed text-[#3C4A42]">

@@ -88,7 +88,7 @@ export default async function Clients({
         sub={
           area
             ? `${area.label}. ${area.brief ?? ""}`.trim()
-            : "Your 273 accounts, sorted by tier, then by how much we actually know. An account we know nothing about does not get to sit at the top of the list because its one measured input happened to be high."
+            : "Your 273 accounts, sorted by OS tier (fit x engagement, A-D), then by how much we actually know. An account we know nothing about does not get to sit at the top of the list because its one measured input happened to be high. HubSpot's letter on the same company is HQ's potential grade, a different scale and a different question."
         }
       />
 
@@ -214,21 +214,27 @@ export default async function Clients({
         </Empty>
       ) : (
         <>
+          {/* Named "OS tier", not "tier". The letter HubSpot shows on the same
+              company is potential__cloned_ (A-G, HQ's own scale) and it disagrees
+              with this one on 214 of the 273 accounts by design. */}
           <div className="mb-5 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[12.5px] text-[#5B6560]">
             <span>{rows.length} accounts</span>
-            {(["A", "B", "C", "D"] as const).map((t) => (
-              <span key={t} className="inline-flex items-center gap-1.5">
-                <TierChip tier={t} />
-                {byTier[t] ?? 0}
-              </span>
-            ))}
+            <span className="inline-flex items-center gap-1.5">
+              <span className="text-[#8A928C]">OS tier</span>
+              {(["A", "B", "C", "D"] as const).map((t) => (
+                <span key={t} className="inline-flex items-center gap-1.5">
+                  <TierChip tier={t} />
+                  {byTier[t] ?? 0}
+                </span>
+              ))}
+            </span>
           </div>
 
           <div className="overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
             <table className="w-full text-[13.5px]">
               <thead>
                 <tr className="border-b border-[#E2DFD5] text-left text-[11px] uppercase tracking-[0.12em] text-[#8A928C]">
-                  <th className="px-4 py-2.5 font-medium">Tier</th>
+                  <th className="px-4 py-2.5 font-medium">OS tier</th>
                   <th className="px-4 py-2.5 font-medium">Account</th>
                   <th className="px-4 py-2.5 font-medium">State</th>
                   <th className="px-4 py-2.5 text-right font-medium">Fit</th>

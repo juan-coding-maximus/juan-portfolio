@@ -229,10 +229,22 @@ export function AccountsMap({
         )}
       </div>
 
-      {/* Tier filter, multi-select. Empty selection means unfiltered rather
-          than empty, so clicking a letter narrows and clicking it again
-          widens back out -- there is no separate "all" button to hunt for. */}
+      {/* HQ POTENTIAL filter, multi-select. Empty selection means unfiltered
+          rather than empty, so clicking a letter narrows and clicking it again
+          widens back out -- there is no separate "all" button to hunt for.
+
+          LABELLED, since 2026-08-02. These letters are nb_accounts.potential_hq
+          (A-G, mirrored from HubSpot's potential__cloned_), NOT the A-D OS tier
+          the Clients table and the week plan rank by. Unlabelled they read as one
+          number that contradicts itself: 214 of the 273 accounts carry a different
+          letter on each scale, by design. See TierChip in lib/ui.tsx. */}
       <div className="flex flex-wrap items-center gap-1.5 border-b border-[#E2DFD5] bg-white px-3 py-2">
+        <span
+          className="mr-0.5 text-[12px] text-[#8A928C]"
+          title="HubSpot's own potential grade (potential__cloned_, A-G). HQ owns it; the OS mirrors it. Not the A-D OS tier."
+        >
+          HQ potential
+        </span>
         {TIERS.map((t) => {
           const active = activeTiers.has(t);
           return (
@@ -328,7 +340,7 @@ export function AccountsMap({
                   </div>
                 )}
                 <div className="mt-1 flex items-center gap-2 text-[11.5px] uppercase tracking-[0.1em] text-[#8A928C]">
-                  {selected.tier && <span>potential {selected.tier}</span>}
+                  {selected.tier && <span>HQ potential {selected.tier}</span>}
                   {selected.area && <span>{areaById.get(selected.area)?.label ?? selected.area}</span>}
                   <span>{selected.channel}</span>
                   <span>·</span>
