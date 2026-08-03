@@ -53,10 +53,7 @@ export default async function PlanPage() {
 
   return (
     <>
-      <PageHead
-        title="Plan"
-        sub="The committed week first, read live from the route tables. The approved month sits under it as the standing shape of the territory."
-      />
+      <PageHead title="Plan" />
 
       {/* The dated week. Live from nb_route_plans; see week.tsx for why it is
           not a generated array like MONTH_PLAN below. */}
