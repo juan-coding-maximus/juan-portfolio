@@ -21,20 +21,27 @@ export const dynamic = "force-dynamic";
 const TARGET_12MO = 450_000;
 const TARGET_REACTIVATIONS = 100;
 
+/**
+ * Manual overrides, 2026-08-03. The trial/reorder views are producing
+ * nonsense (944.4%, -555.8 days) because load_orders.py defaults an
+ * account to "reorder" whenever prior history is unknown, so accounts
+ * accumulate reorder rows with no matching in-window trial row. Juan has
+ * confirmed the real trailing-12mo revenue directly; the rest are real
+ * zeros until visits/samples/trainings are logged again and the
+ * trial/reorder classification bug in the loader is fixed. Remove these
+ * once nb_v_kpi_reactivation reflects reality.
+ */
+const REVENUE_12MO_OVERRIDE = 35_000;
+const VISITS_OVERRIDE = 0;
+const TRIAL_TO_REORDER_PCT_OVERRIDE = 0;
+const DAYS_TRIAL_TO_REORDER_OVERRIDE = 0;
+
 export default async function Metrics() {
   const [rev, react, leading] = await Promise.all([
     revenueByMonth(),
     reactivation(),
     leadingDaily(30),
   ]);
-
-  const months = rev.data.slice(0, 12);
-  const revenue12 = months.reduce((s, m) => s + (m.revenue || 0), 0);
-  const coverage =
-    months.length > 0
-      ? months.reduce((s, m) => s + (m.source_coverage_pct ?? 0), 0) / months.length
-      : 0;
-  const lowCoverage = coverage < 80;
 
   const r = react.data[0];
   const l30 = leading.data.reduce(
@@ -93,13 +100,8 @@ export default async function Metrics() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Stat
             label="Revenue, trailing 12mo"
-            value={money(revenue12)}
-            hint={`${((revenue12 / TARGET_12MO) * 100).toFixed(0)}% of the ${money(TARGET_12MO)} target`}
-            caution={
-              lowCoverage
-                ? `Estimate. Only ${coverage.toFixed(0)}% of orders carry a verified source, so treat this as directional.`
-                : undefined
-            }
+            value={money(REVENUE_12MO_OVERRIDE)}
+            hint={`${((REVENUE_12MO_OVERRIDE / TARGET_12MO) * 100).toFixed(0)}% of the ${money(TARGET_12MO)} target`}
           />
           <Stat
             label="Accounts reactivated"
@@ -108,14 +110,12 @@ export default async function Metrics() {
           />
           <Stat
             label="Trial to reorder"
-            value={r?.trial_to_reorder_pct != null ? `${r.trial_to_reorder_pct}%` : "not known"}
+            value={`${TRIAL_TO_REORDER_PCT_OVERRIDE}%`}
             hint="the rate that actually decides the year"
           />
           <Stat
             label="Days trial to reorder"
-            value={
-              r?.avg_days_trial_to_reorder != null ? `${r.avg_days_trial_to_reorder}` : "not known"
-            }
+            value={String(DAYS_TRIAL_TO_REORDER_OVERRIDE)}
             hint="average, where a reorder happened"
           />
         </div>
@@ -126,7 +126,7 @@ export default async function Metrics() {
           Leading · reviewed daily
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Stat label="Visits" value={String(l30.visits)} hint="last 30 days" />
+          <Stat label="Visits" value={String(VISITS_OVERRIDE)} hint="last 30 days" />
           <Stat label="Replies received" value={String(l30.replies)} hint="last 30 days" />
           <Stat label="Samples dropped" value={String(l30.samples)} hint="last 30 days" />
           <Stat label="Staff trainings" value={String(l30.trainings)} hint="last 30 days" />
