@@ -106,13 +106,68 @@ function WaypointRow({ wp, seq }: { wp: PinnedWaypoint; seq: number }) {
 
 type MapPoint = { lat: number; lng: number; kind: "home" | "stop" | "waypoint" };
 
-// A rough shape, not a real map: no tiles, no roads, just relative position
-// and visit order so a day's route reads at a glance before the stop-by-stop
-// list. Longitude is cosine-corrected by the day's mean latitude so LA's
-// east-west stretch doesn't render diagonal.
-function RouteMiniMap({ points }: { points: MapPoint[] }) {
-  if (points.length < 2) return null;
+// Same muted palette as map/AccountsMap.tsx's MAP_STYLE, in Static Maps'
+// pipe-separated string form (that one is typed against google.maps.MapTypeStyle,
+// which needs the JS API loaded; this file is a server component and has no
+// client script to load it with).
+const STATIC_MAP_STYLE = [
+  "element:labels.text.fill|color:0x8a928c",
+  "element:labels.text.stroke|color:0xf7f6f1",
+  "feature:administrative|element:geometry.stroke|color:0xd8d4c8",
+  "feature:landscape|element:geometry|color:0xf3f1ea",
+  "feature:poi|visibility:off",
+  "feature:road|element:geometry|color:0xffffff",
+  "feature:road|element:labels|visibility:off",
+  "feature:road.arterial|element:geometry|color:0xede9dc",
+  "feature:transit|visibility:off",
+  "feature:water|element:geometry|color:0xdde4e0",
+];
 
+// One static-image request per day-card: real tiles, real roads, real
+// proportions, no client JS bundle and none of AccountsMap.tsx's continuous
+// tile/interaction billing. Google auto-fits the viewport to the markers, so
+// there is no manual bbox math to keep in sync with it.
+//
+// The connecting line is still a straight geodesic between stops, not a
+// routed path: the Google Routes API is not enabled on this project (see the
+// same note in bridges/nutribiotic/plan_week.py), so there is no encoded
+// polyline to draw. Real geography now makes that limitation obvious rather
+// than hidden, which is the honest version of this image.
+function staticMapSrc(points: MapPoint[]): string | null {
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  if (!apiKey) return null;
+
+  const byKind = { home: [] as MapPoint[], stop: [] as MapPoint[], waypoint: [] as MapPoint[] };
+  for (const p of points) byKind[p.kind].push(p);
+
+  const params = new URLSearchParams();
+  params.set("size", "640x220");
+  params.set("scale", "2");
+  params.set("maptype", "roadmap");
+  for (const rule of STATIC_MAP_STYLE) params.append("style", rule);
+
+  const coords = (pts: MapPoint[]) => pts.map((p) => `${p.lat},${p.lng}`).join("|");
+  params.append("path", `color:0x8a928c99|weight:2|geodesic:true|${coords(points)}`);
+
+  const markerGroups: [string, "small" | "mid", MapPoint[]][] = [
+    ["0x2C6A46", "small", byKind.stop],
+    ["0x9C4A1C", "small", byKind.waypoint],
+    ["0x3C4680", "mid", byKind.home],
+  ];
+  for (const [color, size, pts] of markerGroups) {
+    if (pts.length) params.append("markers", `color:${color}|size:${size}|${coords(pts)}`);
+  }
+
+  // key last: keeps every other param stable if this ever gets logged mid-string.
+  params.append("key", apiKey);
+  return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
+}
+
+// Fallback only: no tiles, no roads, just relative position and visit order,
+// for when NEXT_PUBLIC_GOOGLE_MAPS_API_KEY isn't set. Longitude is
+// cosine-corrected by the day's mean latitude so LA's east-west stretch
+// doesn't render diagonal.
+function SchematicFallback({ points }: { points: MapPoint[] }) {
   const meanLat = points.reduce((s, p) => s + p.lat, 0) / points.length;
   const cos = Math.cos((meanLat * Math.PI) / 180);
   const xy = points.map((p) => ({ x: p.lng * cos, y: -p.lat }));
@@ -133,26 +188,47 @@ function RouteMiniMap({ points }: { points: MapPoint[] }) {
   const path = xy.map((p, i) => `${i === 0 ? "M" : "L"} ${sx(p.x).toFixed(1)} ${sy(p.y).toFixed(1)}`).join(" ");
 
   return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-[60px] w-full max-w-[360px]" preserveAspectRatio="xMidYMid meet">
+      <path d={path} fill="none" stroke="#C7CFC8" strokeWidth={0.7} strokeDasharray="1.6 1.3" />
+      {xy.map((p, i) => {
+        const cx = sx(p.x);
+        const cy = sy(p.y);
+        const kind = points[i].kind;
+        return kind === "home" ? (
+          <rect key={i} x={cx - 1.5} y={cy - 1.5} width={3} height={3} fill="#3C4680" />
+        ) : (
+          <circle key={i} cx={cx} cy={cy} r={kind === "waypoint" ? 1.2 : 1.5}
+            fill={kind === "waypoint" ? "#9C4A1C" : "#2C6A46"} />
+        );
+      })}
+    </svg>
+  );
+}
+
+function RouteMiniMap({ points }: { points: MapPoint[] }) {
+  if (points.length < 2) return null;
+  const src = staticMapSrc(points);
+
+  return (
     <div className="border-b border-[#EEECE3] bg-[#FBFAF6] px-5 py-3">
-      <svg viewBox={`0 0 ${W} ${H}`} className="h-[60px] w-full max-w-[360px]" preserveAspectRatio="xMidYMid meet">
-        <path d={path} fill="none" stroke="#C7CFC8" strokeWidth={0.7} strokeDasharray="1.6 1.3" />
-        {xy.map((p, i) => {
-          const cx = sx(p.x);
-          const cy = sy(p.y);
-          const kind = points[i].kind;
-          return kind === "home" ? (
-            <rect key={i} x={cx - 1.5} y={cy - 1.5} width={3} height={3} fill="#3C4680" />
-          ) : (
-            <circle key={i} cx={cx} cy={cy} r={kind === "waypoint" ? 1.2 : 1.5}
-              fill={kind === "waypoint" ? "#9C4A1C" : "#2C6A46"} />
-          );
-        })}
-      </svg>
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element -- external Google-served image, not a build asset
+        <img
+          src={src}
+          alt="Route map for the day"
+          width={640}
+          height={220}
+          loading="lazy"
+          className="h-[140px] w-full max-w-[480px] rounded-md border border-[#EEECE3] object-cover"
+        />
+      ) : (
+        <SchematicFallback points={points} />
+      )}
       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10.5px] text-[#A9AFA9]">
         <span className="inline-flex items-center gap-1"><span className="inline-block h-1.5 w-1.5 bg-[#3C4680]" />home</span>
         <span className="inline-flex items-center gap-1"><span className="inline-block h-1.5 w-1.5 rounded-full bg-[#2C6A46]" />stop</span>
         <span className="inline-flex items-center gap-1"><span className="inline-block h-1.5 w-1.5 rounded-full bg-[#9C4A1C]" />pinned</span>
-        <span>Schematic shape and order only, not a real map.</span>
+        {!src && <span>Schematic shape and order only, not a real map: no Maps key configured.</span>}
       </div>
     </div>
   );
