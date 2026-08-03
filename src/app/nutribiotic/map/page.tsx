@@ -8,18 +8,14 @@
  * listOwnerAccounts() and geocode.py's corroboration rule.
  */
 
-import { countOwnerWithoutCoordinates, isConfigured, listAreas, listOwnerAccounts } from "../lib/dal";
-import { Empty, Ico, PageHead } from "../lib/ui";
+import { isConfigured, listAreas, listOwnerAccounts } from "../lib/dal";
+import { Empty, PageHead } from "../lib/ui";
 import { AccountsMap } from "./AccountsMap";
 
 export const dynamic = "force-dynamic";
 
 export default async function MapPage() {
-  const [accounts, ungeocoded, areas] = await Promise.all([
-    listOwnerAccounts(),
-    countOwnerWithoutCoordinates(),
-    listAreas(),
-  ]);
+  const [accounts, areas] = await Promise.all([listOwnerAccounts(), listAreas()]);
 
   return (
     <>
@@ -27,20 +23,6 @@ export default async function MapPage() {
         title="Map"
         sub="Every account assigned to Juan in HubSpot with a Places-verified address, coloured by territory area. An account missing here is missing an address on file or has an unverified one, never an approximate guess."
       />
-
-      {ungeocoded > 0 && (
-        <p className="mb-4 flex items-start gap-1.5 text-[13px] text-[#A0762C]">
-          <Ico name="alert" size={14} />
-          <span>
-            {ungeocoded} of Juan&rsquo;s account{ungeocoded === 1 ? "" : "s"} cannot appear yet:
-            no verified pin. Run{" "}
-            <code className="rounded bg-[#F3EFE3] px-1 py-0.5 text-[12.5px]">
-              python3 bridges/nutribiotic/geocode.py --write --owner &quot;Juan Arenas Martin&quot;
-            </code>{" "}
-            to place them.
-          </span>
-        </p>
-      )}
 
       {accounts.data.length === 0 ? (
         <Empty>
