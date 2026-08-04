@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GoogleMap, MarkerF, InfoWindowF, PolygonF, useLoadScript } from "@react-google-maps/api";
 import type { MapAccount, TerritoryArea, Tier } from "../lib/dal";
 import { AccountLink } from "../lib/modal";
+import type { FocusRequest } from "./MapScreen";
 
 const CONTAINER_STYLE = { width: "100%", height: "100%" };
 
@@ -60,10 +61,12 @@ export function AccountsMap({
   accounts,
   areas,
   userLoc,
+  focus,
 }: {
   accounts: MapAccount[];
   areas: TerritoryArea[];
   userLoc?: { lat: number; lng: number } | null;
+  focus?: FocusRequest | null;
 }) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const { isLoaded, loadError } = useLoadScript({ googleMapsApiKey: apiKey ?? "" });
@@ -186,6 +189,33 @@ export function AccountsMap({
     fittedRef.current = fitKey;
     userCentredRef.current = true;
   }, [userLoc, mapReady, fitKey]);
+
+  /* SHOW IN MAP, driven by the ten-closest list. A fresh `focus` object arrives
+     on every click (even a repeat click on the same account), so this effect
+     always re-fires. Fits the camera to the two points that matter, Juan and
+     the account, and opens that account's InfoWindow exactly as a click on
+     its pin would (the info card renders at the account's coordinates whether
+     or not a tier/area filter currently hides its dot). Deliberately does not
+     touch activeTiers/activeAreas: clearing them would change `filtered`,
+     which changes fitKey, which would trip the fitKey effect above and refit
+     the camera back out to every pin one tick after this one zoomed in. */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady || !focus) return;
+    const account = accounts.find((a) => a.id === focus.id);
+    if (!account) return;
+    setSelected(account);
+    if (userLoc) {
+      const bounds = new google.maps.LatLngBounds();
+      bounds.extend(userLoc);
+      bounds.extend({ lat: account.lat, lng: account.lng });
+      map.fitBounds(bounds, 96);
+    } else {
+      map.setCenter({ lat: account.lat, lng: account.lng });
+      map.setZoom(14);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus, mapReady]);
 
   if (!apiKey) {
     return (

@@ -10,13 +10,14 @@
  * a location.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { MapAccount, TerritoryArea } from "../lib/dal";
 import { AccountsMap } from "./AccountsMap";
 import { NearestClients } from "./NearestClients";
 
 export type UserLoc = { lat: number; lng: number };
 export type LocStatus = "pending" | "ok" | "denied" | "unavailable";
+export type FocusRequest = { id: string; n: number };
 
 export function MapScreen({
   accounts,
@@ -27,6 +28,18 @@ export function MapScreen({
 }) {
   const [loc, setLoc] = useState<UserLoc | null>(null);
   const [locStatus, setLocStatus] = useState<LocStatus>("pending");
+  const [focus, setFocus] = useState<FocusRequest | null>(null);
+  const focusN = useRef(0);
+  const mapBoxRef = useRef<HTMLDivElement>(null);
+
+  // A fresh n on every click, even a repeat click on the same account, so the
+  // map's focus effect (keyed on this signal) always re-fires and re-zooms
+  // rather than no-op'ing on an unchanged id.
+  function showInMap(id: string) {
+    focusN.current += 1;
+    setFocus({ id, n: focusN.current });
+    mapBoxRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   useEffect(() => {
     if (!("geolocation" in navigator)) {
@@ -52,11 +65,14 @@ export function MapScreen({
           once opened showing Nevada and Texas. The floor has to clear the
           chrome before it is a map; on a phone the rows wrap taller, hence the
           smaller floor there paired with the ten-closest list right below. */}
-      <div className="h-[calc(100vh-240px)] min-h-[520px] overflow-hidden rounded-lg border border-[#E2DFD5] md:min-h-[640px]">
-        <AccountsMap accounts={accounts} areas={areas} userLoc={loc} />
+      <div
+        ref={mapBoxRef}
+        className="h-[calc(100vh-240px)] min-h-[520px] overflow-hidden rounded-lg border border-[#E2DFD5] md:min-h-[640px]"
+      >
+        <AccountsMap accounts={accounts} areas={areas} userLoc={loc} focus={focus} />
       </div>
 
-      <NearestClients accounts={accounts} userLoc={loc} status={locStatus} />
+      <NearestClients accounts={accounts} userLoc={loc} status={locStatus} onShowInMap={showInMap} />
     </>
   );
 }
