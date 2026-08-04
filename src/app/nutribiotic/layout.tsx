@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { isConfigured, listDrafts, workspaceMode } from "./lib/dal";
 import { ModalProvider } from "./lib/modal";
+import { MobileNav } from "./lib/MobileNav";
 import { Ico } from "./lib/ui";
 
 export const metadata: Metadata = {
@@ -109,8 +110,14 @@ export default async function NutribioticLayout({
 
           </aside>
 
-          <main className="min-w-0 flex-1 px-5 py-7 md:px-9">{children}</main>
+          {/* pb clears The OS mobile nav below md; the bar is fixed, so without
+              this the last row of every screen hides behind it. */}
+          <main className="min-w-0 flex-1 px-5 py-7 pb-24 md:px-9 md:pb-7">{children}</main>
         </div>
+
+        {/* The OS mobile nav: the same items as the sidebar, same gating rules,
+            rendered as a bottom tab bar below md where the sidebar disappears. */}
+        <MobileNav items={nav} />
       </div>
       </ModalProvider>
     </div>

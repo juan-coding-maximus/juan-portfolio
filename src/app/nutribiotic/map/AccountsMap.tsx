@@ -43,12 +43,27 @@ const MAP_STYLE: google.maps.MapTypeStyle[] = [
   { featureType: "water", elementType: "geometry", stylers: [{ color: "#dde4e0" }] },
 ];
 
+/* THE POTENTIAL DOTS, Juan's call 2026-08-04: an account carrying an HQ
+   potential grade is the reason to be on this map at all, so those pins stop
+   wearing their area colour and wear the grade instead. Red is A/B (the big
+   capacity), orange is C/D. E-G keep the area dot: colouring "personal use
+   through wholesale" like a hot lead would make the highlight meaningless.
+   The same two colours mark the filter chips, so the legend is the control. */
+const POTENTIAL_COLOR: Partial<Record<Tier, string>> = {
+  A: "#B5372A",
+  B: "#B5372A",
+  C: "#D97E2B",
+  D: "#D97E2B",
+};
+
 export function AccountsMap({
   accounts,
   areas,
+  userLoc,
 }: {
   accounts: MapAccount[];
   areas: TerritoryArea[];
+  userLoc?: { lat: number; lng: number } | null;
 }) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const { isLoaded, loadError } = useLoadScript({ googleMapsApiKey: apiKey ?? "" });
@@ -156,6 +171,22 @@ export function AccountsMap({
     fitToPins();
   }, [fitKey, mapReady, fitToPins]);
 
+  /* OPEN ON JUAN, kinda zoomed in. The fix arrives async (1-3s on a phone), so
+     this cannot be an initial-center option: by then the territory fit has run.
+     When the position lands, the camera moves to it once, at street-cluster
+     zoom, and the fit signature is stamped so the next idle does not yank the
+     viewport back to the whole territory. Touching a filter afterwards is an
+     explicit ask to see those pins, and re-fits as before. */
+  const userCentredRef = useRef(false);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !userLoc || !mapReady || userCentredRef.current) return;
+    map.setCenter(userLoc);
+    map.setZoom(12);
+    fittedRef.current = fitKey;
+    userCentredRef.current = true;
+  }, [userLoc, mapReady, fitKey]);
+
   if (!apiKey) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 rounded-lg border border-[#E2DFD5] bg-white p-8 text-center">
@@ -247,18 +278,24 @@ export function AccountsMap({
         </span>
         {TIERS.map((t) => {
           const active = activeTiers.has(t);
+          const dot = POTENTIAL_COLOR[t];
           return (
             <button
               key={t}
               type="button"
               onClick={() => toggleTier(t)}
               aria-pressed={active}
-              className={`rounded-md border px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
+              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
                 active
                   ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
                   : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
               }`}
             >
+              {/* The chip wears the same dot its pins wear, so the legend and
+                  the control are one thing. Gradeless letters get no dot. */}
+              {dot && (
+                <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: dot }} />
+              )}
               {t} <span className="tabular-nums opacity-70">{tierCounts[t]}</span>
             </button>
           );
@@ -308,23 +345,45 @@ export function AccountsMap({
             />
           ))}
 
-          {filtered.map((a) => (
+          {filtered.map((a) => {
+            const potential = a.tier ? POTENTIAL_COLOR[a.tier] : undefined;
+            return (
+              <MarkerF
+                key={a.id}
+                position={{ lat: a.lat, lng: a.lng }}
+                opacity={a.do_not_visit ? 0.45 : 1}
+                onClick={() => setSelected(a)}
+                zIndex={potential ? 3 : 2}
+                icon={{
+                  path: google.maps.SymbolPath.CIRCLE,
+                  scale: potential ? 7 : 6,
+                  fillColor: potential ?? ((a.area && areaById.get(a.area)?.color) || "#5B6560"),
+                  fillOpacity: 1,
+                  strokeColor: "#F7F6F1",
+                  strokeWeight: 1.5,
+                }}
+              />
+            );
+          })}
+
+          {/* You are here. Blue, the one convention every map user already
+              knows; no area or grade uses it, so it cannot be mistaken for an
+              account. Not clickable: it opens no card and sells nothing. */}
+          {userLoc && (
             <MarkerF
-              key={a.id}
-              position={{ lat: a.lat, lng: a.lng }}
-              opacity={a.do_not_visit ? 0.45 : 1}
-              onClick={() => setSelected(a)}
-              zIndex={2}
+              position={userLoc}
+              zIndex={4}
+              clickable={false}
               icon={{
                 path: google.maps.SymbolPath.CIRCLE,
-                scale: 6,
-                fillColor: (a.area && areaById.get(a.area)?.color) || "#5B6560",
+                scale: 7,
+                fillColor: "#1A73E8",
                 fillOpacity: 1,
-                strokeColor: "#F7F6F1",
-                strokeWeight: 1.5,
+                strokeColor: "#FFFFFF",
+                strokeWeight: 2.5,
               }}
             />
-          ))}
+          )}
 
           {selected && (
             <InfoWindowF

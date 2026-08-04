@@ -1,0 +1,155 @@
+"use client";
+
+/**
+ * The ten closest clients to where Juan is standing, the "who can I hit from
+ * here" list under the map. Distance is straight-line haversine, stated in
+ * miles: honest about being as-the-crow-flies (a route figure would be a
+ * fabricated number, we have no directions API call here).
+ *
+ * Each row carries the three actions a field stop needs: the phone number as a
+ * tap-to-call link, the HubSpot company record, and GO, one big Apple Maps
+ * tap target per the standing field-brief format. do_not_visit accounts are
+ * excluded: a proximity list exists to be driven to.
+ */
+
+import type { MapAccount } from "../lib/dal";
+import { Ico, TierChip } from "../lib/ui";
+import { AccountLink } from "../lib/modal";
+import type { LocStatus, UserLoc } from "./MapScreen";
+
+// Same shape as the map's InfoWindow link: EU portal host, companies object 0-2.
+const HUBSPOT_COMPANY_URL = (hubspotId: string) =>
+  `https://app-eu1.hubspot.com/contacts/148711228/record/0-2/${hubspotId}`;
+
+const POTENTIAL_DOT: Record<string, string> = {
+  A: "#B5372A",
+  B: "#B5372A",
+  C: "#D97E2B",
+  D: "#D97E2B",
+};
+
+function haversineMiles(a: UserLoc, b: { lat: number; lng: number }): number {
+  const R = 3958.8;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const la1 = (a.lat * Math.PI) / 180;
+  const la2 = (b.lat * Math.PI) / 180;
+  const h =
+    Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+export function NearestClients({
+  accounts,
+  userLoc,
+  status,
+}: {
+  accounts: MapAccount[];
+  userLoc: UserLoc | null;
+  status: LocStatus;
+}) {
+  const header = (
+    <div className="mb-3 mt-6 flex items-baseline justify-between">
+      <h2 className="font-[family-name:var(--font-fraunces)] text-[19px] font-semibold tracking-tight">
+        Ten closest
+      </h2>
+      <span className="text-[12px] text-[#8A928C]">straight-line from your position</span>
+    </div>
+  );
+
+  if (!userLoc) {
+    return (
+      <>
+        {header}
+        <div className="rounded-lg border border-[#E2DFD5] bg-white p-5 text-[13.5px] leading-relaxed text-[#5B6560]">
+          {status === "pending" && "Waiting for your position..."}
+          {status === "denied" &&
+            "Location is off for this site, so there is nothing honest to rank by. Allow location access and reload to see the ten closest clients."}
+          {status === "unavailable" &&
+            "This browser exposes no geolocation, so a closest-clients list cannot be computed."}
+        </div>
+      </>
+    );
+  }
+
+  const nearest = accounts
+    .filter((a) => !a.do_not_visit)
+    .map((a) => ({ a, mi: haversineMiles(userLoc, a) }))
+    .sort((x, y) => x.mi - y.mi)
+    .slice(0, 10);
+
+  return (
+    <>
+      {header}
+      <div className="overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
+        <ul className="divide-y divide-[#EEECE3]">
+          {nearest.map(({ a, mi }, i) => (
+            <li key={a.id} className="flex items-center gap-3 px-4 py-3">
+              <span className="w-5 shrink-0 text-right text-[12px] tabular-nums text-[#8A928C]">
+                {i + 1}
+              </span>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  {a.tier && POTENTIAL_DOT[a.tier] && (
+                    <span
+                      aria-hidden
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ background: POTENTIAL_DOT[a.tier] }}
+                    />
+                  )}
+                  <AccountLink
+                    id={a.id}
+                    className="truncate text-[14px] font-medium leading-snug hover:underline"
+                  >
+                    {a.name}
+                  </AccountLink>
+                  {a.tier && <TierChip tier={a.tier} scale="hq" />}
+                </div>
+                <div className="mt-0.5 text-[12.5px] text-[#5B6560]">
+                  <span className="font-medium tabular-nums text-[#3D4A44]">{mi.toFixed(1)} mi</span>
+                  {a.street ? ` · ${a.street}` : ""}
+                  {a.city ? `, ${a.city}` : ""}
+                </div>
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-[12.5px]">
+                  {a.phone ? (
+                    <a
+                      href={`tel:${a.phone}`}
+                      className="inline-flex items-center gap-1 font-medium text-[#2C6A46] underline-offset-2 hover:underline"
+                    >
+                      {a.phone}
+                    </a>
+                  ) : (
+                    <span className="text-[#A9AFA9]">no phone on file</span>
+                  )}
+                  {a.hubspot_company_id && (
+                    <a
+                      href={HUBSPOT_COMPANY_URL(a.hubspot_company_id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#8A928C] underline-offset-2 hover:text-[#3D4A44] hover:underline"
+                    >
+                      HubSpot
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              <a
+                href={`https://maps.apple.com/?daddr=${a.lat},${a.lng}`}
+                className="flex shrink-0 items-center gap-1.5 rounded-md bg-[#2C6A46] px-3.5 py-2.5 text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90"
+              >
+                <Ico name="pin" size={13} />
+                GO
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <p className="mt-2 text-[12px] leading-relaxed text-[#8A928C]">
+        Straight-line distance, not drive time. Red dot: HQ potential A or B. Orange: C or D.
+        Accounts marked do-not-visit are left out.
+      </p>
+    </>
+  );
+}
