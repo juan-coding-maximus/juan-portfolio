@@ -189,6 +189,12 @@ export function AccountsMap({
   const leadStatusOptions = useMemo(() => {
     const c = new Map<string, number>();
     for (const a of accounts) {
+      // A WAYPOINT HAS NO LEAD STATUS AND NEVER WILL. Juan's apartment was the
+      // entire "New to activate (1)" bucket on 2026-08-05, which read as a
+      // sales lead nobody had worked and was really just his front door. Its
+      // null is not a gap in the CRM, it is a category error, so it is left out
+      // of this filter rather than counted as an unworked account.
+      if (a.lifecycle === "waypoint") continue;
       const key = a.lead_status ?? NO_LEAD_STATUS;
       c.set(key, (c.get(key) ?? 0) + 1);
     }
