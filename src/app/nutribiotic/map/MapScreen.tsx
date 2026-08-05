@@ -7,17 +7,17 @@
  * stored anywhere: it exists in this component's state for this page view and
  * that is all. A denied or absent fix degrades honestly, the map falls back to
  * fitting the territory and the list says why it is empty instead of guessing
- * a location.
+ * a location. "Honestly" includes naming the right cause: see requestLoc.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { MapAccount, TerritoryArea } from "../lib/dal";
 import { toggleShowChainAccounts, toggleShowPracticeAccounts } from "../lib/prefs-actions";
 import { AccountsMap } from "./AccountsMap";
 import { NearestClients } from "./NearestClients";
 
 export type UserLoc = { lat: number; lng: number };
-export type LocStatus = "pending" | "ok" | "denied" | "unavailable";
+export type LocStatus = "pending" | "ok" | "denied" | "timeout" | "unavailable";
 export type FocusRequest = { id: string; n: number };
 
 export function MapScreen({
@@ -63,20 +63,68 @@ export function MapScreen({
     mapBoxRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  useEffect(() => {
+  // Ask for the fix. Callable again from the list's retry button, because the
+  // two failures that actually happen here are both recoverable without a
+  // reload: an unanswered permission bubble, and a Mac that took its time.
+  //
+  // Three things this gets right that the first version did not, all of them
+  // learned from the map telling Juan on his Mac that he had denied a
+  // permission the browser reported as "prompt":
+  //
+  // 1. A failure is not automatically a denial. GeolocationPositionError has
+  //    three codes and they mean different things to the person reading the
+  //    screen: only PERMISSION_DENIED is a permission to go change.
+  // 2. getCurrentPosition's timeout starts at the call, not when the user
+  //    answers the bubble, so a 10s cap was a countdown against Juan reading
+  //    a dialog rather than against the radio getting a fix. It expired with
+  //    the bubble still open. The cap is long while an answer is outstanding
+  //    and short once the grant is already on file.
+  // 3. enableHighAccuracy is a phone idea. A Mac has no GPS to switch on, so
+  //    the flag only makes Core Location work longer for the same wifi-derived
+  //    answer, which is the other half of why this timed out. A city-block fix
+  //    is all a "who is near me" ranking can honestly use anyway.
+  const requestLoc = useCallback(() => {
     if (!("geolocation" in navigator)) {
       setLocStatus("unavailable");
       return;
     }
-    navigator.geolocation.getCurrentPosition(
-      (p) => {
-        setLoc({ lat: p.coords.latitude, lng: p.coords.longitude });
-        setLocStatus("ok");
-      },
-      () => setLocStatus("denied"),
-      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
-    );
+    setLocStatus("pending");
+
+    const ask = (answerPending: boolean) =>
+      navigator.geolocation.getCurrentPosition(
+        (p) => {
+          setLoc({ lat: p.coords.latitude, lng: p.coords.longitude });
+          setLocStatus("ok");
+        },
+        (e) => {
+          if (e.code === e.PERMISSION_DENIED) setLocStatus("denied");
+          else if (e.code === e.TIMEOUT) setLocStatus("timeout");
+          else setLocStatus("unavailable");
+        },
+        {
+          enableHighAccuracy: false,
+          timeout: answerPending ? 60_000 : 15_000,
+          maximumAge: 60_000,
+        },
+      );
+
+    // Permissions API is advisory here: if it is missing or refuses the query
+    // (Safari does not expose geolocation state), assume an answer is pending
+    // and take the patient timeout. Being slow to give up is the safe error.
+    const perms = navigator.permissions;
+    if (perms?.query) {
+      perms
+        .query({ name: "geolocation" })
+        .then((s) => ask(s.state === "prompt"))
+        .catch(() => ask(true));
+    } else {
+      ask(true);
+    }
   }, []);
+
+  useEffect(() => {
+    requestLoc();
+  }, [requestLoc]);
 
   return (
     <>
@@ -107,6 +155,7 @@ export function MapScreen({
         accounts={accounts}
         userLoc={loc}
         status={locStatus}
+        onRetryLoc={requestLoc}
         onShowInMap={showInMap}
         showChains={showChains}
         showPractices={showPractices}

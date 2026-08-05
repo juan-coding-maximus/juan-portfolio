@@ -67,6 +67,7 @@ export function NearestClients({
   accounts,
   userLoc,
   status,
+  onRetryLoc,
   onShowInMap,
   showChains,
   showPractices,
@@ -74,6 +75,7 @@ export function NearestClients({
   accounts: MapAccount[];
   userLoc: UserLoc | null;
   status: LocStatus;
+  onRetryLoc: () => void;
   onShowInMap: (id: string) => void;
   showChains: boolean;
   showPractices: boolean;
@@ -92,11 +94,48 @@ export function NearestClients({
       <>
         {header}
         <div className="rounded-lg border border-[#E2DFD5] bg-white p-5 text-[13.5px] leading-relaxed text-[#5B6560]">
-          {status === "pending" && "Waiting for your position..."}
-          {status === "denied" &&
-            "Location is off for this site, so there is nothing honest to rank by. Allow location access and reload to see the ten closest clients."}
-          {status === "unavailable" &&
-            "This browser exposes no geolocation, so a closest-clients list cannot be computed."}
+          {status === "pending" && (
+            <p>
+              Waiting for your position. If your browser is asking permission, answer it and this
+              fills in.
+            </p>
+          )}
+          {status === "denied" && (
+            <p>
+              Location is blocked for this site, so there is nothing honest to rank by. Allow it
+              from the lock icon in the address bar, then use the button below.
+            </p>
+          )}
+          {status === "timeout" && (
+            <>
+              <p>
+                Your browser did not return a position in time, so there is nothing honest to rank
+                by. The site permission is not the problem.
+              </p>
+              <p className="mt-2">
+                On a Mac this is usually Location Services being off for the browser itself: System
+                Settings &rsaquo; Privacy &amp; Security &rsaquo; Location Services, switch on
+                Chrome. Then try again.
+              </p>
+            </>
+          )}
+          {status === "unavailable" && (
+            <p>
+              Your browser could not determine a position at all, so a closest-clients list cannot
+              be computed. On a desktop with no wifi networks in range there may be nothing for it
+              to work from.
+            </p>
+          )}
+          {status !== "pending" && (
+            <button
+              type="button"
+              onClick={onRetryLoc}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white px-3 py-2 text-[12.5px] font-medium text-[#3D4A44] transition-colors hover:bg-[#FAF9F5]"
+            >
+              <Ico name="locate" size={13} />
+              Try my location again
+            </button>
+          )}
         </div>
       </>
     );
