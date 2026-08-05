@@ -133,10 +133,27 @@ export function AccountsMap({
   // on click and widens again on the second click.
   const [activeAreas, setActiveAreas] = useState<Set<string>>(new Set());
 
-  // "" is unfiltered, same convention as an empty tier/area set above. Single
-  // choice, not a set: Juan asked for a dropdown, and a dropdown that
-  // multi-selects is a dropdown that lies about what it does.
-  const [leadStatus, setLeadStatus] = useState<string>("");
+  /* Empty set is unfiltered, same convention as the tier and area chips.
+     Was a single-choice dropdown for a few hours on 2026-08-05; Juan asked for
+     chips like the potential row instead, which also makes it multi-select,
+     since a set of chips that only allowed one would be a radio group wearing
+     the wrong clothes. "Active - follow ups OR New to activate" is a real
+     question, and the dropdown could not ask it. */
+  const [activeLeadStatuses, setActiveLeadStatuses] = useState<Set<string>>(new Set());
+
+  // Closed by default: on a phone the map is what you came for. Desktop
+  // ignores this entirely (md:contents), so the state is mobile-only.
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  function toggleLeadStatus(v: string) {
+    setSelected(null);
+    setActiveLeadStatuses((prev) => {
+      const next = new Set(prev);
+      if (next.has(v)) next.delete(v);
+      else next.add(v);
+      return next;
+    });
+  }
   const mapRef = useRef<google.maps.Map | null>(null);
 
   const areaById = useMemo(() => new Map(areas.map((a) => [a.id, a])), [areas]);
@@ -184,6 +201,16 @@ export function AccountsMap({
       }));
   }, [accounts]);
 
+  // What the collapsed Filters button has to admit to hiding. Chains and
+  // practices are counted only when SHOWN, because hidden is their resting
+  // state and a badge that reads "2" on a map nobody has touched is noise.
+  const activeFilterCount =
+    activeAreas.size +
+    activeTiers.size +
+    activeLeadStatuses.size +
+    (showChains ? 1 : 0) +
+    (showPractices ? 1 : 0);
+
   const areaCounts = useMemo(() => {
     const c: Record<string, number> = {};
     for (const a of accounts) if (a.area) c[a.area] = (c[a.area] ?? 0) + 1;
@@ -216,11 +243,12 @@ export function AccountsMap({
         (a) =>
           (activeTiers.size === 0 || (a.tier !== null && activeTiers.has(a.tier))) &&
           (activeAreas.size === 0 || (a.area !== null && activeAreas.has(a.area))) &&
-          (leadStatus === "" || (a.lead_status ?? NO_LEAD_STATUS) === leadStatus) &&
+          (activeLeadStatuses.size === 0 ||
+            activeLeadStatuses.has(a.lead_status ?? NO_LEAD_STATUS)) &&
           (showChains || !a.chain_excluded) &&
           (showPractices || !a.practice_excluded),
       ),
-    [accounts, activeTiers, activeAreas, leadStatus, showChains, showPractices],
+    [accounts, activeTiers, activeAreas, activeLeadStatuses, showChains, showPractices],
   );
 
   function toggleArea(id: string) {
@@ -353,6 +381,40 @@ export function AccountsMap({
 
   return (
     <div className="flex h-full flex-col">
+      {/* THE FILTERS COLLAPSE ON A PHONE, and this is a bug fix rather than a
+          preference. These three chip rows are 14 areas + 7 grades + up to 6
+          lead statuses, and on a phone they wrap to roughly a full viewport:
+          Juan sent a screenshot on 2026-08-05 where the map itself had been
+          squeezed to about 130px, a strip of Nevada under a wall of buttons.
+          The map is the page; the filters are how you narrow it, which is a
+          thing you do occasionally and the map is a thing you read constantly.
+
+          Open on md and up, where the rows fit in two lines and there is
+          nothing to gain by hiding them. The summary line stays visible at
+          both sizes so "112 of 253" and any active narrowing are never hidden
+          behind a tap: a filtered map that looks unfiltered is how you conclude
+          a territory is empty. */}
+      <div className="flex items-center justify-between gap-2 border-b border-[#E2DFD5] bg-white px-3 py-2 md:hidden">
+        <button
+          type="button"
+          onClick={() => setFiltersOpen((v) => !v)}
+          aria-expanded={filtersOpen}
+          className="inline-flex items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white px-2.5 py-1.5 text-[12.5px] font-medium text-[#3D4A44]"
+        >
+          <Ico name={filtersOpen ? "chevron-up" : "chevron-down"} size={13} />
+          Filters
+          {activeFilterCount > 0 && (
+            <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#14201B] px-1 text-[10.5px] font-semibold tabular-nums text-[#F7F6F1]">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
+        <span className="text-[12px] tabular-nums text-[#8A928C]">
+          {filtered.length} of {accounts.length}
+        </span>
+      </div>
+
+      <div className={`${filtersOpen ? "contents" : "hidden"} md:contents`}>
       {/* Area filter. Each chip carries its area's colour, and that same colour fills
           the area's frontier on the map, so the control and the region it controls are
           visibly one thing. */}
@@ -444,33 +506,6 @@ export function AccountsMap({
           </button>
         )}
 
-        {/* LEAD STATUS, Juan's ask 2026-08-05. Sits on the potential row
-            rather than starting a third one: both are HQ-owned judgments
-            mirrored from the portal, and the map has already spent enough
-            vertical space on chrome (see the height-floor note in MapScreen). */}
-        <span className="ml-2 mr-0.5 text-[12px] text-[#8A928C]" title="HubSpot's Lead Status (hs_lead_status). HQ owns it; the OS mirrors it and never writes back.">
-          Lead status
-        </span>
-        <select
-          value={leadStatus}
-          onChange={(e) => {
-            setSelected(null);
-            setLeadStatus(e.target.value);
-          }}
-          aria-label="Filter by HubSpot lead status"
-          className={`rounded-md border px-2 py-1 text-[12.5px] font-medium transition-colors ${
-            leadStatus
-              ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
-              : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
-          }`}
-        >
-          <option value="">All ({accounts.length})</option>
-          {leadStatusOptions.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label} ({o.count})
-            </option>
-          ))}
-        </select>
         {/* THE CHAINS BUTTON. Juan's ask 2026-08-04: the big national chains
             (Whole Foods, Sprouts, Trader Joe's, CVS/Walgreens, Target)
             crowd out the independent stores this territory is actually
@@ -528,9 +563,54 @@ export function AccountsMap({
             <span className="tabular-nums opacity-70">{practiceExcludedCount}</span>
           </button>
         )}
-        <span className="ml-auto text-[12px] text-[#8A928C]">
+        <span className="ml-auto hidden text-[12px] text-[#8A928C] md:inline">
           {filtered.length} of {accounts.length}
         </span>
+      </div>
+
+      {/* LEAD STATUS, Juan's ask 2026-08-05, chips rather than the dropdown it
+          shipped as earlier that day. Same grammar as the potential row above:
+          multi-select, empty means unfiltered, click again to widen.
+
+          Options are built from what is actually in the territory rather than
+          from the six the property defines, so a chip never offers a status
+          that would empty the map. "New to activate" is the null bucket, not a
+          HubSpot value: see NO_LEAD_STATUS_LABEL. */}
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-[#E2DFD5] bg-white px-3 py-2">
+        <span
+          className="mr-0.5 text-[12px] text-[#8A928C]"
+          title="HubSpot's Lead Status (hs_lead_status). HQ owns it; the OS mirrors it, pull-only."
+        >
+          Lead status
+        </span>
+        {leadStatusOptions.map((o) => {
+          const active = activeLeadStatuses.has(o.value);
+          return (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => toggleLeadStatus(o.value)}
+              aria-pressed={active}
+              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
+                active
+                  ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
+                  : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
+              }`}
+            >
+              {o.label} <span className="tabular-nums opacity-70">{o.count}</span>
+            </button>
+          );
+        })}
+        {activeLeadStatuses.size > 0 && (
+          <button
+            type="button"
+            onClick={() => setActiveLeadStatuses(new Set())}
+            className="rounded-md px-2 py-1 text-[12.5px] text-[#8A928C] underline-offset-2 hover:text-[#3D4A44] hover:underline"
+          >
+            clear
+          </button>
+        )}
+      </div>
       </div>
 
       <div className="min-h-0 flex-1">

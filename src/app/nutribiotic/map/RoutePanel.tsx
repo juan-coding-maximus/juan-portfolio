@@ -22,8 +22,28 @@
  */
 
 import type { MapAccount } from "../lib/dal";
-import { Ico } from "../lib/ui";
+import { Ico, TierChip } from "../lib/ui";
 import { AccountLink } from "../lib/modal";
+
+/* Money, at the grain a rep reads at a door. No cents: the difference between
+   $1,518 and $1,518.00 is noise on a phone held at arm's length, and rounding
+   the display never touches the stored figure. */
+function usd(n: number | null): string | null {
+  if (n === null || n === undefined) return null;
+  return `$${Math.round(n).toLocaleString("en-US")}`;
+}
+
+/* "2026-03-27" -> "Mar 2026". Day precision implies the rep should know which
+   Tuesday; month is the true resolution of "when did they last buy". Parsed as
+   parts rather than new Date(s), which would read the bare date as UTC midnight
+   and render the previous month in Los Angeles for anything dated the 1st. */
+function monthYear(iso: string | null): string | null {
+  if (!iso) return null;
+  const [y, m] = iso.split("-");
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const name = MONTHS[Number(m) - 1];
+  return name ? `${name} ${y}` : iso;
+}
 
 // Straight-line miles, same haversine the ten-closest list uses. Duplicated
 // rather than shared because the two screens are free to diverge later and a
@@ -98,23 +118,82 @@ export function RoutePanel({
         <ul className="divide-y divide-[#EEECE3]">
           {stops.map((a, i) => {
             const prev = i > 0 ? stops[i - 1] : null;
+            // CONTROLS DROP TO THEIR OWN ROW ON A PHONE. Five buttons beside
+            // the text left the name as "DIRECTLY FR..." and the address as
+            // "621 RUSHING C..." in Juan's 2026-08-05 screenshot, which is a
+            // stop you cannot identify next to controls you do not need until
+            // you have. Below sm the text gets the full width and the buttons
+            // sit under it, right-aligned.
             return (
-              <li key={a.id} className="flex items-center gap-3 px-4 py-3">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#14201B] text-[11.5px] font-semibold tabular-nums text-[#F7F6F1]">
+              <li key={a.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#14201B] text-[11.5px] font-semibold tabular-nums text-[#F7F6F1]">
                   {i + 1}
                 </span>
 
                 <div className="min-w-0 flex-1">
-                  <AccountLink
-                    id={a.id}
-                    className="block truncate text-[14px] font-medium leading-snug hover:underline"
-                  >
-                    {a.name}
-                  </AccountLink>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <AccountLink
+                      id={a.id}
+                      className="truncate text-[14px] font-medium leading-snug hover:underline"
+                    >
+                      {a.name}
+                    </AccountLink>
+                    {a.tier && <TierChip tier={a.tier} scale="hq" />}
+                  </div>
                   <div className="mt-0.5 truncate text-[12.5px] text-[#5B6560]">
                     {a.street}
                     {a.city ? `, ${a.city}` : ""}
                   </div>
+
+                  {/* THE TRADING FACTS, Juan's ask 2026-08-05: last order, what
+                      they spent over twelve months and on what, and lifetime.
+                      Each one is omitted when it is unknown rather than shown
+                      as a zero, because "$0 in 12m" and "we hold no orders for
+                      this account" are different sentences and only one of them
+                      is true here. 313 of the 459 accounts have no loaded order
+                      history at all, so the empty case is the common case. */}
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[12px] text-[#5B6560]">
+                    {a.last_order_at ? (
+                      <span>
+                        last order{" "}
+                        <span className="font-medium text-[#3D4A44]">
+                          {monthYear(a.last_order_at)}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-[#A9AFA9]">never ordered</span>
+                    )}
+                    {a.trailing_12m_revenue !== null && (
+                      <span>
+                        12m{" "}
+                        <span className="font-medium tabular-nums text-[#3D4A44]">
+                          {usd(a.trailing_12m_revenue)}
+                        </span>
+                      </span>
+                    )}
+                    {a.lifetime_revenue !== null && (
+                      <span>
+                        lifetime{" "}
+                        <span className="font-medium tabular-nums text-[#3D4A44]">
+                          {usd(a.lifetime_revenue)}
+                        </span>
+                      </span>
+                    )}
+                    {/* 12m category when they have bought this year, else the
+                        lifetime one marked as historic, so "Dietary Supplement"
+                        never silently means "back in 2024". */}
+                    {a.top_category_12m ? (
+                      <span className="font-medium text-[#2C6A46]">{a.top_category_12m}</span>
+                    ) : a.top_category_lifetime ? (
+                      <span className="text-[#8A928C]">
+                        {a.top_category_lifetime} <span className="text-[#A9AFA9]">(historic)</span>
+                      </span>
+                    ) : (
+                      <span className="text-[#A9AFA9]">no orders on file</span>
+                    )}
+                  </div>
+
                   {prev && (
                     <div className="mt-0.5 text-[12px] text-[#8A928C]">
                       <span className="tabular-nums">{haversineMiles(prev, a).toFixed(1)} mi</span>{" "}
@@ -122,8 +201,9 @@ export function RoutePanel({
                     </div>
                   )}
                 </div>
+                </div>
 
-                <div className="flex shrink-0 items-center gap-1">
+                <div className="flex shrink-0 items-center justify-end gap-1">
                   {/* Up/down rather than drag: this is used one-handed in a
                       parked car, where a 44px button beats a drag target. */}
                   <button

@@ -878,6 +878,16 @@ export type MapAccount = {
   area: string | null;
   /** Mirror of HubSpot's hs_lead_status, pull-only (0028). Null = unset there. */
   lead_status: string | null;
+  /* What the route card needs to answer "what is this account to me" without a
+     tap (Juan, 2026-08-05). The three money facts are columns on nb_accounts;
+     the category comes from nb_v_account_product_mix (0030). Every one of them
+     is nullable and MUST render as absent rather than as zero: an account with
+     no loaded orders has not spent nothing, we simply do not know. */
+  last_order_at: string | null;
+  trailing_12m_revenue: number | null;
+  lifetime_revenue: number | null;
+  top_category_12m: string | null;
+  top_category_lifetime: string | null;
 };
 
 /**
@@ -900,10 +910,10 @@ export type MapAccount = {
  * one table.
  */
 export async function listOwnerAccounts(ownerName = "Juan Arenas Martin"): Promise<Result<MapAccount>> {
-  const [result, grades] = await Promise.all([
-    query<Omit<MapAccount, "tier">>("nb_accounts", {
+  const [result, grades, mix] = await Promise.all([
+    query<Omit<MapAccount, "tier" | "top_category_12m" | "top_category_lifetime">>("nb_accounts", {
       select:
-        "id,name,street,city,state,postal,lat,lng,phone,channel,lifecycle,do_not_visit,chain_excluded,practice_excluded,hubspot_company_id,origin,area,lead_status",
+        "id,name,street,city,state,postal,lat,lng,phone,channel,lifecycle,do_not_visit,chain_excluded,practice_excluded,hubspot_company_id,origin,area,lead_status,last_order_at,trailing_12m_revenue,lifetime_revenue",
       owner_name: `eq.${ownerName}`,
       lat: "not.is.null",
       /* CLOSED ACCOUNTS ARE NOT PINS. No toggle, unlike chains and practices:
@@ -918,11 +928,21 @@ export async function listOwnerAccounts(ownerName = "Juan Arenas Martin"): Promi
     raw<{ account_id: string; potential_grade: Tier }>(
       "nb_v_account_potential?select=account_id,potential_grade&limit=1000",
     ),
+    // 0030. Absent row = no loaded order lines, which the card says out loud.
+    raw<{ account_id: string; top_category_12m: string | null; top_category_lifetime: string | null }>(
+      "nb_v_account_product_mix?select=account_id,top_category_12m,top_category_lifetime&limit=1000",
+    ),
   ]);
   const tierById = new Map(grades.map((t) => [t.account_id, t.potential_grade]));
+  const mixById = new Map(mix.map((m) => [m.account_id, m]));
   return {
     ...result,
-    data: result.data.map((a) => ({ ...a, tier: tierById.get(a.id) ?? null })),
+    data: result.data.map((a) => ({
+      ...a,
+      tier: tierById.get(a.id) ?? null,
+      top_category_12m: mixById.get(a.id)?.top_category_12m ?? null,
+      top_category_lifetime: mixById.get(a.id)?.top_category_lifetime ?? null,
+    })),
   };
 }
 
