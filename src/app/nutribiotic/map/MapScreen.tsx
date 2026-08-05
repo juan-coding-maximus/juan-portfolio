@@ -12,7 +12,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { MapAccount, TerritoryArea } from "../lib/dal";
-import { toggleShowChainAccounts } from "../lib/prefs-actions";
+import { toggleShowChainAccounts, toggleShowPracticeAccounts } from "../lib/prefs-actions";
 import { AccountsMap } from "./AccountsMap";
 import { NearestClients } from "./NearestClients";
 
@@ -24,10 +24,12 @@ export function MapScreen({
   accounts,
   areas,
   initialShowChains,
+  initialShowPractices,
 }: {
   accounts: MapAccount[];
   areas: TerritoryArea[];
   initialShowChains: boolean;
+  initialShowPractices: boolean;
 }) {
   const [loc, setLoc] = useState<UserLoc | null>(null);
   const [locStatus, setLocStatus] = useState<LocStatus>("pending");
@@ -35,14 +37,21 @@ export function MapScreen({
   const focusN = useRef(0);
   const mapBoxRef = useRef<HTMLDivElement>(null);
 
-  // Server-persisted (nb_ui_prefs, migration 0024), not component state that
-  // resets on reload: Juan asked for the undo to be semi-permanent same as
-  // the exclusion itself. Optimistic locally, reverted if the write fails.
+  // Server-persisted (nb_ui_prefs, migration 0024/0025), not component state
+  // that resets on reload: Juan asked for the undo to be semi-permanent same
+  // as the exclusion itself. Optimistic locally, reverted if the write fails.
   const [showChains, setShowChains] = useState(initialShowChains);
   function toggleChains() {
     const next = !showChains;
     setShowChains(next);
     toggleShowChainAccounts(next).catch(() => setShowChains(!next));
+  }
+
+  const [showPractices, setShowPractices] = useState(initialShowPractices);
+  function togglePractices() {
+    const next = !showPractices;
+    setShowPractices(next);
+    toggleShowPracticeAccounts(next).catch(() => setShowPractices(!next));
   }
 
   // A fresh n on every click, even a repeat click on the same account, so the
@@ -89,6 +98,8 @@ export function MapScreen({
           focus={focus}
           showChains={showChains}
           onToggleShowChains={toggleChains}
+          showPractices={showPractices}
+          onToggleShowPractices={togglePractices}
         />
       </div>
 
@@ -98,6 +109,7 @@ export function MapScreen({
         status={locStatus}
         onShowInMap={showInMap}
         showChains={showChains}
+        showPractices={showPractices}
       />
     </>
   );

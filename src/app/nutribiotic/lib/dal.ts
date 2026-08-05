@@ -183,6 +183,7 @@ export type TierRow = {
   area: string | null;
   hubspot_owner_id: string | null;
   chain_excluded: boolean;
+  practice_excluded: boolean;
 };
 
 /**
@@ -201,15 +202,17 @@ export async function listAccounts(
      another rep's book and 68 are unowned prospects nobody has sold to. A count that
      includes accounts you do not carry is not a territory, and it made every tier
      total on the page wrong by 68%. */
-  /* CHAIN-EXCLUDED ACCOUNTS ARE LEFT OUT HERE TOO, no toggle on this page.
-     The map has the "show chains" button because that is where Juan asked for
-     it; the Territory/Clients list is a work queue in the same spirit as
-     cadence, and a Whole Foods nobody can sell to has no business occupying a
-     row on it. Undoing this needs exclude_chains.py --undo, not a click. */
+  /* CHAIN- AND PRACTICE-EXCLUDED ACCOUNTS ARE LEFT OUT HERE TOO, no toggle on
+     this page. The map has the "chains"/"practices" buttons because that is
+     where Juan asked for them; the Territory/Clients list is a work queue in
+     the same spirit as cadence, and neither a Whole Foods nor a lone
+     chiropractor's office has business occupying a row on it. Undoing this
+     needs exclude_chains.py/exclude_practices.py --undo, not a click. */
   const params: Record<string, string | number> = {
     select: "*",
     hubspot_owner_id: `eq.${JUAN_OWNER_ID}`,
     chain_excluded: "eq.false",
+    practice_excluded: "eq.false",
     order: "tier.asc,fit_confidence.desc,fit.desc",
     limit: opts.limit ?? 500,
   };
@@ -863,6 +866,7 @@ export type MapAccount = {
   lifecycle: string;
   do_not_visit: boolean;
   chain_excluded: boolean;
+  practice_excluded: boolean;
   hubspot_company_id: string | null;
   tier: Tier | null;
   origin: Origin;
@@ -892,7 +896,7 @@ export async function listOwnerAccounts(ownerName = "Juan Arenas Martin"): Promi
   const [result, grades] = await Promise.all([
     query<Omit<MapAccount, "tier">>("nb_accounts", {
       select:
-        "id,name,street,city,state,postal,lat,lng,phone,channel,lifecycle,do_not_visit,chain_excluded,hubspot_company_id,origin,area",
+        "id,name,street,city,state,postal,lat,lng,phone,channel,lifecycle,do_not_visit,chain_excluded,practice_excluded,hubspot_company_id,origin,area",
       owner_name: `eq.${ownerName}`,
       lat: "not.is.null",
       order: "name.asc",
@@ -918,20 +922,30 @@ export async function countOwnerWithoutCoordinates(ownerName = "Juan Arenas Mart
 }
 
 /**
- * Whether the map/ten-closest are currently showing chain_excluded accounts.
- * One row (nb_ui_prefs, id=1, see 0024), so the preference follows Juan across
- * his phone and his desktop rather than resetting per browser the way
- * localStorage would. Defaults to false (hidden) if the row is ever missing.
+ * Whether the map/ten-closest are currently showing chain_excluded and/or
+ * practice_excluded accounts. One row (nb_ui_prefs, id=1, see 0024/0025), so
+ * the preference follows Juan across his phone and his desktop rather than
+ * resetting per browser the way localStorage would. Both default to false
+ * (hidden) if the row is ever missing.
  */
-export async function getShowChainAccounts(): Promise<boolean> {
-  const rows = await raw<{ show_chain_accounts: boolean }>(
-    "nb_ui_prefs?select=show_chain_accounts&id=eq.1",
+export async function getMapDisplayPrefs(): Promise<{ showChains: boolean; showPractices: boolean }> {
+  const rows = await raw<{ show_chain_accounts: boolean; show_practice_accounts: boolean }>(
+    "nb_ui_prefs?select=show_chain_accounts,show_practice_accounts&id=eq.1",
   );
-  return rows[0]?.show_chain_accounts ?? false;
+  return {
+    showChains: rows[0]?.show_chain_accounts ?? false,
+    showPractices: rows[0]?.show_practice_accounts ?? false,
+  };
 }
 
 export async function setShowChainAccounts(show: boolean): Promise<void> {
   await mutate("nb_ui_prefs", "PATCH", { show_chain_accounts: show, updated_at: new Date().toISOString() }, {
+    id: "eq.1",
+  });
+}
+
+export async function setShowPracticeAccounts(show: boolean): Promise<void> {
+  await mutate("nb_ui_prefs", "PATCH", { show_practice_accounts: show, updated_at: new Date().toISOString() }, {
     id: "eq.1",
   });
 }

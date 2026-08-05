@@ -65,6 +65,8 @@ export function AccountsMap({
   focus,
   showChains,
   onToggleShowChains,
+  showPractices,
+  onToggleShowPractices,
 }: {
   accounts: MapAccount[];
   areas: TerritoryArea[];
@@ -72,6 +74,8 @@ export function AccountsMap({
   focus?: FocusRequest | null;
   showChains: boolean;
   onToggleShowChains: () => void;
+  showPractices: boolean;
+  onToggleShowPractices: () => void;
 }) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const { isLoaded, loadError } = useLoadScript({ googleMapsApiKey: apiKey ?? "" });
@@ -111,29 +115,36 @@ export function AccountsMap({
     return c;
   }, [accounts]);
 
-  // How many the "chains" chip is currently hiding, for its own label. Not a
-  // tier/area chip because it is not exploratory the way those are: it is the
-  // semi-permanent classification from exclude_chains.py (migration 0024),
-  // and this button is only the show/hide half of it, not the tag itself.
+  // How many each chip is currently hiding, for its own label. Not a
+  // tier/area chip because neither is exploratory the way those are: they
+  // are the semi-permanent classifications from exclude_chains.py (0024) and
+  // exclude_practices.py (0025), and these buttons are only the show/hide
+  // half of it, not the tag itself.
   const chainExcludedCount = useMemo(
     () => accounts.filter((a) => a.chain_excluded).length,
+    [accounts],
+  );
+  const practiceExcludedCount = useMemo(
+    () => accounts.filter((a) => a.practice_excluded).length,
     [accounts],
   );
 
   /* Tier and area narrow INDEPENDENTLY and combine with AND. Picking "A" and
      "San Diego" asks for the A accounts in San Diego, which is a question worth
      asking; making one filter reset the other would make it unaskable. showChains
-     is the third and last: OFF drops every chain_excluded pin regardless of tier
-     or area, same as do_not_visit would if the map filtered it out outright. */
+     and showPractices are the last two: OFF drops every matching pin regardless
+     of tier or area, same as do_not_visit would if the map filtered it out
+     outright. */
   const filtered = useMemo(
     () =>
       accounts.filter(
         (a) =>
           (activeTiers.size === 0 || (a.tier !== null && activeTiers.has(a.tier))) &&
           (activeAreas.size === 0 || (a.area !== null && activeAreas.has(a.area))) &&
-          (showChains || !a.chain_excluded),
+          (showChains || !a.chain_excluded) &&
+          (showPractices || !a.practice_excluded),
       ),
-    [accounts, activeTiers, activeAreas, showChains],
+    [accounts, activeTiers, activeAreas, showChains, showPractices],
   );
 
   function toggleArea(id: string) {
@@ -383,6 +394,34 @@ export function AccountsMap({
             <Ico name="accounts" size={12} />
             {showChains ? "Chains shown" : "Chains hidden"}{" "}
             <span className="tabular-nums opacity-70">{chainExcludedCount}</span>
+          </button>
+        )}
+        {/* THE PRACTICES BUTTON, same shape and same day as the chains one.
+            Juan's ask: single-practitioner offices (a chiropractor, an M.D.,
+            an N.D., an L.Ac.) are not a store either, and channel = 'clinic'
+            is already how the enrichment pipeline tells them apart from one
+            (see 0025). Same persistence, same nb_ui_prefs row, independent
+            of the chains toggle: showing chains back does not also show
+            practices, and vice versa. */}
+        {practiceExcludedCount > 0 && (
+          <button
+            type="button"
+            onClick={onToggleShowPractices}
+            aria-pressed={showPractices}
+            title={
+              showPractices
+                ? "Hide single-practitioner offices again"
+                : `${practiceExcludedCount} private-practice account(s) hidden (chiropractors, MDs, NDs, L.Ac.s, ...)`
+            }
+            className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
+              showPractices
+                ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
+                : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
+            }`}
+          >
+            <Ico name="review" size={12} />
+            {showPractices ? "Practices shown" : "Practices hidden"}{" "}
+            <span className="tabular-nums opacity-70">{practiceExcludedCount}</span>
           </button>
         )}
         <span className="ml-auto text-[12px] text-[#8A928C]">
