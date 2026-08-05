@@ -83,7 +83,14 @@ const LEAD_STATUS_LABEL: Record<string, string> = {
 // Sentinel for "HubSpot has no status on this company". A real filter choice,
 // since 27 of Juan's accounts are in exactly that state and finding them is a
 // reasonable thing to want; null would be indistinguishable from "no filter".
+//
+// Shown as "New to activate", Juan's name for the bucket on 2026-08-05: an
+// account nobody has given a status is one nobody has started working. This is
+// a LABEL ON THE NULL BUCKET, not a value: nothing is written to HubSpot, and
+// "New to activate" is not one of hs_lead_status's six options (the nearest,
+// 'NEW', displays as "New to open" and is a different, real, set status).
 const NO_LEAD_STATUS = "__none__";
+const NO_LEAD_STATUS_LABEL = "New to activate";
 
 const POTENTIAL_COLOR: Partial<Record<Tier, string>> = {
   A: "#B5372A",
@@ -173,7 +180,7 @@ export function AccountsMap({
       .map(([value, count]) => ({
         value,
         count,
-        label: value === NO_LEAD_STATUS ? "No status set" : LEAD_STATUS_LABEL[value] ?? value,
+        label: value === NO_LEAD_STATUS ? NO_LEAD_STATUS_LABEL : LEAD_STATUS_LABEL[value] ?? value,
       }));
   }, [accounts]);
 
