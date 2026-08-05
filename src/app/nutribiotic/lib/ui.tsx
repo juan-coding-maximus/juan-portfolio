@@ -40,6 +40,10 @@ const ICONS: Record<string, ReactNode> = {
   flag: <><path d="M3.8 14.2V2.2" /><path d="M3.8 2.8h8.4l-1.9 2.8 1.9 2.8H3.8" /></>,
   book: <><path d="M8 3.4C6.9 2.5 5 2.2 3 2.2v10.2c2 0 3.9.3 5 1.2 1.1-.9 3-1.2 5-1.2V2.2c-2 0-3.9.3-5 1.2Z" /><path d="M8 3.4v10.2" /></>,
   locate: <><circle cx="8" cy="8" r="2.3" /><path d="M8 1.6v2.5M8 11.9v2.5M1.6 8h2.5M11.9 8h2.5" /></>,
+  // Route reordering (0029). Bare chevrons, no shaft: at 13px a full arrow
+  // turns to mud, and these sit four-abreast in a row of small controls.
+  "chevron-up": <><path d="m4 10 4-4 4 4" /></>,
+  "chevron-down": <><path d="m4 6 4 4 4-4" /></>,
 };
 
 export function Ico({ name, size = 16 }: { name: string; size?: number }) {

@@ -10,11 +10,16 @@
  * a location. "Honestly" includes naming the right cause: see requestLoc.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MapAccount, TerritoryArea } from "../lib/dal";
-import { toggleShowChainAccounts, toggleShowPracticeAccounts } from "../lib/prefs-actions";
+import {
+  saveRouteDraft,
+  toggleShowChainAccounts,
+  toggleShowPracticeAccounts,
+} from "../lib/prefs-actions";
 import { AccountsMap } from "./AccountsMap";
 import { NearestClients } from "./NearestClients";
+import { RoutePanel } from "./RoutePanel";
 
 export type UserLoc = { lat: number; lng: number };
 export type LocStatus = "pending" | "ok" | "denied" | "timeout" | "unavailable";
@@ -25,11 +30,13 @@ export function MapScreen({
   areas,
   initialShowChains,
   initialShowPractices,
+  initialRouteDraft,
 }: {
   accounts: MapAccount[];
   areas: TerritoryArea[];
   initialShowChains: boolean;
   initialShowPractices: boolean;
+  initialRouteDraft: string[];
 }) {
   const [loc, setLoc] = useState<UserLoc | null>(null);
   const [locStatus, setLocStatus] = useState<LocStatus>("pending");
@@ -52,6 +59,48 @@ export function MapScreen({
     const next = !showPractices;
     setShowPractices(next);
     toggleShowPracticeAccounts(next).catch(() => setShowPractices(!next));
+  }
+
+  /* THE HAND-BUILT ROUTE (0029). Ids, not account objects, because the ids are
+     what the row stores and resolving them against `accounts` on every render
+     means a stop that gets closed or leaves Juan's book simply stops being a
+     stop, rather than sitting there as an unclickable blank.
+
+     Optimistic like the toggles above: the list moves now and the row catches
+     up, reverted if the write fails. A route is a scratchpad Juan edits half a
+     dozen times at a light, and a save round-trip between each nudge would be
+     felt every time. */
+  const [routeIds, setRouteIds] = useState<string[]>(initialRouteDraft);
+
+  function commitRoute(next: string[]) {
+    const prev = routeIds;
+    setRouteIds(next);
+    saveRouteDraft(next).catch(() => setRouteIds(prev));
+  }
+
+  const routeStops = useMemo(() => {
+    const byId = new Map(accounts.map((a) => [a.id, a]));
+    return routeIds.map((id) => byId.get(id)).filter((a): a is MapAccount => Boolean(a));
+  }, [routeIds, accounts]);
+
+  const inRoute = useMemo(() => new Set(routeIds), [routeIds]);
+
+  function addToRoute(id: string) {
+    if (inRoute.has(id)) return; // adding twice is a mis-tap, not a second visit
+    commitRoute([...routeIds, id]);
+  }
+
+  function removeFromRoute(id: string) {
+    commitRoute(routeIds.filter((x) => x !== id));
+  }
+
+  function moveInRoute(id: string, dir: -1 | 1) {
+    const i = routeIds.indexOf(id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= routeIds.length) return;
+    const next = [...routeIds];
+    [next[i], next[j]] = [next[j], next[i]];
+    commitRoute(next);
   }
 
   // A fresh n on every click, even a repeat click on the same account, so the
@@ -148,8 +197,21 @@ export function MapScreen({
           onToggleShowChains={toggleChains}
           showPractices={showPractices}
           onToggleShowPractices={togglePractices}
+          onAddToRoute={addToRoute}
+          inRoute={inRoute}
         />
       </div>
+
+      {/* Route sits between the map and the ten-closest, where Juan asked for
+          it: the map is where stops come from and the ten-closest is where the
+          next one comes from, so the thing being assembled belongs between. */}
+      <RoutePanel
+        stops={routeStops}
+        onMove={moveInRoute}
+        onRemove={removeFromRoute}
+        onClear={() => commitRoute([])}
+        onShowInMap={showInMap}
+      />
 
       <NearestClients
         accounts={accounts}

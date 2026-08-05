@@ -215,6 +215,9 @@ export async function listAccounts(
     practice_excluded: "eq.false",
     // And closed businesses, which are not a work queue at all (0026).
     closed_at: "is.null",
+    // And waypoints, which are not customers at all (0029): Juan's apartment
+    // is on the map to be routed through, not counted as territory.
+    lifecycle: "neq.waypoint",
     order: "tier.asc,fit_confidence.desc,fit.desc",
     limit: opts.limit ?? 500,
   };
@@ -873,6 +876,8 @@ export type MapAccount = {
   tier: Tier | null;
   origin: Origin;
   area: string | null;
+  /** Mirror of HubSpot's hs_lead_status, pull-only (0028). Null = unset there. */
+  lead_status: string | null;
 };
 
 /**
@@ -898,7 +903,7 @@ export async function listOwnerAccounts(ownerName = "Juan Arenas Martin"): Promi
   const [result, grades] = await Promise.all([
     query<Omit<MapAccount, "tier">>("nb_accounts", {
       select:
-        "id,name,street,city,state,postal,lat,lng,phone,channel,lifecycle,do_not_visit,chain_excluded,practice_excluded,hubspot_company_id,origin,area",
+        "id,name,street,city,state,postal,lat,lng,phone,channel,lifecycle,do_not_visit,chain_excluded,practice_excluded,hubspot_company_id,origin,area,lead_status",
       owner_name: `eq.${ownerName}`,
       lat: "not.is.null",
       /* CLOSED ACCOUNTS ARE NOT PINS. No toggle, unlike chains and practices:
@@ -954,6 +959,30 @@ export async function setShowChainAccounts(show: boolean): Promise<void> {
 
 export async function setShowPracticeAccounts(show: boolean): Promise<void> {
   await mutate("nb_ui_prefs", "PATCH", { show_practice_accounts: show, updated_at: new Date().toISOString() }, {
+    id: "eq.1",
+  });
+}
+
+/**
+ * The hand-built route under the map: an ordered list of nb_accounts.id, order
+ * being stop order (migration 0029). Server-persisted for the same reason the
+ * chain/practice toggles are, and one Juan asked for explicitly: a route he
+ * assembles on the phone in the morning is still there on the desktop, and
+ * still there after a reload, until he removes a stop himself.
+ *
+ * Unknown ids are dropped on read rather than rendered as a blank row. That is
+ * the tombstone case: an account in the draft that gets closed, or falls out of
+ * Juan's book, stops being a stop, and the alternative is a route with a hole
+ * in it that cannot be clicked or removed.
+ */
+export async function getRouteDraft(): Promise<string[]> {
+  const rows = await raw<{ route_draft: string[] | null }>("nb_ui_prefs?select=route_draft&id=eq.1");
+  const ids = rows[0]?.route_draft;
+  return Array.isArray(ids) ? ids.filter((x): x is string => typeof x === "string") : [];
+}
+
+export async function setRouteDraft(ids: string[]): Promise<void> {
+  await mutate("nb_ui_prefs", "PATCH", { route_draft: ids, updated_at: new Date().toISOString() }, {
     id: "eq.1",
   });
 }

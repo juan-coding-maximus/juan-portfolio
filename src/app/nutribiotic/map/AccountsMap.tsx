@@ -61,6 +61,30 @@ const MAP_STYLE: google.maps.MapTypeStyle[] = [
    F and G keep their area dot, both being empty in this territory today; if
    they ever fill, they belong at the grey end with E rather than in a new hue.
    The same colours mark the filter chips, so the legend is the control. */
+/* HubSpot's own Lead Status labels, read from the hs_lead_status property
+   definition on 2026-08-05 (/crm/v3/properties/companies/hs_lead_status), not
+   invented here. Kept as a value -> label map because HubSpot's stored value
+   and its displayed label are NOT the same string for every option: 'No follow
+   ups' is shown to a user as "Active - no follow ups". Filtering on the value
+   and showing the label is the only way this menu matches the portal.
+
+   An unrecognised value renders as itself rather than being dropped, so this
+   map going stale degrades to slightly-wrong wording, never to a missing
+   filter or a silently empty result. */
+const LEAD_STATUS_LABEL: Record<string, string> = {
+  "Active - follow ups": "Active - follow ups",
+  "No follow ups": "Active - no follow ups",
+  NEW: "New to open",
+  Discarded: "Discarded",
+  "To reactivate": "To reactivate",
+  Closed: "Closed",
+};
+
+// Sentinel for "HubSpot has no status on this company". A real filter choice,
+// since 27 of Juan's accounts are in exactly that state and finding them is a
+// reasonable thing to want; null would be indistinguishable from "no filter".
+const NO_LEAD_STATUS = "__none__";
+
 const POTENTIAL_COLOR: Partial<Record<Tier, string>> = {
   A: "#B5372A",
   B: "#B5372A",
@@ -78,6 +102,8 @@ export function AccountsMap({
   onToggleShowChains,
   showPractices,
   onToggleShowPractices,
+  onAddToRoute,
+  inRoute,
 }: {
   accounts: MapAccount[];
   areas: TerritoryArea[];
@@ -87,6 +113,8 @@ export function AccountsMap({
   onToggleShowChains: () => void;
   showPractices: boolean;
   onToggleShowPractices: () => void;
+  onAddToRoute: (id: string) => void;
+  inRoute: Set<string>;
 }) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const { isLoaded, loadError } = useLoadScript({ googleMapsApiKey: apiKey ?? "" });
@@ -97,6 +125,11 @@ export function AccountsMap({
   // Same convention as the tier filter: empty means unfiltered, so a chip narrows
   // on click and widens again on the second click.
   const [activeAreas, setActiveAreas] = useState<Set<string>>(new Set());
+
+  // "" is unfiltered, same convention as an empty tier/area set above. Single
+  // choice, not a set: Juan asked for a dropdown, and a dropdown that
+  // multi-selects is a dropdown that lies about what it does.
+  const [leadStatus, setLeadStatus] = useState<string>("");
   const mapRef = useRef<google.maps.Map | null>(null);
 
   const areaById = useMemo(() => new Map(areas.map((a) => [a.id, a])), [areas]);
@@ -118,6 +151,30 @@ export function AccountsMap({
     const counts: Record<Tier, number> = { A: 0, B: 0, C: 0, D: 0, E: 0, F: 0, G: 0 };
     for (const a of accounts) if (a.tier) counts[a.tier] += 1;
     return counts;
+  }, [accounts]);
+
+  /* LEAD STATUS (0028), a dropdown rather than another chip row: six options
+     on top of the seven tier chips and fourteen area chips would be a wall of
+     controls, and unlike those two this one is a single choice, not a set.
+
+     Options are built from what is actually in the territory, not from the six
+     the property defines, so the menu never offers a status that would return
+     an empty map. Labels come from LEAD_STATUS_LABEL where known and fall
+     back to the raw value, so a seventh option added in HubSpot tomorrow shows
+     up as itself instead of disappearing. Counted the same way the chips are. */
+  const leadStatusOptions = useMemo(() => {
+    const c = new Map<string, number>();
+    for (const a of accounts) {
+      const key = a.lead_status ?? NO_LEAD_STATUS;
+      c.set(key, (c.get(key) ?? 0) + 1);
+    }
+    return [...c.entries()]
+      .sort((x, y) => y[1] - x[1])
+      .map(([value, count]) => ({
+        value,
+        count,
+        label: value === NO_LEAD_STATUS ? "No status set" : LEAD_STATUS_LABEL[value] ?? value,
+      }));
   }, [accounts]);
 
   const areaCounts = useMemo(() => {
@@ -152,10 +209,11 @@ export function AccountsMap({
         (a) =>
           (activeTiers.size === 0 || (a.tier !== null && activeTiers.has(a.tier))) &&
           (activeAreas.size === 0 || (a.area !== null && activeAreas.has(a.area))) &&
+          (leadStatus === "" || (a.lead_status ?? NO_LEAD_STATUS) === leadStatus) &&
           (showChains || !a.chain_excluded) &&
           (showPractices || !a.practice_excluded),
       ),
-    [accounts, activeTiers, activeAreas, showChains, showPractices],
+    [accounts, activeTiers, activeAreas, leadStatus, showChains, showPractices],
   );
 
   function toggleArea(id: string) {
@@ -378,6 +436,34 @@ export function AccountsMap({
             clear
           </button>
         )}
+
+        {/* LEAD STATUS, Juan's ask 2026-08-05. Sits on the potential row
+            rather than starting a third one: both are HQ-owned judgments
+            mirrored from the portal, and the map has already spent enough
+            vertical space on chrome (see the height-floor note in MapScreen). */}
+        <span className="ml-2 mr-0.5 text-[12px] text-[#8A928C]" title="HubSpot's Lead Status (hs_lead_status). HQ owns it; the OS mirrors it and never writes back.">
+          Lead status
+        </span>
+        <select
+          value={leadStatus}
+          onChange={(e) => {
+            setSelected(null);
+            setLeadStatus(e.target.value);
+          }}
+          aria-label="Filter by HubSpot lead status"
+          className={`rounded-md border px-2 py-1 text-[12.5px] font-medium transition-colors ${
+            leadStatus
+              ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
+              : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
+          }`}
+        >
+          <option value="">All ({accounts.length})</option>
+          {leadStatusOptions.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label} ({o.count})
+            </option>
+          ))}
+        </select>
         {/* THE CHAINS BUTTON. Juan's ask 2026-08-04: the big national chains
             (Whole Foods, Sprouts, Trader Joe's, CVS/Walgreens, Target)
             crowd out the independent stores this territory is actually
@@ -534,6 +620,26 @@ export function AccountsMap({
                 {selected.do_not_visit && (
                   <div className="mt-1 text-[11.5px] text-[#A0762C]">do not visit</div>
                 )}
+                {/* ADD TO ROUTE, the primary action on this card now. A pin is
+                    opened to answer "should I go here", and the answer being
+                    yes should cost one tap. Once it is on the route the button
+                    becomes a statement rather than staying a live control:
+                    tapping it again can only be a mis-tap, since a stop cannot
+                    be visited twice in one run. Removing is the route panel's
+                    job, where the stop and its position are both visible. */}
+                <button
+                  type="button"
+                  onClick={() => onAddToRoute(selected.id)}
+                  disabled={inRoute.has(selected.id)}
+                  className={`mt-2 flex w-full items-center justify-center gap-1.5 rounded-md px-3 py-2 text-[12.5px] font-semibold transition-opacity ${
+                    inRoute.has(selected.id)
+                      ? "cursor-default bg-[#EEECE3] text-[#5B6560]"
+                      : "bg-[#2C6A46] text-white hover:opacity-90"
+                  }`}
+                >
+                  <Ico name={inRoute.has(selected.id) ? "check" : "route"} size={13} />
+                  {inRoute.has(selected.id) ? "On the route" : "Add to route"}
+                </button>
                 <div className="mt-2 flex items-center gap-3">
                   <AccountLink
                     id={selected.id}

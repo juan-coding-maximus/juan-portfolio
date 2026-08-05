@@ -8,25 +8,35 @@
  * listOwnerAccounts() and geocode.py's corroboration rule.
  */
 
-import { getMapDisplayPrefs, isConfigured, listAreas, listOwnerAccounts } from "../lib/dal";
+import {
+  getMapDisplayPrefs,
+  getRouteDraft,
+  isConfigured,
+  listAreas,
+  listOwnerAccounts,
+} from "../lib/dal";
 import { Empty, PageHead } from "../lib/ui";
 import { MapScreen } from "./MapScreen";
 
 export const dynamic = "force-dynamic";
 
 export default async function MapPage() {
-  const [accounts, areas, displayPrefs] = await Promise.all([
+  const [accounts, areas, displayPrefs, routeDraft] = await Promise.all([
     listOwnerAccounts(),
     listAreas(),
     getMapDisplayPrefs(),
+    getRouteDraft(),
   ]);
 
   return (
     <>
-      <PageHead
-        title="Map"
-        sub="Every account assigned to Juan in HubSpot with a Places-verified address, coloured by territory area. An account missing here is missing an address on file or has an unverified one, never an approximate guess."
-      />
+      {/* Subtitle removed on Juan's ask 2026-08-05. It explained the two
+          filters behind the map (owner scope, Places-verified pin) to someone
+          reading the page for the first time, and Juan reads it every day: it
+          had become four lines of chrome above a map that needs the height.
+          The rule it described is unchanged and still documented in this
+          file's header and in dal.ts listOwnerAccounts. */}
+      <PageHead title="Map" />
 
       {accounts.data.length === 0 ? (
         <Empty>
@@ -45,6 +55,7 @@ export default async function MapPage() {
             areas={areas}
             initialShowChains={displayPrefs.showChains}
             initialShowPractices={displayPrefs.showPractices}
+            initialRouteDraft={routeDraft}
           />
         </>
       )}
