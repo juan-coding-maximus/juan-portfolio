@@ -213,6 +213,8 @@ export async function listAccounts(
     hubspot_owner_id: `eq.${JUAN_OWNER_ID}`,
     chain_excluded: "eq.false",
     practice_excluded: "eq.false",
+    // And closed businesses, which are not a work queue at all (0026).
+    closed_at: "is.null",
     order: "tier.asc,fit_confidence.desc,fit.desc",
     limit: opts.limit ?? 500,
   };
@@ -899,6 +901,12 @@ export async function listOwnerAccounts(ownerName = "Juan Arenas Martin"): Promi
         "id,name,street,city,state,postal,lat,lng,phone,channel,lifecycle,do_not_visit,chain_excluded,practice_excluded,hubspot_company_id,origin,area",
       owner_name: `eq.${ownerName}`,
       lat: "not.is.null",
+      /* CLOSED ACCOUNTS ARE NOT PINS. No toggle, unlike chains and practices:
+         those hide a business Juan could still walk into, this one is gone.
+         Added 2026-08-05 after SILVERLAKE NATURAL FOOD MARKET, deleted from
+         HubSpot that morning by delete_closed.py, opened as a normal pin with
+         a working GO button. See migration 0026. */
+      closed_at: "is.null",
       order: "name.asc",
       limit: 1000,
     }),

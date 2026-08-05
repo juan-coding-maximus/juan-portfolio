@@ -28,11 +28,14 @@ import type { LocStatus, UserLoc } from "./MapScreen";
 const HUBSPOT_COMPANY_URL = (hubspotId: string) =>
   `https://app-eu1.hubspot.com/contacts/148711228/record/0-2/${hubspotId}`;
 
+// Same ramp as the map's POTENTIAL_COLOR, kept in step with it by hand: red
+// (A/B) to orange (C) to yellow (D) to grey (E). See the comment there.
 const POTENTIAL_DOT: Record<string, string> = {
   A: "#B5372A",
   B: "#B5372A",
   C: "#D97E2B",
-  D: "#D97E2B",
+  D: "#C79A1E",
+  E: "#8A928C",
 };
 
 function haversineMiles(a: UserLoc, b: { lat: number; lng: number }): number {
@@ -232,8 +235,8 @@ export function NearestClients({
         </ul>
       </div>
       <p className="mt-2 text-[12px] leading-relaxed text-[#8A928C]">
-        Straight-line distance, not drive time. Red dot: HQ potential A or B. Orange: C or D.
-        Accounts marked do-not-visit are left out.
+        Straight-line distance, not drive time. Dot is HQ potential: red A or B, orange C, yellow
+        D, grey E. Accounts marked do-not-visit are left out.
       </p>
     </>
   );

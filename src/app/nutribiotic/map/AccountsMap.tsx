@@ -47,15 +47,26 @@ const MAP_STYLE: google.maps.MapTypeStyle[] = [
 
 /* THE POTENTIAL DOTS, Juan's call 2026-08-04: an account carrying an HQ
    potential grade is the reason to be on this map at all, so those pins stop
-   wearing their area colour and wear the grade instead. Red is A/B (the big
-   capacity), orange is C/D. E-G keep the area dot: colouring "personal use
-   through wholesale" like a hot lead would make the highlight meaningless.
-   The same two colours mark the filter chips, so the legend is the control. */
+   wearing their area colour and wear the grade instead.
+
+   RAMP WIDENED 2026-08-05 on Juan's call, from two colours to four. C and D
+   were sharing one orange while holding 112 accounts each, which is 224 pins,
+   more than half the territory, rendered as one undifferentiated mass: the
+   grade was on the chip but not in the eye. Now the ramp cools as capacity
+   falls, red (A/B) to orange (C) to yellow (D) to grey (E), so the map reads
+   hottest-first without reading a label. E is grey rather than a fifth hue on
+   purpose: "personal use" is not a colder lead, it is a different thing, and
+   grey says that where a paler yellow would just say "almost D".
+
+   F and G keep their area dot, both being empty in this territory today; if
+   they ever fill, they belong at the grey end with E rather than in a new hue.
+   The same colours mark the filter chips, so the legend is the control. */
 const POTENTIAL_COLOR: Partial<Record<Tier, string>> = {
   A: "#B5372A",
   B: "#B5372A",
   C: "#D97E2B",
-  D: "#D97E2B",
+  D: "#C79A1E",
+  E: "#8A928C",
 };
 
 export function AccountsMap({
