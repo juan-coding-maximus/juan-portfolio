@@ -8,14 +8,18 @@
  * listOwnerAccounts() and geocode.py's corroboration rule.
  */
 
-import { isConfigured, listAreas, listOwnerAccounts } from "../lib/dal";
+import { getShowChainAccounts, isConfigured, listAreas, listOwnerAccounts } from "../lib/dal";
 import { Empty, PageHead } from "../lib/ui";
 import { MapScreen } from "./MapScreen";
 
 export const dynamic = "force-dynamic";
 
 export default async function MapPage() {
-  const [accounts, areas] = await Promise.all([listOwnerAccounts(), listAreas()]);
+  const [accounts, areas, showChains] = await Promise.all([
+    listOwnerAccounts(),
+    listAreas(),
+    getShowChainAccounts(),
+  ]);
 
   return (
     <>
@@ -36,7 +40,7 @@ export default async function MapPage() {
           {/* MapScreen owns the phone's position and shares it between the map
               (opens centred on Juan) and the ten-closest list under it. The
               height-floor note lives on there with the container it explains. */}
-          <MapScreen accounts={accounts.data} areas={areas} />
+          <MapScreen accounts={accounts.data} areas={areas} initialShowChains={showChains} />
         </>
       )}
     </>

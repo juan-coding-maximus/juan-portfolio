@@ -12,6 +12,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { MapAccount, TerritoryArea } from "../lib/dal";
+import { toggleShowChainAccounts } from "../lib/prefs-actions";
 import { AccountsMap } from "./AccountsMap";
 import { NearestClients } from "./NearestClients";
 
@@ -22,15 +23,27 @@ export type FocusRequest = { id: string; n: number };
 export function MapScreen({
   accounts,
   areas,
+  initialShowChains,
 }: {
   accounts: MapAccount[];
   areas: TerritoryArea[];
+  initialShowChains: boolean;
 }) {
   const [loc, setLoc] = useState<UserLoc | null>(null);
   const [locStatus, setLocStatus] = useState<LocStatus>("pending");
   const [focus, setFocus] = useState<FocusRequest | null>(null);
   const focusN = useRef(0);
   const mapBoxRef = useRef<HTMLDivElement>(null);
+
+  // Server-persisted (nb_ui_prefs, migration 0024), not component state that
+  // resets on reload: Juan asked for the undo to be semi-permanent same as
+  // the exclusion itself. Optimistic locally, reverted if the write fails.
+  const [showChains, setShowChains] = useState(initialShowChains);
+  function toggleChains() {
+    const next = !showChains;
+    setShowChains(next);
+    toggleShowChainAccounts(next).catch(() => setShowChains(!next));
+  }
 
   // A fresh n on every click, even a repeat click on the same account, so the
   // map's focus effect (keyed on this signal) always re-fires and re-zooms
@@ -69,10 +82,23 @@ export function MapScreen({
         ref={mapBoxRef}
         className="h-[calc(100vh-240px)] min-h-[520px] overflow-hidden rounded-lg border border-[#E2DFD5] md:min-h-[640px]"
       >
-        <AccountsMap accounts={accounts} areas={areas} userLoc={loc} focus={focus} />
+        <AccountsMap
+          accounts={accounts}
+          areas={areas}
+          userLoc={loc}
+          focus={focus}
+          showChains={showChains}
+          onToggleShowChains={toggleChains}
+        />
       </div>
 
-      <NearestClients accounts={accounts} userLoc={loc} status={locStatus} onShowInMap={showInMap} />
+      <NearestClients
+        accounts={accounts}
+        userLoc={loc}
+        status={locStatus}
+        onShowInMap={showInMap}
+        showChains={showChains}
+      />
     </>
   );
 }

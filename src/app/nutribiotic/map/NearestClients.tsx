@@ -14,6 +14,8 @@
  * the map above to fit Juan and that one account and opens its pin, and GO,
  * one big Apple Maps tap target per the standing field-brief format.
  * do_not_visit accounts are excluded: a proximity list exists to be driven to.
+ * chain_excluded accounts (the big national chains, migration 0024) are
+ * excluded too unless showChains is on, same flag the map's button flips.
  */
 
 import type { MapAccount } from "../lib/dal";
@@ -65,11 +67,13 @@ export function NearestClients({
   userLoc,
   status,
   onShowInMap,
+  showChains,
 }: {
   accounts: MapAccount[];
   userLoc: UserLoc | null;
   status: LocStatus;
   onShowInMap: (id: string) => void;
+  showChains: boolean;
 }) {
   const header = (
     <div className="mb-3 mt-6 flex items-baseline justify-between">
@@ -96,7 +100,7 @@ export function NearestClients({
   }
 
   const nearest = accounts
-    .filter((a) => !a.do_not_visit)
+    .filter((a) => !a.do_not_visit && (showChains || !a.chain_excluded))
     .map((a) => ({ a, mi: haversineMiles(userLoc, a) }))
     .sort((x, y) => x.mi - y.mi)
     .slice(0, 10);

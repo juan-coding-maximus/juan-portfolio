@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GoogleMap, MarkerF, InfoWindowF, PolygonF, useLoadScript } from "@react-google-maps/api";
 import type { MapAccount, TerritoryArea, Tier } from "../lib/dal";
 import { AccountLink } from "../lib/modal";
+import { Ico } from "../lib/ui";
 import type { FocusRequest } from "./MapScreen";
 
 const CONTAINER_STYLE = { width: "100%", height: "100%" };
@@ -62,11 +63,15 @@ export function AccountsMap({
   areas,
   userLoc,
   focus,
+  showChains,
+  onToggleShowChains,
 }: {
   accounts: MapAccount[];
   areas: TerritoryArea[];
   userLoc?: { lat: number; lng: number } | null;
   focus?: FocusRequest | null;
+  showChains: boolean;
+  onToggleShowChains: () => void;
 }) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const { isLoaded, loadError } = useLoadScript({ googleMapsApiKey: apiKey ?? "" });
@@ -106,17 +111,29 @@ export function AccountsMap({
     return c;
   }, [accounts]);
 
+  // How many the "chains" chip is currently hiding, for its own label. Not a
+  // tier/area chip because it is not exploratory the way those are: it is the
+  // semi-permanent classification from exclude_chains.py (migration 0024),
+  // and this button is only the show/hide half of it, not the tag itself.
+  const chainExcludedCount = useMemo(
+    () => accounts.filter((a) => a.chain_excluded).length,
+    [accounts],
+  );
+
   /* Tier and area narrow INDEPENDENTLY and combine with AND. Picking "A" and
      "San Diego" asks for the A accounts in San Diego, which is a question worth
-     asking; making one filter reset the other would make it unaskable. */
+     asking; making one filter reset the other would make it unaskable. showChains
+     is the third and last: OFF drops every chain_excluded pin regardless of tier
+     or area, same as do_not_visit would if the map filtered it out outright. */
   const filtered = useMemo(
     () =>
       accounts.filter(
         (a) =>
           (activeTiers.size === 0 || (a.tier !== null && activeTiers.has(a.tier))) &&
-          (activeAreas.size === 0 || (a.area !== null && activeAreas.has(a.area))),
+          (activeAreas.size === 0 || (a.area !== null && activeAreas.has(a.area))) &&
+          (showChains || !a.chain_excluded),
       ),
-    [accounts, activeTiers, activeAreas],
+    [accounts, activeTiers, activeAreas, showChains],
   );
 
   function toggleArea(id: string) {
@@ -337,6 +354,35 @@ export function AccountsMap({
             className="rounded-md px-2 py-1 text-[12.5px] text-[#8A928C] underline-offset-2 hover:text-[#3D4A44] hover:underline"
           >
             clear
+          </button>
+        )}
+        {/* THE CHAINS BUTTON. Juan's ask 2026-08-04: the big national chains
+            (Whole Foods, Sprouts, Trader Joe's, CVS/Walgreens, Target)
+            crowd out the independent stores this territory is actually
+            built on, so they are hidden by default. This chip is only the
+            undo, and it is semi-permanent same as the hide: the click
+            persists to nb_ui_prefs (migration 0024) so it survives a
+            reload and follows Juan to his other device, it does not just
+            flip a local filter back for this page view. */}
+        {chainExcludedCount > 0 && (
+          <button
+            type="button"
+            onClick={onToggleShowChains}
+            aria-pressed={showChains}
+            title={
+              showChains
+                ? "Hide the big national chains again"
+                : `${chainExcludedCount} big-chain account(s) hidden (Whole Foods, Sprouts, Trader Joe's, CVS/Walgreens, Target)`
+            }
+            className={`ml-1 inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
+              showChains
+                ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
+                : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
+            }`}
+          >
+            <Ico name="accounts" size={12} />
+            {showChains ? "Chains shown" : "Chains hidden"}{" "}
+            <span className="tabular-nums opacity-70">{chainExcludedCount}</span>
           </button>
         )}
         <span className="ml-auto text-[12px] text-[#8A928C]">
