@@ -92,7 +92,7 @@ const EXTRACT_TOOL = {
           },
           detail: {
             type: "string",
-            description: "clean 1-3 sentence field-note summary, third person, only facts present in the raw text",
+            description: "what the rep said, kept in the rep's own first-person words ('I called...', not 'The rep called...'). Trim filler words and clean up punctuation/capitalization/structure, but never paraphrase into third person and never drop a stated fact.",
           },
         },
         required: ["kind", "direction", "detail"],
@@ -150,7 +150,7 @@ ${candidates.map((c) => `${c.id} · ${c.name} · ${c.city ?? "unknown city"}`).j
 RULES, all absolute:
 - Extract only what the text states or directly implies. Never invent a name, title, email, phone, date, or outcome that is not in the text.
 - If the account is not clearly identifiable from the candidate list, set account_id to null and account_confidence to "none" rather than guessing.
-- activity.detail is a clean rewrite of what happened, third person, factual, no speculation, no advice, 1-3 sentences.
+- activity.detail is what the rep said, kept in the rep's own first-person words ("I called...", not "The rep called..."). You may tidy filler, punctuation, and capitalization, and add light structure, but never rewrite it into third person, never paraphrase away his actual wording, and never drop a fact he stated.
 - Only include a person in "people" if the note actually names them or clearly describes a specific individual (a title alone like "the manager" with no name is still worth including with first_name/last_name null, if a real detail like an email or a stated preference is attached to them).
 - Only include a calendar_action if the note describes something that should go on a calendar (a scheduled meeting, an explicit follow-up date, a planned return visit). Do not invent a follow-up that was not mentioned.
 - when_iso must be a real resolved timestamp if a specific day/time was stated; if only vague ("follow up soon") leave it null and say so in notes.`;
