@@ -15,19 +15,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GoogleMap, MarkerF, InfoWindowF, PolygonF, useLoadScript } from "@react-google-maps/api";
 import type { MapAccount, TerritoryArea, Tier } from "../lib/dal";
 import { AccountLink } from "../lib/modal";
-import { Ico } from "../lib/ui";
+import { Ico, ReachLinks } from "../lib/ui";
 import type { FocusRequest } from "./MapScreen";
 
 const CONTAINER_STYLE = { width: "100%", height: "100%" };
 
 const TIERS: Tier[] = ["A", "B", "C", "D", "E", "F", "G"];
-
-// Portal 148711228 is EU-hosted, so the record host is app-eu1, not the
-// app.hubspot.com in every generic doc example. Same URL shape already used
-// for company deep-links in bridges/nutribiotic/portal_duplicates.py. 0-2 is
-// HubSpot's own object type id for companies, not something this app assigns.
-const HUBSPOT_COMPANY_URL = (hubspotId: string) =>
-  `https://app-eu1.hubspot.com/contacts/148711228/record/0-2/${hubspotId}`;
 
 // Muted / desaturated, so the map reads as one system with the rest of the
 // editorial UI rather than Google's default saturated red-blue-green.
@@ -733,23 +726,22 @@ export function AccountsMap({
                   <Ico name={inRoute.has(selected.id) ? "check" : "route"} size={13} />
                   {inRoute.has(selected.id) ? "On the route" : "Add to route"}
                 </button>
-                <div className="mt-2 flex items-center gap-3">
+                <div className="mt-2">
                   <AccountLink
                     id={selected.id}
                     className="text-[12.5px] font-medium underline-offset-2 hover:underline"
                   >
                     View account
                   </AccountLink>
-                  {selected.hubspot_company_id && (
-                    <a
-                      href={HUBSPOT_COMPANY_URL(selected.hubspot_company_id)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[12.5px] font-medium text-[#8A928C] underline-offset-2 hover:text-[#3D4A44] hover:underline"
-                    >
-                      View in HubSpot
-                    </a>
-                  )}
+                  {/* Same three handles as a route stop and a profile, in the
+                      same order, so the pin card is not a shorter story than
+                      the list the pin feeds. */}
+                  <ReachLinks
+                    className="mt-1.5"
+                    hubspotId={selected.hubspot_company_id}
+                    website={selected.website}
+                    phone={selected.phone}
+                  />
                 </div>
               </div>
             </InfoWindowF>

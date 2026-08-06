@@ -6,16 +6,27 @@
  */
 
 import type { Account, Activity, Contact } from "./dal";
-import { Card, Empty, Ico, PhoneDisplay, daysAgo, money } from "./ui";
+import {
+  Card,
+  Empty,
+  HUBSPOT_COMPANY_URL,
+  Ico,
+  PhoneDisplay,
+  daysAgo,
+  money,
+  prettyPhone,
+  prettyUrl,
+} from "./ui";
 
+// Website is NOT here: it graduated to the action row at the top of the profile
+// (2026-08-05) and listing it twice would make the same link look like two.
 const SOCIAL_LINKS = (a: Account) =>
   [
-    a.website && { href: a.website, label: a.website.replace(/^https?:\/\//, ""), icon: "globe" as const },
     a.email && { href: `mailto:${a.email}`, label: a.email, icon: "mail" as const },
     a.instagram_url && { href: a.instagram_url, label: "Instagram", icon: "instagram" as const },
     a.facebook_url && { href: a.facebook_url, label: "Facebook", icon: "facebook" as const },
     a.linkedin_url && { href: a.linkedin_url, label: "LinkedIn", icon: "linkedin" as const },
-  ].filter(Boolean) as { href: string; label: string; icon: "globe" | "mail" | "instagram" | "facebook" | "linkedin" }[];
+  ].filter(Boolean) as { href: string; label: string; icon: "mail" | "instagram" | "facebook" | "linkedin" }[];
 
 export function AccountDetailBody({
   account: a,
@@ -30,7 +41,68 @@ export function AccountDetailBody({
   const links = SOCIAL_LINKS(a);
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+    <div className="flex flex-col gap-5">
+      {/* THE THREE OUTSIDE HANDLES, ABOVE EVERYTHING. Juan, 2026-08-05: the
+          HubSpot record was reachable only from a map pin's card, so opening an
+          account from a list meant closing the profile again to get to the
+          portal. Website and phone sat in the right column, which is the last
+          thing read on a laptop and the last thing scrolled to on a phone. All
+          three are actions, not attributes, so they lead. The full number stays
+          in the sidebar too: this row is for tapping, that one is for reading
+          aloud. Absent ones render as muted, unclickable text rather than
+          vanishing, so "we never found a site" is visible as a gap to fill. */}
+      <div className="flex flex-wrap items-center gap-2">
+        {a.hubspot_company_id ? (
+          <a
+            href={HUBSPOT_COMPANY_URL(a.hubspot_company_id)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md bg-[#2C6A46] px-3.5 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+          >
+            <Ico name="external" size={13} />
+            Open in HubSpot
+          </a>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-[#E2DFD5] px-3.5 py-2 text-[13px] text-[#A9AFA9]">
+            <Ico name="external" size={13} />
+            No HubSpot record
+          </span>
+        )}
+
+        {a.website ? (
+          <a
+            href={a.website}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white px-3.5 py-2 text-[13px] font-medium text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] hover:text-[#14201B]"
+          >
+            <Ico name="globe" size={13} />
+            <span className="max-w-[26ch] truncate">{prettyUrl(a.website)}</span>
+          </a>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-[#E2DFD5] px-3.5 py-2 text-[13px] text-[#A9AFA9]">
+            <Ico name="globe" size={13} />
+            No site on file
+          </span>
+        )}
+
+        {a.phone ? (
+          <a
+            href={`tel:${a.phone}`}
+            className="inline-flex items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white px-3.5 py-2 text-[13px] font-medium tabular-nums text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] hover:text-[#14201B]"
+          >
+            <Ico name="phone" size={13} />
+            {prettyPhone(a.phone)}
+          </a>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-[#E2DFD5] px-3.5 py-2 text-[13px] text-[#A9AFA9]">
+            <Ico name="phone" size={13} />
+            No phone on file
+          </span>
+        )}
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
       <div className="flex flex-col gap-5">
         {/* Quirks first. This is what makes or breaks the visit. */}
         {a.quirks && (
@@ -202,6 +274,7 @@ export function AccountDetailBody({
           </Card>
         )}
       </aside>
+      </div>
     </div>
   );
 }

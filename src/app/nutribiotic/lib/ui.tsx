@@ -44,7 +44,21 @@ const ICONS: Record<string, ReactNode> = {
   // turns to mud, and these sit four-abreast in a row of small controls.
   "chevron-up": <><path d="m4 10 4-4 4 4" /></>,
   "chevron-down": <><path d="m4 6 4 4 4-4" /></>,
+  phone: <><path d="M5.6 2.6H3.4c-.7 0-1.3.6-1.2 1.3.3 5.2 4.7 9.6 9.9 9.9.7.1 1.3-.5 1.3-1.2v-2.2l-2.8-.9-1.2 1.4a9.4 9.4 0 0 1-4.1-4.1l1.4-1.2z" /></>,
+  external: <><path d="M9 2.6h4.4V7" /><path d="M13.4 2.6 7.6 8.4" /><path d="M11.8 9.4v3.2c0 .5-.4.9-.9.9H3.4c-.5 0-.9-.4-.9-.9V5.1c0-.5.4-.9.9-.9h3.2" /></>,
 };
+
+/**
+ * The one place a HubSpot company record's URL is built.
+ *
+ * app-eu1, not app.hubspot.com: portal 148711228 lives in HubSpot's EU data
+ * region and the generic .com host lands on a chooser rather than the record.
+ * 0-2 is HubSpot's own object type id for companies, not something this app
+ * assigns. Was copy-pasted in three screens until 2026-08-05; a wrong host
+ * here is a dead link in a parked car, so it is worth having exactly once.
+ */
+export const HUBSPOT_COMPANY_URL = (hubspotId: string) =>
+  `https://app-eu1.hubspot.com/contacts/148711228/record/0-2/${hubspotId}`;
 
 export function Ico({ name, size = 16 }: { name: string; size?: number }) {
   return (
@@ -230,6 +244,73 @@ export function PhoneDisplay({ value }: { value: string | null }) {
       <span className="mx-[3px] text-[13px]">-</span>
       <span className="text-[23px] tracking-tight tabular-nums">{last}</span>
     </a>
+  );
+}
+
+/** "+13105551234" -> "(310) 555-1234". Anything else is shown as stored. */
+export function prettyPhone(value: string): string {
+  const m = value.match(/^\+1(\d{3})(\d{3})(\d{4})$/);
+  return m ? `(${m[1]}) ${m[2]}-${m[3]}` : value;
+}
+
+/** "https://www.store.com/shop" -> "store.com/shop", for a link label. */
+export function prettyUrl(value: string): string {
+  return value.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/$/, "");
+}
+
+/**
+ * The three ways to reach a stop before you drive to it: the HubSpot record,
+ * the site, the phone. Juan's ask 2026-08-05, for every stop on a route.
+ *
+ * WHAT IS MISSING IS SAID OUT LOUD, in muted type, rather than left blank. A
+ * missing link and a link nobody has looked for are the same silence on screen
+ * otherwise, and "no site on file" is the line that sends someone to go find
+ * one. Each absent piece is one short phrase, never a sentence.
+ */
+export function ReachLinks({
+  hubspotId,
+  website,
+  phone,
+  className = "",
+}: {
+  hubspotId: string | null;
+  website: string | null;
+  phone: string | null;
+  className?: string;
+}) {
+  const link =
+    "inline-flex items-center gap-1 font-medium text-[#3D4A44] underline-offset-2 hover:text-[#14201B] hover:underline";
+  const absent = "inline-flex items-center gap-1 text-[#A9AFA9]";
+
+  return (
+    <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] ${className}`}>
+      {hubspotId ? (
+        <a href={HUBSPOT_COMPANY_URL(hubspotId)} target="_blank" rel="noopener noreferrer" className={link}>
+          <Ico name="external" size={12} />
+          HubSpot
+        </a>
+      ) : (
+        <span className={absent}>not in HubSpot</span>
+      )}
+
+      {website ? (
+        <a href={website} target="_blank" rel="noopener noreferrer" className={`${link} min-w-0`}>
+          <Ico name="globe" size={12} />
+          <span className="max-w-[22ch] truncate">{prettyUrl(website)}</span>
+        </a>
+      ) : (
+        <span className={absent}>no site on file</span>
+      )}
+
+      {phone ? (
+        <a href={`tel:${phone}`} className={`${link} tabular-nums`}>
+          <Ico name="phone" size={12} />
+          {prettyPhone(phone)}
+        </a>
+      ) : (
+        <span className={absent}>no phone on file</span>
+      )}
+    </div>
   );
 }
 

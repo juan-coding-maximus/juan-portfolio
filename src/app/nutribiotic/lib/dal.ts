@@ -318,6 +318,8 @@ export type Account = {
   future_state: string | null;
   impact: string | null;
   business_hours: Record<string, string[][]> | null;
+  /** HubSpot company record id. Null = this account has no company in the portal. */
+  hubspot_company_id: string | null;
   origin: Origin;
 };
 
@@ -867,6 +869,9 @@ export type MapAccount = {
   lat: number;
   lng: number;
   phone: string | null;
+  /* The route card carries the three ways to reach a stop before you drive to
+     it (Juan, 2026-08-05): the portal record, the site, the phone. */
+  website: string | null;
   channel: string;
   lifecycle: string;
   do_not_visit: boolean;
@@ -913,7 +918,7 @@ export async function listOwnerAccounts(ownerName = "Juan Arenas Martin"): Promi
   const [result, grades, mix] = await Promise.all([
     query<Omit<MapAccount, "tier" | "top_category_12m" | "top_category_lifetime">>("nb_accounts", {
       select:
-        "id,name,street,city,state,postal,lat,lng,phone,channel,lifecycle,do_not_visit,chain_excluded,practice_excluded,hubspot_company_id,origin,area,lead_status,last_order_at,trailing_12m_revenue,lifetime_revenue",
+        "id,name,street,city,state,postal,lat,lng,phone,website,channel,lifecycle,do_not_visit,chain_excluded,practice_excluded,hubspot_company_id,origin,area,lead_status,last_order_at,trailing_12m_revenue,lifetime_revenue",
       owner_name: `eq.${ownerName}`,
       lat: "not.is.null",
       /* CLOSED ACCOUNTS ARE NOT PINS. No toggle, unlike chains and practices:
@@ -1056,6 +1061,7 @@ export type RouteStopRow = {
     street: string | null;
     city: string | null;
     phone: string | null;
+    website: string | null;
     last_order_at: string | null;
     lifetime_revenue: number | null;
     places_status: string | null;
@@ -1137,7 +1143,7 @@ export async function getCurrentRoutePlan(): Promise<RoutePlan | null> {
       "&select=id,date,kind,cluster_id,depart_at,return_by,start_lat,start_lng,directions_cache," +
       "nb_route_stops(seq,priority_band,eta,etd,drive_seconds,drive_meters,dwell_minutes," +
       "window_open,window_close," +
-      "nb_accounts(id,name,street,city,phone,last_order_at,lifetime_revenue,places_status,lat,lng,hubspot_company_id))",
+      "nb_accounts(id,name,street,city,phone,website,last_order_at,lifetime_revenue,places_status,lat,lng,hubspot_company_id))",
   );
 
   // PostgREST does not order an embedded resource for us. An out-of-order day is

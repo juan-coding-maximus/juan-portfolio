@@ -22,7 +22,7 @@
  */
 
 import type { MapAccount } from "../lib/dal";
-import { Ico, TierChip } from "../lib/ui";
+import { Ico, ReachLinks, TierChip } from "../lib/ui";
 import { AccountLink } from "../lib/modal";
 
 /* Money, at the grain a rep reads at a door. No cents: the difference between
@@ -193,6 +193,19 @@ export function RoutePanel({
                       <span className="text-[#A9AFA9]">no orders on file</span>
                     )}
                   </div>
+
+                  {/* HUBSPOT, SITE, PHONE ON EVERY STOP (Juan, 2026-08-05).
+                      A stop is decided at the curb: the portal record for what
+                      HQ knows, the site for what they sell, the number for
+                      "are you open / is the buyer in today". All three were a
+                      tap-through into the profile before this, which is the one
+                      thing a phone in a car should not have to do. */}
+                  <ReachLinks
+                    className="mt-1"
+                    hubspotId={a.hubspot_company_id}
+                    website={a.website}
+                    phone={a.phone}
+                  />
 
                   {prev && (
                     <div className="mt-0.5 text-[12px] text-[#8A928C]">

@@ -15,15 +15,9 @@
 
 import type { PinnedWaypoint, RouteDayRow, RoutePlan, StopBrief } from "../lib/dal";
 import { AccountLink } from "../lib/modal";
-import { Card, Ico } from "../lib/ui";
+import { Card, Ico, ReachLinks } from "../lib/ui";
 
 const LA = "America/Los_Angeles";
-
-// Portal 148711228 is EU-hosted, so the record host is app-eu1. Same URL
-// shape as map/AccountsMap.tsx's HUBSPOT_COMPANY_URL; kept local here rather
-// than shared because that file is a client component with no exports.
-const HUBSPOT_COMPANY_URL = (hubspotId: string) =>
-  `https://app-eu1.hubspot.com/contacts/148711228/record/0-2/${hubspotId}`;
 
 function hhmm(iso: string | null): string {
   if (!iso) return "";
@@ -234,27 +228,27 @@ function RouteMiniMap({ points }: { points: MapPoint[] }) {
   );
 }
 
-function ProfileLinks({ accountId, hubspotId }: { accountId: string; hubspotId: string | null }) {
+/* Every planned stop carries the four ways in: the OS profile, the HubSpot
+   record, the site, the phone (Juan, 2026-08-05). HubSpot/site/phone come from
+   the shared ReachLinks so the hand-built route on the map screen and this
+   computed week say the same three things in the same order. */
+function ProfileLinks({
+  accountId, hubspotId, website, phone,
+}: {
+  accountId: string;
+  hubspotId: string | null;
+  website: string | null;
+  phone: string | null;
+}) {
   return (
-    <div className="mt-1 flex items-center gap-3 text-[12px]">
+    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
       <AccountLink
         id={accountId}
         className="font-medium text-[#3C4A42] underline-offset-2 hover:underline"
       >
         OS profile
       </AccountLink>
-      {hubspotId ? (
-        <a
-          href={HUBSPOT_COMPANY_URL(hubspotId)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-medium text-[#8A928C] underline-offset-2 hover:text-[#3C4A42] hover:underline"
-        >
-          HubSpot
-        </a>
-      ) : (
-        <span className="text-[#A9AFA9]">not linked in HubSpot</span>
-      )}
+      <ReachLinks hubspotId={hubspotId} website={website} phone={phone} />
     </div>
   );
 }
@@ -295,7 +289,12 @@ function StopRow({
           </span>
         </div>
 
-        <ProfileLinks accountId={a.id} hubspotId={a.hubspot_company_id} />
+        <ProfileLinks
+          accountId={a.id}
+          hubspotId={a.hubspot_company_id}
+          website={a.website}
+          phone={a.phone}
+        />
 
         {/* No contact is rendered as NOTHING, not as an apology. The snapshot in
             nb_route_plans.config.field_brief was audited against live nb_contacts
