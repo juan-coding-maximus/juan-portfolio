@@ -10,7 +10,7 @@
 import { notFound } from "next/navigation";
 import { getAccount, listActivities, listContacts } from "../../lib/dal";
 import { AccountDetailBody } from "../../lib/account-detail";
-import { PageHead } from "../../lib/ui";
+import { PageHead, realChannel } from "../../lib/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +29,7 @@ export default async function AccountDetail({
     <>
       <PageHead
         title={a.name}
-        sub={[a.channel, [a.street, a.city, a.postal].filter(Boolean).join(", ")]
+        sub={[realChannel(a.channel), [a.street, a.city, a.postal].filter(Boolean).join(", ")]
           .filter(Boolean)
           .join(" · ")}
       />

@@ -21,7 +21,7 @@ import {
 } from "react";
 import { getAccountDetail, type AccountDetailData } from "./account-actions";
 import { AccountDetailBody } from "./account-detail";
-import { Ico } from "./ui";
+import { Ico, realChannel } from "./ui";
 
 type ModalCtx = { open: (id: string) => void };
 const Ctx = createContext<ModalCtx | null>(null);
@@ -76,7 +76,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
                 </h2>
                 {data?.account && (
                   <p className="mt-1 truncate text-[13px] text-[#5B6560]">
-                    {[data.account.channel, [data.account.street, data.account.city, data.account.postal].filter(Boolean).join(", ")]
+                    {[realChannel(data.account.channel), [data.account.street, data.account.city, data.account.postal].filter(Boolean).join(", ")]
                       .filter(Boolean)
                       .join(" · ")}
                   </p>

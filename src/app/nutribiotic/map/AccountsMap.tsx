@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GoogleMap, MarkerF, InfoWindowF, PolygonF, useLoadScript } from "@react-google-maps/api";
 import type { CustomStop, MapAccount, TerritoryArea, Tier } from "../lib/dal";
 import { AccountLink } from "../lib/modal";
-import { CUSTOM_STOP_LABEL, Ico, ReachLinks } from "../lib/ui";
+import { CUSTOM_STOP_LABEL, Ico, ReachLinks, realChannel } from "../lib/ui";
 import type { FocusRequest } from "./MapScreen";
 
 const CONTAINER_STYLE = { width: "100%", height: "100%" };
@@ -771,7 +771,7 @@ export function AccountsMap({
                 <div className="mt-1 flex items-center gap-2 text-[11.5px] uppercase tracking-[0.1em] text-[#8A928C]">
                   {selected.tier && <span>HQ potential {selected.tier}</span>}
                   {selected.area && <span>{areaById.get(selected.area)?.label ?? selected.area}</span>}
-                  <span>{selected.channel}</span>
+                  {realChannel(selected.channel) && <span>{realChannel(selected.channel)}</span>}
                   <span>·</span>
                   <span>{selected.lifecycle}</span>
                 </div>

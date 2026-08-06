@@ -231,7 +231,7 @@ export function daysAgo(iso: string | null): string {
  * number itself is what the eye lands on, not the punctuation around it.
  */
 export function PhoneDisplay({ value }: { value: string | null }) {
-  if (!value) return <span className="text-[13.5px] text-[#8A928C]">not known</span>;
+  if (!value) return null;
 
   const m = value.match(/^\+1(\d{3})(\d{3})(\d{4})$/);
   if (!m) {
@@ -264,6 +264,15 @@ export function prettyPhone(value: string): string {
 /** "https://www.store.com/shop" -> "store.com/shop", for a link label. */
 export function prettyUrl(value: string): string {
   return value.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/$/, "");
+}
+
+/**
+ * "unknown" is a seed default meaning nobody has classified this account yet,
+ * not a real channel. It must read as absent, not as a value, so callers
+ * treat it like null rather than printing the literal word.
+ */
+export function realChannel(channel: string | null | undefined): string | null {
+  return channel && channel !== "unknown" ? channel : null;
 }
 
 /**
@@ -323,6 +332,6 @@ export function ReachLinks({
 }
 
 export function money(n: number | null | undefined): string {
-  if (n == null) return "not known";
+  if (n == null) return "$0";
   return `$${Math.round(n).toLocaleString("en-US")}`;
 }

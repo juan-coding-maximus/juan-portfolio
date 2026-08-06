@@ -121,11 +121,11 @@ export function AccountDetailBody({
             <div className="mb-3 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">People</div>
             <ul className="flex flex-col gap-3">
               {contacts.map((c) => {
-                const name = [c.first_name, c.last_name].filter(Boolean).join(" ") || "Name not known";
+                const name = [c.first_name, c.last_name].filter(Boolean).join(" ");
                 return (
                   <li key={c.id} className="flex flex-col gap-0.5 text-[13.5px]">
                     <div className="flex items-baseline gap-2">
-                      <span className="font-medium">{name}</span>
+                      {name && <span className="font-medium">{name}</span>}
                       {c.title && <span className="text-[12px] text-[#8A928C]">{c.title}</span>}
                       {c.is_decision_maker && (
                         <span className="rounded bg-[#ECEAE1] px-1.5 py-0.5 text-[10.5px] font-medium tracking-wide text-[#3D4A44] uppercase">
@@ -157,12 +157,14 @@ export function AccountDetailBody({
           </Card>
         )}
 
-        {/* Gap Selling. Diagnosis before pitch. */}
-        <Card>
-          <div className="mb-3 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
-            The gap
-          </div>
-          {gap ? (
+        {/* Gap Selling. Diagnosis before pitch. Renders only once discovery has
+            actually captured something, same rule as every other optional
+            card below: a field nobody has filled in is absent, not explained. */}
+        {gap && (
+          <Card>
+            <div className="mb-3 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
+              The gap
+            </div>
             <dl className="flex flex-col gap-3 text-[14px]">
               {[
                 ["Where they are now", a.current_state],
@@ -177,14 +179,8 @@ export function AccountDetailBody({
                 ) : null,
               )}
             </dl>
-          ) : (
-            <p className="text-[13.5px] leading-relaxed text-[#5B6560]">
-              Not diagnosed yet. Discovery cannot be marked complete until current state, future
-              state, and impact are captured in the buyer&apos;s own numbers. Ask what is turning
-              slowest and what customers ask for that they cannot supply.
-            </p>
-          )}
-        </Card>
+          </Card>
+        )}
 
         {/* History. Append-only, so this is the real record. */}
         <section>
@@ -226,12 +222,14 @@ export function AccountDetailBody({
                 <dd className="text-right">{v}</dd>
               </div>
             ))}
-            <div className="flex items-center justify-between gap-3 border-t border-[#EDEBE3] pt-2.5">
-              <dt className="text-[#8A928C]">Phone</dt>
-              <dd className="text-right">
-                <PhoneDisplay value={a.phone} />
-              </dd>
-            </div>
+            {a.phone && (
+              <div className="flex items-center justify-between gap-3 border-t border-[#EDEBE3] pt-2.5">
+                <dt className="text-[#8A928C]">Phone</dt>
+                <dd className="text-right">
+                  <PhoneDisplay value={a.phone} />
+                </dd>
+              </div>
+            )}
           </dl>
         </Card>
 
