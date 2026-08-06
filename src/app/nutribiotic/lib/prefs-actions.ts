@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { setRouteDraft, setShowChainAccounts, setShowPracticeAccounts } from "./dal";
+import { setRouteDraft, setShowChainAccounts, setShowPracticeAccounts, type RouteDraftEntry } from "./dal";
 
 /** The map's "chains" button. Persists to nb_ui_prefs (see migration 0024)
  * rather than client state, so the undo Juan asked to be semi-permanent
@@ -28,6 +28,6 @@ export async function toggleShowPracticeAccounts(show: boolean): Promise<void> {
  * would throw the map's pan, zoom and open InfoWindow away every time Juan
  * nudged a stop. The row is the durable copy, the screen is already right.
  */
-export async function saveRouteDraft(ids: string[]): Promise<void> {
-  await setRouteDraft(ids);
+export async function saveRouteDraft(entries: RouteDraftEntry[]): Promise<void> {
+  await setRouteDraft(entries);
 }

@@ -989,25 +989,71 @@ export async function setShowPracticeAccounts(show: boolean): Promise<void> {
 }
 
 /**
- * The hand-built route under the map: an ordered list of nb_accounts.id, order
- * being stop order (migration 0029). Server-persisted for the same reason the
- * chain/practice toggles are, and one Juan asked for explicitly: a route he
- * assembles on the phone in the morning is still there on the desktop, and
- * still there after a reload, until he removes a stop himself.
+ * A stop on the route that is not an account: lunch, the hotel, a warehouse, a
+ * parking garage (Juan, 2026-08-05). It carries its own coordinates because it
+ * has no row to look them up in, resolved once from Google Places when it is
+ * added (see lib/stop-actions.ts) and then frozen. A day is not planned around
+ * a lunch place that silently moves.
+ */
+export type CustomStopKind = "lunch" | "hotel" | "stop";
+
+export type CustomStop = {
+  /** Always prefixed "custom:", which is what tells the two apart in a draft. */
+  id: string;
+  kind: CustomStopKind;
+  label: string;
+  address: string;
+  lat: number;
+  lng: number;
+};
+
+/** One position in the route: an account id, or a stop that carries itself. */
+export type RouteDraftEntry = string | CustomStop;
+
+const CUSTOM_KINDS: CustomStopKind[] = ["lunch", "hotel", "stop"];
+
+/* Anything that is not exactly a stop is dropped, not repaired. This column is
+   jsonb written by a browser; a half-shaped object here would become a row in
+   the route with no coordinates and no way to remove it. */
+function asDraftEntry(x: unknown): RouteDraftEntry | null {
+  if (typeof x === "string") return x;
+  if (!x || typeof x !== "object") return null;
+  const o = x as Record<string, unknown>;
+  if (typeof o.id !== "string" || !o.id.startsWith("custom:")) return null;
+  if (typeof o.kind !== "string" || !CUSTOM_KINDS.includes(o.kind as CustomStopKind)) return null;
+  if (typeof o.label !== "string" || typeof o.address !== "string") return null;
+  if (typeof o.lat !== "number" || typeof o.lng !== "number") return null;
+  if (!Number.isFinite(o.lat) || !Number.isFinite(o.lng)) return null;
+  return { id: o.id, kind: o.kind as CustomStopKind, label: o.label, address: o.address, lat: o.lat, lng: o.lng };
+}
+
+/**
+ * The hand-built route under the map: an ordered list where order is stop order
+ * (migration 0029). Server-persisted for the same reason the chain/practice
+ * toggles are, and one Juan asked for explicitly: a route he assembles on the
+ * phone in the morning is still there on the desktop, and still there after a
+ * reload, until he removes a stop himself.
+ *
+ * MIXED ON PURPOSE. A bare string is an account id, which is every entry
+ * written before 2026-08-05 and every account added since; an object is a
+ * lunch/hotel/other stop that carries its own address and coordinates. One
+ * ordered list rather than two, because the ordering IS the route and two
+ * lists would have to agree about interleaving on every nudge.
  *
  * Unknown ids are dropped on read rather than rendered as a blank row. That is
  * the tombstone case: an account in the draft that gets closed, or falls out of
  * Juan's book, stops being a stop, and the alternative is a route with a hole
  * in it that cannot be clicked or removed.
  */
-export async function getRouteDraft(): Promise<string[]> {
-  const rows = await raw<{ route_draft: string[] | null }>("nb_ui_prefs?select=route_draft&id=eq.1");
-  const ids = rows[0]?.route_draft;
-  return Array.isArray(ids) ? ids.filter((x): x is string => typeof x === "string") : [];
+export async function getRouteDraft(): Promise<RouteDraftEntry[]> {
+  const rows = await raw<{ route_draft: unknown[] | null }>("nb_ui_prefs?select=route_draft&id=eq.1");
+  const entries = rows[0]?.route_draft;
+  if (!Array.isArray(entries)) return [];
+  return entries.map(asDraftEntry).filter((e): e is RouteDraftEntry => e !== null);
 }
 
-export async function setRouteDraft(ids: string[]): Promise<void> {
-  await mutate("nb_ui_prefs", "PATCH", { route_draft: ids, updated_at: new Date().toISOString() }, {
+export async function setRouteDraft(entries: RouteDraftEntry[]): Promise<void> {
+  await mutate("nb_ui_prefs", "PATCH", { route_draft: entries, updated_at: new Date().toISOString() }, {
     id: "eq.1",
   });
 }

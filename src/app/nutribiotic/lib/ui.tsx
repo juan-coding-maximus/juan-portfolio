@@ -8,6 +8,14 @@
  */
 
 import type { ReactNode } from "react";
+import type { CustomStopKind } from "./dal";
+
+/** What a non-account route stop is called on screen. One noun, no adjectives. */
+export const CUSTOM_STOP_LABEL: Record<CustomStopKind, string> = {
+  lunch: "Lunch",
+  hotel: "Hotel",
+  stop: "Stop",
+};
 
 const ICONS: Record<string, ReactNode> = {
   today: <><circle cx="8" cy="8" r="6.2" /><path d="M8 4.6V8l2.3 1.4" /></>,

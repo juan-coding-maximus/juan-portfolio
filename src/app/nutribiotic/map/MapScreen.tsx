@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { MapAccount, TerritoryArea } from "../lib/dal";
+import type { CustomStop, MapAccount, RouteDraftEntry, TerritoryArea } from "../lib/dal";
 import {
   saveRouteDraft,
   toggleShowChainAccounts,
@@ -25,6 +25,16 @@ export type UserLoc = { lat: number; lng: number };
 export type LocStatus = "pending" | "ok" | "denied" | "timeout" | "unavailable";
 export type FocusRequest = { id: string; n: number };
 
+/**
+ * A resolved position on the route. Coordinates sit at the top level on both
+ * arms so the leg maths and the Maps links never branch: what differs between
+ * an account and a lunch stop is what the card SAYS, not where it is.
+ */
+export type RouteStopView = { id: string; lat: number; lng: number } & (
+  | { type: "account"; account: MapAccount }
+  | { type: "custom"; custom: CustomStop }
+);
+
 export function MapScreen({
   accounts,
   areas,
@@ -36,7 +46,7 @@ export function MapScreen({
   areas: TerritoryArea[];
   initialShowChains: boolean;
   initialShowPractices: boolean;
-  initialRouteDraft: string[];
+  initialRouteDraft: RouteDraftEntry[];
 }) {
   const [loc, setLoc] = useState<UserLoc | null>(null);
   const [locStatus, setLocStatus] = useState<LocStatus>("pending");
@@ -70,35 +80,62 @@ export function MapScreen({
      up, reverted if the write fails. A route is a scratchpad Juan edits half a
      dozen times at a light, and a save round-trip between each nudge would be
      felt every time. */
-  const [routeIds, setRouteIds] = useState<string[]>(initialRouteDraft);
+  const [routeDraft, setRouteDraft] = useState<RouteDraftEntry[]>(initialRouteDraft);
 
-  function commitRoute(next: string[]) {
-    const prev = routeIds;
-    setRouteIds(next);
-    saveRouteDraft(next).catch(() => setRouteIds(prev));
+  function commitRoute(next: RouteDraftEntry[]) {
+    const prev = routeDraft;
+    setRouteDraft(next);
+    saveRouteDraft(next).catch(() => setRouteDraft(prev));
   }
 
-  const routeStops = useMemo(() => {
-    const byId = new Map(accounts.map((a) => [a.id, a]));
-    return routeIds.map((id) => byId.get(id)).filter((a): a is MapAccount => Boolean(a));
-  }, [routeIds, accounts]);
+  const entryId = (e: RouteDraftEntry) => (typeof e === "string" ? e : e.id);
 
-  const inRoute = useMemo(() => new Set(routeIds), [routeIds]);
+  /* An account entry that no longer resolves drops out here (see getRouteDraft);
+     a custom stop cannot drop out, because it carries everything it needs. */
+  const routeStops = useMemo<RouteStopView[]>(() => {
+    const byId = new Map(accounts.map((a) => [a.id, a]));
+    return routeDraft
+      .map((e): RouteStopView | null => {
+        if (typeof e !== "string") {
+          return { id: e.id, lat: e.lat, lng: e.lng, type: "custom", custom: e };
+        }
+        const a = byId.get(e);
+        return a ? { id: a.id, lat: a.lat, lng: a.lng, type: "account", account: a } : null;
+      })
+      .filter((s): s is RouteStopView => s !== null);
+  }, [routeDraft, accounts]);
+
+  const inRoute = useMemo(() => new Set(routeDraft.map(entryId)), [routeDraft]);
+
+  // Drawn on the map as well as listed: a lunch stop between two clusters is
+  // only useful if you can see where it falls in the day.
+  const customStops = useMemo(
+    () => routeStops.filter((s) => s.type === "custom").map((s) => s.custom),
+    [routeStops],
+  );
 
   function addToRoute(id: string) {
     if (inRoute.has(id)) return; // adding twice is a mis-tap, not a second visit
-    commitRoute([...routeIds, id]);
+    commitRoute([...routeDraft, id]);
+  }
+
+  /* Lunch, the hotel, anything with an address (2026-08-05). No duplicate check,
+     unlike an account: two coffee stops in one day is a real day, and the id is
+     minted here so even the same place twice stays independently removable. */
+  function addCustomStop(stop: Omit<CustomStop, "id">) {
+    const id = `custom:${stop.kind}:${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+    commitRoute([...routeDraft, { ...stop, id }]);
   }
 
   function removeFromRoute(id: string) {
-    commitRoute(routeIds.filter((x) => x !== id));
+    commitRoute(routeDraft.filter((e) => entryId(e) !== id));
   }
 
   function moveInRoute(id: string, dir: -1 | 1) {
-    const i = routeIds.indexOf(id);
+    const i = routeDraft.findIndex((e) => entryId(e) === id);
     const j = i + dir;
-    if (i < 0 || j < 0 || j >= routeIds.length) return;
-    const next = [...routeIds];
+    if (i < 0 || j < 0 || j >= routeDraft.length) return;
+    const next = [...routeDraft];
     [next[i], next[j]] = [next[j], next[i]];
     commitRoute(next);
   }
@@ -199,6 +236,7 @@ export function MapScreen({
           onToggleShowPractices={togglePractices}
           onAddToRoute={addToRoute}
           inRoute={inRoute}
+          customStops={customStops}
         />
       </div>
 
@@ -211,6 +249,7 @@ export function MapScreen({
         onRemove={removeFromRoute}
         onClear={() => commitRoute([])}
         onShowInMap={showInMap}
+        onAddCustomStop={addCustomStop}
       />
 
       <NearestClients

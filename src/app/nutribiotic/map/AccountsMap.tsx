@@ -13,9 +13,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GoogleMap, MarkerF, InfoWindowF, PolygonF, useLoadScript } from "@react-google-maps/api";
-import type { MapAccount, TerritoryArea, Tier } from "../lib/dal";
+import type { CustomStop, MapAccount, TerritoryArea, Tier } from "../lib/dal";
 import { AccountLink } from "../lib/modal";
-import { Ico, ReachLinks } from "../lib/ui";
+import { CUSTOM_STOP_LABEL, Ico, ReachLinks } from "../lib/ui";
 import type { FocusRequest } from "./MapScreen";
 
 const CONTAINER_STYLE = { width: "100%", height: "100%" };
@@ -104,11 +104,14 @@ export function AccountsMap({
   onToggleShowPractices,
   onAddToRoute,
   inRoute,
+  customStops,
 }: {
   accounts: MapAccount[];
   areas: TerritoryArea[];
   userLoc?: { lat: number; lng: number } | null;
   focus?: FocusRequest | null;
+  /** Lunch / hotel / other stops on the hand-built route (2026-08-05). */
+  customStops: CustomStop[];
   showChains: boolean;
   onToggleShowChains: () => void;
   showPractices: boolean;
@@ -119,6 +122,11 @@ export function AccountsMap({
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const { isLoaded, loadError } = useLoadScript({ googleMapsApiKey: apiKey ?? "" });
   const [selected, setSelected] = useState<MapAccount | null>(null);
+  // A route stop that is not an account. Separate state from `selected` rather
+  // than a union, because only one of the two can ever be open and the card
+  // bodies share nothing: there is no grade, no order history, no portal record
+  // behind a hotel.
+  const [selectedStop, setSelectedStop] = useState<CustomStop | null>(null);
   // Empty set reads as "no filter", not "nothing matches" -- the default view
   // is every pin, same as the map before tiers existed on it.
   const [activeTiers, setActiveTiers] = useState<Set<Tier>>(new Set());
@@ -333,16 +341,29 @@ export function AccountsMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady || !focus) return;
-    const account = accounts.find((a) => a.id === focus.id);
-    if (!account) return;
-    setSelected(account);
+
+    // A route stop carries a "custom:" id and lives in customStops, not in the
+    // book. Same camera behaviour either way, so only the lookup branches.
+    const target = focus.id.startsWith("custom:")
+      ? customStops.find((s) => s.id === focus.id)
+      : accounts.find((a) => a.id === focus.id);
+    if (!target) return;
+
+    if ("kind" in target) {
+      setSelected(null);
+      setSelectedStop(target);
+    } else {
+      setSelectedStop(null);
+      setSelected(target);
+    }
+
     if (userLoc) {
       const bounds = new google.maps.LatLngBounds();
       bounds.extend(userLoc);
-      bounds.extend({ lat: account.lat, lng: account.lng });
+      bounds.extend({ lat: target.lat, lng: target.lng });
       map.fitBounds(bounds, 96);
     } else {
-      map.setCenter({ lat: account.lat, lng: account.lng });
+      map.setCenter({ lat: target.lat, lng: target.lng });
       map.setZoom(14);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -650,7 +671,10 @@ export function AccountsMap({
                 key={a.id}
                 position={{ lat: a.lat, lng: a.lng }}
                 opacity={a.do_not_visit ? 0.45 : 1}
-                onClick={() => setSelected(a)}
+                onClick={() => {
+                  setSelectedStop(null);
+                  setSelected(a);
+                }}
                 zIndex={potential ? 3 : 2}
                 icon={{
                   path: google.maps.SymbolPath.CIRCLE,
@@ -663,6 +687,54 @@ export function AccountsMap({
               />
             );
           })}
+
+          {/* ROUTE STOPS THAT ARE NOT ACCOUNTS: lunch, the hotel, a warehouse.
+              Drawn as a square, never a circle, because every circle on this
+              map is a company in the book and a lunch place is not one of them.
+              Amber rather than an area or potential colour for the same reason:
+              nothing on this map should read as "an account we have not graded
+              yet" unless it is one. Above the pins, below "you are here". */}
+          {customStops.map((s) => (
+            <MarkerF
+              key={s.id}
+              position={{ lat: s.lat, lng: s.lng }}
+              onClick={() => {
+                setSelected(null);
+                setSelectedStop(s);
+              }}
+              zIndex={3}
+              title={s.label}
+              icon={{
+                path: "M -6 -6 L 6 -6 L 6 6 L -6 6 Z",
+                scale: 1,
+                fillColor: "#A0762C",
+                fillOpacity: 1,
+                strokeColor: "#F7F6F1",
+                strokeWeight: 1.5,
+              }}
+            />
+          ))}
+
+          {selectedStop && (
+            <InfoWindowF
+              position={{ lat: selectedStop.lat, lng: selectedStop.lng }}
+              onCloseClick={() => setSelectedStop(null)}
+            >
+              <div className="min-w-[180px] max-w-[240px] p-1 text-[13px] text-[#14201B]">
+                <div className="font-semibold">{selectedStop.label}</div>
+                <div className="mt-0.5 text-[12px] text-[#5B6560]">{selectedStop.address}</div>
+                <div className="mt-1 text-[11.5px] uppercase tracking-[0.1em] text-[#8A928C]">
+                  {CUSTOM_STOP_LABEL[selectedStop.kind]} · on your route
+                </div>
+                <a
+                  href={`https://maps.apple.com/?daddr=${selectedStop.lat},${selectedStop.lng}`}
+                  className="mt-2 flex w-full items-center justify-center rounded-md bg-[#2C6A46] px-3 py-2 text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90"
+                >
+                  GO
+                </a>
+              </div>
+            </InfoWindowF>
+          )}
 
           {/* You are here. Blue, the one convention every map user already
               knows; no area or grade uses it, so it cannot be mistaken for an
