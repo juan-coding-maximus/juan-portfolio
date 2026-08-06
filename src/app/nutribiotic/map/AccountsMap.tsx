@@ -172,11 +172,24 @@ export function AccountsMap({
     [areas, activeAreas],
   );
 
+  /* What every badge below counts FROM. Chains and practices are excluded
+     here whenever their toggle is off (the resting state), same predicate as
+     `filtered` uses for pins. Without this, a badge counts the whole book
+     while the map only draws the chain/practice-free subset, so "HQ potential
+     A 5" reads as a lie when four of the five are Whole Foods pins nobody can
+     see (Juan, 2026-08-06). Deliberately NOT filtered by tier/area/lead
+     status: those chips ask "how many of X", so X's own count must stay
+     whole for every OTHER chip to still make sense picked alongside it. */
+  const visibleAccounts = useMemo(
+    () => accounts.filter((a) => (showChains || !a.chain_excluded) && (showPractices || !a.practice_excluded)),
+    [accounts, showChains, showPractices],
+  );
+
   const tierCounts = useMemo(() => {
     const counts: Record<Tier, number> = { A: 0, B: 0, C: 0, D: 0, E: 0, F: 0, G: 0 };
-    for (const a of accounts) if (a.tier) counts[a.tier] += 1;
+    for (const a of visibleAccounts) if (a.tier) counts[a.tier] += 1;
     return counts;
-  }, [accounts]);
+  }, [visibleAccounts]);
 
   /* LEAD STATUS (0028), a dropdown rather than another chip row: six options
      on top of the seven tier chips and fourteen area chips would be a wall of
@@ -189,7 +202,7 @@ export function AccountsMap({
      up as itself instead of disappearing. Counted the same way the chips are. */
   const leadStatusOptions = useMemo(() => {
     const c = new Map<string, number>();
-    for (const a of accounts) {
+    for (const a of visibleAccounts) {
       // A WAYPOINT HAS NO LEAD STATUS AND NEVER WILL. Juan's apartment was the
       // entire "New to activate (1)" bucket on 2026-08-05, which read as a
       // sales lead nobody had worked and was really just his front door. Its
@@ -206,7 +219,7 @@ export function AccountsMap({
         count,
         label: value === NO_LEAD_STATUS ? NO_LEAD_STATUS_LABEL : LEAD_STATUS_LABEL[value] ?? value,
       }));
-  }, [accounts]);
+  }, [visibleAccounts]);
 
   // What the collapsed Filters button has to admit to hiding. Chains and
   // practices are counted only when SHOWN, because hidden is their resting
@@ -220,9 +233,9 @@ export function AccountsMap({
 
   const areaCounts = useMemo(() => {
     const c: Record<string, number> = {};
-    for (const a of accounts) if (a.area) c[a.area] = (c[a.area] ?? 0) + 1;
+    for (const a of visibleAccounts) if (a.area) c[a.area] = (c[a.area] ?? 0) + 1;
     return c;
-  }, [accounts]);
+  }, [visibleAccounts]);
 
   // How many each chip is currently hiding, for its own label. Not a
   // tier/area chip because neither is exploratory the way those are: they
@@ -246,16 +259,14 @@ export function AccountsMap({
      outright. */
   const filtered = useMemo(
     () =>
-      accounts.filter(
+      visibleAccounts.filter(
         (a) =>
           (activeTiers.size === 0 || (a.tier !== null && activeTiers.has(a.tier))) &&
           (activeAreas.size === 0 || (a.area !== null && activeAreas.has(a.area))) &&
           (activeLeadStatuses.size === 0 ||
-            activeLeadStatuses.has(a.lead_status ?? NO_LEAD_STATUS)) &&
-          (showChains || !a.chain_excluded) &&
-          (showPractices || !a.practice_excluded),
+            activeLeadStatuses.has(a.lead_status ?? NO_LEAD_STATUS)),
       ),
-    [accounts, activeTiers, activeAreas, activeLeadStatuses, showChains, showPractices],
+    [visibleAccounts, activeTiers, activeAreas, activeLeadStatuses],
   );
 
   function toggleArea(id: string) {
