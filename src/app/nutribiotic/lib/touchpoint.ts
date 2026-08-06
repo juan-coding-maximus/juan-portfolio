@@ -288,7 +288,7 @@ export async function recordTouchpoint(
       kind: ca.kind,
       title: account ? `${account.name}: ${ca.title}` : ca.title,
       starts_at: ca.when_iso,
-      duration_minutes: ca.duration_minutes ?? 30,
+      duration_minutes: ca.duration_minutes ?? 60,
       notes: ca.notes,
     });
     calendarProposals += 1;
