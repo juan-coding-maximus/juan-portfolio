@@ -33,11 +33,12 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const text = (body?.text as string | undefined)?.trim();
   const accountIdHint = (body?.account_id as string | undefined) || null;
+  const occurredAt = (body?.occurred_at as string | undefined) || null;
   if (!text) {
     return Response.json({ ok: false, error: "text is required." }, { status: 400 });
   }
 
-  const result = await recordTouchpoint(text, accountIdHint);
+  const result = await recordTouchpoint(text, accountIdHint, occurredAt);
   if (!result.ok) {
     return Response.json({ ok: false, error: result.error }, { status: 422 });
   }

@@ -464,6 +464,8 @@ export type NewActivity = {
   direction: string;
   outcome?: string | null;
   detail?: string | null;
+  /** When it HAPPENED, if known and different from now. Omit to default to now(). */
+  at?: string;
 };
 
 export async function insertActivity(input: NewActivity): Promise<Activity> {

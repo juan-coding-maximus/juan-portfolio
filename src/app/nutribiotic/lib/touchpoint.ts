@@ -164,6 +164,7 @@ export type RecordTouchpointResult =
 export async function recordTouchpoint(
   rawText: string,
   accountIdHint?: string | null,
+  occurredAt?: string | null,
 ): Promise<RecordTouchpointResult> {
   const text = rawText.trim();
   if (!text) return { ok: false, error: "Nothing to record." };
@@ -229,6 +230,7 @@ export async function recordTouchpoint(
     direction: parsed.activity.direction,
     outcome: parsed.activity.outcome,
     detail: parsed.activity.detail,
+    ...(occurredAt ? { at: occurredAt } : {}),
   });
 
   const existing = await listContacts(accountId);
