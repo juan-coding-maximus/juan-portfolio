@@ -9,13 +9,24 @@
  * Nothing is parsed or written to the CRM here. This only creates the
  * 'uploaded' tracking row; bridges/nutribiotic/visits.py transcribes it and
  * POSTs the text to /api/visits/transcript, which runs the real extraction.
+ *
+ * Cookie-gated (hasValidSession): unlike touchpoint/transcript, this route has
+ * no Mac-side caller, only the browser mid-recording, so it checks the same
+ * session cookie the PIN gate mints rather than a bearer token. Previously had
+ * no auth check at all, reachable by anyone with the URL to write junk audio
+ * and storage rows; closed 2026-08-10 alongside the PIN gate's reinstatement.
  */
 import { insertVisitRecording, uploadVisitAudio } from "../../../lib/dal";
+import { hasValidSession } from "../../../lib/session";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
+  if (!(await hasValidSession())) {
+    return Response.json({ ok: false, error: "Unauthorized." }, { status: 401 });
+  }
+
   let form: FormData;
   try {
     form = await req.formData();

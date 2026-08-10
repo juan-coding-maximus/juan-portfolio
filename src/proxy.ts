@@ -4,19 +4,46 @@
  * SCOPE: only /nutribiotic/*. The matcher below deliberately excludes every
  * other route so the public portfolio is completely untouched by this file.
  *
- * THE PIN GATE WAS REMOVED OUTRIGHT on 2026-07-20, at Juan's direction.
- * Consequence, stated plainly rather than buried: anyone with the URL can read
- * these pages, and they hold real business data on real prospects. The headers
- * below keep the surface out of search results and frames; they are not access
- * control. If a gate ever returns, build it in the DAL first (Next's own
- * guidance: Proxy runs on every matched route including prefetches, so it must
- * never be the authorization gate).
+ * THIS IS NOT THE AUTHORIZATION GATE, and it must never become one. Next's own
+ * guidance (node_modules/next/dist/docs/01-app/02-guides/authentication.md:1031)
+ * is explicit: Proxy runs on every matched route including prefetches, so it may
+ * only read the cookie optimistically and must never hit a database. The real
+ * gate is verifySession() in the Data Access Layer, which runs at the top of
+ * every single query.
+ *
+ * So this file does exactly one useful thing: bounce an obviously-unauthenticated
+ * request to the gate before the page renders. If it were bypassed entirely, the
+ * DAL would still refuse to return a single row.
+ *
+ * PIN gate reinstated 2026-08-10, at Juan's direction, after 18 days open
+ * ("anyone with the URL can read these pages" — the prior state of this file).
+ * Same shape as before: one PIN, one signed session cookie, no per-page layers.
  */
 
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { COOKIE, verifyToken } from "./app/nutribiotic/lib/session";
 
-export function proxy(_req: NextRequest) {
+export async function proxy(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+
+  // The gate itself and every API route stay reachable while logged out: the
+  // gate obviously needs to be, and the API routes either mint the session
+  // (api/auth) or carry their own bearer-token gate for the Mac-only callers
+  // (api/touchpoint, api/visits/*) — a redirect here would break a POST body
+  // those callers send with no browser cookie at all.
+  if (pathname === "/nutribiotic/gate" || pathname.startsWith("/nutribiotic/api/")) {
+    return NextResponse.next();
+  }
+
+  const ok = await verifyToken(req.cookies.get(COOKIE)?.value);
+  if (!ok) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/nutribiotic/gate";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
   const res = NextResponse.next();
 
   // This surface shows a third party's customer data. It has no business being

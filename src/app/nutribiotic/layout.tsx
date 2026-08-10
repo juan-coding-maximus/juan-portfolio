@@ -3,6 +3,7 @@ import Link from "next/link";
 import { isConfigured, listDrafts, workspaceMode } from "./lib/dal";
 import { ModalProvider } from "./lib/modal";
 import { MobileNav } from "./lib/MobileNav";
+import { hasValidSession } from "./lib/session";
 import { Ico } from "./lib/ui";
 
 export const metadata: Metadata = {
@@ -44,6 +45,17 @@ const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>
 export default async function NutribioticLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // The layout must NOT be the gate.
+  //
+  // The gate page renders as a child of this layout, so any redirect-on-failure
+  // here bounces the gate to itself forever. So this checks the session WITHOUT
+  // redirecting, and renders the unauthenticated view bare (no nav, no data
+  // reads — workspaceMode()/listDrafts() below touch the DAL, which is the real
+  // gate and would redirect to /nutribiotic/gate itself if reached unauthed).
+  if (!(await hasValidSession())) {
+    return <div className="min-h-screen bg-[#F7F6F1] text-[#14201B]">{children}</div>;
+  }
+
   const mode = await workspaceMode();
   const synthetic = mode === "synthetic";
 

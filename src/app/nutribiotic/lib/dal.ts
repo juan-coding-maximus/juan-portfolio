@@ -4,17 +4,24 @@
  * THE ONLY PLACE THIS APP TOUCHES SUPABASE. No page, no component, and no action
  * constructs a client of its own.
  *
- * Per Next 16's `02-guides/data-security.md`: one data-fetching approach, one
- * door, one place to audit.
+ * Two reasons, both from Next 16's own docs shipped in node_modules:
  *
- * ACCESS: open, by decision 2026-07-20. The PIN gate was removed outright (not
- * just switched off) — anyone with the URL can read these pages. The noindex/
- * no-frame headers in proxy.ts keep it out of search results, but they are not
- * access control. If a gate is ever wanted again, rebuild it here in the DAL
- * first (per Next's authentication guide), never in Proxy alone.
+ *  1. `02-guides/authentication.md` recommends centralizing authorization in a
+ *     DAL and warns that Proxy must NOT be the gate (it runs on every route
+ *     including prefetches, so it may only read the cookie). `verifySession()`
+ *     here, wrapped in React `cache()`, is the real gate and runs at the top of
+ *     every query.
+ *  2. `02-guides/data-security.md` warns against mixing data-fetching approaches.
+ *     One door means one place to audit.
+ *
+ * ACCESS: PIN-gated again as of 2026-08-10 (was removed outright 2026-07-20;
+ * reinstated at Juan's direction after the OS accumulated real customer data
+ * and a live weekly route/location plan, both openly reachable by anyone with
+ * the URL in the meantime). verifySession() below is the actual gate; proxy.ts
+ * only bounces the obvious case before a page even renders.
  *
  * KEY HANDLING: this holds the SERVICE-ROLE key, server-side only. The anon key
- * is never shipped to the browser at all. For a single-user tool, browser-side
+ * is never shipped to the browser at all. With a single PIN user, browser-side
  * RLS buys nothing, and a publishable key sitting on a public domain would be
  * pure liability. Consequence, accepted deliberately: no browser Realtime. The
  * route page polls instead.
@@ -28,6 +35,8 @@
 
 import "server-only";
 import { cache } from "react";
+import { redirect } from "next/navigation";
+import { hasValidSession } from "./session";
 
 const SB_URL = process.env.NB_SUPABASE_URL ?? "";
 const SB_KEY = process.env.NB_SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -58,12 +67,24 @@ export class MixedOriginError extends Error {
 
 export const isConfigured = (): boolean => Boolean(SB_URL && SB_KEY);
 
+/**
+ * The real authorization gate. Called at the top of every query and mutation
+ * below. `cache()` memoizes it for the duration of one render pass, per the
+ * Next 16 auth guide, so many queries on one page do not repeat the check.
+ */
+export const verifySession = cache(async (): Promise<true> => {
+  if (!(await hasValidSession())) redirect("/nutribiotic/gate");
+  return true;
+});
+
 type QueryOpts = Record<string, string | number | undefined>;
 
 async function query<T extends { origin?: Origin }>(
   table: string,
   opts: QueryOpts = {},
 ): Promise<Result<T>> {
+  await verifySession();
+
   if (!isConfigured()) {
     // Degrade honestly. An unconfigured backend returns nothing; it never
     // fabricates a plausible-looking empty state that implies real emptiness.
@@ -117,6 +138,8 @@ async function mutate<T>(
   body: unknown,
   opts: QueryOpts = {},
 ): Promise<T[]> {
+  await verifySession();
+
   if (!isConfigured()) {
     throw new Error(`Cannot write to "${table}": no data source configured.`);
   }
@@ -160,6 +183,7 @@ function randId(prefix: string): string {
  * screenshot, which is how these numbers actually escape into a conversation.
  */
 export const workspaceMode = cache(async (): Promise<Mode> => {
+  await verifySession();
   if (!isConfigured()) return "empty";
   const res = await query<{ origin: Origin }>("nb_accounts", { select: "origin", limit: 1 });
   return res.mode;
@@ -615,6 +639,7 @@ export type VisitRecording = {
 
 /** Uploads raw audio bytes to the private visit-audio bucket. Returns the storage path. */
 export async function uploadVisitAudio(bytes: ArrayBuffer, contentType: string, ext: string): Promise<string> {
+  await verifySession();
   if (!isConfigured()) throw new Error("Cannot upload audio: no data source configured.");
   const path = `${new Date().toISOString().slice(0, 10)}/${Date.now().toString(36)}${Math.random()
     .toString(36)
@@ -652,6 +677,7 @@ export async function insertVisitRecording(input: {
 /** Not origin-tagged data (a processing-status row, not a CRM fact), so this bypasses
  * query()'s origin machinery and fetches directly. */
 export async function getVisitRecording(id: string): Promise<VisitRecording | null> {
+  await verifySession();
   if (!isConfigured()) return null;
   const res = await fetch(`${SB_URL}/rest/v1/nb_visit_recordings?select=*&id=eq.${id}&limit=1`, {
     headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Accept: "application/json" },
@@ -711,6 +737,7 @@ export type ImportBatch = {
 };
 
 async function raw<T>(path: string): Promise<T[]> {
+  await verifySession();
   if (!isConfigured()) return [];
   const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
     headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Accept: "application/json" },
