@@ -116,11 +116,11 @@ export function RequestForm({ snapshot, codeNorm }: { snapshot: Snapshot; codeNo
         </div>
         <div>
           <label htmlFor="rq-email" className="mb-1 block text-[12.5px] font-medium text-[#3D4A44]">Email</label>
-          <input id="rq-email" name="contact_email" type="email" className={field} autoComplete="email" />
+          <input id="rq-email" name="contact_email" type="email" required className={field} autoComplete="email" />
         </div>
         <div>
           <label htmlFor="rq-phone" className="mb-1 block text-[12.5px] font-medium text-[#3D4A44]">Phone</label>
-          <input id="rq-phone" name="contact_phone" type="tel" className={field} autoComplete="tel" />
+          <input id="rq-phone" name="contact_phone" type="tel" required className={field} autoComplete="tel" />
         </div>
       </div>
 

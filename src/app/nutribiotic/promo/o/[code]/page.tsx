@@ -196,7 +196,7 @@ export default async function OfferPage({ params }: { params: Promise<{ code: st
         <blockquote className="mt-5 border-l-2 border-[#C9CEC6] pl-4 text-[14.5px] leading-relaxed text-[#3D4A44]">
           &ldquo;{s.testimonial.quote}&rdquo;
           {s.testimonial.attribution && (
-            <footer className="mt-1 text-[12.5px] text-[#8A928C]">— {s.testimonial.attribution}</footer>
+            <footer className="mt-1 text-[12.5px] text-[#8A928C]">· {s.testimonial.attribution}</footer>
           )}
         </blockquote>
       )}

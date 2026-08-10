@@ -2,10 +2,10 @@
  * Order request intake. Public by design (the buyer holds no session), bounded
  * the same way as lookup: rate-limited, exact-code, insert-only.
  *
- * WRITE SEQUENCE: the order row first, then the code state. The database is
- * the record; the "email to Juan" of the original spec is deliberately absent
- * because no send leaves this system without a human (agency principle 1).
- * Requests surface in the phone tab, where the relay block is one copy away.
+ * WRITE SEQUENCE: the order row first, then the code state, then the email to
+ * Juan (promo-email.ts, inward and non-fatal). The database is the record;
+ * requests surface in the phone tab either way, where the relay block is one
+ * copy away. The relay itself and anything to the buyer stay human sends.
  *
  * TOTALS ARE RECOMPUTED HERE from the frozen snapshot's per-unit numbers and
  * the submitted quantities. The client shows a live total as quantities move,
@@ -13,6 +13,7 @@
  * client total never reaches the record.
  */
 import { createOrder, getCode, rateLimited } from "../../../lib/promo-public";
+import { sendOrderNotification } from "../../../lib/promo-email";
 
 export const runtime = "nodejs";
 
@@ -40,9 +41,11 @@ export async function POST(req: Request) {
   const contact_phone = String(body.contact_phone ?? "").trim();
   const ship = String(body.ship_address ?? "").trim();
   const notes = String(body.notes ?? "").trim();
-  if (!contact_name || !company || (!contact_email && !contact_phone)) {
+  // All three contact fields required (Juan, 2026-08-10): the request IS the
+  // lead, and a lead he cannot both call and email is half a lead.
+  if (!contact_name || !company || !contact_email || !contact_phone) {
     return Response.json(
-      { ok: false, error: "Name, business name, and an email or phone are required." },
+      { ok: false, error: "Name, business name, email, and phone are all required." },
       { status: 400 },
     );
   }
@@ -69,14 +72,20 @@ export async function POST(req: Request) {
   const order = await createOrder({
     code_norm: code.code_norm,
     contact_name,
-    contact_email: contact_email || null,
-    contact_phone: contact_phone || null,
+    contact_email,
+    contact_phone,
     company,
     ship_address: ship ? { text: ship } : null,
     line_items,
     totals: { you_pay: Math.round(you_pay * 100) / 100 },
     notes: notes || null,
   });
+
+  // Doorbell to Juan, AFTER the row exists: the database is the record, the
+  // email a notification, so a mail failure never fails the request. The
+  // phone tab shows it either way.
+  code.requested_at = new Date().toISOString();
+  await sendOrderNotification(order, code);
 
   return Response.json({ ok: true, redirect: `/nutribiotic/promo/o/${code.code_norm}/received`, id: order.id });
 }
