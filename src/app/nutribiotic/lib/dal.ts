@@ -1301,7 +1301,6 @@ export async function getCurrentRoutePlan(): Promise<RoutePlan | null> {
 // ---------------------------------------------------------------------------
 
 import {
-  clientTypeStem,
   codeSuffix,
   freezeSnapshot,
   normalizeCode,
@@ -1408,10 +1407,12 @@ export async function createPromoCode(opts: {
   const products = await listPromoProducts();
   const snapshot = freezeSnapshot(tpl, products);
 
-  const stem = clientTypeStem(tpl.client_type);
+  /* Code shape simplified 2026-08-10 at Juan's direction: JA-NN-SS, one global
+     sequence, no client-type stem. Four characters after JA is what a hand
+     writes on a card in a parking lot; the offer's type lives in the OS list,
+     not in the code. The random suffix still carries the anti-guessing weight. */
   const existing = await query<{ code_norm: string; origin?: Origin }>("nb_promo_codes", {
     select: "code_norm",
-    display_code: `like.JA-${stem}-%`,
   });
   const seq = String(existing.data.length + 1).padStart(2, "0");
 
@@ -1419,7 +1420,7 @@ export async function createPromoCode(opts: {
   const bonusMs = opts.urgency === "72h" ? 72 * 3600_000 : opts.urgency === "7d" ? 7 * 86400_000 : null;
 
   for (let attempt = 0; attempt < 4; attempt++) {
-    const display = `JA-${stem}-${seq}-${codeSuffix()}`;
+    const display = `JA-${seq}-${codeSuffix()}`;
     const row: Omit<PromoCode, "first_viewed_at" | "requested_at" | "created_at"> = {
       code_norm: normalizeCode(display),
       display_code: display,

@@ -69,6 +69,22 @@ export const FRICTION_REMOVERS = [
   "No minimum order",
 ] as const;
 
+/**
+ * Each term restated in plain words (Juan's ask, 2026-08-10). Restatements of
+ * what the term already promises, nothing added: the map is fixed here so a
+ * template cannot carry an explanation its term does not back.
+ */
+export const TERMS_PLAIN: Record<string, string> = {
+  "Net 30 invoicing":
+    "Nothing is paid today. Juan confirms the order first, and the invoice is due 30 days after it ships.",
+  "60 day money back guarantee":
+    "If it does not sell within 60 days, send it back and the money comes back.",
+  "Return freight paid":
+    "If anything goes back, the return shipping is covered. It costs nothing to return.",
+  "No minimum order":
+    "Order exactly what fits the shelf. There is no minimum to hit.",
+};
+
 export const OFFER_TTL_DAYS = 30;
 
 export type Mechanic =

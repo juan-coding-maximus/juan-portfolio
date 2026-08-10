@@ -14,7 +14,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Ico } from "../../../lib/ui";
-import { REP, clientTypeLabel, money } from "../../../lib/promo";
+import { REP, TERMS_PLAIN, clientTypeLabel, money } from "../../../lib/promo";
 import { generalTemplate, getCode, latestOrder, markViewed } from "../../../lib/promo-public";
 import { GeneralOfferCard, PriceRow, RepContact } from "../../ui";
 import { BonusCountdown, PrintButton, RequestForm } from "./client";
@@ -180,11 +180,18 @@ export default async function OfferPage({ params }: { params: Promise<{ code: st
           <div className="font-[family-name:var(--font-fraunces)] text-[17px] font-semibold tracking-tight">
             Sell it before you pay for it.
           </div>
-          <ul className="mt-2.5 grid gap-1.5 sm:grid-cols-2">
+          <ul className="mt-3 space-y-3">
             {s.friction.map((f) => (
-              <li key={f} className="flex items-center gap-2 text-[13.5px] text-[#3D4A44]">
-                <Ico name="check" size={13} />
-                {f}
+              <li key={f} className="flex gap-2.5">
+                <span className="mt-0.5 text-[#4A6242]">
+                  <Ico name="check" size={14} />
+                </span>
+                <span>
+                  <span className="block text-[14px] font-semibold text-[#14201B]">{f}</span>
+                  {TERMS_PLAIN[f] && (
+                    <span className="block text-[13px] leading-relaxed text-[#5B6560]">{TERMS_PLAIN[f]}</span>
+                  )}
+                </span>
               </li>
             ))}
           </ul>
