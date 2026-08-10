@@ -151,7 +151,10 @@ export default async function OfferPage({ params }: { params: Promise<{ code: st
         </table>
         <div className="mt-3 space-y-1.5 border-t border-[#E2DFD5] pt-3">
           <PriceRow label="You pay" value={s.totals.you_pay} strong />
-          <PriceRow label="Normally" value={s.totals.normally} />
+          {/* "Normally" is the same-goods-without-the-offer figure; when the
+              offer IS plain wholesale the two are equal and repeating the
+              number reads as a mistake, so it only renders when it differs. */}
+          {s.totals.normally !== s.totals.you_pay && <PriceRow label="Normally" value={s.totals.normally} />}
           <PriceRow label="Retail value" value={s.totals.retail_value} />
         </div>
         {code.show_margin && s.margin_at_retail_pct !== null && (
