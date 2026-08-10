@@ -8,10 +8,20 @@
  * independently, so the two guards fail separately.
  */
 
-import { listDrafts , isConfigured } from "../lib/dal";
+import { listDrafts, isConfigured, type Draft } from "../lib/dal";
+import { decideDraft } from "../lib/outbound-actions";
 import { Card, Empty, PageHead, daysAgo } from "../lib/ui";
 
 export const dynamic = "force-dynamic";
+
+/** Outlook Web compose, prefilled. Opens in a new tab; nothing sends until
+ * Juan clicks Send inside his own mailbox — this mailbox holds no Mail.Send
+ * scope, so a compose deep-link is the only path that exists. */
+function owaComposeLink(d: Draft): string {
+  const params = new URLSearchParams({ to: d.to_email ?? "", body: d.body_md });
+  if (d.subject) params.set("subject", d.subject);
+  return `https://outlook.office.com/mail/deeplink/compose?${params}`;
+}
 
 export default async function Outbound() {
   const res = await listDrafts();
@@ -48,6 +58,12 @@ export default async function Outbound() {
                     {d.channel}
                   </span>
                   {d.subject && <span className="text-[14px] font-medium">{d.subject}</span>}
+                  {d.to_email && (
+                    <span className="text-[12px] text-[#8A928C]">
+                      {d.to_name ? `${d.to_name} · ` : ""}
+                      {d.to_email}
+                    </span>
+                  )}
                   <span className="text-[12px] text-[#8A928C]">{daysAgo(d.created_at)}</span>
                   {d.play_key && (
                     <span
@@ -61,21 +77,51 @@ export default async function Outbound() {
                 <p className="max-w-[76ch] text-[13.5px] leading-relaxed whitespace-pre-wrap text-[#3D4A44]">
                   {d.body_md}
                 </p>
-                <div className="mt-3.5 flex gap-2">
-                  <button
-                    type="button"
-                    disabled={synthetic}
-                    className="rounded-md bg-[#14201B] px-3 py-1.5 text-[13px] font-medium text-[#F7F6F1] disabled:opacity-35"
-                    title={synthetic ? "Synthetic drafts cannot be approved for sending." : undefined}
-                  >
-                    Approve
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-md border border-[#D8D4C8] px-3 py-1.5 text-[13px] text-[#3D4A44]"
-                  >
-                    Dismiss
-                  </button>
+                <div className="mt-3.5 flex flex-wrap items-center gap-2">
+                  {d.channel === "email" && d.to_email && !synthetic ? (
+                    <>
+                      <a
+                        href={owaComposeLink(d)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-md bg-[#14201B] px-3 py-1.5 text-[13px] font-medium text-[#F7F6F1]"
+                      >
+                        Open in Outlook &rarr;
+                      </a>
+                      <form action={decideDraft.bind(null, d.id, "sent")}>
+                        <button
+                          type="submit"
+                          className="rounded-md border border-[#D8D4C8] px-3 py-1.5 text-[13px] text-[#3D4A44]"
+                          title="Marks this sent on your word — this mailbox has no send access, so the OS can't verify it."
+                        >
+                          Mark sent
+                        </button>
+                      </form>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={synthetic || !d.to_email}
+                      className="rounded-md bg-[#14201B] px-3 py-1.5 text-[13px] font-medium text-[#F7F6F1] disabled:opacity-35"
+                      title={
+                        synthetic
+                          ? "Synthetic drafts cannot be approved for sending."
+                          : !d.to_email
+                            ? "No email on file for this account — call instead."
+                            : undefined
+                      }
+                    >
+                      Approve
+                    </button>
+                  )}
+                  <form action={decideDraft.bind(null, d.id, "dismissed")}>
+                    <button
+                      type="submit"
+                      className="rounded-md border border-[#D8D4C8] px-3 py-1.5 text-[13px] text-[#3D4A44]"
+                    >
+                      Dismiss
+                    </button>
+                  </form>
                 </div>
               </Card>
             </li>

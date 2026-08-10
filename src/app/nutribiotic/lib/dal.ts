@@ -419,6 +419,8 @@ export type Draft = {
   channel: string;
   subject: string | null;
   body_md: string;
+  to_email: string | null;
+  to_name: string | null;
   play_key: string | null;
   status: string;
   created_at: string;
@@ -432,6 +434,19 @@ export async function listDrafts(limit = 100): Promise<Result<Draft>> {
     order: "created_at.desc",
     limit,
   });
+}
+
+/** Juan clicked the compose link (or is dismissing a draft he won't send).
+ * 'sent' is self-reported here — this mailbox holds no Mail.Send scope, so the
+ * OS cannot verify a send; it only records that Juan says he did. */
+export async function setDraftStatus(
+  id: string,
+  status: "sent" | "dismissed",
+): Promise<Draft> {
+  const patch: Record<string, unknown> = { status };
+  if (status === "sent") patch.sent_at = new Date().toISOString();
+  const [row] = await mutate<Draft>("nb_outbound_drafts", "PATCH", patch, { id: `eq.${id}` });
+  return row;
 }
 
 export type RevenueMonth = {
