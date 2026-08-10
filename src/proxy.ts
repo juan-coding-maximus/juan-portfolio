@@ -36,6 +36,18 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // The buyer surface. A store owner holding a handwritten card must never
+  // meet a PIN, so /nutribiotic/promo/* passes with no cookie. What keeps it
+  // safe is the shape of its data access, not this file: promo-public.ts
+  // reads one code by exact key and inserts orders, nothing else. Headers
+  // still apply; a personalized offer page has no business being indexed.
+  if (pathname.startsWith("/nutribiotic/promo")) {
+    const res = NextResponse.next();
+    res.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+    res.headers.set("Referrer-Policy", "no-referrer");
+    return res;
+  }
+
   const ok = await verifyToken(req.cookies.get(COOKIE)?.value);
   if (!ok) {
     const url = req.nextUrl.clone();

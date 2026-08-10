@@ -40,6 +40,14 @@ const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>
   /* Playbook is the shelf those goals produce: the strategy docs rendered from
      the repo's own markdown, so the site and the files can never disagree. */
   { href: "/nutribiotic/playbook", label: "Playbook", icon: "book" },
+  /* The offer-code trio, added 2026-08-10 at Juan's direction (three tabs, all
+     in the directory). Phone issues a handwritten code in a parking lot and
+     holds the requests waiting on a relay; Offers is the template builder those
+     codes bind to; Promo is the buyer page itself, PIN-free by design, here so
+     the rep sees exactly what the buyer sees. */
+  { href: "/nutribiotic/phone", label: "Phone", icon: "phone" },
+  { href: "/nutribiotic/offer_builder", label: "Offers", icon: "tag" },
+  { href: "/nutribiotic/promo", label: "Promo", icon: "external" },
 ];
 
 export default async function NutribioticLayout({

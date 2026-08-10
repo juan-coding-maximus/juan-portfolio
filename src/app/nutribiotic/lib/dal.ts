@@ -1277,3 +1277,179 @@ export async function getCurrentRoutePlan(): Promise<RoutePlan | null> {
 
   return plan;
 }
+
+// ---------------------------------------------------------------------------
+// Promo (phone / offer_builder). GATED side of the offer system: everything
+// here runs behind verifySession() like the rest of this file. The buyer-facing
+// reads live in promo-public.ts, the one documented exception to this door;
+// see the header there for why it exists and what bounds it.
+// ---------------------------------------------------------------------------
+
+import {
+  clientTypeStem,
+  codeSuffix,
+  freezeSnapshot,
+  normalizeCode,
+  OFFER_TTL_DAYS,
+  type PromoCode,
+  type PromoOrder,
+  type PromoProduct,
+  type PromoTemplate,
+  type TemplateBlocks,
+} from "./promo";
+
+export async function listPromoProducts(): Promise<PromoProduct[]> {
+  const r = await query<PromoProduct & { origin?: Origin }>("nb_promo_products", {
+    select: "*",
+    order: "name.asc",
+  });
+  return r.data;
+}
+
+export async function upsertPromoProduct(
+  p: Omit<PromoProduct, "id"> & { id?: string },
+): Promise<PromoProduct> {
+  if (p.id) {
+    const rows = await mutate<PromoProduct>("nb_promo_products", "PATCH", p, { id: `eq.${p.id}` });
+    return rows[0];
+  }
+  const rows = await mutate<PromoProduct>("nb_promo_products", "POST", { ...p, id: randId("pprod") });
+  return rows[0];
+}
+
+export async function listPromoTemplates(): Promise<PromoTemplate[]> {
+  const r = await query<PromoTemplate & { origin?: Origin }>("nb_promo_templates", {
+    select: "*",
+    order: "updated_at.desc",
+  });
+  return r.data;
+}
+
+export async function upsertPromoTemplate(
+  t: {
+    id?: string;
+    name: string;
+    client_type: string;
+    headline: string | null;
+    subhead: string | null;
+    body_blocks: TemplateBlocks;
+    show_margin: boolean;
+    bonus_label: string | null;
+    is_general: boolean;
+    active: boolean;
+  },
+): Promise<PromoTemplate> {
+  if (t.id) {
+    /* Editing a published template versions rather than rewrites: pages a
+       buyer already saw are frozen in their code's snapshot regardless, but
+       the bumped version number keeps "which offer did they get" answerable. */
+    const { id, ...rest } = t;
+    const cur = await query<PromoTemplate & { origin?: Origin }>("nb_promo_templates", {
+      select: "version",
+      id: `eq.${id}`,
+    });
+    const rows = await mutate<PromoTemplate>(
+      "nb_promo_templates",
+      "PATCH",
+      { ...rest, version: (cur.data[0]?.version ?? 0) + 1, updated_at: new Date().toISOString() },
+      { id: `eq.${id}` },
+    );
+    return rows[0];
+  }
+  const rows = await mutate<PromoTemplate>("nb_promo_templates", "POST", { ...t, id: randId("ptpl") });
+  return rows[0];
+}
+
+export async function listPromoCodes(limit = 200): Promise<PromoCode[]> {
+  const r = await query<PromoCode & { origin?: Origin }>("nb_promo_codes", {
+    select: "*",
+    order: "created_at.desc",
+    limit,
+  });
+  return r.data;
+}
+
+/**
+ * Issue a code: freeze the template into a snapshot, mint JA-XXX-NN-SS, insert.
+ * The sequence number is per client-type and purely cosmetic (the suffix is
+ * what defeats guessing), so a count query is enough; a collision on the full
+ * normalized code retries with a fresh suffix.
+ */
+export async function createPromoCode(opts: {
+  template_id: string;
+  client_name: string | null;
+  client_company?: string | null;
+  urgency: "none" | "72h" | "7d";
+  rep_notes?: string | null;
+}): Promise<PromoCode> {
+  const tpls = await query<PromoTemplate & { origin?: Origin }>("nb_promo_templates", {
+    select: "*",
+    id: `eq.${opts.template_id}`,
+  });
+  const tpl = tpls.data[0];
+  if (!tpl) throw new Error("Template not found.");
+  if (!tpl.active) throw new Error(`"${tpl.name}" is not published; publish it in the builder first.`);
+
+  const products = await listPromoProducts();
+  const snapshot = freezeSnapshot(tpl, products);
+
+  const stem = clientTypeStem(tpl.client_type);
+  const existing = await query<{ code_norm: string; origin?: Origin }>("nb_promo_codes", {
+    select: "code_norm",
+    display_code: `like.JA-${stem}-%`,
+  });
+  const seq = String(existing.data.length + 1).padStart(2, "0");
+
+  const now = Date.now();
+  const bonusMs = opts.urgency === "72h" ? 72 * 3600_000 : opts.urgency === "7d" ? 7 * 86400_000 : null;
+
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const display = `JA-${stem}-${seq}-${codeSuffix()}`;
+    const row: Omit<PromoCode, "first_viewed_at" | "requested_at" | "created_at"> = {
+      code_norm: normalizeCode(display),
+      display_code: display,
+      template_id: tpl.id,
+      client_name: opts.client_name,
+      client_company: opts.client_company ?? null,
+      snapshot,
+      show_margin: tpl.show_margin,
+      bonus_label: bonusMs ? tpl.bonus_label : null,
+      bonus_expires_at: bonusMs ? new Date(now + bonusMs).toISOString() : null,
+      expires_at: new Date(now + OFFER_TTL_DAYS * 86400_000).toISOString(),
+      state: "issued",
+      rep_notes: opts.rep_notes ?? null,
+    };
+    try {
+      const rows = await mutate<PromoCode>("nb_promo_codes", "POST", row);
+      return rows[0];
+    } catch (e) {
+      // Unique violation on the suffix lottery: try again. Anything else is real.
+      if (attempt === 3 || !String(e).includes("409")) throw e;
+    }
+  }
+  throw new Error("Could not mint a unique code.");
+}
+
+export async function voidPromoCode(code_norm: string): Promise<void> {
+  await mutate("nb_promo_codes", "PATCH", { state: "void" }, { code_norm: `eq.${code_norm}` });
+}
+
+export async function savePromoCodeNotes(code_norm: string, rep_notes: string): Promise<void> {
+  await mutate("nb_promo_codes", "PATCH", { rep_notes }, { code_norm: `eq.${code_norm}` });
+}
+
+export async function listPromoOrders(limit = 100): Promise<PromoOrder[]> {
+  const r = await query<PromoOrder & { origin?: Origin }>("nb_promo_orders", {
+    select: "*",
+    order: "created_at.desc",
+    limit,
+  });
+  return r.data;
+}
+
+/** new -> reviewed -> relayed -> closed; relayed stamps the relay time. */
+export async function setPromoOrderState(id: string, state: PromoOrder["state"]): Promise<void> {
+  const patch: Record<string, unknown> = { state };
+  if (state === "relayed") patch.relayed_at = new Date().toISOString();
+  await mutate("nb_promo_orders", "PATCH", patch, { id: `eq.${id}` });
+}

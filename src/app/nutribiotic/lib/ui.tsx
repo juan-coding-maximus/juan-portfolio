@@ -53,6 +53,7 @@ const ICONS: Record<string, ReactNode> = {
   "chevron-up": <><path d="m4 10 4-4 4 4" /></>,
   "chevron-down": <><path d="m4 6 4 4 4-4" /></>,
   phone: <><path d="M5.6 2.6H3.4c-.7 0-1.3.6-1.2 1.3.3 5.2 4.7 9.6 9.9 9.9.7.1 1.3-.5 1.3-1.2v-2.2l-2.8-.9-1.2 1.4a9.4 9.4 0 0 1-4.1-4.1l1.4-1.2z" /></>,
+  tag: <><path d="M2.6 2.6h5.2l5.6 5.6c.5.5.5 1.3 0 1.8l-3.4 3.4c-.5.5-1.3.5-1.8 0L2.6 7.8z" /><circle cx="5.7" cy="5.7" r="0.6" fill="currentColor" stroke="none" /></>,
   external: <><path d="M9 2.6h4.4V7" /><path d="M13.4 2.6 7.6 8.4" /><path d="M11.8 9.4v3.2c0 .5-.4.9-.9.9H3.4c-.5 0-.9-.4-.9-.9V5.1c0-.5.4-.9.9-.9h3.2" /></>,
 };
 
