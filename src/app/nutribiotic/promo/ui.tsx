@@ -11,9 +11,8 @@ import { REP, money, type PromoTemplate } from "../lib/promo";
 export function RepContact({ phone, compact = false }: { phone: string | null; compact?: boolean }) {
   return (
     <div className={`flex items-center gap-3 ${compact ? "" : "rounded-lg border border-[#E2DFD5] bg-white p-4"}`}>
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#14201B] font-[family-name:var(--font-fraunces)] text-[15px] font-semibold text-[#F7F6F1]">
-        JA
-      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={REP.photo} alt={REP.name} className="h-10 w-10 shrink-0 rounded-full object-cover" />
       <div className="min-w-0">
         <div className="text-[14.5px] font-semibold">{REP.name}</div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[13px] text-[#5B6560]">

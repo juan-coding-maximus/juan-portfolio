@@ -33,6 +33,7 @@ export const REP = {
   name: "Juan Arenas",
   prefix: "JA",
   email: "juan@nutribiotic.com",
+  photo: "/nutribiotic/promo/rep-juan.webp",
 } as const;
 
 /** Offer grid in the phone tab; 3-letter stems for the handwritten code. */
