@@ -34,7 +34,7 @@ function claimIcon(claim: string) {
   if (c.includes("california") || c.includes("made in")) return "pin";
   if (c.includes("cgmp") || c.includes("compliant")) return "review";
   if (c.includes("tested")) return "check";
-  if (c.includes("since") || c.includes("lineage")) return "flag";
+  if (c.includes("since") || c.includes("lineage") || c.includes("standard")) return "book";
   return "check";
 }
 
@@ -157,13 +157,16 @@ export default async function OfferPage({ params }: { params: Promise<{ code: st
           </tbody>
         </table>
         <div className="mt-3 space-y-1.5 border-t border-[#E2DFD5] pt-3">
-          <PriceRow label="You pay" value={s.totals.you_pay} strong />
+          <PriceRow label="Invoice (30-day grace period)" value={s.totals.you_pay} strong />
           {/* "Normally" is the same-goods-without-the-offer figure; when the
               offer IS plain wholesale the two are equal and repeating the
               number reads as a mistake, so it only renders when it differs. */}
           {s.totals.normally !== s.totals.you_pay && <PriceRow label="Normally" value={s.totals.normally} />}
           <PriceRow label="Retail value" value={s.totals.retail_value} />
         </div>
+        <p className="mt-2 text-[12.5px] text-[#5B6560]">
+          No payment now. Juan will confirm your package and discount today.
+        </p>
         {code.show_margin && s.margin_at_retail_pct !== null && (
           <div className="mt-3 rounded-md bg-[#F2F0E9] px-3 py-2 text-center text-[14px]">
             Margin at full retail: <span className="font-semibold tabular-nums">{s.margin_at_retail_pct}%</span>
@@ -218,16 +221,18 @@ export default async function OfferPage({ params }: { params: Promise<{ code: st
         </blockquote>
       )}
 
-      {/* 9 · Claims. Filled chips (not outline pills) so trust markers read as
-          badges/stamps rather than blend into the page's low-contrast borders. */}
+      {/* 9 · Claims. Tinted chips with an accent icon: legible against the
+          off-white page without going full black/white. */}
       {s.claims.length > 0 && (
         <div className="mt-5 flex flex-wrap gap-2">
           {s.claims.map((c) => (
             <span
               key={c}
-              className="flex items-center gap-1.5 rounded-full bg-[#14201B] px-3 py-1.5 text-[12.5px] font-medium text-[#F7F6F1]"
+              className="flex items-center gap-1.5 rounded-full border border-[#CBD8C6] bg-[#EFF4EC] px-3 py-1.5 text-[12.5px] font-medium text-[#3D4A44]"
             >
-              <Ico name={claimIcon(c)} size={12} />
+              <span className="text-[#4A6242]">
+                <Ico name={claimIcon(c)} size={12} />
+              </span>
               {c}
             </span>
           ))}

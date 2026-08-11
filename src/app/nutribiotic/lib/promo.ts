@@ -58,7 +58,7 @@ export const clientTypeStem = (key: string): string =>
  * hands over substantiation; rendering an unsubstantiated product claim on a
  * sales page is the textbook fabrication this OS exists to prevent.
  */
-export const CLAIMS = ["Made in California", "cGMP compliant", "Third-party tested", "Since 1981"] as const;
+export const CLAIMS = ["Made in California", "cGMP compliant", "Third-party tested", "Higher Standards since 1981"] as const;
 export const LOCKED_CLAIMS = ["Vegan", "Gluten free", "Non-GMO", "Cruelty free", "Linus Pauling lineage"] as const;
 
 /** Risk-removal terms, from the spec's own list. One idea: sell it before you pay for it. */
