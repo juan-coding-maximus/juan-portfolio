@@ -8,24 +8,17 @@
  * listOwnerAccounts() and geocode.py's corroboration rule.
  */
 
-import {
-  getMapDisplayPrefs,
-  getRouteDraft,
-  isConfigured,
-  listAreas,
-  listOwnerAccounts,
-} from "../lib/dal";
+import { getMapDisplayPrefs, isConfigured, listAreas, listOwnerAccounts } from "../lib/dal";
 import { Empty, PageHead } from "../lib/ui";
 import { MapScreen } from "./MapScreen";
 
 export const dynamic = "force-dynamic";
 
 export default async function MapPage() {
-  const [accounts, areas, displayPrefs, routeDraft] = await Promise.all([
+  const [accounts, areas, displayPrefs] = await Promise.all([
     listOwnerAccounts(),
     listAreas(),
     getMapDisplayPrefs(),
-    getRouteDraft(),
   ]);
 
   return (
@@ -55,7 +48,6 @@ export default async function MapPage() {
             areas={areas}
             initialShowChains={displayPrefs.showChains}
             initialShowPractices={displayPrefs.showPractices}
-            initialRouteDraft={routeDraft}
           />
         </>
       )}

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { isConfigured, listDrafts, workspaceMode } from "./lib/dal";
+import { getRouteDraft, isConfigured, listDrafts, workspaceMode } from "./lib/dal";
 import { ModalProvider } from "./lib/modal";
 import { MobileNav } from "./lib/MobileNav";
+import { RouteProvider } from "./lib/route-context";
 import { hasValidSession } from "./lib/session";
 import { Ico } from "./lib/ui";
 
@@ -68,6 +69,7 @@ export default async function NutribioticLayout({
   const synthetic = mode === "synthetic";
 
   const drafts = isConfigured() ? await listDrafts(1) : { data: [] };
+  const routeDraft = isConfigured() ? await getRouteDraft() : [];
   const nav = [...NAV];
   if (drafts.data.length > 0) {
     nav.splice(2, 0, { href: "/nutribiotic/outbound", label: "Outbound", icon: "outbound" });
@@ -79,6 +81,7 @@ export default async function NutribioticLayout({
 
   return (
     <div className="min-h-screen bg-[#F7F6F1] text-[#14201B]">
+      <RouteProvider initial={routeDraft}>
       <ModalProvider>
       <div className="min-h-screen bg-[#F7F6F1]">
         {/* Synthetic-data signal, redesigned 2026-07-18.
@@ -140,6 +143,7 @@ export default async function NutribioticLayout({
         <MobileNav items={nav} />
       </div>
       </ModalProvider>
+      </RouteProvider>
     </div>
   );
 }

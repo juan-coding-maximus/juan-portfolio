@@ -11,12 +11,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CustomStop, MapAccount, RouteDraftEntry, TerritoryArea } from "../lib/dal";
-import {
-  saveRouteDraft,
-  toggleShowChainAccounts,
-  toggleShowPracticeAccounts,
-} from "../lib/prefs-actions";
+import type { CustomStop, MapAccount, TerritoryArea } from "../lib/dal";
+import { toggleShowChainAccounts, toggleShowPracticeAccounts } from "../lib/prefs-actions";
+import { useRoute } from "../lib/route-context";
 import { AccountsMap } from "./AccountsMap";
 import { NearestClients } from "./NearestClients";
 import { RoutePanel } from "./RoutePanel";
@@ -40,13 +37,11 @@ export function MapScreen({
   areas,
   initialShowChains,
   initialShowPractices,
-  initialRouteDraft,
 }: {
   accounts: MapAccount[];
   areas: TerritoryArea[];
   initialShowChains: boolean;
   initialShowPractices: boolean;
-  initialRouteDraft: RouteDraftEntry[];
 }) {
   const [loc, setLoc] = useState<UserLoc | null>(null);
   const [locStatus, setLocStatus] = useState<LocStatus>("pending");
@@ -71,24 +66,14 @@ export function MapScreen({
     toggleShowPracticeAccounts(next).catch(() => setShowPractices(!next));
   }
 
-  /* THE HAND-BUILT ROUTE (0029). Ids, not account objects, because the ids are
-     what the row stores and resolving them against `accounts` on every render
-     means a stop that gets closed or leaves Juan's book simply stops being a
-     stop, rather than sitting there as an unclickable blank.
-
-     Optimistic like the toggles above: the list moves now and the row catches
-     up, reverted if the write fails. A route is a scratchpad Juan edits half a
-     dozen times at a light, and a save round-trip between each nudge would be
-     felt every time. */
-  const [routeDraft, setRouteDraft] = useState<RouteDraftEntry[]>(initialRouteDraft);
-
-  function commitRoute(next: RouteDraftEntry[]) {
-    const prev = routeDraft;
-    setRouteDraft(next);
-    saveRouteDraft(next).catch(() => setRouteDraft(prev));
-  }
-
-  const entryId = (e: RouteDraftEntry) => (typeof e === "string" ? e : e.id);
+  /* THE HAND-BUILT ROUTE (0029), lifted to app-wide state in route-context.tsx
+     2026-08-11 so the same "Add to route" action also works from an account's
+     profile, not only from a map pin's card. Ids, not account objects, because
+     the ids are what the row stores and resolving them against `accounts` on
+     every render means a stop that gets closed or leaves Juan's book simply
+     stops being a stop, rather than sitting there as an unclickable blank. */
+  const { routeDraft, inRoute, addToRoute, addCustomStop, removeFromRoute, moveInRoute, clearRoute } =
+    useRoute();
 
   /* An account entry that no longer resolves drops out here (see getRouteDraft);
      a custom stop cannot drop out, because it carries everything it needs. */
@@ -105,40 +90,12 @@ export function MapScreen({
       .filter((s): s is RouteStopView => s !== null);
   }, [routeDraft, accounts]);
 
-  const inRoute = useMemo(() => new Set(routeDraft.map(entryId)), [routeDraft]);
-
   // Drawn on the map as well as listed: a lunch stop between two clusters is
   // only useful if you can see where it falls in the day.
   const customStops = useMemo(
     () => routeStops.filter((s) => s.type === "custom").map((s) => s.custom),
     [routeStops],
   );
-
-  function addToRoute(id: string) {
-    if (inRoute.has(id)) return; // adding twice is a mis-tap, not a second visit
-    commitRoute([...routeDraft, id]);
-  }
-
-  /* Lunch, the hotel, anything with an address (2026-08-05). No duplicate check,
-     unlike an account: two coffee stops in one day is a real day, and the id is
-     minted here so even the same place twice stays independently removable. */
-  function addCustomStop(stop: Omit<CustomStop, "id">) {
-    const id = `custom:${stop.kind}:${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
-    commitRoute([...routeDraft, { ...stop, id }]);
-  }
-
-  function removeFromRoute(id: string) {
-    commitRoute(routeDraft.filter((e) => entryId(e) !== id));
-  }
-
-  function moveInRoute(id: string, dir: -1 | 1) {
-    const i = routeDraft.findIndex((e) => entryId(e) === id);
-    const j = i + dir;
-    if (i < 0 || j < 0 || j >= routeDraft.length) return;
-    const next = [...routeDraft];
-    [next[i], next[j]] = [next[j], next[i]];
-    commitRoute(next);
-  }
 
   // A fresh n on every click, even a repeat click on the same account, so the
   // map's focus effect (keyed on this signal) always re-fires and re-zooms
@@ -247,7 +204,7 @@ export function MapScreen({
         stops={routeStops}
         onMove={moveInRoute}
         onRemove={removeFromRoute}
-        onClear={() => commitRoute([])}
+        onClear={clearRoute}
         onShowInMap={showInMap}
         onAddCustomStop={addCustomStop}
       />

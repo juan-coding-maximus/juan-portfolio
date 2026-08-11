@@ -1,17 +1,25 @@
+"use client";
+
 /**
  * The account profile body. Pure presentation, no data fetching, so it renders
  * identically whether it lands on the standalone /account/[id] page (deep
  * link, direct visit) or inside the pop-up modal every list link opens by
  * default (see modal.tsx). One shape, two hosts.
+ *
+ * "use client" only because it reads the route context for the Add to route
+ * button; the standalone page is a Server Component, which can still render
+ * this as a client child.
  */
 
 import type { Account, Activity, Contact } from "./dal";
+import { useRoute } from "./route-context";
 import {
   Card,
   Empty,
   HUBSPOT_COMPANY_URL,
   Ico,
   PhoneDisplay,
+  absoluteUrl,
   daysAgo,
   money,
   prettyPhone,
@@ -39,6 +47,8 @@ export function AccountDetailBody({
 }) {
   const gap = a.current_state || a.future_state || a.impact;
   const links = SOCIAL_LINKS(a);
+  const { addToRoute, inRoute } = useRoute();
+  const onRoute = inRoute.has(a.id);
 
   return (
     <div className="flex flex-col gap-5">
@@ -71,7 +81,7 @@ export function AccountDetailBody({
 
         {a.website ? (
           <a
-            href={a.website}
+            href={absoluteUrl(a.website)}
             target="_blank"
             rel="noreferrer"
             className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white px-3.5 py-2 text-[13px] font-medium text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] hover:text-[#14201B]"
@@ -100,6 +110,24 @@ export function AccountDetailBody({
             No phone on file
           </span>
         )}
+
+        {/* Add to route, same action and same one-tap rule as a pin's card on
+            the map (see RoutePanel.tsx / AccountsMap.tsx): once it is on the
+            route, tapping again can only be a mis-tap, so it goes inert rather
+            than staying live. Removing is the route panel's job. */}
+        <button
+          type="button"
+          onClick={() => addToRoute(a.id)}
+          disabled={onRoute}
+          className={`inline-flex items-center gap-1.5 rounded-md px-3.5 py-2 text-[13px] font-semibold transition-opacity ${
+            onRoute
+              ? "cursor-default bg-[#EEECE3] text-[#5B6560]"
+              : "bg-[#2C6A46] text-white hover:opacity-90"
+          }`}
+        >
+          <Ico name={onRoute ? "check" : "route"} size={13} />
+          {onRoute ? "On the route" : "Add to route"}
+        </button>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[1fr_320px]">

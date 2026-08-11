@@ -268,6 +268,17 @@ export function prettyUrl(value: string): string {
 }
 
 /**
+ * Stored sites are inconsistently schemed ("islavistafood.coop" as often as
+ * "https://islavistafood.coop"). An `href` without a scheme resolves as a
+ * path on this site rather than an external link, which is a redirect to a
+ * 404 disguised as a working button. Always use this for an `<a href>` built
+ * from a stored `website`, never the raw column value.
+ */
+export function absoluteUrl(value: string): string {
+  return /^https?:\/\//i.test(value) ? value : `https://${value}`;
+}
+
+/**
  * "unknown" is a seed default meaning nobody has classified this account yet,
  * not a real channel. It must read as absent, not as a value, so callers
  * treat it like null rather than printing the literal word.
@@ -312,7 +323,7 @@ export function ReachLinks({
       )}
 
       {website ? (
-        <a href={website} target="_blank" rel="noopener noreferrer" className={`${link} min-w-0`}>
+        <a href={absoluteUrl(website)} target="_blank" rel="noopener noreferrer" className={`${link} min-w-0`}>
           <Ico name="globe" size={12} />
           <span className="max-w-[22ch] truncate">{prettyUrl(website)}</span>
         </a>
