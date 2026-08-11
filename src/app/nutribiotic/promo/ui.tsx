@@ -28,6 +28,11 @@ export function RepContact({ phone, compact = false }: { phone: string | null; c
             {REP.email}
           </a>
         </div>
+        {!compact && (
+          <div className="mt-1 text-[12.5px] text-[#8A928C]">
+            Please call or email me with any questions!
+          </div>
+        )}
       </div>
     </div>
   );

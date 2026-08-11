@@ -29,6 +29,15 @@ export const dynamic = "force-dynamic";
 const dateLabel = (iso: string) =>
   new Date(iso).toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" });
 
+function claimIcon(claim: string) {
+  const c = claim.toLowerCase();
+  if (c.includes("california") || c.includes("made in")) return "pin";
+  if (c.includes("cgmp") || c.includes("compliant")) return "review";
+  if (c.includes("tested")) return "check";
+  if (c.includes("since") || c.includes("lineage")) return "flag";
+  return "check";
+}
+
 export default async function OfferPage({ params }: { params: Promise<{ code: string }> }) {
   const { code: raw } = await params;
   const code = await getCode(raw);
@@ -130,8 +139,7 @@ export default async function OfferPage({ params }: { params: Promise<{ code: st
             <tr className="text-left text-[11.5px] uppercase tracking-[0.1em] text-[#8A928C]">
               <th className="pb-1.5 font-medium">Line</th>
               <th className="pb-1.5 text-right font-medium">Retail ea</th>
-              <th className="pb-1.5 text-right font-medium">Wholesale ea</th>
-              <th className="pb-1.5 text-right font-medium">Your cost ea</th>
+              <th className="pb-1.5 text-right font-medium">Trial ea</th>
             </tr>
           </thead>
           <tbody className="tabular-nums">
@@ -143,7 +151,6 @@ export default async function OfferPage({ params }: { params: Promise<{ code: st
                   {l.qty_free > 0 && <span className="ml-1 text-[11.5px] font-medium text-[#5F7A56]">{l.qty_free} free</span>}
                 </td>
                 <td className="py-1.5 text-right">{money(l.retail_each)}</td>
-                <td className="py-1.5 text-right">{money(l.wholesale_each)}</td>
                 <td className="py-1.5 text-right font-semibold">{money(l.effective_each)}</td>
               </tr>
             ))}
@@ -211,11 +218,16 @@ export default async function OfferPage({ params }: { params: Promise<{ code: st
         </blockquote>
       )}
 
-      {/* 9 · Claims. */}
+      {/* 9 · Claims. Filled chips (not outline pills) so trust markers read as
+          badges/stamps rather than blend into the page's low-contrast borders. */}
       {s.claims.length > 0 && (
         <div className="mt-5 flex flex-wrap gap-2">
           {s.claims.map((c) => (
-            <span key={c} className="rounded-full border border-[#E2DFD5] bg-white px-3 py-1 text-[12.5px] text-[#3D4A44]">
+            <span
+              key={c}
+              className="flex items-center gap-1.5 rounded-full bg-[#14201B] px-3 py-1.5 text-[12.5px] font-medium text-[#F7F6F1]"
+            >
+              <Ico name={claimIcon(c)} size={12} />
               {c}
             </span>
           ))}
