@@ -10,17 +10,39 @@
 
 import { listDrafts, isConfigured, type Draft } from "../lib/dal";
 import { decideDraft } from "../lib/outbound-actions";
+import { CopyBodyButton } from "../lib/outbound-ui";
 import { Card, Empty, PageHead, daysAgo } from "../lib/ui";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * How long the whole compose URL may get before the body is left out.
+ *
+ * A deep-link is a query string, and percent-encoding roughly doubles a
+ * markdown body once newlines and punctuation are escaped. Browsers and the
+ * Outlook endpoint both stop carrying one somewhere in the low thousands of
+ * characters, and the failure is quiet: the link still opens, just without the
+ * text. 1900 is comfortably under the most conservative of those ceilings.
+ */
+const COMPOSE_URL_LIMIT = 1900;
+
 /** Outlook Web compose, prefilled. Opens in a new tab; nothing sends until
  * Juan clicks Send inside his own mailbox — this mailbox holds no Mail.Send
- * scope, so a compose deep-link is the only path that exists. */
-function owaComposeLink(d: Draft): string {
-  const params = new URLSearchParams({ to: d.to_email ?? "", body: d.body_md });
-  if (d.subject) params.set("subject", d.subject);
-  return `https://outlook.office.com/mail/deeplink/compose?${params}`;
+ * scope, so a compose deep-link is the only path that exists.
+ *
+ * A body that will not fit is DROPPED RATHER THAN TRUNCATED, and the caller
+ * offers a copy button instead. A half-sent email that looks complete is worse
+ * than an empty compose window next to a copy button. */
+function owaComposeLink(d: Draft): { href: string; bodyOmitted: boolean } {
+  const base = "https://outlook.office.com/mail/deeplink/compose?";
+  const withBody = new URLSearchParams({ to: d.to_email ?? "", body: d.body_md });
+  if (d.subject) withBody.set("subject", d.subject);
+  const full = base + withBody;
+  if (full.length <= COMPOSE_URL_LIMIT) return { href: full, bodyOmitted: false };
+
+  const withoutBody = new URLSearchParams({ to: d.to_email ?? "" });
+  if (d.subject) withoutBody.set("subject", d.subject);
+  return { href: base + withoutBody, bodyOmitted: true };
 }
 
 export default async function Outbound() {
@@ -81,13 +103,21 @@ export default async function Outbound() {
                   {d.channel === "email" && d.to_email && !synthetic ? (
                     <>
                       <a
-                        href={owaComposeLink(d)}
+                        href={owaComposeLink(d).href}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="rounded-md bg-[#14201B] px-3 py-1.5 text-[13px] font-medium text-[#F7F6F1]"
                       >
                         Open in Outlook &rarr;
                       </a>
+                      {owaComposeLink(d).bodyOmitted && (
+                        <>
+                          <CopyBodyButton body={d.body_md} />
+                          <span className="text-[12px] text-[#8A6D2F]">
+                            Too long to prefill. Outlook opens addressed; paste the body in.
+                          </span>
+                        </>
+                      )}
                       <form action={decideDraft.bind(null, d.id, "sent")}>
                         <button
                           type="submit"
