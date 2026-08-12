@@ -1526,6 +1526,27 @@ export type HubspotLogRow = {
 };
 
 /**
+ * A compact stand-in for a body too bulky to keep whole. Mirrors
+ * `receipt()` in bridges/nutribiotic/hubspot.py.
+ */
+function receipt(obj: unknown): Record<string, unknown> {
+  let bytes = 0;
+  try {
+    bytes = JSON.stringify(obj)?.length ?? 0;
+  } catch {
+    return { _trimmed: true, note: "unserializable body" };
+  }
+  const out: Record<string, unknown> = { _trimmed: true, bytes };
+  if (Array.isArray(obj)) out.results = obj.length;
+  else if (obj && typeof obj === "object") {
+    const o = obj as Record<string, unknown>;
+    if (Array.isArray(o.results)) out.results = o.results.length;
+    out.keys = Object.keys(o).sort().slice(0, 12);
+  }
+  return out;
+}
+
+/**
  * Append one row to nb_hubspot_sync_log. NEVER THROWS.
  *
  * The contract is copied deliberately from hubspot.py:101-119: a logging
@@ -1552,9 +1573,22 @@ export async function logHubspotCall(row: HubspotLogRow): Promise<void> {
       body: JSON.stringify([
         {
           ...row,
-          // Truncated for the same reason Python truncates: a 100-record batch
-          // body is large, and 90 days of retention is worth more than the last
-          // kilobyte of any single row.
+          // Pull bodies are receipts, not full copies. A clobber worth
+          // reconstructing is a WRITE, so pushes keep everything; reads keep a
+          // size and count. Without this the 60-second reads alone put 615 MB
+          // into a 650 MB database in twelve days. See hubspot.py's log().
+          request:
+            row.request === undefined
+              ? undefined
+              : row.direction === "pull"
+                ? receipt(row.request)
+                : row.request,
+          response:
+            row.response === undefined
+              ? undefined
+              : row.direction === "pull"
+                ? receipt(row.response)
+                : row.response,
           error: row.error ? row.error.slice(0, 2000) : undefined,
         },
       ]),
