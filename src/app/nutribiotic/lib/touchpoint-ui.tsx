@@ -2,21 +2,43 @@
 
 import { useRef, useState, useTransition } from "react";
 import { decideCalendarProposal } from "./calendar-actions";
+import { useDictation, routeOf, stripKeyword, type DictationLang } from "./dictate";
 import { recordTouchpoint, type RecordTouchpointResult } from "./touchpoint";
 import { Card, Ico } from "./ui";
 
+/**
+ * The typed capture box, with a microphone.
+ *
+ * DELIBERATELY NOT A SECOND CAPTURE DOOR. AGENTS.md is explicit that a new way
+ * of capturing a touchpoint must be a new route onto recordTouchpoint(), never
+ * a new parse, because two extraction prompts is how a spoken visit and a typed
+ * one start disagreeing about the same store. So dictation types into this same
+ * box and files through this same call: the mic is an input method here, not a
+ * pipeline.
+ *
+ * Contrast RecordVisit below, which is genuinely a different thing: it uploads
+ * audio for the Mac to transcribe later. This one shows the words as they land
+ * so Juan can fix "Air One" to "Erewhon" before filing.
+ */
 export function TouchpointCapture() {
-  const [text, setText] = useState("");
+  const dict = useDictation();
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<RecordTouchpointResult | null>(null);
 
+  // Committed text only. The in-flight guess is still being revised and has no
+  // business being filed.
+  const text = dict.committed;
+  const route = routeOf(text);
+  const routedElsewhere = route === "expensos";
+
   function submit() {
-    const value = text;
-    if (!value.trim() || pending) return;
+    const value = stripKeyword(text);
+    if (!value.trim() || pending || routedElsewhere) return;
+    dict.stop();
     startTransition(async () => {
       const res = await recordTouchpoint(value);
       setResult(res);
-      if (res.ok) setText("");
+      if (res.ok) dict.reset();
     });
   }
 
@@ -25,22 +47,87 @@ export function TouchpointCapture() {
       <div className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
         <Ico name="pin" size={13} />
         Record a touchpoint
+        {route && (
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] tracking-[0.08em] ${
+              routedElsewhere
+                ? "bg-[#FBF6E9] text-[#8A6D2F]"
+                : "bg-[#EEF1EC] text-[#3D4A44]"
+            }`}
+          >
+            {route}
+          </span>
+        )}
+        {dict.supported && (
+          <div className="ml-auto flex items-center gap-1">
+            {(["en-US", "es-US"] as DictationLang[]).map((l) => (
+              <button
+                key={l}
+                onClick={() => dict.setLang(l)}
+                className={`rounded px-1.5 py-0.5 text-[10px] tracking-[0.08em] transition-colors ${
+                  dict.lang === l ? "bg-[#14201B] text-[#F7F6F1]" : "text-[#8A928C] hover:bg-[#FAF9F5]"
+                }`}
+              >
+                {l === "en-US" ? "EN" : "ES"}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="What just happened? e.g. Stopped by Lindberg, talked to Dana (assistant manager), she wants to try the probiotic line, following up Thursday at 2pm with samples."
-        rows={3}
-        className="w-full resize-none rounded-md border border-[#E2DFD5] bg-[#FAF9F5] p-3 text-[13.5px] leading-relaxed text-[#14201B] placeholder:text-[#A9AFA9] focus:border-[#14201B] focus:outline-none"
-      />
+
+      <div className="relative">
+        <textarea
+          value={dict.value}
+          onChange={(e) => dict.onUserEdit(e.target.value)}
+          placeholder="What just happened? e.g. Stopped by Lindberg, talked to Dana (assistant manager), she wants to try the probiotic line, following up Thursday at 2pm with samples."
+          rows={3}
+          className={`w-full resize-none rounded-md border bg-[#FAF9F5] p-3 pr-11 text-[13.5px] leading-relaxed text-[#14201B] placeholder:text-[#A9AFA9] focus:outline-none ${
+            dict.listening ? "border-[#14201B]" : "border-[#E2DFD5] focus:border-[#14201B]"
+          }`}
+        />
+        {dict.supported && (
+          <button
+            onClick={dict.toggle}
+            aria-label={dict.listening ? "Stop dictation" : "Start dictation"}
+            aria-pressed={dict.listening}
+            className={`absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
+              dict.listening
+                ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
+                : "border-[#E2DFD5] bg-white text-[#5B6560] hover:border-[#14201B] hover:text-[#14201B]"
+            }`}
+          >
+            <Ico name={dict.listening ? "stop" : "mic"} size={14} />
+          </button>
+        )}
+      </div>
+
       <div className="mt-2 flex items-center justify-between gap-3">
         <p className="max-w-[46ch] text-[11.5px] leading-snug text-[#8A928C]">
-          Becomes an activity log entry and contact detail right away. Any follow-up it hears goes below for you to
-          approve before it touches your calendar.
+          {dict.listening ? (
+            <span className="flex items-center gap-1.5 text-[#3D4A44]">
+              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#14201B]" />
+              Listening. Type over anything it mishears; your edit wins.
+            </span>
+          ) : dict.error ? (
+            <span className="text-[#8A6D2F]">{dict.error}</span>
+          ) : routedElsewhere ? (
+            <span className="text-[#8A6D2F]">
+              That is addressed to expensos, which does not file from here yet. Use the terminal for expenses.
+            </span>
+          ) : !dict.supported ? (
+            <>
+              This browser has no dictation. Your keyboard&apos;s own mic works fine, and so does typing.
+            </>
+          ) : (
+            <>
+              Becomes an activity log entry and contact detail right away. Any follow-up it hears goes below for you to
+              approve before it touches your calendar.
+            </>
+          )}
         </p>
         <button
           onClick={submit}
-          disabled={pending || !text.trim()}
+          disabled={pending || !stripKeyword(text).trim() || routedElsewhere}
           className="shrink-0 rounded-md bg-[#14201B] px-3.5 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
         >
           {pending ? "Recording..." : "Record"}
