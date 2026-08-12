@@ -65,9 +65,8 @@ export default async function OfferPage({ params }: { params: Promise<{ code: st
 
       {/* 1 · Greeting: continuity from the handshake. */}
       <div className="flex items-center gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#14201B] font-[family-name:var(--font-fraunces)] text-[16px] font-semibold text-[#F7F6F1]">
-          JA
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={REP.photo} alt={REP.name} className="h-11 w-11 shrink-0 rounded-full object-cover" />
         <div>
           <div className="font-[family-name:var(--font-fraunces)] text-[19px] font-semibold tracking-tight">
             {code.client_name ? `Hi ${code.client_name},` : "Hello,"}
