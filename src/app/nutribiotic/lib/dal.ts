@@ -1469,3 +1469,97 @@ export async function setPromoOrderState(id: string, state: PromoOrder["state"])
   if (state === "relayed") patch.relayed_at = new Date().toISOString();
   await mutate("nb_promo_orders", "PATCH", patch, { id: `eq.${id}` });
 }
+
+// ---------------------------------------------------------------------------
+// HubSpot boundary support
+//
+// Two functions the app needs now that it writes to HubSpot itself rather than
+// leaving that entirely to the Mac. Both live here because this file is the
+// only door to Supabase, and neither should tempt a caller into opening a
+// second one.
+// ---------------------------------------------------------------------------
+
+/**
+ * Read a mirrored config file out of nb_config.
+ *
+ * The authoritative copy is the JSON file in the agency repo named by the row's
+ * `source`; this is a derived mirror published by bridges/nutribiotic/
+ * publish_config.py, because `portfolio` is a separate submodule and cannot see
+ * that repo at build or run time. See migration 0033.
+ *
+ * Returns null rather than throwing when the mirror is absent, so callers can
+ * fail closed. A missing config must mean "write nothing", never "write
+ * everything the token allows".
+ */
+export const readConfig = cache(async <T>(key: string): Promise<T | null> => {
+  await verifySession();
+  if (!isConfigured()) return null;
+
+  try {
+    const res = await fetch(
+      `${SB_URL}/rest/v1/nb_config?select=value&key=eq.${encodeURIComponent(key)}&limit=1`,
+      {
+        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Accept: "application/json" },
+        cache: "no-store",
+      },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<{ value: T }>;
+    return rows[0]?.value ?? null;
+  } catch {
+    return null;
+  }
+});
+
+export type HubspotLogRow = {
+  direction: "push" | "pull";
+  entity: string;
+  operation: string;
+  payload_hash: string;
+  status: "ok" | "skipped_idempotent" | "conflict" | "error" | "rate_limited" | "network_error";
+  http_status?: number;
+  local_id?: string;
+  hubspot_id?: string;
+  request?: unknown;
+  response?: unknown;
+  error?: string;
+};
+
+/**
+ * Append one row to nb_hubspot_sync_log. NEVER THROWS.
+ *
+ * The contract is copied deliberately from hubspot.py:101-119: a logging
+ * failure must not take down a call that otherwise succeeded. It is also why
+ * this does not go through mutate(), which throws on a bad response and would
+ * turn an unwritable log into a failed HubSpot write.
+ *
+ * The log is not telemetry. A field-ownership bug surfaces as a value quietly
+ * reverting weeks later, and 90 days of full request/response is the only thing
+ * that makes such a clobber reconstructible. It is what made the 2026-08-01
+ * cross-book push revertible.
+ */
+export async function logHubspotCall(row: HubspotLogRow): Promise<void> {
+  try {
+    if (!isConfigured()) return;
+    await fetch(`${SB_URL}/rest/v1/nb_hubspot_sync_log`, {
+      method: "POST",
+      headers: {
+        apikey: SB_KEY,
+        Authorization: `Bearer ${SB_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify([
+        {
+          ...row,
+          // Truncated for the same reason Python truncates: a 100-record batch
+          // body is large, and 90 days of retention is worth more than the last
+          // kilobyte of any single row.
+          error: row.error ? row.error.slice(0, 2000) : undefined,
+        },
+      ]),
+    });
+  } catch {
+    // Swallowed on purpose. See the contract above.
+  }
+}
