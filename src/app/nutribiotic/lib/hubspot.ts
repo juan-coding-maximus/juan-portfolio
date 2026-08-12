@@ -25,8 +25,10 @@
  *   3. OWNER SCOPE IS ASSERTED TWICE, once in the query and once against the
  *      live record, per AGENTS.md hard rule 2.
  *   4. WHAT MAY BE PUSHED comes from hubspot_fields.json, never from this file.
- *      A property with no owner class there is one the sync refuses to touch,
- *      and the app inherits that rule rather than restating it.
+ *      The rule is the `push` key and owner is irrelevant to it, which is not
+ *      obvious: `phone` is owner "hubspot" yet pushable as a blank-fill. The
+ *      derivation lives in hubspot-fields.ts and is parity-tested against
+ *      hubspot_sync.py, because getting it wrong fails silently.
  *
  * FAIL CLOSED, EVERYWHERE. No token, no config, no Supabase to log to: refuse
  * the write. An unauditable or unpoliced write to a shared employer portal is
@@ -41,6 +43,14 @@
 import "server-only";
 import { payloadHash } from "./hubspot-hash";
 import { logHubspotCall, readConfig } from "./dal";
+import {
+  derivePushable,
+  type FieldSpec,
+  type FieldsConfig,
+  type PushableObject,
+} from "./hubspot-fields";
+
+export type { FieldSpec } from "./hubspot-fields";
 
 const BASE = "https://api.hubapi.com";
 
@@ -255,39 +265,20 @@ export async function assertJuansBook(companyIds: string[]): Promise<ScopeVerdic
   return { allowed, dropped };
 }
 
-type FieldSpec = {
-  hubspot: string;
-  local: string;
-  owner: "hubspot" | "os" | "shared";
-  push?: "own" | "fill";
-};
-
 /**
  * The properties this app is permitted to write, read from the mirrored
- * hubspot_fields.json rather than restated here.
+ * hubspot_fields.json rather than restated here. The derivation itself lives in
+ * hubspot-fields.ts so it can be parity-tested against hubspot_sync.py.
  *
- * FAIL CLOSED. If the mirror is missing (migration 0033 not applied, or
- * publish_config.py has never run) this returns an empty map, and every write
- * that consults it becomes a no-op. The alternative, defaulting to "anything
- * the token allows", is how a property nobody meant to expose gets pushed.
+ * FAIL CLOSED. A missing mirror (migration 0033 unapplied, or
+ * publish_config.py never run) returns an empty map, and every write that
+ * consults it becomes a no-op. Defaulting to "anything the token allows" is how
+ * a property nobody meant to expose reaches a shared portal.
  */
-export async function pushableCompanyProperties(): Promise<Map<string, FieldSpec>> {
-  const config = await readConfig<{
-    objects?: { companies?: Record<string, FieldSpec> };
-  }>("hubspot_fields");
-
-  const out = new Map<string, FieldSpec>();
-  if (!config) return out;
-
-  for (const spec of Object.values(config.objects?.companies ?? {})) {
-    // Both conditions, exactly as hubspot_sync.py:213 selects pushables: an
-    // owner class of "os" is not enough on its own, the field must also declare
-    // how it pushes.
-    if (spec && spec.owner === "os" && (spec.push === "own" || spec.push === "fill")) {
-      out.set(spec.hubspot, spec);
-    }
-  }
-  return out;
+export async function pushableProperties(
+  object: PushableObject = "companies",
+): Promise<Map<string, FieldSpec>> {
+  return derivePushable(await readConfig<FieldsConfig>("hubspot_fields"), object);
 }
 
 /**
