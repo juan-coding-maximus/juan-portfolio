@@ -69,7 +69,7 @@ export default async function OfferPage({ params }: { params: Promise<{ code: st
         <img src={REP.photo} alt={REP.name} className="h-11 w-11 shrink-0 rounded-full object-cover" />
         <div>
           <div className="font-[family-name:var(--font-fraunces)] text-[19px] font-semibold tracking-tight">
-            {code.client_name ? `Hi ${code.client_name},` : "Hello,"}
+            {code.client_name ? `Hi ${code.client_name},` : "Hello, Client"}
           </div>
           <div className="text-[13px] text-[#5B6560]">
             put together by {REP.name}
