@@ -469,16 +469,40 @@ export type Draft = {
   play_key: string | null;
   status: string;
   created_at: string;
+  /** 2 urgent · 1 soon · 0 low · null not yet read against the notes.
+   * Set by bridges/nutribiotic/draft_urgency.py from what the account's
+   * HubSpot notes/calls/meetings actually say, never from this row's own
+   * subject line. `urgency_reason` carries the evidence. */
+  urgency: number | null;
+  urgency_reason: string | null;
   origin: Origin;
 };
 
+/**
+ * The pending queue, most urgent first.
+ *
+ * WHY THE SORT IS HERE AND NOT IN THE QUERY. PostgREST rejects an `order` on a
+ * column it cannot see with a 400, which would take the whole Outbound screen
+ * down in any environment where 0035 has not been applied yet (or against the
+ * migration target project, which is mid-move). Sorting the rows we already
+ * hold cannot fail that way, and `Array.prototype.sort` is required to be
+ * stable, so drafts inside a tier keep the `created_at desc` order the query
+ * asked for — which is exactly the tiebreak we want.
+ *
+ * An UNGRADED draft (urgency null, e.g. one staged since the last grading run)
+ * sorts BELOW `low` rather than being treated as low. "Nobody has read the
+ * notes for this one yet" is a different statement from "the notes say there is
+ * no hurry", and the queue should not launder the first into the second.
+ */
 export async function listDrafts(limit = 100): Promise<Result<Draft>> {
-  return query<Draft>("nb_outbound_drafts", {
+  const res = await query<Draft>("nb_outbound_drafts", {
     select: "*",
     status: "eq.pending",
     order: "created_at.desc",
     limit,
   });
+  const rank = (d: Draft) => (typeof d.urgency === "number" ? d.urgency : -1);
+  return { ...res, data: [...res.data].sort((a, b) => rank(b) - rank(a)) };
 }
 
 /** Juan clicked the compose link (or is dismissing a draft he won't send).

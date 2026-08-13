@@ -87,6 +87,22 @@ export default async function Outbound() {
                     </span>
                   )}
                   <span className="text-[12px] text-[#8A928C]">{daysAgo(d.created_at)}</span>
+                  {/* The reason the queue is in this order. Shown only for the
+                      two tiers that mean "do something", so the screen stays
+                      quiet, and carrying its own evidence in the tooltip: a
+                      priority with no stated reason is one nobody can correct. */}
+                  {(d.urgency === 2 || d.urgency === 1) && (
+                    <span
+                      className={
+                        d.urgency === 2
+                          ? "rounded bg-[#F3E3C6] px-1.5 py-0.5 text-[11px] font-medium text-[#8A6D2F]"
+                          : "rounded border border-[#DAD7CC] px-1.5 py-0.5 text-[11px] text-[#5B6560]"
+                      }
+                      title={d.urgency_reason ?? undefined}
+                    >
+                      {d.urgency === 2 ? "needs a reply today" : "soon"}
+                    </span>
+                  )}
                   {d.play_key && (
                     <span
                       className="rounded bg-[#ECEAE1] px-1.5 py-0.5 text-[11px] text-[#3D4A44]"
