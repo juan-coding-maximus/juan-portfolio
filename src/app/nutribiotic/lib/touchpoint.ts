@@ -19,6 +19,8 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import {
+  finalizeTouchpointAccount,
+  getTouchpointById,
   insertActivity,
   insertCalendarProposal,
   insertContact,
@@ -54,6 +56,7 @@ type ParsedCalendarAction = {
 type ParsedTouchpoint = {
   account_id: string | null;
   account_confidence: "high" | "low" | "none";
+  business_name_guess: string | null;
   activity: {
     kind: string;
     direction: "outbound" | "inbound" | "internal";
@@ -75,6 +78,10 @@ const EXTRACT_TOOL = {
         description: "id of the best-matching account from the candidate list, or null if no confident match",
       },
       account_confidence: { type: "string", enum: ["high", "low", "none"] },
+      business_name_guess: {
+        type: ["string", "null"],
+        description: "the business/store name AS STATED in the note, verbatim, even when account_confidence is low or none. Null only if no business name was said at all.",
+      },
       activity: {
         type: "object",
         properties: {
@@ -135,7 +142,7 @@ const EXTRACT_TOOL = {
         },
       },
     },
-    required: ["account_confidence", "activity", "people", "calendar_actions"],
+    required: ["account_confidence", "business_name_guess", "activity", "people", "calendar_actions"],
   },
 };
 
@@ -150,6 +157,7 @@ ${candidates.map((c) => `${c.id} · ${c.name} · ${c.city ?? "unknown city"}`).j
 RULES, all absolute:
 - Extract only what the text states or directly implies. Never invent a name, title, email, phone, date, or outcome that is not in the text.
 - If the account is not clearly identifiable from the candidate list, set account_id to null and account_confidence to "none" rather than guessing.
+- business_name_guess is the store/business name as the rep actually said it, verbatim, ALWAYS extracted when one was said, regardless of account_confidence. It is used to search for the business when it turns out to be new, so it must never be normalized, expanded, or guessed at when none was actually stated.
 - activity.detail is what the rep said, kept in the rep's own first-person words ("I called...", not "The rep called..."). You may tidy filler, punctuation, and capitalization, and add light structure, but never rewrite it into third person, never paraphrase away his actual wording, and never drop a fact he stated.
 - Only include a person in "people" if the note actually names them or clearly describes a specific individual (a title alone like "the manager" with no name is still worth including with first_name/last_name null, if a real detail like an email or a stated preference is attached to them).
 - Only include a calendar_action if the note describes something that should go on a calendar (a scheduled meeting, an explicit follow-up date, a planned return visit). Do not invent a follow-up that was not mentioned.
@@ -158,7 +166,17 @@ RULES, all absolute:
 
 export type RecordTouchpointResult =
   | { ok: true; touchpoint_id: string; accountName: string | null; needsAccount: false; summary: string; peopleAdded: number; peopleUpdated: number; calendarProposals: number }
-  | { ok: true; touchpoint_id: string; accountName: null; needsAccount: true; summary: string; peopleAdded: 0; peopleUpdated: 0; calendarProposals: 0 }
+  | {
+      ok: true;
+      touchpoint_id: string;
+      accountName: null;
+      needsAccount: true;
+      summary: string;
+      businessNameGuess: string | null;
+      peopleAdded: 0;
+      peopleUpdated: 0;
+      calendarProposals: 0;
+    }
   | { ok: false; error: string };
 
 export async function recordTouchpoint(
@@ -216,6 +234,7 @@ export async function recordTouchpoint(
       accountName: null,
       needsAccount: true,
       summary: parsed.activity?.detail ?? text.slice(0, 140),
+      businessNameGuess: parsed.business_name_guess ?? null,
       peopleAdded: 0,
       peopleUpdated: 0,
       calendarProposals: 0,
@@ -306,4 +325,101 @@ export async function recordTouchpoint(
     peopleUpdated,
     calendarProposals,
   };
+}
+
+export type ResolveResult =
+  | {
+      ok: true;
+      accountName: string;
+      summary: string;
+      peopleAdded: number;
+      peopleUpdated: number;
+      calendarProposals: number;
+    }
+  | { ok: false; error: string };
+
+/**
+ * A touchpoint that parked as needs_account, now that an account exists for
+ * it (Juan confirmed a match, or lib/new-account-actions.ts just created one
+ * from Google Places). Re-uses the SAME parse the touchpoint already carries
+ * rather than calling Claude a second time: he already saw that summary once,
+ * asking the model to redo it risks a second, slightly different answer to
+ * the exact words he already confirmed.
+ */
+export async function resolveTouchpointToAccount(
+  touchpointId: string,
+  accountId: string,
+  accountName: string,
+): Promise<ResolveResult> {
+  const tp = await getTouchpointById(touchpointId);
+  if (!tp) return { ok: false, error: "That touchpoint no longer exists." };
+  if (tp.status !== "needs_account") {
+    return { ok: false, error: `Touchpoint is already ${tp.status}, not needs_account.` };
+  }
+  const parsed = tp.parsed as ParsedTouchpoint | null;
+  if (!parsed) return { ok: false, error: "That touchpoint has no parsed data to file." };
+
+  const activity = await insertActivity({
+    account_id: accountId,
+    kind: parsed.activity.kind,
+    direction: parsed.activity.direction,
+    outcome: parsed.activity.outcome,
+    detail: parsed.activity.detail,
+  });
+
+  const linked = await finalizeTouchpointAccount(touchpointId, accountId, activity.id);
+  if (!linked) return { ok: false, error: "Touchpoint was already resolved by another request." };
+
+  const existing = await listContacts(accountId);
+  let peopleAdded = 0;
+  let peopleUpdated = 0;
+  for (const p of parsed.people ?? []) {
+    const nameKey = (s: string | null) => (s ?? "").trim().toLowerCase();
+    const match = existing.data.find(
+      (c) =>
+        nameKey(c.first_name) === nameKey(p.first_name) &&
+        nameKey(c.last_name) === nameKey(p.last_name) &&
+        (nameKey(p.first_name) || nameKey(p.last_name)) !== "",
+    );
+    if (match) {
+      const patch: Record<string, string | boolean> = {};
+      if (!match.title && p.title) patch.title = p.title;
+      if (!match.role_tag && p.role_tag) patch.role_tag = p.role_tag;
+      if (!match.email && p.email) patch.email = p.email;
+      if (!match.phone && p.phone) patch.phone = p.phone;
+      if (!match.is_decision_maker && p.is_decision_maker) patch.is_decision_maker = true;
+      if (Object.keys(patch).length > 0) {
+        await patchContact(match.id, patch);
+        peopleUpdated += 1;
+      }
+    } else if (p.first_name || p.last_name || p.title) {
+      await insertContact({
+        account_id: accountId,
+        first_name: p.first_name,
+        last_name: p.last_name,
+        title: p.title,
+        role_tag: p.role_tag,
+        is_decision_maker: p.is_decision_maker,
+        email: p.email,
+        phone: p.phone,
+      });
+      peopleAdded += 1;
+    }
+  }
+
+  let calendarProposals = 0;
+  for (const ca of parsed.calendar_actions ?? []) {
+    await insertCalendarProposal({
+      touchpoint_id: touchpointId,
+      account_id: accountId,
+      kind: ca.kind,
+      title: `${accountName}: ${ca.title}`,
+      starts_at: ca.when_iso,
+      duration_minutes: ca.duration_minutes ?? 60,
+      notes: ca.notes,
+    });
+    calendarProposals += 1;
+  }
+
+  return { ok: true, accountName, summary: parsed.activity.detail, peopleAdded, peopleUpdated, calendarProposals };
 }

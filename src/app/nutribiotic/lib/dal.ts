@@ -351,6 +351,54 @@ export async function getAccount(id: string): Promise<Result<Account>> {
   return query<Account>("nb_accounts", { select: "*", id: `eq.${id}`, limit: 1 });
 }
 
+export type NewAccount = {
+  name: string;
+  channel?: string;
+  street?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  phone?: string | null;
+  website?: string | null;
+  business_hours?: Record<string, string[][]> | null;
+};
+
+/** A genuinely new business, created from the field (Visit tab), not from the
+ * ERP intake pipeline. Only `id` and `name` are required by the schema
+ * (migration 0002); everything else here is what Google Places returned, so
+ * an account created this way starts already enriched rather than blank. */
+export async function insertAccount(input: NewAccount): Promise<Account> {
+  const [row] = await mutate<Account>("nb_accounts", "POST", {
+    id: randId("a"),
+    origin: "manual",
+    ...input,
+  });
+  return row;
+}
+
+/** Write-once link from an OS account to the portal company just created for
+ * it, guarded the same way stampActivityEngagementId is: the is.null filter
+ * means a race can only ever set this once. Mirrors
+ * hubspot_create_company.py's post-create PATCH (owner filled immediately
+ * rather than waiting for the next sync, since the OS is not guessing the
+ * portal's state here, it just set it). */
+export async function linkAccountHubspotCompany(
+  accountId: string,
+  companyId: string,
+  ownerId: string,
+  ownerName: string,
+): Promise<Account | null> {
+  const rows = await mutate<Account>(
+    "nb_accounts",
+    "PATCH",
+    { hubspot_company_id: companyId, hubspot_owner_id: ownerId, owner_name: ownerName },
+    { id: `eq.${accountId}`, hubspot_company_id: "is.null" },
+  );
+  return rows[0] ?? null;
+}
+
 export type Contact = {
   id: string;
   account_id: string;
@@ -708,6 +756,32 @@ export async function getTouchpointParsedForActivity(activityId: number): Promis
     limit: 1,
   });
   return res.data[0]?.parsed ?? null;
+}
+
+export async function getTouchpointById(id: string): Promise<Touchpoint | null> {
+  const res = await query<Touchpoint>("nb_touchpoints", {
+    select: "*",
+    id: `eq.${id}`,
+    limit: 1,
+  });
+  return res.data[0] ?? null;
+}
+
+/** Once a needs_account touchpoint has an account (Juan confirmed a match or
+ * a just-created business), stamp it filed. Guarded to never re-file a
+ * touchpoint that already has one. */
+export async function finalizeTouchpointAccount(
+  id: string,
+  accountId: string,
+  activityId: number,
+): Promise<Touchpoint | null> {
+  const rows = await mutate<Touchpoint>(
+    "nb_touchpoints",
+    "PATCH",
+    { account_id: accountId, status: "parsed", activity_id: activityId },
+    { id: `eq.${id}`, status: "eq.needs_account" },
+  );
+  return rows[0] ?? null;
 }
 
 export type CalendarProposal = {

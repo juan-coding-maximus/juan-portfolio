@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { decideCalendarProposal } from "./calendar-actions";
+import { NewBusinessResolver } from "./new-account-ui";
 import { recordTouchpoint, type RecordTouchpointResult } from "./touchpoint";
 import { Card, Ico } from "./ui";
 
@@ -57,7 +58,7 @@ export function TouchpointCapture() {
         >
           {result.ok ? (
             result.needsAccount ? (
-              <>Logged, but couldn&apos;t confidently match an account. Add it by hand from the Clients screen for now.</>
+              <>Logged, but couldn&apos;t confidently match an account.</>
             ) : (
               <>
                 Logged to <span className="font-medium">{result.accountName}</span>: {result.summary}
@@ -82,6 +83,10 @@ export function TouchpointCapture() {
             result.error
           )}
         </div>
+      )}
+
+      {result?.ok && result.needsAccount && (
+        <NewBusinessResolver touchpointId={result.touchpoint_id} nameGuess={result.businessNameGuess} />
       )}
     </Card>
   );

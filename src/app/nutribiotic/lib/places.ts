@@ -1,0 +1,120 @@
+/**
+ * Google Places (New) Text Search, ported from bridges/nutribiotic/geocode.py.
+ * Read that file first: same endpoint, same field mask, same API key
+ * (NB_PLACES_API_KEY). This exists so a business a rep names for the first
+ * time can be looked up from the phone, without his Mac.
+ *
+ * NO CORROBORATION LADDER HERE, unlike geocode.py. That script is validating
+ * a fuzzy match against an address already on file; this is a fresh business
+ * with nothing on file yet, so there is nothing to corroborate against. The
+ * candidate is shown to Juan instead, and HIS confirmation is the check.
+ */
+
+import "server-only";
+
+const PLACES_URL = "https://places.googleapis.com/v1/places:searchText";
+
+const FIELD_MASK = [
+  "places.id",
+  "places.displayName",
+  "places.formattedAddress",
+  "places.addressComponents",
+  "places.location",
+  "places.nationalPhoneNumber",
+  "places.websiteUri",
+  "places.regularOpeningHours.periods",
+  "places.businessStatus",
+].join(",");
+
+export type PlaceCandidate = {
+  placeId: string;
+  name: string;
+  formattedAddress: string | null;
+  street: string | null;
+  city: string | null;
+  state: string | null;
+  postal: string | null;
+  lat: number | null;
+  lng: number | null;
+  phone: string | null;
+  website: string | null;
+  businessStatus: string | null;
+  businessHours: Record<string, string[][]> | null;
+};
+
+type RawPlace = {
+  id?: string;
+  displayName?: { text?: string };
+  formattedAddress?: string;
+  addressComponents?: Array<{ types?: string[]; longText?: string; shortText?: string }>;
+  location?: { latitude?: number; longitude?: number };
+  nationalPhoneNumber?: string;
+  websiteUri?: string;
+  businessStatus?: string;
+  regularOpeningHours?: { periods?: Array<{ open?: { day?: number; hour?: number; minute?: number }; close?: { hour?: number; minute?: number } }> };
+};
+
+function component(place: RawPlace, kind: string): string | null {
+  for (const c of place.addressComponents ?? []) {
+    if ((c.types ?? []).includes(kind)) return c.longText || c.shortText || null;
+  }
+  return null;
+}
+
+const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+
+function openingHours(place: RawPlace): Record<string, string[][]> | null {
+  const periods = place.regularOpeningHours?.periods ?? [];
+  if (periods.length === 0) return null;
+  const out: Record<string, string[][]> = Object.fromEntries(DAYS.map((d) => [d, []]));
+  const fmt = (h?: number, m?: number) => `${String(h ?? 0).padStart(2, "0")}:${String(m ?? 0).padStart(2, "0")}`;
+  for (const p of periods) {
+    const day = p.open?.day;
+    if (day == null) continue;
+    out[DAYS[day]].push([fmt(p.open?.hour, p.open?.minute), p.close ? fmt(p.close.hour, p.close.minute) : "23:59"]);
+  }
+  return out;
+}
+
+function toCandidate(place: RawPlace): PlaceCandidate {
+  return {
+    placeId: place.id ?? "",
+    name: place.displayName?.text ?? "",
+    formattedAddress: place.formattedAddress ?? null,
+    street: [component(place, "street_number"), component(place, "route")].filter(Boolean).join(" ") || null,
+    city: component(place, "locality"),
+    state: component(place, "administrative_area_level_1"),
+    postal: component(place, "postal_code"),
+    lat: place.location?.latitude ?? null,
+    lng: place.location?.longitude ?? null,
+    phone: place.nationalPhoneNumber ?? null,
+    website: place.websiteUri ?? null,
+    businessStatus: place.businessStatus ?? null,
+    businessHours: openingHours(place),
+  };
+}
+
+export class PlacesError extends Error {}
+
+/** Top few candidates for a free-text query ("XCEL Wellness, Huntington Beach, CA"). */
+export async function searchPlaces(query: string, maxResults = 3): Promise<PlaceCandidate[]> {
+  const key = process.env.NB_PLACES_API_KEY ?? "";
+  if (!key) throw new PlacesError("NB_PLACES_API_KEY is not configured on this deployment.");
+
+  const res = await fetch(PLACES_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": key,
+      "X-Goog-FieldMask": FIELD_MASK,
+    },
+    body: JSON.stringify({ textQuery: query, maxResultCount: maxResults, languageCode: "en" }),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    throw new PlacesError(`Places HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  }
+  const data = (await res.json()) as { places?: RawPlace[] };
+  return (data.places ?? []).map(toCandidate);
+}
