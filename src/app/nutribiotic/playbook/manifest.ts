@@ -34,6 +34,14 @@ export const DOCS: PlaybookDoc[] = [
     group: "Playbooks",
   },
   {
+    slug: "document-standards",
+    file: "document-standards.md",
+    title: "Document Standards",
+    blurb:
+      "The house standard for any sales sheet, offer sheet, or talking-points doc built for this department: cut prose, lead with facts, frame pricing to favor the reader, check typography every time.",
+    group: "Playbooks",
+  },
+  {
     slug: "sales-playbook",
     file: "sales-playbook.md",
     title: "Sales Playbook",
