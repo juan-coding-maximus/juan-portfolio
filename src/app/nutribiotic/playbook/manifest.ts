@@ -15,12 +15,23 @@ export type PlaybookDoc = {
 
 export const DOCS: PlaybookDoc[] = [
   {
+    // Not on the shelf (see GROUPS below): the Goals nav tab is the daily-use
+    // surface for this content now. The doc and route stay live so that tab's
+    // "GOALS.md on the Playbook shelf" cross-link keeps resolving.
     slug: "goals",
     file: "GOALS.md",
     title: "Goals · the ladder",
     blurb:
       "Director in one, VP in four. The six Year-1 SMART goals, measured baselines, and the Y2-4 arc. The Goals tab is the summary; this is the full text.",
     group: "The ladder",
+  },
+  {
+    slug: "notes-to-self",
+    file: "notes-to-self.md",
+    title: "Notes to Self",
+    blurb:
+      "The running list of field learnings worth carrying to every account of that shape: prospecting, area scoping, the value proposition that opens each account type.",
+    group: "Playbooks",
   },
   {
     slug: "sales-playbook",
@@ -88,7 +99,10 @@ export const DOCS: PlaybookDoc[] = [
   },
 ];
 
-export const GROUPS: PlaybookDoc["group"][] = ["The ladder", "Playbooks", "Scale"];
+// "The ladder" is deliberately absent: Goals now has its own nav tab as the
+// daily-use surface, and a second copy of it on the shelf was clutter. The
+// doc stays in DOCS above so /nutribiotic/playbook/goals keeps resolving.
+export const GROUPS: PlaybookDoc["group"][] = ["Playbooks", "Scale"];
 
 export function docBySlug(slug: string): PlaybookDoc | undefined {
   return DOCS.find((d) => d.slug === slug);

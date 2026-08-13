@@ -1624,3 +1624,87 @@ export async function logHubspotCall(row: HubspotLogRow): Promise<void> {
     // Swallowed on purpose. See the contract above.
   }
 }
+
+// ---------------------------------------------------------------------------
+// Playbook > Reports. The latest daily and weekly field-report PDFs, one
+// click away from the shelf. bridges/nutribiotic/field_report.py and
+// weekly_report.py upload the PDF to this bucket and delete any older file
+// of the same kind on every run (see sb.storage_publish_latest), so the
+// bucket itself is the version-pruning: at most one daily-*.pdf and one
+// weekly-*.pdf exist at a time, and this just reads whichever is there.
+// Private bucket, signed URL per render, same posture as the session gate on
+// the rest of the OS rather than a public link that outlives this page view.
+// ---------------------------------------------------------------------------
+
+const REPORTS_BUCKET = "nb-reports";
+
+export type PlaybookReport = {
+  kind: "daily" | "weekly";
+  label: string;
+  url: string;
+};
+
+function reportLabel(kind: "daily" | "weekly", name: string): string {
+  const fmt = (iso: string) =>
+    new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  const stem = name.replace(/^(daily|weekly)-/, "").replace(/\.pdf$/, "");
+  if (kind === "daily") return fmt(stem);
+  const [start, end] = stem.split("_to_");
+  if (!start || !end) return stem;
+  return `${fmt(start)} – ${fmt(end)}`;
+}
+
+/** Latest report of each kind found in the bucket. Never throws: an unreachable
+ *  or empty bucket just means the Reports section shows nothing rather than
+ *  the whole Playbook page failing to render. */
+export async function listPlaybookReports(): Promise<PlaybookReport[]> {
+  await verifySession();
+  if (!isConfigured()) return [];
+
+  try {
+    const listRes = await fetch(`${SB_URL}/storage/v1/object/list/${REPORTS_BUCKET}`, {
+      method: "POST",
+      headers: {
+        apikey: SB_KEY,
+        Authorization: `Bearer ${SB_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prefix: "", limit: 100, sortBy: { column: "name", order: "asc" } }),
+      cache: "no-store",
+    });
+    if (!listRes.ok) return [];
+    const objects = (await listRes.json()) as Array<{ name: string }>;
+
+    const reports: PlaybookReport[] = [];
+    for (const kind of ["daily", "weekly"] as const) {
+      const obj = objects.find((o) => o.name.startsWith(`${kind}-`));
+      if (!obj) continue;
+
+      const signRes = await fetch(
+        `${SB_URL}/storage/v1/object/sign/${REPORTS_BUCKET}/${encodeURIComponent(obj.name)}`,
+        {
+          method: "POST",
+          headers: {
+            apikey: SB_KEY,
+            Authorization: `Bearer ${SB_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ expiresIn: 300 }),
+          cache: "no-store",
+        },
+      );
+      if (!signRes.ok) continue;
+      const { signedURL } = (await signRes.json()) as { signedURL: string };
+
+      reports.push({ kind, label: reportLabel(kind, obj.name), url: `${SB_URL}/storage/v1${signedURL}` });
+    }
+    return reports;
+  } catch {
+    return [];
+  }
+}
