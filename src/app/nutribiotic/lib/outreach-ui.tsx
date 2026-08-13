@@ -1,8 +1,11 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { AttachmentButton, attachmentNote } from "./attachments-ui";
+import type { MarketingFile } from "./dal";
 import type { RecordTouchpointResult } from "./touchpoint";
 import { recordOutreachSent } from "./outreach-actions";
+import { draftOutreachMessage } from "./outreach-draft";
 import { OUTREACH_TEMPLATES } from "./outreach-templates";
 import { Card, Ico } from "./ui";
 
@@ -15,21 +18,28 @@ export type OutreachContactLite = {
   title: string | null;
   phone: string;
 };
-export type OutreachFile = { folder: "marketing" | "field"; name: string; label: string; url: string };
 
 /** Last-10-digit normalize + US country code, same rule as
  *  bridges/nutribiotic/match.py's norm_phone. Returns null rather than a
  *  guess when the number doesn't cleanly resolve to 10 digits, so a bad
  *  number never silently opens a chat with the wrong person. */
-function toWhatsAppPhone(raw: string | null): string | null {
+export function toWhatsAppPhone(raw: string | null): string | null {
   if (!raw) return null;
   const digits = raw.replace(/\D/g, "");
   const last10 = digits.length > 10 ? digits.slice(-10) : digits;
   return last10.length === 10 ? `1${last10}` : null;
 }
 
-function waLink(phone: string, text: string): string {
+export function waLink(phone: string, text: string): string {
   return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+}
+
+function fmtWhen(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  } catch {
+    return iso.slice(0, 10);
+  }
 }
 
 export function OutreachComposer({
@@ -39,13 +49,18 @@ export function OutreachComposer({
 }: {
   accounts: OutreachAccount[];
   contacts: OutreachContactLite[];
-  files: OutreachFile[];
+  files: MarketingFile[];
 }) {
   const [search, setSearch] = useState("");
   const [accountId, setAccountId] = useState<string | null>(null);
   const [recipientKey, setRecipientKey] = useState<string | null>(null); // "account" or a contact id
-  const [templateId, setTemplateId] = useState(OUTREACH_TEMPLATES[0].id);
-  const [message, setMessage] = useState(OUTREACH_TEMPLATES[0].body(""));
+  const [templateId, setTemplateId] = useState<string>("auto");
+  const [message, setMessage] = useState("");
+  const [basedOn, setBasedOn] = useState<{ detail: string; kind: string; at: string } | null>(null);
+  const [needsAttachment, setNeedsAttachment] = useState(false);
+  const [attachmentHint, setAttachmentHint] = useState<string | null>(null);
+  const [attached, setAttached] = useState<MarketingFile[]>([]);
+  const [draftPending, startDraft] = useTransition();
   const [opened, setOpened] = useState(false);
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<RecordTouchpointResult | null>(null);
@@ -68,6 +83,20 @@ export function OutreachComposer({
     setRecipientKey(a.phone ? "account" : null);
     setOpened(false);
     setResult(null);
+    setTemplateId("auto");
+    setMessage("");
+    setBasedOn(null);
+    setNeedsAttachment(false);
+    setAttachmentHint(null);
+    setAttached([]);
+
+    startDraft(async () => {
+      const d = await draftOutreachMessage(a.id, a.name);
+      setMessage(d.draft);
+      setBasedOn(d.basedOn);
+      setNeedsAttachment(d.needsAttachment);
+      setAttachmentHint(d.attachmentHint);
+    });
   }
 
   function applyTemplate(id: string) {
@@ -90,10 +119,11 @@ export function OutreachComposer({
           return name ? `${name} (${account?.name})` : account?.name ?? "";
         })();
   const waPhone = toWhatsAppPhone(recipientPhone);
+  const finalMessage = message + attachmentNote(attached);
 
   function openWhatsApp() {
     if (!waPhone || !message.trim()) return;
-    window.open(waLink(waPhone, message), "_blank", "noopener,noreferrer");
+    window.open(waLink(waPhone, finalMessage), "_blank", "noopener,noreferrer");
     setOpened(true);
     setResult(null);
   }
@@ -101,7 +131,7 @@ export function OutreachComposer({
   function markSent() {
     if (!account || pending) return;
     startTransition(async () => {
-      const res = await recordOutreachSent(account.id, recipientLabel, message);
+      const res = await recordOutreachSent(account.id, recipientLabel, finalMessage);
       setResult(res);
       if (res.ok) setOpened(false);
     });
@@ -178,142 +208,129 @@ export function OutreachComposer({
         )}
       </Card>
 
-      <Card>
-        <div className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
-          <Ico name="mail" size={13} />
-          Message
-        </div>
-        <div className="mb-2 flex flex-wrap gap-1.5">
-          {OUTREACH_TEMPLATES.map((t) => (
+      {account && (
+        <Card>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
+              <Ico name="mail" size={13} />
+              Message
+            </div>
+            {draftPending && <span className="text-[11.5px] text-[#8A928C]">Drafting from the last touchpoint...</span>}
+          </div>
+
+          {basedOn ? (
+            <div className="mb-2 rounded-md border border-[#E2DFD5] bg-[#FAF9F5] px-3 py-2 text-[12px] leading-snug text-[#5B6560]">
+              Continuing from the {basedOn.kind} logged {fmtWhen(basedOn.at)}: &quot;{basedOn.detail}&quot;
+            </div>
+          ) : (
+            !draftPending && (
+              <div className="mb-2 rounded-md border border-[#E2DFD5] bg-[#FAF9F5] px-3 py-2 text-[12px] leading-snug text-[#5B6560]">
+                No prior touchpoint on file for this account, this reads as a first contact.
+              </div>
+            )
+          )}
+
+          {needsAttachment && attached.length === 0 && (
+            <div className="mb-2 flex items-start gap-2 rounded-md border border-[#E5D9BF] bg-[#FBF6E9] px-3 py-2 text-[12.5px] leading-snug text-[#8A6D2F]">
+              <Ico name="alert" size={13} />
+              <span>
+                The last touchpoint mentions {attachmentHint ?? "something to send over"}, use Attach below.
+              </span>
+            </div>
+          )}
+
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={4}
+            placeholder="Pick an account above to draft a message."
+            className="w-full resize-none rounded-md border border-[#E2DFD5] bg-[#FAF9F5] p-3 text-[13.5px] leading-relaxed text-[#14201B] placeholder:text-[#A9AFA9] focus:border-[#14201B] focus:outline-none"
+          />
+          {attached.length > 0 && (
+            <p className="mt-1 text-[11.5px] text-[#8A928C]">
+              Will include: <span className="text-[#5B6560]">Attaching: {attached.map((f) => f.label).join(", ")}</span>
+            </p>
+          )}
+
+          <div className="mt-2">
+            <AttachmentButton files={files} selected={attached} onChange={setAttached} />
+          </div>
+
+          <details className="mt-2">
+            <summary className="cursor-pointer text-[11.5px] text-[#8A928C]">Use a generic template instead</summary>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {OUTREACH_TEMPLATES.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => applyTemplate(t.id)}
+                  className={`rounded-full border px-2.5 py-1 text-[12px] transition-colors ${
+                    templateId === t.id
+                      ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
+                      : "border-[#E2DFD5] text-[#5B6560] hover:bg-[#FAF9F5]"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </details>
+        </Card>
+      )}
+
+      {account && (
+        <Card>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="max-w-[46ch] text-[11.5px] leading-snug text-[#8A928C]">
+              Opens WhatsApp Web/app with this text pre-filled in the chat. Nothing sends until you press send
+              there yourself. Any attachment you picked above already downloaded, drag it into the chat.
+            </p>
             <button
-              key={t.id}
-              onClick={() => applyTemplate(t.id)}
-              className={`rounded-full border px-2.5 py-1 text-[12px] transition-colors ${
-                templateId === t.id
-                  ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
-                  : "border-[#E2DFD5] text-[#5B6560] hover:bg-[#FAF9F5]"
+              onClick={openWhatsApp}
+              disabled={!waPhone || !message.trim()}
+              className="flex shrink-0 items-center gap-1.5 rounded-md bg-[#25D366] px-3.5 py-2 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+            >
+              <Ico name="whatsapp" size={13} />
+              Open in WhatsApp
+            </button>
+          </div>
+
+          {opened && !result && (
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-[#E2DFD5] bg-[#FAF9F5] px-3 py-2.5">
+              <p className="text-[13px] text-[#3D4A44]">Sent it in WhatsApp? File it to the OS and HubSpot queue.</p>
+              <button
+                onClick={markSent}
+                disabled={pending}
+                className="shrink-0 rounded-md border border-[#14201B] px-3 py-1.5 text-[12.5px] font-medium text-[#14201B] transition-colors hover:bg-white disabled:opacity-40"
+              >
+                {pending ? "Filing..." : "Mark as sent"}
+              </button>
+            </div>
+          )}
+
+          {result && (
+            <div
+              className={`mt-3 rounded-md border px-3 py-2.5 text-[13px] leading-relaxed ${
+                result.ok
+                  ? "border-[#E2DFD5] bg-[#FAF9F5] text-[#3D4A44]"
+                  : "border-[#E5D9BF] bg-[#FBF6E9] text-[#8A6D2F]"
               }`}
             >
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          rows={4}
-          placeholder="Write the message, or pick a template above and edit it."
-          className="w-full resize-none rounded-md border border-[#E2DFD5] bg-[#FAF9F5] p-3 text-[13.5px] leading-relaxed text-[#14201B] placeholder:text-[#A9AFA9] focus:border-[#14201B] focus:outline-none"
-        />
-      </Card>
-
-      <AttachmentPicker files={files} />
-
-      <Card>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="max-w-[46ch] text-[11.5px] leading-snug text-[#8A928C]">
-            Opens WhatsApp Web/app with this text pre-filled in the chat. Nothing sends until you press send
-            there yourself. If you picked a file above, download it first and drag it into the chat, WhatsApp
-            doesn&apos;t support attaching a file through this link.
-          </p>
-          <button
-            onClick={openWhatsApp}
-            disabled={!waPhone || !message.trim()}
-            className="flex shrink-0 items-center gap-1.5 rounded-md bg-[#14201B] px-3.5 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
-          >
-            <Ico name="whatsapp" size={13} />
-            Open in WhatsApp
-          </button>
-        </div>
-
-        {opened && !result && (
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-[#E2DFD5] bg-[#FAF9F5] px-3 py-2.5">
-            <p className="text-[13px] text-[#3D4A44]">Sent it in WhatsApp? File it to the OS and HubSpot queue.</p>
-            <button
-              onClick={markSent}
-              disabled={pending}
-              className="shrink-0 rounded-md border border-[#14201B] px-3 py-1.5 text-[12.5px] font-medium text-[#14201B] transition-colors hover:bg-white disabled:opacity-40"
-            >
-              {pending ? "Filing..." : "Mark as sent"}
-            </button>
-          </div>
-        )}
-
-        {result && (
-          <div
-            className={`mt-3 rounded-md border px-3 py-2.5 text-[13px] leading-relaxed ${
-              result.ok
-                ? "border-[#E2DFD5] bg-[#FAF9F5] text-[#3D4A44]"
-                : "border-[#E5D9BF] bg-[#FBF6E9] text-[#8A6D2F]"
-            }`}
-          >
-            {result.ok ? (
-              result.needsAccount ? (
-                <>Logged, but couldn&apos;t confidently match an account.</>
+              {result.ok ? (
+                result.needsAccount ? (
+                  <>Logged, but couldn&apos;t confidently match an account.</>
+                ) : (
+                  <>
+                    Filed to <span className="font-medium">{result.accountName}</span>. HubSpot Note is queued
+                    for the next dry-run-then-write pass, same gate as clientos.
+                  </>
+                )
               ) : (
-                <>
-                  Filed to <span className="font-medium">{result.accountName}</span>. HubSpot Note is queued
-                  for the next dry-run-then-write pass, same gate as clientos.
-                </>
-              )
-            ) : (
-              result.error
-            )}
-          </div>
-        )}
-      </Card>
-    </div>
-  );
-}
-
-function AttachmentPicker({ files }: { files: OutreachFile[] }) {
-  const [open, setOpen] = useState(false);
-  const marketing = files.filter((f) => f.folder === "marketing");
-  const field = files.filter((f) => f.folder === "field");
-
-  if (files.length === 0) return null;
-
-  return (
-    <Card>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between text-[11px] uppercase tracking-[0.14em] text-[#8A928C]"
-      >
-        <span className="flex items-center gap-2">
-          <Ico name="book" size={13} />
-          Attach a doc ({files.length})
-        </span>
-        <Ico name={open ? "chevron-up" : "chevron-down"} size={12} />
-      </button>
-      {open && (
-        <div className="mt-2 space-y-3">
-          {[
-            ["Marketing", marketing],
-            ["Field materials", field],
-          ].map(([label, group]) =>
-            (group as OutreachFile[]).length > 0 ? (
-              <div key={label as string}>
-                <div className="mb-1 text-[11.5px] font-medium text-[#5B6560]">{label as string}</div>
-                <ul className="divide-y divide-[#E2DFD5] rounded-md border border-[#E2DFD5]">
-                  {(group as OutreachFile[]).map((f) => (
-                    <li key={`${f.folder}/${f.name}`} className="flex items-center justify-between px-3 py-2">
-                      <span className="truncate text-[13px]">{f.label}</span>
-                      <a
-                        href={f.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="shrink-0 rounded-md border border-[#E2DFD5] px-2 py-1 text-[12px] text-[#3D4A44] hover:bg-[#FAF9F5]"
-                      >
-                        Download
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null,
+                result.error
+              )}
+            </div>
           )}
-        </div>
+        </Card>
       )}
-    </Card>
+    </div>
   );
 }

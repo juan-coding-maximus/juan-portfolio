@@ -1,84 +1,97 @@
 /**
- * Outbound. A queue of drafts waiting on a human.
+ * Outbound. Draft and send outreach, and the queue of drafts waiting on a
+ * human.
  *
- * Agency principle 1: drafting may be automatic once trusted, SENDING never is.
- * Nothing on this screen sends. Approval marks a row for the send worker, which
- * is the only code path that touches Gmail or LinkedIn, and which refuses any
- * synthetic row outright. A database trigger blocks the same transition
- * independently, so the two guards fail separately.
+ * Agency principle 1: drafting may be automatic once trusted, SENDING never
+ * is. Nothing on this screen sends anything itself: the WhatsApp composer
+ * opens a wa.me deep link Juan taps send on himself, and the email queue's
+ * "Open in Outlook" opens a compose window he sends from his own mailbox
+ * (which holds no Mail.Send scope, so a deep-link is the only path that
+ * exists). "Mark sent" is a self-report either way; the OS cannot verify a
+ * send on either channel.
+ *
+ * ONE TAB, ON PURPOSE (2026-08-13): the WhatsApp composer shipped as its own
+ * /nutribiotic/outreach page first and Juan asked for it folded in here
+ * instead, so "outbound" means one place for every outbound channel rather
+ * than a page per channel. The stored `channel` on a draft is a hint about
+ * how it was generated, not a hard gate on how it can be sent — a draft
+ * stamped "email" still gets an Open in WhatsApp button the moment a phone
+ * resolves for its account, because the generator's channel guess is
+ * sometimes just wrong (Juan, 2026-08-13, on a Beverly Microblading Center
+ * draft that should have been WhatsApp from the start). See
+ * [[nutribiotic-whatsapp-bridge]].
  */
 
-import { listDrafts, isConfigured, type Draft } from "../lib/dal";
-import { decideDraft } from "../lib/outbound-actions";
-import { CopyBodyButton } from "../lib/outbound-ui";
+import {
+  listDrafts,
+  listMarketingFiles,
+  listOwnerAccounts,
+  listOwnerContactPhones,
+  isConfigured,
+} from "../lib/dal";
+import { DraftActions } from "../lib/outbound-ui";
+import { OutreachComposer } from "../lib/outreach-ui";
 import { Card, Empty, PageHead, daysAgo } from "../lib/ui";
 
 export const dynamic = "force-dynamic";
 
-/**
- * How long the whole compose URL may get before the body is left out.
- *
- * A deep-link is a query string, and percent-encoding roughly doubles a
- * markdown body once newlines and punctuation are escaped. Browsers and the
- * Outlook endpoint both stop carrying one somewhere in the low thousands of
- * characters, and the failure is quiet: the link still opens, just without the
- * text. 1900 is comfortably under the most conservative of those ceilings.
- */
-const COMPOSE_URL_LIMIT = 1900;
-
-/** Outlook Web compose, prefilled. Opens in a new tab; nothing sends until
- * Juan clicks Send inside his own mailbox — this mailbox holds no Mail.Send
- * scope, so a compose deep-link is the only path that exists.
- *
- * A body that will not fit is DROPPED RATHER THAN TRUNCATED, and the caller
- * offers a copy button instead. A half-sent email that looks complete is worse
- * than an empty compose window next to a copy button. */
-function owaComposeLink(d: Draft): { href: string; bodyOmitted: boolean } {
-  const base = "https://outlook.cloud.microsoft/mail/deeplink/compose?";
-  const withBody = new URLSearchParams({ to: d.to_email ?? "", body: d.body_md });
-  if (d.subject) withBody.set("subject", d.subject);
-  const full = base + withBody;
-  if (full.length <= COMPOSE_URL_LIMIT) return { href: full, bodyOmitted: false };
-
-  const withoutBody = new URLSearchParams({ to: d.to_email ?? "" });
-  if (d.subject) withoutBody.set("subject", d.subject);
-  return { href: base + withoutBody, bodyOmitted: true };
-}
-
 export default async function Outbound() {
-  const res = await listDrafts();
+  const [res, accountsResult, contacts, files] = await Promise.all([
+    listDrafts(),
+    listOwnerAccounts(),
+    listOwnerContactPhones(),
+    listMarketingFiles(),
+  ]);
   const synthetic = res.mode === "synthetic";
+  const accounts = accountsResult.data
+    .map((a) => ({ id: a.id, name: a.name, phone: a.phone, city: a.city }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  // account -> best phone on file (the account's own line, else the first
+  // named contact's cell), used so every draft card can offer WhatsApp
+  // regardless of what channel it was originally generated as.
+  const phoneByAccount = new Map<string, string>();
+  for (const a of accounts) if (a.phone) phoneByAccount.set(a.id, a.phone);
+  for (const c of contacts) if (c.phone && !phoneByAccount.has(c.account_id)) phoneByAccount.set(c.account_id, c.phone);
 
   return (
     <>
       <PageHead
         title="Outbound"
-        sub="Drafts wait here until you approve them. Nothing on this screen sends anything."
+        sub="Draft a WhatsApp message and open it pre-filled, or work through drafts waiting on you. Nothing on this screen sends anything."
       />
+
+      <div className="mb-6">
+        <div className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">WhatsApp</div>
+        {accounts.length === 0 ? (
+          <Card>
+            <p className="text-[13px] text-[#8A928C]">No accounts loaded yet.</p>
+          </Card>
+        ) : (
+          <OutreachComposer accounts={accounts} contacts={contacts} files={files} />
+        )}
+      </div>
+
+      <div className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">Waiting on you</div>
 
       {synthetic && (
         <Card className="mb-5 border-l-[3px] border-l-[#E8A33D]">
           <p className="text-[13.5px] leading-relaxed text-[#5B6560]">
-            These drafts are synthetic. They cannot be sent: the send worker refuses any row marked
-            synthetic, and the database blocks the status change independently of it. Every
-            recipient address here uses a reserved domain that can never resolve.
+            These drafts are synthetic. They cannot be sent: every recipient address here uses a reserved domain
+            that can never resolve, and this screen&apos;s own buttons stay disabled on a synthetic row.
           </p>
         </Card>
       )}
 
       {res.data.length === 0 ? (
-        <Empty>
-          {!isConfigured() ? "No data source configured." : "No drafts waiting on you."}
-        </Empty>
+        <Empty>{!isConfigured() ? "No data source configured." : "No drafts waiting on you."}</Empty>
       ) : (
         <ul className="flex flex-col gap-3">
           {res.data.map((d) => (
             <li key={d.id}>
               <Card>
                 <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <span className="text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
-                    {d.channel}
-                  </span>
+                  <span className="text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">{d.channel}</span>
                   {d.subject && <span className="text-[14px] font-medium">{d.subject}</span>}
                   {d.to_email && (
                     <span className="text-[12px] text-[#8A928C]">
@@ -115,60 +128,12 @@ export default async function Outbound() {
                 <p className="max-w-[76ch] text-[13.5px] leading-relaxed whitespace-pre-wrap text-[#3D4A44]">
                   {d.body_md}
                 </p>
-                <div className="mt-3.5 flex flex-wrap items-center gap-2">
-                  {d.channel === "email" && d.to_email && !synthetic ? (
-                    <>
-                      <a
-                        href={owaComposeLink(d).href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="rounded-md bg-[#14201B] px-3 py-1.5 text-[13px] font-medium text-[#F7F6F1]"
-                      >
-                        Open in Outlook &rarr;
-                      </a>
-                      {owaComposeLink(d).bodyOmitted && (
-                        <>
-                          <CopyBodyButton body={d.body_md} />
-                          <span className="text-[12px] text-[#8A6D2F]">
-                            Too long to prefill. Outlook opens addressed; paste the body in.
-                          </span>
-                        </>
-                      )}
-                      <form action={decideDraft.bind(null, d.id, "sent")}>
-                        <button
-                          type="submit"
-                          className="rounded-md border border-[#D8D4C8] px-3 py-1.5 text-[13px] text-[#3D4A44]"
-                          title="Marks this sent on your word — this mailbox has no send access, so the OS can't verify it."
-                        >
-                          Mark sent
-                        </button>
-                      </form>
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={synthetic || !d.to_email}
-                      className="rounded-md bg-[#14201B] px-3 py-1.5 text-[13px] font-medium text-[#F7F6F1] disabled:opacity-35"
-                      title={
-                        synthetic
-                          ? "Synthetic drafts cannot be approved for sending."
-                          : !d.to_email
-                            ? "No email on file for this account — call instead."
-                            : undefined
-                      }
-                    >
-                      Approve
-                    </button>
-                  )}
-                  <form action={decideDraft.bind(null, d.id, "dismissed")}>
-                    <button
-                      type="submit"
-                      className="rounded-md border border-[#D8D4C8] px-3 py-1.5 text-[13px] text-[#3D4A44]"
-                    >
-                      Dismiss
-                    </button>
-                  </form>
-                </div>
+                <DraftActions
+                  draft={d}
+                  phone={d.account_id ? (phoneByAccount.get(d.account_id) ?? null) : null}
+                  files={files}
+                  synthetic={synthetic}
+                />
               </Card>
             </li>
           ))}

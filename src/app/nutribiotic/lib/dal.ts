@@ -1871,7 +1871,27 @@ async function listMarketingFolder(folder: "marketing" | "field"): Promise<Marke
     );
     if (!signRes.ok) continue;
     const { signedURL } = (await signRes.json()) as { signedURL: string };
-    files.push({ folder, name: obj.name, label: obj.name, url: `${SB_URL}/storage/v1${signedURL}` });
+    // `&download=<name>` is what makes the response carry Content-Disposition:
+    // attachment (confirmed live 2026-08-13: absent this, the cross-origin
+    // Supabase URL serves inline and a PDF just opens a new tab instead of
+    // downloading, which is silent and easy to miss). Belongs on the final
+    // URL, not the sign request body -- the sign endpoint ignores it there.
+    //
+    // The `.replace(/ /g, "%20")` is load-bearing, not cosmetic: Supabase's
+    // own signedURL response can carry a literal, unencoded space for a
+    // filename like "Clarity+ Flyer.pdf" (confirmed live 2026-08-13) even
+    // though the path segment was sent already percent-encoded. Browsers
+    // tolerate a raw space in a URL by auto-encoding it on navigation, but
+    // relying on that silently is exactly the class of bug the %2F signature
+    // mismatch above already was, so it's fixed explicitly here instead. A
+    // plain `encodeURI()` would be wrong: it re-escapes the existing %XX
+    // sequences (including the token) into %25XX and breaks the signature.
+    files.push({
+      folder,
+      name: obj.name,
+      label: obj.name,
+      url: `${SB_URL}/storage/v1${signedURL}&download=${encodeURIComponent(obj.name)}`.replace(/ /g, "%20"),
+    });
   }
   return files;
 }
