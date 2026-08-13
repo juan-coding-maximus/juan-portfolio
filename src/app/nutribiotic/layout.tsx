@@ -15,24 +15,19 @@ export const metadata: Metadata = {
 // Every read is request-time; nothing here may be statically cached.
 export const dynamic = "force-dynamic";
 
-/* Nav consolidation, 2026-07-20; Today retired in favor of Plan, 2026-08-02.
-   Plan is home now: it carries the daily touchpoint capture and work queues
-   Today used to hold, plus the itinerary, so a separate landing tab was two
-   places doing one job. Pipeline merged into Clients (it is a view over the
-   same accounts, and with a pre-first-visit territory a separate board was
-   empty ceremony). Route and Support keep their pages but leave the nav until
-   their phases ship: a permanent nav item whose screen says "not built" or
-   holds a twice-a-month log is nav noise. They are reachable from Plan.
-   Outbound is the approval gate, so it appears exactly when something is
-   waiting on a human and not before. Nav that grows as phases land beats nav
-   that promises them. */
+/* Nav consolidation, 2026-07-20; Today retired in favor of Plan, 2026-08-02;
+   Plan retired outright 2026-08-12 (its static month itinerary was stale and
+   superseded by Map's live routing; its daily-capture widgets went with it,
+   Juan's call). Map is home now. Pipeline merged into Clients (it is a view
+   over the same accounts, and with a pre-first-visit territory a separate
+   board was empty ceremony). Route and Support keep their pages but leave the
+   nav until their phases ship: a permanent nav item whose screen says "not
+   built" or holds a twice-a-month log is nav noise. Outbound is the approval
+   gate, so it appears exactly when something is waiting on a human and not
+   before. Nav that grows as phases land beats nav that promises them. */
 const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>["name"] }[] = [
-  /* Plan is the static approved month plus the daily capture, the screen Juan
-     opens first every driving day. Not the phase-7 planner (which stays out
-     of nav at ./route). */
-  { href: "/nutribiotic/plan", label: "Plan", icon: "route" },
-  { href: "/nutribiotic/clients", label: "Clients", icon: "accounts" },
   { href: "/nutribiotic/map", label: "Map", icon: "pin" },
+  { href: "/nutribiotic/clients", label: "Clients", icon: "accounts" },
   { href: "/nutribiotic/metrics", label: "Metrics", icon: "metrics" },
   /* Goals earns its slot on the same rule: it is the standing ladder (Director
      in one, VP in four) and the six SMART goals it decomposes into, content

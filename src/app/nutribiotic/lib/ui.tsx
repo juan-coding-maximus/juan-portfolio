@@ -347,3 +347,13 @@ export function money(n: number | null | undefined): string {
   if (n == null) return "$0";
   return `$${Math.round(n).toLocaleString("en-US")}`;
 }
+
+/** "2026-07-16" -> "Jul 16, 2026". The exact date, not a relative one; see
+ * daysAgo() for "how long ago" instead. */
+export function exactDate(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}

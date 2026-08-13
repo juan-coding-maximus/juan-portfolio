@@ -15,6 +15,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type MouseEvent,
   type ReactNode,
@@ -23,7 +24,7 @@ import { getAccountDetail, type AccountDetailData } from "./account-actions";
 import { AccountDetailBody } from "./account-detail";
 import { Ico, realChannel } from "./ui";
 
-type ModalCtx = { open: (id: string) => void };
+type ModalCtx = { open: (id: string) => void; prefetch: (id: string) => void };
 const Ctx = createContext<ModalCtx | null>(null);
 
 export function ModalProvider({ children }: { children: ReactNode }) {
@@ -31,13 +32,27 @@ export function ModalProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AccountDetailData>(null);
   const [loading, setLoading] = useState(false);
 
+  // Keyed by account id so a finger touching a row starts the fetch before the
+  // click handler below even runs (touchstart fires ~50-150ms ahead of click).
+  // open() then reuses whatever is already in flight instead of firing a
+  // second request, which is the actual latency win: the round trip overlaps
+  // with the tap instead of following it.
+  const inflight = useRef(new Map<string, Promise<AccountDetailData>>());
+
+  const prefetch = useCallback((id: string) => {
+    if (!inflight.current.has(id)) inflight.current.set(id, getAccountDetail(id));
+  }, []);
+
   const open = useCallback((id: string) => {
     setOpenId(id);
     setData(null);
     setLoading(true);
-    getAccountDetail(id).then((res) => {
+    const req = inflight.current.get(id) ?? getAccountDetail(id);
+    inflight.current.set(id, req);
+    req.then((res) => {
       setData(res);
       setLoading(false);
+      inflight.current.delete(id);
     });
   }, []);
 
@@ -58,7 +73,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
   }, [openId, close]);
 
   return (
-    <Ctx.Provider value={{ open }}>
+    <Ctx.Provider value={{ open, prefetch }}>
       {children}
       {openId && (
         <div
@@ -97,7 +112,13 @@ export function ModalProvider({ children }: { children: ReactNode }) {
                 <div className="py-10 text-center text-[13.5px] text-[#8A928C]">Account not found.</div>
               )}
               {!loading && data && (
-                <AccountDetailBody account={data.account} activities={data.activities} contacts={data.contacts} />
+                <AccountDetailBody
+                  account={data.account}
+                  activities={data.activities}
+                  contacts={data.contacts}
+                  orders={data.orders}
+                  lines={data.lines}
+                />
               )}
             </div>
           </div>
@@ -122,11 +143,14 @@ export function AccountLink({
   className?: string;
   children: ReactNode;
 }) {
-  const { open } = useModal();
+  const { open, prefetch } = useModal();
   return (
     <Link
       href={`/nutribiotic/account/${id}`}
       className={className}
+      // Fires before onClick on both touch and mouse, so the fetch is already
+      // in flight by the time the tap registers (see prefetch in ModalProvider).
+      onPointerDown={() => prefetch(id)}
       onClick={(e) => {
         // Modifier/middle clicks keep native "open in new tab" behavior.
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;

@@ -784,7 +784,7 @@ export function AccountsMap({
                   {selected.area && <span>{areaById.get(selected.area)?.label ?? selected.area}</span>}
                   {realChannel(selected.channel) && <span>{realChannel(selected.channel)}</span>}
                   <span>·</span>
-                  <span>{selected.lifecycle}</span>
+                  <span>{selected.lifecycle || "unknown"}</span>
                 </div>
                 {selected.do_not_visit && (
                   <div className="mt-1 text-[11.5px] text-[#A0762C]">do not visit</div>

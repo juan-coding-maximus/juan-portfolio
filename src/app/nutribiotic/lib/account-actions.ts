@@ -1,18 +1,35 @@
 "use server";
 
-import { getAccount, listActivities, listContacts, type Account, type Activity, type Contact } from "./dal";
+import {
+  getAccount,
+  listActivities,
+  listContacts,
+  listPurchases,
+  type Account,
+  type Activity,
+  type Contact,
+  type PurchaseLine,
+  type PurchaseOrder,
+} from "./dal";
 
 export type AccountDetailData = {
   account: Account;
   activities: Activity[];
   contacts: Contact[];
+  orders: PurchaseOrder[];
+  lines: PurchaseLine[];
 } | null;
 
 /** Feeds the pop-up account modal. Same DAL calls the standalone /account/[id]
  * page makes, so the two hosts never drift. */
 export async function getAccountDetail(id: string): Promise<AccountDetailData> {
-  const [acc, acts, contacts] = await Promise.all([getAccount(id), listActivities(id), listContacts(id)]);
+  const [acc, acts, contacts, purchases] = await Promise.all([
+    getAccount(id),
+    listActivities(id),
+    listContacts(id),
+    listPurchases(id),
+  ]);
   const a = acc.data[0];
   if (!a) return null;
-  return { account: a, activities: acts.data, contacts: contacts.data };
+  return { account: a, activities: acts.data, contacts: contacts.data, orders: purchases.orders, lines: purchases.lines };
 }

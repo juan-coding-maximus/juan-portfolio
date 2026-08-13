@@ -11,7 +11,7 @@
  * this as a client child.
  */
 
-import type { Account, Activity, Contact } from "./dal";
+import type { Account, Activity, Contact, PurchaseLine, PurchaseOrder } from "./dal";
 import { useRoute } from "./route-context";
 import {
   Card,
@@ -21,6 +21,7 @@ import {
   PhoneDisplay,
   absoluteUrl,
   daysAgo,
+  exactDate,
   money,
   prettyPhone,
   prettyUrl,
@@ -40,10 +41,14 @@ export function AccountDetailBody({
   account: a,
   activities: acts,
   contacts,
+  orders = [],
+  lines = [],
 }: {
   account: Account;
   activities: Activity[];
   contacts: Contact[];
+  orders?: PurchaseOrder[];
+  lines?: PurchaseLine[];
 }) {
   const gap = a.current_state || a.future_state || a.impact;
   const links = SOCIAL_LINKS(a);
@@ -210,6 +215,36 @@ export function AccountDetailBody({
           </Card>
         )}
 
+        {/* Purchases. Exact orders and dates, for the 146 of 459 accounts with
+            loaded order history; absent entirely otherwise (see
+            listPurchases in dal.ts), same honesty rule as every other card
+            here: no orders on file is silence, not a zero. */}
+        {orders.length > 0 && (
+          <Card>
+            <div className="mb-3 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">Purchases</div>
+            <ul className="flex flex-col gap-3">
+              {orders.map((o) => {
+                const items = lines.filter((l) => l.order_id === o.id);
+                return (
+                  <li key={o.id} className="text-[13.5px]">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="font-medium">{exactDate(o.ordered_at)}</span>
+                      <span className="tabular-nums text-[#5B6560]">{money(o.revenue_cents / 100)}</span>
+                    </div>
+                    {items.length > 0 && (
+                      <div className="mt-0.5 leading-relaxed text-[12.5px] text-[#5B6560]">
+                        {items
+                          .map((l) => `${l.product_name ?? "item"}${l.qty ? ` ×${l.qty}` : ""}`)
+                          .join(", ")}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        )}
+
         {/* History. Append-only, so this is the real record. */}
         <section>
           <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8A928C]">
@@ -239,7 +274,7 @@ export function AccountDetailBody({
         <Card>
           <dl className="flex flex-col gap-2.5 text-[13.5px]">
             {[
-              ["State", a.lifecycle],
+              ["State", a.lifecycle || "unknown"],
               ["Last order", a.last_order_at ? daysAgo(a.last_order_at) : "never"],
               ["Lifetime", money(a.lifetime_revenue)],
               ["Trailing 12mo", money(a.trailing_12m_revenue)],

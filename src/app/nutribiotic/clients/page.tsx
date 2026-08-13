@@ -258,7 +258,7 @@ export default async function Clients({
                           {r.name}
                         </AccountLink>
                       </td>
-                      <td className="px-4 py-2.5 text-[#5B6560]">{r.lifecycle}</td>
+                      <td className="px-4 py-2.5 text-[#5B6560]">{r.lifecycle || "unknown"}</td>
                       {/* Low-confidence scores are visually demoted so a weak
                           number never reads with the same authority as a measured one. */}
                       <td

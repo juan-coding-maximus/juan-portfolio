@@ -8,7 +8,7 @@
  */
 
 import { notFound } from "next/navigation";
-import { getAccount, listActivities, listContacts } from "../../lib/dal";
+import { getAccount, listActivities, listContacts, listPurchases } from "../../lib/dal";
 import { AccountDetailBody } from "../../lib/account-detail";
 import { PageHead, realChannel } from "../../lib/ui";
 
@@ -21,7 +21,12 @@ export default async function AccountDetail({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [acc, acts, contacts] = await Promise.all([getAccount(id), listActivities(id), listContacts(id)]);
+  const [acc, acts, contacts, purchases] = await Promise.all([
+    getAccount(id),
+    listActivities(id),
+    listContacts(id),
+    listPurchases(id),
+  ]);
   const a = acc.data[0];
   if (!a) notFound();
 
@@ -33,7 +38,13 @@ export default async function AccountDetail({
           .filter(Boolean)
           .join(" · ")}
       />
-      <AccountDetailBody account={a} activities={acts.data} contacts={contacts.data} />
+      <AccountDetailBody
+        account={a}
+        activities={acts.data}
+        contacts={contacts.data}
+        orders={purchases.orders}
+        lines={purchases.lines}
+      />
     </>
   );
 }

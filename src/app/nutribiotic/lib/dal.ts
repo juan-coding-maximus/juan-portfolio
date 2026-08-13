@@ -394,6 +394,51 @@ export async function listActivities(accountId: string, limit = 60): Promise<Res
   });
 }
 
+export type PurchaseOrder = {
+  id: string;
+  ordered_at: string;
+  revenue_cents: number;
+  order_type: string;
+  origin: Origin;
+};
+
+export type PurchaseLine = {
+  id: string;
+  order_id: string;
+  product_name: string | null;
+  qty: number | null;
+  line_revenue_cents: number;
+  origin: Origin;
+};
+
+/**
+ * The last few orders with what was actually on them, for the account profile.
+ * Only 146 of 459 accounts have any loaded order history (nb_order_lines, see
+ * migration 0015); accounts without it get an empty result, not a zero-filled
+ * one. Two queries rather than one PostgREST embed: ordering top-level rows by
+ * an embedded resource's column isn't reliable across PostgREST versions, and
+ * this is only ever a handful of orders per account.
+ */
+export async function listPurchases(
+  accountId: string,
+  limit = 8,
+): Promise<{ orders: PurchaseOrder[]; lines: PurchaseLine[] }> {
+  const orders = await query<PurchaseOrder>("nb_orders", {
+    select: "id,ordered_at,revenue_cents,order_type,origin",
+    account_id: `eq.${accountId}`,
+    order: "ordered_at.desc",
+    limit,
+  });
+  if (orders.data.length === 0) return { orders: [], lines: [] };
+
+  const ids = orders.data.map((o) => o.id).join(",");
+  const lines = await query<PurchaseLine>("nb_order_lines", {
+    select: "id,order_id,product_name,qty,line_revenue_cents,origin",
+    order_id: `in.(${ids})`,
+  });
+  return { orders: orders.data, lines: lines.data };
+}
+
 export type SupportIssue = {
   id: string;
   account_id: string;
