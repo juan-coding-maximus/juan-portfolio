@@ -76,6 +76,16 @@ function openingHours(place: RawPlace): Record<string, string[][]> | null {
   return out;
 }
 
+/** "(657) 655-4420" -> "657-655-4420", the format every other nb_accounts.
+ * phone is stored in (dashed, no country code). Anything that doesn't parse
+ * as a US 10-digit number is passed through rather than mangled. */
+function normalizePhone(raw: string | undefined): string | null {
+  if (!raw) return null;
+  const digits = raw.replace(/\D/g, "").replace(/^1/, "");
+  if (digits.length !== 10) return raw;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
 function toCandidate(place: RawPlace): PlaceCandidate {
   return {
     placeId: place.id ?? "",
@@ -87,7 +97,7 @@ function toCandidate(place: RawPlace): PlaceCandidate {
     postal: component(place, "postal_code"),
     lat: place.location?.latitude ?? null,
     lng: place.location?.longitude ?? null,
-    phone: place.nationalPhoneNumber ?? null,
+    phone: normalizePhone(place.nationalPhoneNumber),
     website: place.websiteUri ?? null,
     businessStatus: place.businessStatus ?? null,
     businessHours: openingHours(place),
