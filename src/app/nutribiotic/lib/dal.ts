@@ -494,48 +494,6 @@ export async function setDraftStatus(
   return row;
 }
 
-export type RevenueMonth = {
-  month: string;
-  origin: Origin;
-  revenue: number;
-  order_count: number;
-  active_accounts: number;
-  source_coverage_pct: number | null;
-};
-
-export async function revenueByMonth(): Promise<Result<RevenueMonth>> {
-  return query<RevenueMonth>("nb_v_kpi_revenue_monthly", { select: "*", order: "month.desc", limit: 24 });
-}
-
-export type Reactivation = {
-  origin: Origin;
-  accounts_with_trial: number;
-  accounts_reactivated: number;
-  trial_to_reorder_pct: number | null;
-  avg_days_trial_to_reorder: number | null;
-};
-
-export async function reactivation(): Promise<Result<Reactivation>> {
-  return query<Reactivation>("nb_v_kpi_reactivation", { select: "*" });
-}
-
-export type LeadingDay = {
-  day: string;
-  origin: Origin;
-  visits: number;
-  calls: number;
-  emails_out: number;
-  samples_dropped: number;
-  staff_trainings: number;
-  meetings: number;
-  replies_in: number;
-  accounts_visited: number;
-};
-
-export async function leadingDaily(days = 30): Promise<Result<LeadingDay>> {
-  return query<LeadingDay>("nb_v_kpi_leading_daily", { select: "*", order: "day.desc", limit: days });
-}
-
 // ---------------------------------------------------------------------------
 // Writes. All Juan's own data: a note he typed, a detail he stated. Nothing
 // here is fabricated, so every row lands as origin: 'manual'.

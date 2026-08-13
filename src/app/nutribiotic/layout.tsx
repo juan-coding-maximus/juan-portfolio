@@ -28,7 +28,6 @@ export const dynamic = "force-dynamic";
 const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>["name"] }[] = [
   { href: "/nutribiotic/map", label: "Map", icon: "pin" },
   { href: "/nutribiotic/clients", label: "Clients", icon: "accounts" },
-  { href: "/nutribiotic/metrics", label: "Metrics", icon: "metrics" },
   /* Goals earns its slot on the same rule: it is the standing ladder (Director
      in one, VP in four) and the six SMART goals it decomposes into, content
      meant to be seen every day, not a promise of a future phase. */
