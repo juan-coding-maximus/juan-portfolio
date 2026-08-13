@@ -362,6 +362,7 @@ export type Contact = {
   email: string | null;
   phone: string | null;
   linkedin_url: string | null;
+  hubspot_contact_id: string | null;
   origin: Origin;
 };
 
@@ -392,6 +393,88 @@ export async function listActivities(accountId: string, limit = 60): Promise<Res
     order: "at.desc",
     limit,
   });
+}
+
+/** The full row, for the HubSpot engagement port (mirrors hubspot_notes.py's
+ * ACTIVITY_COLS). listActivities()/Activity above stays narrow because most
+ * callers never need contact_id/hubspot_engagement_id/actor/logged_at. */
+export type EngagementActivity = {
+  id: number;
+  account_id: string;
+  contact_id: string | null;
+  at: string | null;
+  logged_at: string | null;
+  kind: string;
+  direction: string;
+  actor: string | null;
+  outcome: string | null;
+  detail: string | null;
+  hubspot_engagement_id: string | null;
+  origin: Origin;
+};
+
+export async function getActivityById(id: number): Promise<EngagementActivity | null> {
+  const res = await query<EngagementActivity>("nb_activities", {
+    select: "id,account_id,contact_id,at,logged_at,kind,direction,actor,outcome,detail,hubspot_engagement_id,origin",
+    id: `eq.${id}`,
+    limit: 1,
+  });
+  return res.data[0] ?? null;
+}
+
+/** Activities Juan has logged (any door) that have never crossed into HubSpot,
+ * for the Visit tab's filing queue. Synthetic rows are excluded at the query
+ * rather than left for the caller to filter, same rule hubspot_notes.py's
+ * own synthetic guard enforces at write time. */
+export async function listUnfiledActivities(limit = 20): Promise<Result<EngagementActivity>> {
+  return query<EngagementActivity>("nb_activities", {
+    select: "id,account_id,contact_id,at,logged_at,kind,direction,actor,outcome,detail,hubspot_engagement_id,origin",
+    hubspot_engagement_id: "is.null",
+    account_id: "not.is.null",
+    origin: "neq.synthetic",
+    order: "at.desc",
+    limit,
+  });
+}
+
+/** Write-once stamp, mirrors hubspot_notes.py's stamp(): the is.null filter is
+ * belt-and-braces with the DB trigger (migration 0002:236-247) that already
+ * rejects a second write. Returns the row if this call did the stamping,
+ * null if another had already landed first (not an error, just a race). */
+export async function stampActivityEngagementId(
+  activityId: number,
+  engagementId: string,
+): Promise<EngagementActivity | null> {
+  const rows = await mutate<EngagementActivity>(
+    "nb_activities",
+    "PATCH",
+    { hubspot_engagement_id: engagementId },
+    { id: `eq.${activityId}`, hubspot_engagement_id: "is.null" },
+  );
+  return rows[0] ?? null;
+}
+
+/** Narrow projection for the HubSpot boundary, mirrors hubspot_notes.py's
+ * resolve_account(). The broad Account type (used by the profile page) is
+ * left alone; this exists so a scope check never has to over-fetch. */
+export type EngagementAccount = {
+  id: string;
+  name: string;
+  hubspot_company_id: string | null;
+  owner_name: string | null;
+  website: string | null;
+  phone: string | null;
+  email: string | null;
+  origin: Origin;
+};
+
+export async function getAccountForEngagement(id: string): Promise<EngagementAccount | null> {
+  const res = await query<EngagementAccount>("nb_accounts", {
+    select: "id,name,hubspot_company_id,owner_name,website,phone,email,origin",
+    id: `eq.${id}`,
+    limit: 1,
+  });
+  return res.data[0] ?? null;
 }
 
 export type PurchaseOrder = {
@@ -553,6 +636,7 @@ export type NewContact = {
   email?: string | null;
   phone?: string | null;
   linkedin_url?: string | null;
+  hubspot_contact_id?: string | null;
 };
 
 export async function insertContact(input: NewContact): Promise<Contact> {
@@ -569,6 +653,21 @@ export async function insertContact(input: NewContact): Promise<Contact> {
 export async function patchContact(id: string, patch: Partial<NewContact>): Promise<Contact> {
   const [row] = await mutate<Contact>("nb_contacts", "PATCH", patch, { id: `eq.${id}` });
   return row;
+}
+
+/** Stamp an OS contact with the HubSpot contact it was just matched or
+ * created against, only if it did not already carry one. Mirrors
+ * hubspot_notes.py's link step: guarded by the same is.null filter rather
+ * than patchContact's unconditional write, since two engagement fills racing
+ * on the same contact must not stamp two different ids. */
+export async function linkContactHubspotId(id: string, hubspotContactId: string): Promise<Contact | null> {
+  const rows = await mutate<Contact>(
+    "nb_contacts",
+    "PATCH",
+    { hubspot_contact_id: hubspotContactId },
+    { id: `eq.${id}`, hubspot_contact_id: "is.null" },
+  );
+  return rows[0] ?? null;
 }
 
 export type Touchpoint = {
@@ -597,6 +696,18 @@ export async function insertTouchpoint(input: {
     ...input,
   });
   return row;
+}
+
+/** The note body source is the activity row, never re-parsed; `parsed` here
+ * is used only for the per-person detail in the engagement port's people
+ * match, mirroring hubspot_notes.py's load_touchpoint(). */
+export async function getTouchpointParsedForActivity(activityId: number): Promise<unknown> {
+  const res = await query<Touchpoint>("nb_touchpoints", {
+    select: "id,parsed,origin",
+    activity_id: `eq.${activityId}`,
+    limit: 1,
+  });
+  return res.data[0]?.parsed ?? null;
 }
 
 export type CalendarProposal = {
@@ -1744,7 +1855,13 @@ async function listMarketingFolder(folder: "marketing" | "field"): Promise<Marke
   const files: MarketingFile[] = [];
   for (const obj of objects) {
     const signRes = await fetch(
-      `${SB_URL}/storage/v1/object/sign/${MARKETING_BUCKET}/${encodeURIComponent(`${folder}/${obj.name}`)}`,
+      // `folder` is a fixed, ASCII-safe path segment; only the filename gets
+      // encoded. Encoding the two together (encodeURIComponent on the whole
+      // "folder/name" string) turns the internal "/" into "%2F", which gets
+      // baked into the signed token's own url claim but decoded back to "/"
+      // by the time the redemption request lands, so it can never verify
+      // (confirmed live 2026-08-13: every download 400'd InvalidSignature).
+      `${SB_URL}/storage/v1/object/sign/${MARKETING_BUCKET}/${folder}/${encodeURIComponent(obj.name)}`,
       {
         method: "POST",
         headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" },

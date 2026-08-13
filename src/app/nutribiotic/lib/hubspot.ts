@@ -122,8 +122,13 @@ export async function request<T = Record<string, unknown>>(opts: RequestOpts): P
     );
   }
 
-  const isMutation = method !== "GET";
-  if (isMutation && !writeEnabled()) {
+  // A read against /read or /search is still a pull, per hubspot.py:153: CRM
+  // search and batch-read are sent as POST but never mutate anything, and
+  // gating them behind the write flag would block a caller from previewing
+  // (searching for a duplicate, batch-reading a live owner) without arming
+  // real writes.
+  const direction = method === "GET" || path.endsWith("/read") || path.endsWith("/search") ? "pull" : "push";
+  if (direction === "push" && !writeEnabled()) {
     throw new ScopeError(
       `Refusing ${method} ${path}: NB_HUBSPOT_WRITE_ENABLED is not "true". ` +
         "This path is dry by default until it has been proved by hand.",
@@ -136,9 +141,6 @@ export async function request<T = Record<string, unknown>>(opts: RequestOpts): P
   // Matches hubspot.py:139: the body when there is one, otherwise the path and
   // query, so a GET still gets a stable hash to log against.
   const phash = await payloadHash(body !== undefined ? body : { path, qs: qs ?? {} });
-
-  // A read against /read is still a pull, per hubspot.py:153.
-  const direction = method === "GET" || path.endsWith("/read") ? "pull" : "push";
 
   let delay = 1000;
   for (let attempt = 0; attempt < retries; attempt++) {

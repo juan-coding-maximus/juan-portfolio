@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getRouteDraft, isConfigured, listDrafts, workspaceMode } from "./lib/dal";
+import { getRouteDraft, isConfigured, workspaceMode } from "./lib/dal";
 import { ModalProvider } from "./lib/modal";
 import { MobileNav } from "./lib/MobileNav";
 import { RouteProvider } from "./lib/route-context";
@@ -22,11 +22,24 @@ export const dynamic = "force-dynamic";
    over the same accounts, and with a pre-first-visit territory a separate
    board was empty ceremony). Route and Support keep their pages but leave the
    nav until their phases ship: a permanent nav item whose screen says "not
-   built" or holds a twice-a-month log is nav noise. Outbound is the approval
-   gate, so it appears exactly when something is waiting on a human and not
-   before. Nav that grows as phases land beats nav that promises them. */
+   built" or holds a twice-a-month log is nav noise. Nav that grows as phases
+   land beats nav that promises them.
+
+   Outbound used to appear only when a draft was waiting (the approval-gate
+   rule above). 2026-08-13: it also hosts the WhatsApp composer now (wa.me
+   deep-link drafts grounded in the account's last logged touchpoint, plus
+   marketing/field-material attachments), and that half is a tool Juan reaches
+   for on his own schedule, not a backlog notification, so Outbound moved into
+   NAV proper rather than staying conditionally spliced in. Juan was explicit
+   this had to be the SAME tab as the existing drafts queue, not a second one
+   ([[nutribiotic-whatsapp-bridge]]). */
 const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>["name"] }[] = [
   { href: "/nutribiotic/map", label: "Map", icon: "pin" },
+  /* Visit, 2026-08-13: door 3 onto the shared extractor (lib/touchpoint.ts),
+     typed or recorded, filing end to end the same way clientos does, Juan's
+     own click on the preview standing in for the CLI skill's dry-run review.
+     See lib/hubspot-engagement.ts. */
+  { href: "/nutribiotic/visit", label: "Visit", icon: "mic" },
   { href: "/nutribiotic/clients", label: "Clients", icon: "accounts" },
   /* Goals earns its slot on the same rule: it is the standing ladder (Director
      in one, VP in four) and the six SMART goals it decomposes into, content
@@ -35,6 +48,7 @@ const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>
   /* Playbook is the shelf those goals produce: the strategy docs rendered from
      the repo's own markdown, so the site and the files can never disagree. */
   { href: "/nutribiotic/playbook", label: "Playbook", icon: "book" },
+  { href: "/nutribiotic/outbound", label: "Outbound", icon: "outbound" },
   /* The offer-code trio, added 2026-08-10 at Juan's direction (three tabs, all
      in the directory). Phone issues a handwritten code in a parking lot and
      holds the requests waiting on a relay; Offers is the template builder those
@@ -43,12 +57,6 @@ const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>
   { href: "/nutribiotic/phone", label: "Phone", icon: "phone" },
   { href: "/nutribiotic/offer_builder", label: "Offers", icon: "tag" },
   { href: "/nutribiotic/promo", label: "Promo", icon: "external" },
-  /* Outreach, 2026-08-13: WhatsApp drafts via wa.me click-to-chat deep links
-     (the officially supported, zero-setup mechanism, not browser automation
-     or a Business API integration), attachments from the marketing/field
-     buckets. Sending is always Juan's own tap in WhatsApp; this page never
-     sends anything itself. */
-  { href: "/nutribiotic/outreach", label: "Outreach", icon: "whatsapp" },
 ];
 
 export default async function NutribioticLayout({
@@ -68,12 +76,8 @@ export default async function NutribioticLayout({
   const mode = await workspaceMode();
   const synthetic = mode === "synthetic";
 
-  const drafts = isConfigured() ? await listDrafts(1) : { data: [] };
   const routeDraft = isConfigured() ? await getRouteDraft() : [];
-  const nav = [...NAV];
-  if (drafts.data.length > 0) {
-    nav.splice(2, 0, { href: "/nutribiotic/outbound", label: "Outbound", icon: "outbound" });
-  }
+  const nav = NAV;
 
   /* Review left the nav for good, 2026-08-02: the page stays reachable at
      /nutribiotic/review for an occasional import cleanup, same treatment as
