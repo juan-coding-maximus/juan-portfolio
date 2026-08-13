@@ -34,7 +34,7 @@ const COMPOSE_URL_LIMIT = 1900;
  * offers a copy button instead. A half-sent email that looks complete is worse
  * than an empty compose window next to a copy button. */
 function owaComposeLink(d: Draft): { href: string; bodyOmitted: boolean } {
-  const base = "https://outlook.office.com/mail/deeplink/compose?";
+  const base = "https://outlook.cloud.microsoft/mail/deeplink/compose?";
   const withBody = new URLSearchParams({ to: d.to_email ?? "", body: d.body_md });
   if (d.subject) withBody.set("subject", d.subject);
   const full = base + withBody;
