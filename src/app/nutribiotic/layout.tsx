@@ -43,6 +43,12 @@ const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>
   { href: "/nutribiotic/phone", label: "Phone", icon: "phone" },
   { href: "/nutribiotic/offer_builder", label: "Offers", icon: "tag" },
   { href: "/nutribiotic/promo", label: "Promo", icon: "external" },
+  /* Outreach, 2026-08-13: WhatsApp drafts via wa.me click-to-chat deep links
+     (the officially supported, zero-setup mechanism, not browser automation
+     or a Business API integration), attachments from the marketing/field
+     buckets. Sending is always Juan's own tap in WhatsApp; this page never
+     sends anything itself. */
+  { href: "/nutribiotic/outreach", label: "Outreach", icon: "whatsapp" },
 ];
 
 export default async function NutribioticLayout({

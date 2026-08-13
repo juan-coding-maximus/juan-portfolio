@@ -1708,3 +1708,94 @@ export async function listPlaybookReports(): Promise<PlaybookReport[]> {
     return [];
   }
 }
+
+/* ---------------------------------------------------------------------- *
+ * Outreach: marketing/field-material attachments + phone lookups.
+ *
+ * MARKETING_BUCKET mirrors REPORTS_BUCKET's pattern exactly (list -> sign
+ * each object, 300s expiry), the one difference being this bucket keeps
+ * TWO real folders (marketing/, field/) rather than a flat, one-per-kind
+ * shelf, so the Storage list API's own delimiter semantics are used
+ * directly instead of the client-side prefix filter storage_publish_latest
+ * needs for a flat bucket. Source of truth is Juan's own Desktop, synced in
+ * by bridges/nutribiotic/sync_marketing_files.py; this DAL function only
+ * ever reads what that script has already uploaded.
+ * ---------------------------------------------------------------------- */
+
+const MARKETING_BUCKET = "nb-marketing";
+
+export type MarketingFile = {
+  folder: "marketing" | "field";
+  name: string;
+  label: string;
+  url: string;
+};
+
+async function listMarketingFolder(folder: "marketing" | "field"): Promise<MarketingFile[]> {
+  const listRes = await fetch(`${SB_URL}/storage/v1/object/list/${MARKETING_BUCKET}`, {
+    method: "POST",
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ prefix: `${folder}/`, limit: 200, sortBy: { column: "name", order: "asc" } }),
+    cache: "no-store",
+  });
+  if (!listRes.ok) return [];
+  const objects = (await listRes.json()) as Array<{ name: string }>;
+
+  const files: MarketingFile[] = [];
+  for (const obj of objects) {
+    const signRes = await fetch(
+      `${SB_URL}/storage/v1/object/sign/${MARKETING_BUCKET}/${encodeURIComponent(`${folder}/${obj.name}`)}`,
+      {
+        method: "POST",
+        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ expiresIn: 300 }),
+        cache: "no-store",
+      },
+    );
+    if (!signRes.ok) continue;
+    const { signedURL } = (await signRes.json()) as { signedURL: string };
+    files.push({ folder, name: obj.name, label: obj.name, url: `${SB_URL}/storage/v1${signedURL}` });
+  }
+  return files;
+}
+
+/** Never throws: an unreachable or empty bucket just means the attachment
+ *  picker shows nothing, same degrade-honestly rule as listPlaybookReports. */
+export async function listMarketingFiles(): Promise<MarketingFile[]> {
+  await verifySession();
+  if (!isConfigured()) return [];
+  try {
+    const [marketing, field] = await Promise.all([
+      listMarketingFolder("marketing"),
+      listMarketingFolder("field"),
+    ]);
+    return [...marketing, ...field];
+  } catch {
+    return [];
+  }
+}
+
+export type OutreachContact = {
+  id: string;
+  account_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  title: string | null;
+  phone: string;
+};
+
+/** Every named contact with a phone on file, across Juan's whole book, for the
+ *  Outreach recipient picker. One query rather than one per account: the
+ *  picker needs all of them up front to search across accounts. */
+export async function listOwnerContactPhones(ownerName = "Juan Arenas Martin"): Promise<OutreachContact[]> {
+  await verifySession();
+  if (!isConfigured()) return [];
+  const accounts = await raw<{ id: string }>(
+    `nb_accounts?select=id&owner_name=eq.${encodeURIComponent(ownerName)}&closed_at=is.null`,
+  );
+  if (!accounts.length) return [];
+  const ids = accounts.map((a) => a.id).join(",");
+  return raw<OutreachContact>(
+    `nb_contacts?select=id,account_id,first_name,last_name,title,phone&account_id=in.(${ids})&phone=not.is.null`,
+  );
+}
