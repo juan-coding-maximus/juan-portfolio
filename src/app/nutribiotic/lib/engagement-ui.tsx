@@ -1,32 +1,74 @@
 "use client";
 
 /**
- * The queue of logged activities that have not yet crossed into HubSpot, and
- * the review-then-file card for each. This is the browser's stand-in for
- * clientos's "read the dry output yourself, then write" step: the preview
- * below is the exact same deterministic output hubspot_notes.py would print
- * (see lib/hubspot-engagement.ts), rendered automatically, so Juan is always
- * the one reading it before the File button becomes the thing that writes.
+ * The queue of logged activities that have not yet crossed into HubSpot.
+ * Enrichment findings (actor "enrichment") are machine-sourced, not Juan's
+ * own words, so they file themselves with no click; only a filing failure
+ * surfaces, as a reviewable card. Everything else is Juan's own dictated
+ * account of a visit/call/text, which still gets the review-then-file card:
+ * the preview is the exact same deterministic output hubspot_notes.py would
+ * print (see lib/hubspot-engagement.ts), so he reads it before it writes.
  */
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { fileEngagement, previewEngagement, type EngagementOutcome } from "./engagement-actions";
 import { Card, Ico } from "./ui";
 import type { EngagementActivity } from "./dal";
 
+const AUTO_FILE_ACTOR = "enrichment";
+
 export function EngagementQueue({ activities }: { activities: EngagementActivity[] }) {
   if (activities.length === 0) return null;
+  const auto = activities.filter((a) => a.actor === AUTO_FILE_ACTOR);
+  const manual = activities.filter((a) => a.actor !== AUTO_FILE_ACTOR);
   return (
     <section>
+      {auto.length > 0 && <AutoFiler activities={auto} />}
+      {manual.length > 0 && (
+        <>
+          <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8A928C]">
+            Ready to file to HubSpot
+          </h2>
+          <div className="flex flex-col gap-3">
+            {manual.map((a) => (
+              <EngagementRow key={a.id} activity={a} />
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+/** Files enrichment activities the moment they land here, no card, no click.
+ * A failure doesn't retry silently in a loop; it drops into the normal
+ * review card below so Juan sees why and can push it through by hand. */
+function AutoFiler({ activities }: { activities: EngagementActivity[] }) {
+  const fired = useRef(new Set<number>());
+  const [failed, setFailed] = useState<EngagementActivity[]>([]);
+
+  useEffect(() => {
+    for (const a of activities) {
+      if (fired.current.has(a.id)) continue;
+      fired.current.add(a.id);
+      fileEngagement(a.id).then((res) => {
+        if (!res.ok) setFailed((f) => [...f, a]);
+      });
+    }
+  }, [activities]);
+
+  if (failed.length === 0) return null;
+  return (
+    <>
       <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8A928C]">
-        Ready to file to HubSpot
+        Enrichment note needs a look
       </h2>
-      <div className="flex flex-col gap-3">
-        {activities.map((a) => (
+      <div className="mb-3 flex flex-col gap-3">
+        {failed.map((a) => (
           <EngagementRow key={a.id} activity={a} />
         ))}
       </div>
-    </section>
+    </>
   );
 }
 
@@ -59,7 +101,12 @@ function EngagementRow({ activity }: { activity: EngagementActivity }) {
         <span className="text-[13.5px] font-medium">{(activity.kind || "").replace(/_/g, " ")}</span>
         <span className="text-[12px] text-[#8A928C]">{(activity.at ?? "").slice(0, 16).replace("T", " ")}</span>
       </div>
-      {activity.detail && <p className="mt-1 text-[13px] leading-relaxed text-[#5B6560]">{activity.detail}</p>}
+      {/* Once the preview box below has loaded it's the actual filing text,
+          a superset of this raw detail, so this line steps aside for it
+          rather than repeating the same paragraph twice. */}
+      {activity.detail && !(shown?.ok && !shown.result.alreadyFiledId) && (
+        <p className="mt-1 text-[13px] leading-relaxed text-[#5B6560]">{activity.detail}</p>
+      )}
 
       {!shown && <div className="mt-3 text-[12.5px] text-[#8A928C]">Checking HubSpot...</div>}
 
@@ -78,10 +125,10 @@ function EngagementRow({ activity }: { activity: EngagementActivity }) {
 
       {shown?.ok && !shown.result.alreadyFiledId && (
         <>
-          <div className="mt-3 rounded-md border border-[#E2DFD5] bg-[#FAF9F5] p-3 text-[12.5px] leading-relaxed text-[#3D4A44]">
-            <div className="mb-1.5 text-[11px] uppercase tracking-[0.1em] text-[#8A928C]">
-              Will file to {shown.result.accountName} as a {shown.result.otype.toLowerCase()}
-              {shown.result.otype !== shown.result.etype && " (typed engagement not built yet, falls back to a note)"}
+          <div className="mt-3 rounded-md border border-[#E2DFD5] bg-[#FAF9F5] p-2.5 text-[12.5px] leading-relaxed text-[#3D4A44]">
+            <div className="mb-1 text-[11px] text-[#8A928C]">
+              → {shown.result.accountName} · {shown.result.otype.toLowerCase()}
+              {shown.result.otype !== shown.result.etype && " (falls back to a note)"}
             </div>
             {shown.result.lines.map((ln, i) => (
               <div key={i}>{ln || " "}</div>
