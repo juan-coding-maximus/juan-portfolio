@@ -42,6 +42,7 @@ import {
   type EngagementActivity,
 } from "./dal";
 import { assertJuansBook, OWNER_ID, request } from "./hubspot";
+import { ensureCompanyDomainForEmail } from "./hubspot-company";
 
 export class Blocked extends Error {}
 
@@ -460,6 +461,7 @@ export async function runEngagement(activityId: number, opts: { write: boolean }
         const first = m.contact.first_name ?? m.person.first_name ?? null;
         const last = m.contact.last_name ?? m.person.last_name ?? null;
         if ((first || last) && opts.write) {
+          if (email) await ensureCompanyDomainForEmail(companyId, email);
           const res = await request<{ id?: string }>({
             method: "POST",
             path: "/crm/v3/objects/contacts",

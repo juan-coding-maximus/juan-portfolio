@@ -14,7 +14,7 @@
  */
 
 import "server-only";
-import { OWNER_ID, request } from "./hubspot";
+import { batchRead, OWNER_ID, request } from "./hubspot";
 
 export type DuplicateCandidate = { id: string; name: string | null; city: string | null; owner: string | null };
 
@@ -78,4 +78,46 @@ export async function createCompany(input: NewCompany): Promise<string> {
   });
   if (!res.id) throw new Error("HubSpot accepted the company but returned no id.");
   return res.id;
+}
+
+/** Consumer webmail, never a company's own domain. Setting one as a `website`
+ * would hand HubSpot a merge key shared by thousands of unrelated companies,
+ * the exact failure DIRECTORY_HOSTS in hubspot.ts exists to prevent for
+ * scraped links; this is the same danger from a contact's personal email. */
+const FREEMAIL_HOSTS = new Set([
+  "gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "aol.com", "icloud.com",
+  "live.com", "msn.com", "protonmail.com", "me.com", "comcast.net", "verizon.net",
+  "att.net", "sbcglobal.net",
+]);
+
+/**
+ * Blank-fill a company's `website` from a contact's own email domain, before
+ * that contact is created against it.
+ *
+ * WHY. HubSpot auto-associates a new contact to a company by matching the
+ * contact's email domain against existing companies' `domain`. A company with
+ * no `website`/`domain` yet has nothing to match, so HubSpot fabricates a
+ * second, blank, unowned company from the domain and silently associates the
+ * contact there instead, orphaning the real company (found live 2026-08-13,
+ * Limitless Nutrition Zone: the contact landed on a nameless duplicate).
+ * Filling `website` first gives HubSpot's own matcher something to find.
+ *
+ * Blank-fill only, same as every enrichment write in this department: a
+ * company that already has a website keeps it untouched. Freemail is skipped
+ * outright, see FREEMAIL_HOSTS.
+ */
+export async function ensureCompanyDomainForEmail(companyId: string, email: string | null | undefined): Promise<void> {
+  const domain = (email ?? "").split("@")[1]?.trim().toLowerCase();
+  if (!domain || FREEMAIL_HOSTS.has(domain)) return;
+
+  const live = await batchRead("companies", [companyId], ["website"]);
+  if ((live[0]?.properties?.website ?? "").trim()) return;
+
+  await request({
+    method: "PATCH",
+    path: `/crm/v3/objects/companies/${companyId}`,
+    body: { properties: { website: domain } },
+    entity: "companies",
+    operation: "upsert",
+  });
 }
