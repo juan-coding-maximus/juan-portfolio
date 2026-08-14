@@ -100,10 +100,44 @@ export function DraftActions({
   synthetic: boolean;
 }) {
   const [attached, setAttached] = useState<MarketingFile[]>([]);
+  // Decided locally, not just server-revalidated: `decideDraft` used to be a
+  // bare <form action={...}>, which gives zero on-screen feedback while it's
+  // in flight and, if it throws, fails completely silently (Juan, 2026-08-14,
+  // "dismiss and sent button dont work" — the writes were actually landing,
+  // confirmed by two drafts that really did flip to dismissed, but nothing on
+  // screen ever said so, so a click that worked and a click that did nothing
+  // were indistinguishable and both read as broken). Driving it as a plain
+  // async handler instead means every click gets a state: pending while the
+  // request is in flight, then either a visible confirmation or a visible
+  // error, never silence.
+  const [pending, setPending] = useState<"sent" | "dismissed" | null>(null);
+  const [decided, setDecided] = useState<"sent" | "dismissed" | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const waPhone = toWhatsAppPhone(phone);
   const finalBody = draft.body_md + attachmentNote(attached);
   const outlook = draft.to_email ? owaComposeLink(draft.to_email, draft.subject, finalBody) : null;
   const hasPath = Boolean(draft.to_email || waPhone);
+
+  async function decide(status: "sent" | "dismissed") {
+    setPending(status);
+    setError(null);
+    try {
+      await decideDraft(draft.id, status);
+      setDecided(status);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That didn't go through, try again.");
+    } finally {
+      setPending(null);
+    }
+  }
+
+  if (decided) {
+    return (
+      <div className="mt-3.5 text-[12px] text-[#8A928C]">
+        {decided === "sent" ? "Marked sent." : "Dismissed."}
+      </div>
+    );
+  }
 
   return (
     <div className="mt-3.5 flex flex-wrap items-center gap-2">
@@ -156,21 +190,25 @@ export function DraftActions({
       )}
 
       {hasPath && !synthetic && (
-        <form action={decideDraft.bind(null, draft.id, "sent")}>
-          <button
-            type="submit"
-            className="rounded-md border border-[#D8D4C8] px-3 py-1.5 text-[13px] text-[#3D4A44]"
-            title="Marks this sent on your word — the OS can't verify a send on either channel."
-          >
-            Mark sent
-          </button>
-        </form>
-      )}
-      <form action={decideDraft.bind(null, draft.id, "dismissed")}>
-        <button type="submit" className="rounded-md border border-[#D8D4C8] px-3 py-1.5 text-[13px] text-[#3D4A44]">
-          Dismiss
+        <button
+          type="button"
+          onClick={() => decide("sent")}
+          disabled={pending !== null}
+          className="rounded-md border border-[#D8D4C8] px-3 py-1.5 text-[13px] text-[#3D4A44] disabled:opacity-50"
+          title="Marks this sent on your word — the OS can't verify a send on either channel."
+        >
+          {pending === "sent" ? "Marking sent…" : "Mark sent"}
         </button>
-      </form>
+      )}
+      <button
+        type="button"
+        onClick={() => decide("dismissed")}
+        disabled={pending !== null}
+        className="rounded-md border border-[#D8D4C8] px-3 py-1.5 text-[13px] text-[#3D4A44] disabled:opacity-50"
+      >
+        {pending === "dismissed" ? "Dismissing…" : "Dismiss"}
+      </button>
+      {error && <span className="text-[12px] text-[#B3452C]">{error}</span>}
     </div>
   );
 }
