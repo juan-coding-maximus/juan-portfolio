@@ -93,17 +93,21 @@ function tierLabel(stop) {
  * this again" are different intentions and a widget that guesses between them
  * gets one of them wrong every time.
  *
- * ONLY ON THE STOP YOU ARE GOING TO. Twenty-one tap targets on a large widget
- * is not a richer widget, it is a smaller one: the buttons shrink under the
- * 44pt a thumb needs in a moving car. Later stops keep the single whole-row tap
- * into turn-by-turn, which is the one thing you want from a stop you are
- * skipping ahead to.
+ * ON EVERY VISIBLE STOP (Juan, 2026-08-14, looking at it on the phone). The
+ * first cut put them on the hero only, reasoning that twelve tap targets would
+ * shrink below the 44pt a thumb needs in a moving car. On the actual screen
+ * there is room: four stops with a compact row each still clear that, and the
+ * decision "call this one before driving" is one you make about stop 3 as often
+ * as about stop 1.
+ *
+ * `compact` trades 2pt of padding and half a point of type for the fourth row
+ * fitting. It is only used where four rows have to coexist.
  *
  * A button whose fact is missing is not drawn. There is no greyed-out Call on
  * an account with no phone on file: an unusable control reads as a broken app,
  * and its absence already says "no number here" to anyone who would have tapped.
  */
-function actionRow(on, stop) {
+function actionRow(on, stop, { compact = false } = {}) {
   const row = on.addStack();
   row.centerAlignContent();
 
@@ -111,20 +115,35 @@ function actionRow(on, stop) {
     const b = row.addStack();
     b.url = url;
     b.centerAlignContent();
-    b.setPadding(6, 10, 6, 10);
+    if (compact) b.setPadding(4, 8, 4, 8);
+    else b.setPadding(6, 10, 6, 10);
     b.cornerRadius = 7;
     b.backgroundColor = filled ? GREEN : Color.dynamic(new Color("#ECEAE1"), new Color("#232C27"));
     const t = b.addText(label);
-    t.font = Font.semiboldSystemFont(11.5);
+    t.font = Font.semiboldSystemFont(compact ? 10.5 : 11.5);
     t.textColor = filled ? new Color("#FFFFFF") : INK;
-    row.addSpacer(6);
+    row.addSpacer(compact ? 5 : 6);
   };
 
   pill("GO", stop.maps_url, true);
   if (stop.call_url) pill("Call", stop.call_url, false);
-  if (stop.account_url) pill("See account", stop.account_url, false);
+  if (stop.account_url) pill(compact ? "Account" : "See account", stop.account_url, false);
   row.addSpacer();
   return row;
+}
+
+/**
+ * How old what you are reading is.
+ *
+ * iOS decides when a widget redraws, not the script, so the honest thing a
+ * widget can do about staleness is show it rather than promise freshness it
+ * does not control. Server time from the payload, not the phone's clock at
+ * render: it answers "when was this route actually read", which is the question.
+ */
+function stamp(w, data) {
+  const at = new Date(data.generated_at);
+  const t = at.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  txt(w, `as of ${t}`, { size: 9.5, color: FAINT });
 }
 
 function header(w, data, { compact = false } = {}) {
@@ -230,16 +249,20 @@ function renderMedium(w, data) {
     }
   }
   w.addSpacer();
+  stamp(w, data);
   w.url = `${NB.base}/nutribiotic/map`;
 }
 
 /* -------------------------------------------------------------------- large */
-/* The whole day, as far as it fits, with the facts that decide a stop at the
-   curb. Every row is its own tap target straight into turn-by-turn. */
+/* Four stops, each with the facts that decide it at the curb and its own GO,
+   Call and Account. Type and padding are tuned down from the medium family for
+   one reason: four button rows have to fit a fixed canvas that cannot scroll,
+   and a fourth stop clipped off the bottom is worse than a slightly smaller
+   third one. */
 function renderLarge(w, data) {
   header(w, data);
   if (data.count === 0) return renderEmpty(w);
-  w.addSpacer(8);
+  w.addSpacer(6);
 
   /* FOUR (Juan, 2026-08-14), and four is the end of it: a widget cannot scroll.
      WidgetKit renders a static snapshot whose only interaction is a tap target,
@@ -249,44 +272,43 @@ function renderLarge(w, data) {
   const shown = data.stops.slice(0, 4);
   shown.forEach((s, i) => {
     if (i > 0) {
-      w.addSpacer(5);
+      w.addSpacer(4);
       divider(w);
-      w.addSpacer(5);
+      w.addSpacer(4);
     }
     const row = w.addStack();
     row.topAlignContent();
-    chip(row, s, 20);
-    row.addSpacer(8);
+    chip(row, s, 18);
+    row.addSpacer(7);
 
     const col = row.addStack();
     col.layoutVertically();
     const nameRow = col.addStack();
     nameRow.centerAlignContent();
-    txt(nameRow, s.name, { size: 13.5, bold: true });
+    txt(nameRow, s.name, { size: 12.5, bold: true });
     const tier = tierLabel(s);
     if (tier) {
-      nameRow.addSpacer(6);
-      txt(nameRow, tier, { size: 9, color: s.type === "custom" ? AMBER : GREEN, bold: true });
+      nameRow.addSpacer(5);
+      txt(nameRow, tier, { size: 8.5, color: s.type === "custom" ? AMBER : GREEN, bold: true });
     }
     const sub = [s.address, s.city].filter(Boolean).join(", ");
-    if (sub) txt(col, sub, { size: 10.5, color: MUTED });
+    if (sub) txt(col, sub, { size: 9.5, color: MUTED });
     if (s.type === "account") {
       const cat = s.top_category_12m || s.top_category_lifetime;
-      txt(col, [moneyLine(s), cat].filter(Boolean).join("  ·  "), { size: 10, color: FAINT });
+      txt(col, [moneyLine(s), cat].filter(Boolean).join("  ·  "), { size: 9.5, color: FAINT });
     }
 
     row.addSpacer();
     if (s.straight_line_miles_from_prev !== null)
-      txt(row, `${s.straight_line_miles_from_prev} mi`, { size: 10, color: FAINT });
+      txt(row, `${s.straight_line_miles_from_prev} mi`, { size: 9.5, color: FAINT });
 
-    // The stop you are going to gets the buttons; the ones after it keep the
-    // single whole-row tap into turn-by-turn. See actionRow.
-    if (i === 0) {
-      w.addSpacer(7);
-      actionRow(w, s);
-    } else {
-      row.url = s.maps_url;
-    }
+    /* Buttons on every visible stop (Juan, 2026-08-14). No whole-row tap any
+       more: with an explicit GO on the row, a second invisible one covering the
+       text is a target you hit by accident, never on purpose. */
+    w.addSpacer(5);
+    const actions = w.addStack();
+    actions.addSpacer(25); // clears the number chip, so the pills line up under the name
+    actionRow(actions, s, { compact: true });
   });
 
   /* The rest of the day, as a tap rather than a scroll that cannot exist. Its
@@ -309,6 +331,7 @@ function renderLarge(w, data) {
     more.addSpacer();
   }
   w.addSpacer();
+  stamp(w, data);
   w.url = `${NB.base}/nutribiotic/map`;
 }
 
@@ -365,7 +388,18 @@ if (!accessory) {
   widget.backgroundColor = PAPER;
   widget.setPadding(13, 14, 13, 14);
 }
-widget.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000);
+/* AS SOON AS iOS WILL ALLOW (Juan asked for instant, 2026-08-14).
+ *
+ * This is a request, not a schedule. WidgetKit treats refreshAfterDate as "not
+ * before this", then decides for itself using a daily budget it allocates per
+ * widget, so asking for one minute does not buy sixty refreshes an hour, it
+ * just guarantees the widget is always eligible the moment the system is
+ * willing. Two minutes is the floor worth asking for; in practice expect a
+ * redraw every few minutes, sooner right after you have used the phone.
+ *
+ * Which is exactly why stamp() prints the read time on the widget. A widget
+ * that cannot promise freshness should at least never hide staleness. */
+widget.refreshAfterDate = new Date(Date.now() + 2 * 60 * 1000);
 
 try {
   const data = await fetchRoute();
