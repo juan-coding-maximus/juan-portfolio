@@ -25,6 +25,7 @@ import {
   listAreas,
   listDeals,
   listStaleDeals,
+  listTerritoryAccountIds,
   isConfigured,
 } from "../lib/dal";
 import { AccountLink } from "../lib/modal";
@@ -55,12 +56,23 @@ export default async function Clients({
 }) {
   const sp = await searchParams;
 
-  const [areas, deals, stale, criteria] = await Promise.all([
+  const [areas, dealsRaw, staleRaw, criteria, territoryIds] = await Promise.all([
     listAreas(),
     listDeals(),
-    listStaleDeals(20),
+    // Over-fetch, then filter to territory below, so a other-rep deal filling
+    // this list doesn't crowd out one of Juan's that would've made the top 20.
+    listStaleDeals(150),
     loadCriteria(),
+    listTerritoryAccountIds(),
   ]);
+  /* NEITHER nb_deals NOR nb_v_pipeline_stale carries hubspot_owner_id (the
+     portal is shared with another rep), so both reads above are portal-wide
+     until filtered here. See listTerritoryAccountIds' doc comment. */
+  const deals = { ...dealsRaw, data: dealsRaw.data.filter((d) => territoryIds.has(d.account_id)) };
+  const stale = {
+    ...staleRaw,
+    data: staleRaw.data.filter((s) => territoryIds.has(s.account_id)).slice(0, 20),
+  };
   /* An unknown ?area= is dropped rather than 404'd or passed through. A stale
      bookmark from before the areas were redrawn should land on the whole territory,
      not on an empty table that reads as "you have no accounts here". */

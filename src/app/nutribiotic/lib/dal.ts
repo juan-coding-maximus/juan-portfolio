@@ -1214,6 +1214,22 @@ export async function listOwnerAccounts(ownerName = "Juan Arenas Martin"): Promi
   };
 }
 
+/**
+ * Account ids in Juan's SoCal territory, same scope as listAccounts (owner,
+ * not chain/practice-excluded, not closed, not a waypoint) but with no area or
+ * row-count limit. Exists because nb_deals and nb_v_pipeline_stale carry no
+ * hubspot_owner_id column at all — the portal is shared with another rep, so
+ * without this, the pipeline board and weekly review on /clients would surface
+ * that rep's deals right alongside Juan's.
+ */
+export async function listTerritoryAccountIds(): Promise<Set<string>> {
+  const rows = await raw<{ id: string }>(
+    `nb_accounts?select=id&hubspot_owner_id=eq.${JUAN_OWNER_ID}&chain_excluded=eq.false` +
+      `&practice_excluded=eq.false&closed_at=is.null&lifecycle=neq.waypoint&limit=2000`,
+  );
+  return new Set(rows.map((r) => r.id));
+}
+
 /** How many of ownerName's accounts exist locally but have no verified pin yet. */
 export async function countOwnerWithoutCoordinates(ownerName = "Juan Arenas Martin"): Promise<number> {
   const rows = await raw<{ id: string }>(
