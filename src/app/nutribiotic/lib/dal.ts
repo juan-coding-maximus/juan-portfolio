@@ -219,7 +219,7 @@ export type TierRow = {
  * confidently-ranked pile of noise as a work queue.
  */
 export async function listAccounts(
-  opts: { area?: string | null; limit?: number } = {},
+  opts: { area?: string | null; limit?: number; sort?: "tier" | "engagement" } = {},
 ): Promise<Result<TierRow>> {
   /* SCOPED TO JUAN'S BOOK, and this is a correction rather than a feature. The page
      is titled "Territory" and was showing all 459 CA accounts: 118 of them are in
@@ -242,7 +242,14 @@ export async function listAccounts(
     // And waypoints, which are not customers at all (0029): Juan's apartment
     // is on the map to be routed through, not counted as territory.
     lifecycle: "neq.waypoint",
-    order: "tier.asc,fit_confidence.desc,fit.desc",
+    // "Most engaged" is a Juan-requested override, not a second default: it drops
+    // OS tier as the primary key entirely, so an under-known A can sit below a
+    // well-measured D. Fine for "who's actually talking to me right now", wrong
+    // as the resting order of a work queue.
+    order:
+      opts.sort === "engagement"
+        ? "engagement.desc.nullslast,tier.asc"
+        : "tier.asc,fit_confidence.desc,fit.desc",
     limit: opts.limit ?? 500,
   };
   if (opts.area) params.area = `eq.${opts.area}`;

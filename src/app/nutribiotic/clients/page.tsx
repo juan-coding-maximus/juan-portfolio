@@ -51,7 +51,7 @@ const ORDER = ["identified", "contacted", "discovery", "sampled", "trial", "stoc
 export default async function Clients({
   searchParams,
 }: {
-  searchParams: Promise<{ area?: string }>;
+  searchParams: Promise<{ area?: string; sort?: string }>;
 }) {
   const sp = await searchParams;
 
@@ -65,8 +65,13 @@ export default async function Clients({
      bookmark from before the areas were redrawn should land on the whole territory,
      not on an empty table that reads as "you have no accounts here". */
   const area = areas.find((a) => a.id === sp.area) ?? null;
-  const accounts = await listAccounts({ area: area?.id ?? null });
+  const byEngagement = sp.sort === "engagement";
+  const accounts = await listAccounts({
+    area: area?.id ?? null,
+    sort: byEngagement ? "engagement" : "tier",
+  });
   const rows = accounts.data;
+  const areaQuery = area ? `area=${area.id}` : "";
 
   const byTier = { A: 0, B: 0, C: 0, D: 0 } as Record<string, number>;
   for (const r of rows) {
@@ -217,17 +222,45 @@ export default async function Clients({
           {/* Named "OS tier", not "tier". The letter HubSpot shows on the same
               company is potential__cloned_ (A-G, HQ's own scale) and it disagrees
               with this one on 214 of the 273 accounts by design. */}
-          <div className="mb-5 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[12.5px] text-[#5B6560]">
-            <span>{rows.length} accounts</span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="text-[#8A928C]">OS tier</span>
-              {(["A", "B", "C", "D"] as const).map((t) => (
-                <span key={t} className="inline-flex items-center gap-1.5">
-                  <TierChip tier={t} />
-                  {byTier[t] ?? 0}
-                </span>
-              ))}
-            </span>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-x-5 gap-y-1.5">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[12.5px] text-[#5B6560]">
+              <span>{rows.length} accounts</span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="text-[#8A928C]">OS tier</span>
+                {(["A", "B", "C", "D"] as const).map((t) => (
+                  <span key={t} className="inline-flex items-center gap-1.5">
+                    <TierChip tier={t} />
+                    {byTier[t] ?? 0}
+                  </span>
+                ))}
+              </span>
+            </div>
+            {/* Overrides the resting order (tier, then confidence) with a straight
+                engagement ranking. A separate link rather than a clickable column
+                header because this isn't a generic sortable table, it's one named
+                escape hatch from a deliberate default (see the header comment). */}
+            <div className="flex items-center gap-1 text-[12px]">
+              <Link
+                href={`/nutribiotic/clients${areaQuery ? `?${areaQuery}` : ""}`}
+                className={`rounded-md border px-2.5 py-1 transition-colors ${
+                  !byEngagement
+                    ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
+                    : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
+                }`}
+              >
+                OS tier
+              </Link>
+              <Link
+                href={`/nutribiotic/clients?${[areaQuery, "sort=engagement"].filter(Boolean).join("&")}`}
+                className={`rounded-md border px-2.5 py-1 transition-colors ${
+                  byEngagement
+                    ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
+                    : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
+                }`}
+              >
+                Most engaged
+              </Link>
+            </div>
           </div>
 
           <div className="overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
