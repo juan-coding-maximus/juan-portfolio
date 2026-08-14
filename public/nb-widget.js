@@ -87,6 +87,46 @@ function tierLabel(stop) {
   return stop.tier ? `TIER ${stop.tier}` : null;
 }
 
+/**
+ * The three things a stop is for (Juan, 2026-08-14): drive to it, call it, read
+ * it. Explicit buttons rather than one whole-row tap, because "GO" and "who is
+ * this again" are different intentions and a widget that guesses between them
+ * gets one of them wrong every time.
+ *
+ * ONLY ON THE STOP YOU ARE GOING TO. Twenty-one tap targets on a large widget
+ * is not a richer widget, it is a smaller one: the buttons shrink under the
+ * 44pt a thumb needs in a moving car. Later stops keep the single whole-row tap
+ * into turn-by-turn, which is the one thing you want from a stop you are
+ * skipping ahead to.
+ *
+ * A button whose fact is missing is not drawn. There is no greyed-out Call on
+ * an account with no phone on file: an unusable control reads as a broken app,
+ * and its absence already says "no number here" to anyone who would have tapped.
+ */
+function actionRow(on, stop) {
+  const row = on.addStack();
+  row.centerAlignContent();
+
+  const pill = (label, url, filled) => {
+    const b = row.addStack();
+    b.url = url;
+    b.centerAlignContent();
+    b.setPadding(6, 10, 6, 10);
+    b.cornerRadius = 7;
+    b.backgroundColor = filled ? GREEN : Color.dynamic(new Color("#ECEAE1"), new Color("#232C27"));
+    const t = b.addText(label);
+    t.font = Font.semiboldSystemFont(11.5);
+    t.textColor = filled ? new Color("#FFFFFF") : INK;
+    row.addSpacer(6);
+  };
+
+  pill("GO", stop.maps_url, true);
+  if (stop.call_url) pill("Call", stop.call_url, false);
+  if (stop.account_url) pill("See account", stop.account_url, false);
+  row.addSpacer();
+  return row;
+}
+
 function header(w, data, { compact = false } = {}) {
   const row = w.addStack();
   row.centerAlignContent();
@@ -167,11 +207,13 @@ function renderMedium(w, data) {
     txt(col, line, { size: 10, color: FAINT });
   }
   top.addSpacer();
-  top.url = s.maps_url;
+
+  w.addSpacer(8);
+  actionRow(w, s);
 
   const rest = data.stops.slice(1, 3);
   if (rest.length) {
-    w.addSpacer(7);
+    w.addSpacer(8);
     divider(w);
     w.addSpacer(6);
     for (const r of rest) {
@@ -199,7 +241,9 @@ function renderLarge(w, data) {
   if (data.count === 0) return renderEmpty(w);
   w.addSpacer(8);
 
-  const shown = data.stops.slice(0, 7);
+  /* Six, not seven: the hero's button row costs about one stop's height, and a
+     seventh line squeezed under it is a line you cannot read anyway. */
+  const shown = data.stops.slice(0, 6);
   shown.forEach((s, i) => {
     if (i > 0) {
       w.addSpacer(5);
@@ -231,7 +275,15 @@ function renderLarge(w, data) {
     row.addSpacer();
     if (s.straight_line_miles_from_prev !== null)
       txt(row, `${s.straight_line_miles_from_prev} mi`, { size: 10, color: FAINT });
-    row.url = s.maps_url;
+
+    // The stop you are going to gets the buttons; the ones after it keep the
+    // single whole-row tap into turn-by-turn. See actionRow.
+    if (i === 0) {
+      w.addSpacer(7);
+      actionRow(w, s);
+    } else {
+      row.url = s.maps_url;
+    }
   });
 
   if (data.count > shown.length) {

@@ -67,9 +67,34 @@ type Stop = {
   top_category_lifetime: string | null;
   /** Straight-line miles from the previous stop. Null on the first. */
   straight_line_miles_from_prev: number | null;
+  /* THE THREE THINGS A STOP IS FOR (Juan, 2026-08-14): drive to it, call it,
+     read it. Each is a whole URL rather than a piece the widget assembles,
+     because a deep link built in two places is a deep link that breaks in one
+     of them. call_url and account_url are null when the fact is missing, and a
+     null renders as no button, never as a dead one. */
   maps_url: string;
+  call_url: string | null;
   account_url: string | null;
 };
+
+/**
+ * Apple Maps by ADDRESS, not by coordinate pair (Juan's ask, 2026-08-14).
+ *
+ * Coordinates drop an unnamed pin in the middle of a parking lot: correct to
+ * the metre and useless for confirming you are at the right door. An address
+ * resolves to the business card, with the name, the hours and Maps' own call
+ * button on it. The stored address is Places-verified for exactly the accounts
+ * that have a pin at all (see geocode.py's corroboration rule), so this is not
+ * trading precision for a guess.
+ *
+ * Coordinates remain the fallback, and remain what the whole-route link uses,
+ * where a dozen addresses would blow past the URL length Apple accepts.
+ */
+function mapsUrl(a: { street: string | null; city: string | null; state: string | null; postal: string | null; lat: number; lng: number }): string {
+  const address = [a.street, a.city, a.state, a.postal].filter(Boolean).join(", ");
+  const daddr = a.street && a.city ? encodeURIComponent(address) : `${a.lat},${a.lng}`;
+  return `https://maps.apple.com/?daddr=${daddr}`;
+}
 
 export async function GET() {
   if (!(await hasWidgetToken()) && !(await hasValidSession())) {
@@ -102,7 +127,10 @@ export async function GET() {
         top_category_12m: null,
         top_category_lifetime: null,
         straight_line_miles_from_prev: null,
-        maps_url: `https://maps.apple.com/?daddr=${e.lat},${e.lng}`,
+        /* A custom stop's address IS its identity (it was resolved from Places
+           when it was added and then frozen), so it deep-links by address too. */
+        maps_url: `https://maps.apple.com/?daddr=${encodeURIComponent(e.address)}`,
+        call_url: null,
         account_url: null,
       });
       continue;
@@ -129,7 +157,8 @@ export async function GET() {
       top_category_12m: a.top_category_12m,
       top_category_lifetime: a.top_category_lifetime,
       straight_line_miles_from_prev: null,
-      maps_url: `https://maps.apple.com/?daddr=${a.lat},${a.lng}`,
+      maps_url: mapsUrl(a),
+      call_url: a.phone ? `tel:${a.phone.replace(/[^\d+]/g, "")}` : null,
       account_url: `${SITE}/nutribiotic/account/${a.id}`,
     });
   }
