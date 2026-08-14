@@ -10,6 +10,12 @@ import { Ico } from "./lib/ui";
 export const metadata: Metadata = {
   title: "NutriBiotic OS",
   robots: { index: false, follow: false },
+  /* Added to Home Screen, this opens standalone: no address bar, no tab strip,
+     which on a phone held at a door is the difference between a tool and a web
+     page. The eight-hour session cookie survives it, so it is not a PIN prompt
+     every morning. Icon comes from apple-icon.tsx in this segment. See
+     /nutribiotic/widget for the install steps Juan follows once. */
+  appleWebApp: { capable: true, title: "NutriBiotic", statusBarStyle: "default" },
 };
 
 // Every read is request-time; nothing here may be statically cached.

@@ -36,6 +36,14 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // The home-screen icon (apple-icon.tsx). iOS fetches it while adding the page
+  // to the Home Screen and again on later refreshes, sometimes outside Safari's
+  // cookie jar; a redirect to the gate there yields a blank grey icon. It is a
+  // generated wordmark with no data behind it, so it costs nothing to serve.
+  if (pathname === "/nutribiotic/apple-icon") {
+    return NextResponse.next();
+  }
+
   // The buyer surface. A store owner holding a handwritten card must never
   // meet a PIN, so /nutribiotic/promo/* passes with no cookie. What keeps it
   // safe is the shape of its data access, not this file: promo-public.ts

@@ -36,7 +36,7 @@
 import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
-import { hasValidSession } from "./session";
+import { hasValidSession, hasWidgetToken } from "./session";
 
 const SB_URL = process.env.NB_SUPABASE_URL ?? "";
 const SB_KEY = process.env.NB_SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -77,13 +77,25 @@ export const verifySession = cache(async (): Promise<true> => {
   return true;
 });
 
+/**
+ * The gate on reads, which is the same gate plus one narrower key: the home
+ * screen widget's NB_WIDGET_TOKEN (see session.ts). Split from verifySession
+ * rather than folded into it so the widget's bearer can never reach mutate(),
+ * which still demands a real session. A read-only token is only read-only if
+ * something enforces it.
+ */
+const verifyReadAccess = cache(async (): Promise<true> => {
+  if (await hasWidgetToken()) return true;
+  return verifySession();
+});
+
 type QueryOpts = Record<string, string | number | undefined>;
 
 async function query<T extends { origin?: Origin }>(
   table: string,
   opts: QueryOpts = {},
 ): Promise<Result<T>> {
-  await verifySession();
+  await verifyReadAccess();
 
   if (!isConfigured()) {
     // Degrade honestly. An unconfigured backend returns nothing; it never
@@ -971,7 +983,7 @@ export type ImportBatch = {
 };
 
 async function raw<T>(path: string): Promise<T[]> {
-  await verifySession();
+  await verifyReadAccess();
   if (!isConfigured()) return [];
   const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
     headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Accept: "application/json" },

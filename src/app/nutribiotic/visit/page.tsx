@@ -15,7 +15,10 @@ import { CalendarProposalRow, RecordVisit, TouchpointCapture } from "../lib/touc
 import { Empty, PageHead } from "../lib/ui";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Visit · NutriBiotic OS" };
+/* appleWebApp.title is what the home-screen icon is labelled when this exact
+   screen is the one added, which is the point of adding it: a "Visit" icon that
+   lands on capture, not a "NutriBiotic" icon that lands on the map. */
+export const metadata = { title: "Visit · NutriBiotic OS", appleWebApp: { title: "Visit" } };
 
 export default async function VisitPage() {
   const [proposals, unfiled] = await Promise.all([

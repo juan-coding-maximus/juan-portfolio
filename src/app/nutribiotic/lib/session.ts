@@ -119,6 +119,27 @@ export async function hasValidSession(): Promise<boolean> {
 }
 
 /**
+ * The home-screen widget's own proof (NB_WIDGET_TOKEN), and a READ-ONLY one.
+ *
+ * A widget on a phone cannot hold a cookie, so it has to carry a secret. It
+ * deliberately does not carry THIS module's secret: NB_SESSION_SECRET signs the
+ * session cookie and unlocks the Mac bridges' write endpoints, so a copy of it
+ * in a Scriptable script would be a session-minting key living in a pocket,
+ * revocable only by logging Juan out of everything.
+ *
+ * So this is a second, separate bearer, recognized by dal.ts on READS ONLY
+ * (query(), never mutate()). Worst case if it leaks: someone learns which
+ * stores Juan planned to visit, and the token is rotated in Vercel with no
+ * other consequence.
+ */
+export async function hasWidgetToken(): Promise<boolean> {
+  const token = process.env.NB_WIDGET_TOKEN;
+  if (!token) return false;
+  const hdrs = await headers();
+  return timingSafeEqual(hdrs.get("authorization") ?? "", `Bearer ${token}`);
+}
+
+/**
  * Lockout state.
  *
  * In-memory, which is the honest choice for a single-user tool on serverless:
