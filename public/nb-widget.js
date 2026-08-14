@@ -65,17 +65,20 @@ function chip(on, stop, size) {
   return box;
 }
 
-/** The one money line a stop gets on a phone held at arm's length. Each figure
- *  is dropped when unknown; "never ordered" and "$0" are different sentences. */
+/** The one money line a stop gets on a phone held at arm's length.
+ *
+ *  ONE FIGURE, NOT THE PANEL'S THREE, and which one is a judgement the panel
+ *  does not have to make: an account that has bought this year is described by
+ *  what it bought this year, and one that has not is described by its lifetime,
+ *  with the last-order month right beside it saying how long ago that was.
+ *  A trailing-12m of exactly $0 is a real value and falls to the lifetime arm
+ *  rather than rendering as "12m $0", which reads as a dead account next to a
+ *  date that already says so. Absent stays absent; nothing here shows a zero
+ *  in place of a fact we do not hold. */
 function moneyLine(stop) {
-  const bits = [];
-  bits.push(stop.last_order_at ? monthYear(stop.last_order_at) : "never ordered");
-  const m12 = usd(stop.trailing_12m_revenue);
-  if (m12) bits.push(`12m ${m12}`);
-  else {
-    const life = usd(stop.lifetime_revenue);
-    if (life) bits.push(`life ${life}`);
-  }
+  const bits = [stop.last_order_at ? monthYear(stop.last_order_at) : "never ordered"];
+  if (stop.trailing_12m_revenue) bits.push(`12m ${usd(stop.trailing_12m_revenue)}`);
+  else if (stop.lifetime_revenue) bits.push(`life ${usd(stop.lifetime_revenue)}`);
   return bits.join("  ·  ");
 }
 
@@ -226,14 +229,8 @@ function renderLarge(w, data) {
     }
 
     row.addSpacer();
-    if (s.straight_line_miles_from_prev !== null) {
-      const leg = row.addStack();
-      leg.layoutVertically();
-      const t = leg.addText(`${s.straight_line_miles_from_prev} mi`);
-      t.font = Font.systemFont(10);
-      t.textColor = FAINT;
-      t.rightAlignText();
-    }
+    if (s.straight_line_miles_from_prev !== null)
+      txt(row, `${s.straight_line_miles_from_prev} mi`, { size: 10, color: FAINT });
     row.url = s.maps_url;
   });
 
