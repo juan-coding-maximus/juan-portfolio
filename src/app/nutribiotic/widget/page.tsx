@@ -1,6 +1,9 @@
 /**
- * Phone. Two things that put the OS on Juan's home screen without a browser
+ * Home screen. Two things that put the OS on Juan's phone without a browser
  * around it: the route as a real WidgetKit widget, and Visit as an icon.
+ *
+ * NOT called "Phone", which is already a nav tab and a different thing (the
+ * offer-code screen a rep works from in a parking lot).
  *
  * WHY THE TOKEN IS RENDERED HERE. The widget has to carry a bearer, and the
  * ways to hand Juan a secret are all bad except one: paste it into a chat (it
@@ -17,7 +20,7 @@ import { Card, Ico, PageHead } from "../lib/ui";
 import { CopyBlock } from "./CopyBlock";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Phone · NutriBiotic OS" };
+export const metadata = { title: "Home screen · NutriBiotic OS" };
 
 const SITE = "https://juanarenas.bio";
 
@@ -55,8 +58,8 @@ export default async function WidgetSetupPage() {
   return (
     <>
       <PageHead
-        title="Phone"
-        sub="The route on the home screen, and Visit as an icon. Both point at this OS; neither is a second copy of it."
+        title="Home screen"
+        sub="The route as a widget, and Visit as an icon. Both point at this OS; neither is a second copy of it."
       />
 
       <div className="flex max-w-[720px] flex-col gap-9">
