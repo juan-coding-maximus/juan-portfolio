@@ -21,7 +21,6 @@ import {
   PhoneDisplay,
   absoluteUrl,
   daysAgo,
-  exactDate,
   money,
   prettyPhone,
   prettyUrl,
@@ -215,35 +214,48 @@ export function AccountDetailBody({
           </Card>
         )}
 
-        {/* Purchases. Exact orders and dates, for the 146 of 459 accounts with
-            loaded order history; absent entirely otherwise (see
-            listPurchases in dal.ts), same honesty rule as every other card
-            here: no orders on file is silence, not a zero. */}
-        {orders.length > 0 && (
-          <Card>
-            <div className="mb-3 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">Purchases</div>
-            <ul className="flex flex-col gap-3">
-              {orders.map((o) => {
-                const items = lines.filter((l) => l.order_id === o.id);
-                return (
-                  <li key={o.id} className="text-[13.5px]">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="font-medium">{exactDate(o.ordered_at)}</span>
-                      <span className="tabular-nums text-[#5B6560]">{money(o.revenue_cents / 100)}</span>
-                    </div>
-                    {items.length > 0 && (
-                      <div className="mt-0.5 leading-relaxed text-[12.5px] text-[#5B6560]">
-                        {items
-                          .map((l) => `${l.product_name ?? "item"}${l.qty ? ` ×${l.qty}` : ""}`)
-                          .join(", ")}
-                      </div>
-                    )}
+        {/* Purchases. Every item this account has ever ordered, summed to net
+            units across the full order history and ranked most-to-least, for
+            the 146 of 459 accounts with loaded order history; absent entirely
+            otherwise (see listPurchases in dal.ts), same honesty rule as
+            every other card here: no orders on file is silence, not a zero.
+            Summing net (not gross) matters: a credit line has negative qty,
+            and a return should pull an item's rank down, not inflate it. */}
+        {orders.length > 0 && (() => {
+          const totals = new Map<string, { qty: number; revenueCents: number }>();
+          for (const l of lines) {
+            const name = l.product_name ?? "Item";
+            const prev = totals.get(name) ?? { qty: 0, revenueCents: 0 };
+            totals.set(name, {
+              qty: prev.qty + (l.qty ?? 0),
+              revenueCents: prev.revenueCents + l.line_revenue_cents,
+            });
+          }
+          const items = [...totals.entries()]
+            .filter(([, t]) => t.qty !== 0)
+            .sort((a, b) => b[1].qty - a[1].qty);
+
+          return (
+            <Card>
+              <div className="mb-3 flex items-baseline justify-between gap-3 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
+                <span>Purchases</span>
+                <span className="normal-case tracking-normal">
+                  {orders.length} order{orders.length === 1 ? "" : "s"} · most units first
+                </span>
+              </div>
+              <ul className="flex flex-col divide-y divide-[#EDEBE3]">
+                {items.map(([name, t]) => (
+                  <li key={name} className="flex items-baseline justify-between gap-3 py-1.5 text-[13.5px]">
+                    <span>{name}</span>
+                    <span className="shrink-0 tabular-nums text-[#5B6560]">
+                      ×{t.qty} <span className="text-[#8A928C]">· {money(t.revenueCents / 100)}</span>
+                    </span>
                   </li>
-                );
-              })}
-            </ul>
-          </Card>
-        )}
+                ))}
+              </ul>
+            </Card>
+          );
+        })()}
 
         {/* History. Append-only, so this is the real record. */}
         <section>

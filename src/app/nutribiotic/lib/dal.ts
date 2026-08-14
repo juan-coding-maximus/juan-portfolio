@@ -562,16 +562,19 @@ export type PurchaseLine = {
 };
 
 /**
- * The last few orders with what was actually on them, for the account profile.
+ * Full order history with what was actually on it, for the account profile.
  * Only 146 of 459 accounts have any loaded order history (nb_order_lines, see
  * migration 0015); accounts without it get an empty result, not a zero-filled
  * one. Two queries rather than one PostgREST embed: ordering top-level rows by
  * an embedded resource's column isn't reliable across PostgREST versions, and
- * this is only ever a handful of orders per account.
+ * this is only ever a handful of orders per account. limit is generous
+ * headroom, not a display cap — the profile aggregates across every order to
+ * rank items by lifetime units, so silently dropping the oldest orders would
+ * silently wrong that ranking.
  */
 export async function listPurchases(
   accountId: string,
-  limit = 8,
+  limit = 500,
 ): Promise<{ orders: PurchaseOrder[]; lines: PurchaseLine[] }> {
   const orders = await query<PurchaseOrder>("nb_orders", {
     select: "id,ordered_at,revenue_cents,order_type,origin",
