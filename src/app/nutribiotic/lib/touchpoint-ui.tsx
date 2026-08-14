@@ -36,8 +36,8 @@ export function TouchpointCapture() {
       />
       <div className="mt-2 flex items-center justify-between gap-3">
         <p className="max-w-[46ch] text-[11.5px] leading-snug text-[#8A928C]">
-          Becomes an activity log entry and contact detail right away. Any follow-up it hears goes below for you to
-          approve before it touches your calendar.
+          Log what just happened, typed or recorded. It becomes an activity log entry and contact detail right
+          away; any follow-up it hears waits below for your approval before it touches your calendar or HubSpot.
         </p>
         <button
           onClick={submit}
