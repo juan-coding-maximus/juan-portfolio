@@ -20,7 +20,7 @@
  */
 
 import type { MapAccount } from "../lib/dal";
-import { Ico, TierChip } from "../lib/ui";
+import { appleMapsUrl, fullAddress, Ico, TierChip } from "../lib/ui";
 import { AccountLink } from "../lib/modal";
 import type { LocStatus, UserLoc } from "./MapScreen";
 
@@ -223,7 +223,7 @@ export function NearestClients({
                   <Ico name="locate" size={13} />
                 </button>
                 <a
-                  href={`https://maps.apple.com/?daddr=${a.lat},${a.lng}`}
+                  href={appleMapsUrl({ address: fullAddress(a), lat: a.lat, lng: a.lng })}
                   className="flex items-center gap-1.5 rounded-md bg-[#2C6A46] px-3.5 py-2.5 text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90"
                 >
                   <Ico name="pin" size={13} />

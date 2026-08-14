@@ -74,6 +74,43 @@ const ICONS: Record<string, ReactNode> = {
 export const HUBSPOT_COMPANY_URL = (hubspotId: string) =>
   `https://app-eu1.hubspot.com/contacts/148711228/record/0-2/${hubspotId}`;
 
+/**
+ * The one place a GO button's destination is built, for the same reason the
+ * HubSpot URL has one: a dead deep link is discovered in a parked car.
+ *
+ * BY ADDRESS WHEN THERE IS ONE (Juan, 2026-08-14). A coordinate pair drops an
+ * unnamed pin in the middle of a parking lot: exact to the metre and no help at
+ * all in confirming you are at the right door. An address resolves to the
+ * business card, with the name, the hours, and Maps' own call button on it. The
+ * addresses this passes are Places-verified for exactly the accounts that have
+ * a pin at all (see geocode.py's corroboration rule), so this is not precision
+ * traded away for a guess, and coordinates remain the fallback when a record is
+ * missing a street or a city.
+ *
+ * A MULTI-STOP ROUTE STILL USES COORDINATES. Apple caps the query it accepts,
+ * and a dozen spelled-out addresses blow past it; see RoutePanel.
+ */
+export function appleMapsUrl(dest: { address?: string | null; lat: number; lng: number }): string {
+  const address = dest.address?.trim();
+  return `https://maps.apple.com/?daddr=${address ? encodeURIComponent(address) : `${dest.lat},${dest.lng}`}`;
+}
+
+/**
+ * "621 RUSHING CREEK PL, THOUSAND OAKS, CA, 91360", or null when the record is
+ * too thin to name a place. Street AND city are both required: "CA, 91360"
+ * alone geocodes to a postal centroid, which is the very thing the coordinate
+ * fallback is better at.
+ */
+export function fullAddress(a: {
+  street: string | null;
+  city: string | null;
+  state: string | null;
+  postal: string | null;
+}): string | null {
+  if (!a.street || !a.city) return null;
+  return [a.street, a.city, a.state, a.postal].filter(Boolean).join(", ");
+}
+
 export function Ico({ name, size = 16 }: { name: string; size?: number }) {
   return (
     <svg

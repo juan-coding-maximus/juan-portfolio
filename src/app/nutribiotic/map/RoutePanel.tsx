@@ -23,7 +23,7 @@
 
 import { useState } from "react";
 import type { CustomStop, CustomStopKind } from "../lib/dal";
-import { CUSTOM_STOP_LABEL, Ico, ReachLinks, TierChip } from "../lib/ui";
+import { appleMapsUrl, CUSTOM_STOP_LABEL, fullAddress, Ico, ReachLinks, TierChip } from "../lib/ui";
 import { AccountLink } from "../lib/modal";
 import { resolveStopAddress } from "../lib/stop-actions";
 import type { RouteStopView } from "./MapScreen";
@@ -413,7 +413,11 @@ export function RoutePanel({
                     <Ico name="locate" size={13} />
                   </button>
                   <a
-                    href={`https://maps.apple.com/?daddr=${s.lat},${s.lng}`}
+                    href={appleMapsUrl({
+                      address: c ? c.address : fullAddress(a!),
+                      lat: s.lat,
+                      lng: s.lng,
+                    })}
                     className="rounded-md bg-[#2C6A46] px-3 py-2 text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90"
                   >
                     GO

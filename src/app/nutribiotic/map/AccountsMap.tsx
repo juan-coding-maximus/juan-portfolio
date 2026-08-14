@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GoogleMap, MarkerF, InfoWindowF, PolygonF, useLoadScript } from "@react-google-maps/api";
 import type { CustomStop, MapAccount, TerritoryArea, Tier } from "../lib/dal";
 import { AccountLink } from "../lib/modal";
-import { CUSTOM_STOP_LABEL, Ico, ReachLinks, realChannel } from "../lib/ui";
+import { appleMapsUrl, CUSTOM_STOP_LABEL, Ico, ReachLinks, realChannel } from "../lib/ui";
 import type { FocusRequest } from "./MapScreen";
 
 const CONTAINER_STYLE = { width: "100%", height: "100%" };
@@ -738,7 +738,7 @@ export function AccountsMap({
                   {CUSTOM_STOP_LABEL[selectedStop.kind]} · on your route
                 </div>
                 <a
-                  href={`https://maps.apple.com/?daddr=${selectedStop.lat},${selectedStop.lng}`}
+                  href={appleMapsUrl(selectedStop)}
                   className="mt-2 flex w-full items-center justify-center rounded-md bg-[#2C6A46] px-3 py-2 text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90"
                 >
                   GO

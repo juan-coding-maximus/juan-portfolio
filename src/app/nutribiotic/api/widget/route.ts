@@ -26,7 +26,7 @@
  */
 import { getRouteDraft, listOwnerAccounts, type CustomStop, type MapAccount } from "../../lib/dal";
 import { hasValidSession, hasWidgetToken } from "../../lib/session";
-import { HUBSPOT_COMPANY_URL } from "../../lib/ui";
+import { appleMapsUrl, fullAddress, HUBSPOT_COMPANY_URL } from "../../lib/ui";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,25 +77,6 @@ type Stop = {
   account_url: string | null;
 };
 
-/**
- * Apple Maps by ADDRESS, not by coordinate pair (Juan's ask, 2026-08-14).
- *
- * Coordinates drop an unnamed pin in the middle of a parking lot: correct to
- * the metre and useless for confirming you are at the right door. An address
- * resolves to the business card, with the name, the hours and Maps' own call
- * button on it. The stored address is Places-verified for exactly the accounts
- * that have a pin at all (see geocode.py's corroboration rule), so this is not
- * trading precision for a guess.
- *
- * Coordinates remain the fallback, and remain what the whole-route link uses,
- * where a dozen addresses would blow past the URL length Apple accepts.
- */
-function mapsUrl(a: { street: string | null; city: string | null; state: string | null; postal: string | null; lat: number; lng: number }): string {
-  const address = [a.street, a.city, a.state, a.postal].filter(Boolean).join(", ");
-  const daddr = a.street && a.city ? encodeURIComponent(address) : `${a.lat},${a.lng}`;
-  return `https://maps.apple.com/?daddr=${daddr}`;
-}
-
 export async function GET() {
   if (!(await hasWidgetToken()) && !(await hasValidSession())) {
     return Response.json({ ok: false, error: "Unauthorized." }, { status: 401 });
@@ -129,7 +110,7 @@ export async function GET() {
         straight_line_miles_from_prev: null,
         /* A custom stop's address IS its identity (it was resolved from Places
            when it was added and then frozen), so it deep-links by address too. */
-        maps_url: `https://maps.apple.com/?daddr=${encodeURIComponent(e.address)}`,
+        maps_url: appleMapsUrl(e),
         call_url: null,
         account_url: null,
       });
@@ -157,7 +138,7 @@ export async function GET() {
       top_category_12m: a.top_category_12m,
       top_category_lifetime: a.top_category_lifetime,
       straight_line_miles_from_prev: null,
-      maps_url: mapsUrl(a),
+      maps_url: appleMapsUrl({ address: fullAddress(a), lat: a.lat, lng: a.lng }),
       call_url: a.phone ? `tel:${a.phone.replace(/[^\d+]/g, "")}` : null,
       account_url: `${SITE}/nutribiotic/account/${a.id}`,
     });
