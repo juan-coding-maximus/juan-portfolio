@@ -49,6 +49,13 @@ const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>
      the repo's own markdown, so the site and the files can never disagree. */
   { href: "/nutribiotic/playbook", label: "Playbook", icon: "book" },
   { href: "/nutribiotic/outbound", label: "Outbound", icon: "outbound" },
+  /* Expenses, 2026-08-14: the `expensos` CLI skill's Drive/Sheets tree, now
+     also reachable by hand: clock in/out with a break in minutes, a photo
+     dropzone that auto-sorts odometer vs receipt, and a link to the current
+     semi-monthly pay period's sheet. Writes via a service account (Vercel
+     has no access to the Mac-side OAuth token the CLI uses); see lib/gdrive.ts
+     and lib/expenses.ts. */
+  { href: "/nutribiotic/expenses", label: "Expenses", icon: "receipt" },
   /* The offer-code trio, added 2026-08-10 at Juan's direction (three tabs, all
      in the directory). Phone issues a handwritten code in a parking lot and
      holds the requests waiting on a relay; Offers is the template builder those

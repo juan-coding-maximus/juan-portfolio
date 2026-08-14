@@ -57,6 +57,9 @@ const ICONS: Record<string, ReactNode> = {
   external: <><path d="M9 2.6h4.4V7" /><path d="M13.4 2.6 7.6 8.4" /><path d="M11.8 9.4v3.2c0 .5-.4.9-.9.9H3.4c-.5 0-.9-.4-.9-.9V5.1c0-.5.4-.9.9-.9h3.2" /></>,
   whatsapp: <><path d="M2.6 3.4h10.8a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H6.4l-2.8 2.3v-2.3H2.6a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1Z" /><path d="M5.2 6.4h5.6M5.2 8.6h3.6" /></>,
   plus: <><path d="M8 2.6v10.8M2.6 8h10.8" /></>,
+  camera: <><path d="M2.4 5.4h2.2l1-1.6h4.8l1 1.6h2.2v7.2H2.4z" /><circle cx="8" cy="9" r="2.3" /></>,
+  gauge: <><circle cx="8" cy="8.6" r="5.8" /><path d="M8 8.6 10.6 6M5.4 8.6h5.2" strokeLinecap="round" /></>,
+  receipt: <><path d="M4 2.4h8v11.2l-1.4-1-1.4 1-1.2-1-1.2 1-1.4-1-1.4 1z" /><path d="M6 5.6h4M6 8h4M6 10.4h2.6" /></>,
 };
 
 /**
