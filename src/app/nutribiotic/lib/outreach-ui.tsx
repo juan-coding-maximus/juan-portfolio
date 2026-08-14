@@ -5,7 +5,7 @@ import { AttachmentButton, attachmentNote } from "./attachments-ui";
 import type { MarketingFile } from "./dal";
 import type { RecordTouchpointResult } from "./touchpoint";
 import { recordOutreachSent } from "./outreach-actions";
-import { draftOutreachMessage } from "./outreach-draft";
+import { draftOutreachMessage, type LastDraftLite } from "./outreach-draft";
 import { OUTREACH_TEMPLATES } from "./outreach-templates";
 import { Card, Ico } from "./ui";
 
@@ -42,6 +42,13 @@ function fmtWhen(iso: string): string {
   }
 }
 
+function snippet(text: string, max = 160): string {
+  const t = text.trim();
+  return t.length > max ? `${t.slice(0, max).trimEnd()}…` : t;
+}
+
+type SearchMode = "company" | "person";
+
 export function OutreachComposer({
   accounts,
   contacts,
@@ -51,12 +58,14 @@ export function OutreachComposer({
   contacts: OutreachContactLite[];
   files: MarketingFile[];
 }) {
+  const [mode, setMode] = useState<SearchMode>("company");
   const [search, setSearch] = useState("");
   const [accountId, setAccountId] = useState<string | null>(null);
   const [recipientKey, setRecipientKey] = useState<string | null>(null); // "account" or a contact id
   const [templateId, setTemplateId] = useState<string>("auto");
   const [message, setMessage] = useState("");
   const [basedOn, setBasedOn] = useState<{ detail: string; kind: string; at: string } | null>(null);
+  const [lastDraft, setLastDraft] = useState<LastDraftLite | null>(null);
   const [needsAttachment, setNeedsAttachment] = useState(false);
   const [attachmentHint, setAttachmentHint] = useState<string | null>(null);
   const [attached, setAttached] = useState<MarketingFile[]>([]);
@@ -70,22 +79,31 @@ export function OutreachComposer({
     () => contacts.filter((c) => c.account_id === accountId),
     [contacts, accountId],
   );
+  const accountNameById = useMemo(() => new Map(accounts.map((a) => [a.id, a.name])), [accounts]);
 
-  const matches = useMemo(() => {
+  const accountMatches = useMemo(() => {
+    if (mode !== "company") return [];
     const q = search.trim().toLowerCase();
     if (!q) return [];
     return accounts.filter((a) => a.name.toLowerCase().includes(q)).slice(0, 8);
-  }, [accounts, search]);
+  }, [mode, accounts, search]);
 
-  function pickAccount(a: OutreachAccount) {
-    setAccountId(a.id);
-    setSearch(a.name);
-    setRecipientKey(a.phone ? "account" : null);
+  const contactMatches = useMemo(() => {
+    if (mode !== "person") return [];
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+    return contacts
+      .filter((c) => [c.first_name, c.last_name].filter(Boolean).join(" ").toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [mode, contacts, search]);
+
+  function loadDraftFor(a: OutreachAccount) {
     setOpened(false);
     setResult(null);
     setTemplateId("auto");
     setMessage("");
     setBasedOn(null);
+    setLastDraft(null);
     setNeedsAttachment(false);
     setAttachmentHint(null);
     setAttached([]);
@@ -94,9 +112,26 @@ export function OutreachComposer({
       const d = await draftOutreachMessage(a.id, a.name);
       setMessage(d.draft);
       setBasedOn(d.basedOn);
+      setLastDraft(d.lastDraft);
       setNeedsAttachment(d.needsAttachment);
       setAttachmentHint(d.attachmentHint);
     });
+  }
+
+  function pickAccount(a: OutreachAccount) {
+    setAccountId(a.id);
+    setSearch(a.name);
+    setRecipientKey(a.phone ? "account" : null);
+    loadDraftFor(a);
+  }
+
+  function pickContact(c: OutreachContactLite) {
+    const a = accounts.find((x) => x.id === c.account_id);
+    if (!a) return;
+    setAccountId(a.id);
+    setSearch([c.first_name, c.last_name].filter(Boolean).join(" "));
+    setRecipientKey(c.id);
+    loadDraftFor(a);
   }
 
   function applyTemplate(id: string) {
@@ -140,9 +175,30 @@ export function OutreachComposer({
   return (
     <div className="space-y-3">
       <Card>
-        <div className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
-          <Ico name="whatsapp" size={13} />
-          Who
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
+            <Ico name="whatsapp" size={13} />
+            Who
+          </div>
+          <div className="flex gap-1 rounded-md border border-[#E2DFD5] p-0.5">
+            {(["company", "person"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => {
+                  setMode(m);
+                  setSearch("");
+                  setAccountId(null);
+                  setRecipientKey(null);
+                }}
+                className={`rounded px-2.5 py-1 text-[11.5px] font-medium transition-colors ${
+                  mode === m ? "bg-[#14201B] text-[#F7F6F1]" : "text-[#5B6560] hover:bg-[#FAF9F5]"
+                }`}
+              >
+                {m === "company" ? "Company" : "Person"}
+              </button>
+            ))}
+          </div>
         </div>
         <input
           value={search}
@@ -151,12 +207,12 @@ export function OutreachComposer({
             setAccountId(null);
             setRecipientKey(null);
           }}
-          placeholder="Search an account by name..."
+          placeholder={mode === "company" ? "Search an account by name..." : "Search by first or last name..."}
           className="w-full rounded-md border border-[#E2DFD5] bg-[#FAF9F5] px-3 py-2 text-[13.5px] text-[#14201B] placeholder:text-[#A9AFA9] focus:border-[#14201B] focus:outline-none"
         />
-        {matches.length > 0 && (
+        {mode === "company" && accountMatches.length > 0 && (
           <ul className="mt-1.5 divide-y divide-[#E2DFD5] rounded-md border border-[#E2DFD5]">
-            {matches.map((a) => (
+            {accountMatches.map((a) => (
               <li key={a.id}>
                 <button
                   onClick={() => pickAccount(a)}
@@ -168,6 +224,27 @@ export function OutreachComposer({
               </li>
             ))}
           </ul>
+        )}
+        {mode === "person" && contactMatches.length > 0 && (
+          <ul className="mt-1.5 divide-y divide-[#E2DFD5] rounded-md border border-[#E2DFD5]">
+            {contactMatches.map((c) => (
+              <li key={c.id}>
+                <button
+                  onClick={() => pickContact(c)}
+                  className="flex w-full items-center justify-between px-3 py-2 text-left text-[13px] hover:bg-[#FAF9F5]"
+                >
+                  <span>
+                    {[c.first_name, c.last_name].filter(Boolean).join(" ")}
+                    {c.title ? <span className="text-[#8A928C]"> · {c.title}</span> : null}
+                  </span>
+                  <span className="text-[11.5px] text-[#8A928C]">{accountNameById.get(c.account_id) ?? ""}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {mode === "person" && search.trim() && contactMatches.length === 0 && (
+          <p className="mt-1.5 text-[12px] text-[#8A928C]">No named contact on file matches that.</p>
         )}
 
         {account && (
@@ -210,6 +287,51 @@ export function OutreachComposer({
 
       {account && (
         <Card>
+          <div className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
+            <Ico name="clock" size={13} />
+            Prep
+          </div>
+
+          <div className="mb-2">
+            <div className="mb-1 text-[11px] font-medium text-[#5B6560]">Latest draft on file</div>
+            {draftPending ? (
+              <p className="text-[12px] text-[#8A928C]">Checking...</p>
+            ) : lastDraft ? (
+              <div className="rounded-md border border-[#E2DFD5] bg-[#FAF9F5] px-3 py-2 text-[12px] leading-snug text-[#5B6560]">
+                <div className="mb-0.5 flex flex-wrap items-baseline gap-x-2 text-[11px] text-[#8A928C]">
+                  <span className="uppercase tracking-[0.1em]">{lastDraft.channel}</span>
+                  <span>{fmtWhen(lastDraft.created_at)}</span>
+                  <span className="capitalize">{lastDraft.status}</span>
+                </div>
+                {lastDraft.subject && <div className="font-medium text-[#3D4A44]">{lastDraft.subject}</div>}
+                <div>{snippet(lastDraft.body_md)}</div>
+              </div>
+            ) : (
+              <div className="rounded-md border border-[#E2DFD5] bg-[#FAF9F5] px-3 py-2 text-[12px] leading-snug text-[#5B6560]">
+                No draft on file for this account yet.
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div className="mb-1 text-[11px] font-medium text-[#5B6560]">Most recent HubSpot activity</div>
+            {draftPending ? (
+              <p className="text-[12px] text-[#8A928C]">Checking...</p>
+            ) : basedOn ? (
+              <div className="rounded-md border border-[#E2DFD5] bg-[#FAF9F5] px-3 py-2 text-[12px] leading-snug text-[#5B6560]">
+                <span className="capitalize">{basedOn.kind}</span> logged {fmtWhen(basedOn.at)}: &quot;{basedOn.detail}&quot;
+              </div>
+            ) : (
+              <div className="rounded-md border border-[#E2DFD5] bg-[#FAF9F5] px-3 py-2 text-[12px] leading-snug text-[#5B6560]">
+                No prior touchpoint on file for this account, this reads as a first contact.
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {account && (
+        <Card>
           <div className="mb-2 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
               <Ico name="mail" size={13} />
@@ -217,18 +339,6 @@ export function OutreachComposer({
             </div>
             {draftPending && <span className="text-[11.5px] text-[#8A928C]">Drafting from the last touchpoint...</span>}
           </div>
-
-          {basedOn ? (
-            <div className="mb-2 rounded-md border border-[#E2DFD5] bg-[#FAF9F5] px-3 py-2 text-[12px] leading-snug text-[#5B6560]">
-              Continuing from the {basedOn.kind} logged {fmtWhen(basedOn.at)}: &quot;{basedOn.detail}&quot;
-            </div>
-          ) : (
-            !draftPending && (
-              <div className="mb-2 rounded-md border border-[#E2DFD5] bg-[#FAF9F5] px-3 py-2 text-[12px] leading-snug text-[#5B6560]">
-                No prior touchpoint on file for this account, this reads as a first contact.
-              </div>
-            )
-          )}
 
           {needsAttachment && attached.length === 0 && (
             <div className="mb-2 flex items-start gap-2 rounded-md border border-[#E5D9BF] bg-[#FBF6E9] px-3 py-2 text-[12.5px] leading-snug text-[#8A6D2F]">

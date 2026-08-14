@@ -1,15 +1,27 @@
 "use server";
 
 import Anthropic from "@anthropic-ai/sdk";
-import { listActivities } from "./dal";
+import { getLatestDraftForAccount, listActivities } from "./dal";
 
 const client = process.env.ANTHROPIC_API_KEY ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) : null;
+
+export type LastDraftLite = {
+  channel: string;
+  subject: string | null;
+  body_md: string;
+  status: string;
+  created_at: string;
+};
 
 export type OutreachDraft = {
   draft: string;
   basedOn: { detail: string; kind: string; at: string } | null;
   needsAttachment: boolean;
   attachmentHint: string | null;
+  /** The account's own most recent draft on file, any channel/status — shown
+   *  as prep so Juan sees what was last sent or queued before writing a new
+   *  one. Distinct from `draft` above, which is the fresh AI suggestion. */
+  lastDraft: LastDraftLite | null;
 };
 
 const DRAFT_TOOL = {
@@ -56,9 +68,21 @@ Rules: use ONLY facts in that note. Never invent a product, price, promise, or d
  *  template. Grounded, tool-forced, same no-fabrication discipline as
  *  touchpoint.ts's extractor: the model may only use what's in the note. */
 export async function draftOutreachMessage(accountId: string, accountName: string): Promise<OutreachDraft> {
-  const activities = await listActivities(accountId, 5);
+  const [activities, lastDraftRow] = await Promise.all([
+    listActivities(accountId, 5),
+    getLatestDraftForAccount(accountId),
+  ]);
   const last = activities.data.find((a) => (a.detail ?? "").trim().length > 0) ?? null;
   const note = last ? { detail: last.detail as string, kind: last.kind, at: last.at } : null;
+  const lastDraft: LastDraftLite | null = lastDraftRow
+    ? {
+        channel: lastDraftRow.channel,
+        subject: lastDraftRow.subject,
+        body_md: lastDraftRow.body_md,
+        status: lastDraftRow.status,
+        created_at: lastDraftRow.created_at,
+      }
+    : null;
 
   if (!client) {
     return {
@@ -68,6 +92,7 @@ export async function draftOutreachMessage(accountId: string, accountName: strin
       basedOn: note,
       needsAttachment: false,
       attachmentHint: null,
+      lastDraft,
     };
   }
 
@@ -82,16 +107,23 @@ export async function draftOutreachMessage(accountId: string, accountName: strin
     });
     const toolUse = msg.content.find((b) => b.type === "tool_use");
     if (!toolUse || toolUse.type !== "tool_use") {
-      return { draft: "", basedOn: note, needsAttachment: false, attachmentHint: null };
+      return { draft: "", basedOn: note, needsAttachment: false, attachmentHint: null, lastDraft };
     }
     const out = toolUse.input as { draft: string; needs_attachment: boolean; attachment_hint: string | null };
-    return { draft: out.draft, basedOn: note, needsAttachment: out.needs_attachment, attachmentHint: out.attachment_hint };
+    return {
+      draft: out.draft,
+      basedOn: note,
+      needsAttachment: out.needs_attachment,
+      attachmentHint: out.attachment_hint,
+      lastDraft,
+    };
   } catch {
     return {
       draft: note ? `Hi! Following up on our last conversation.` : `Hi! This is Juan from NutriBiotic.`,
       basedOn: note,
       needsAttachment: false,
       attachmentHint: null,
+      lastDraft,
     };
   }
 }

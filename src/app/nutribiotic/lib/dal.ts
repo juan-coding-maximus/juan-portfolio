@@ -655,6 +655,21 @@ export async function listDrafts(limit = 100): Promise<Result<Draft>> {
   return { ...res, data: [...res.data].sort((a, b) => rank(b) - rank(a)) };
 }
 
+/** The account's single most recent draft, any status (pending, sent, or
+ *  dismissed) — unlike listDrafts() this is not restricted to the open queue.
+ *  Used by the outreach composer's prep step: before Juan drafts a fresh
+ *  WhatsApp message, show whatever was drafted for this account last, so he
+ *  isn't repeating himself or missing something already queued. */
+export async function getLatestDraftForAccount(accountId: string): Promise<Draft | null> {
+  const res = await query<Draft>("nb_outbound_drafts", {
+    select: "*",
+    account_id: `eq.${accountId}`,
+    order: "created_at.desc",
+    limit: 1,
+  });
+  return res.data[0] ?? null;
+}
+
 /** Juan clicked the compose link (or is dismissing a draft he won't send).
  * 'sent' is self-reported here — this mailbox holds no Mail.Send scope, so the
  * OS cannot verify a send; it only records that Juan says he did. */
