@@ -76,14 +76,27 @@ async function findChild(
   parent: string | null,
   mime?: string,
 ): Promise<{ id: string; name: string; webViewLink?: string | null } | null> {
+  // No `'root' in parents` fallback for a null parent: this service account
+  // owns nothing of its own (a bare Gmail-project service account has zero
+  // Drive storage quota), it only sees the "NutriBiotic Field Expenses"
+  // folder because Juan shared it directly. That folder is not "in root" of
+  // the service account's own (empty) Drive, so a root-scoped search always
+  // came back empty and `ensureFolder` then tried to CREATE a top-level
+  // folder, which fails outright for the same no-quota reason ("The caller
+  // does not have permission", the exact error this replaced). Searching by
+  // name with no parent filter finds it among everything shared with this
+  // account instead, which for a bare service account is a precise search:
+  // nothing else is visible to it.
   const q = [`name = '${name.replace(/'/g, "\\'")}'`, "trashed = false"];
-  q.push(parent ? `'${parent}' in parents` : "'root' in parents");
+  if (parent) q.push(`'${parent}' in parents`);
   if (mime) q.push(`mimeType = '${mime}'`);
   const res = await drive().files.list({
     q: q.join(" and "),
     fields: "files(id,name,webViewLink,mimeType)",
     pageSize: 10,
     spaces: "drive",
+    includeItemsFromAllDrives: true,
+    supportsAllDrives: true,
   });
   const files = res.data.files ?? [];
   return files.length ? (files[0] as { id: string; name: string; webViewLink?: string | null }) : null;
