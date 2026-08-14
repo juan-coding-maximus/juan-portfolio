@@ -50,6 +50,30 @@ was tried, what worked. No imported objection scripts from the internet.
 - **HubSpot portal 148711228**: shared with another rep; everything written there is scoped to Juan's book, twice.
 - The stack behind these is documented for the next hire in [`onboarding/stack.md`](onboarding/stack.md).
 
+## 8. New-account prospecting kit (proposed, not built, awaiting go-ahead)
+
+Source: Connor Murray's B2B SDR/BDR prospecting method, adapted for door-to-door new
+logos rather than cold calls. Aimed at stores/clinics not yet in the 273-account book,
+distinct from Section 6's reactivation motion (which works dormant *existing* accounts).
+
+- **Vertical taxonomy.** Segment prospects by store type, not by title×industry: independent
+  health food store, chiropractic, naturopathic/functional medicine, gym/juice bar/wellness
+  studio, co-op grocery. Each vertical gets one config entry (priorities, challenges, how
+  NutriBiotic solves them), written and signed off by Juan once, reused verbatim, never
+  improvised per door (no-fabrication rule applies to repeated claims same as anywhere else).
+- **Discovery, not import.** Search each of the 14 territory areas by vertical via the Places
+  API already wired for the OS, dedupe against the 273 existing accounts and `nb_import_rows`,
+  land results in a new `nb_prospects` table as `candidate` status. Nothing becomes a target
+  until Juan approves it, same human-gate pattern as imports today.
+- **Script + email kit.** A `prospect_kit.py` that takes a vertical and renders a walk-in
+  script and an email draft from that vertical's config to `out/`. No auto-send.
+- **Authoring pass.** Draft each vertical's priorities/challenges/outcomes fast using Connor's
+  4-prompt method, then Juan edits and locks the wording before it's reused across prospects.
+
+Scoped-down option if this gets greenlit: build discovery only first (verticals × areas →
+`nb_prospects`), prove the list is good, then add the script/template generator.
+
 ## Changelog
 
+- 2026-08-14 · added Section 8 (new-account prospecting kit, proposed, awaiting go-ahead).
 - 2026-08-02 · v0 skeleton, structure and the already-proven sections.
