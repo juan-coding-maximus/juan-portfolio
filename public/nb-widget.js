@@ -241,9 +241,12 @@ function renderLarge(w, data) {
   if (data.count === 0) return renderEmpty(w);
   w.addSpacer(8);
 
-  /* Six, not seven: the hero's button row costs about one stop's height, and a
-     seventh line squeezed under it is a line you cannot read anyway. */
-  const shown = data.stops.slice(0, 6);
+  /* FOUR (Juan, 2026-08-14), and four is the end of it: a widget cannot scroll.
+     WidgetKit renders a static snapshot whose only interaction is a tap target,
+     so there is no fifth stop hiding below the fold to reach for. Four is what
+     the widget IS, and the footer says how many it is not showing and where the
+     rest live, rather than implying a gesture that does nothing. */
+  const shown = data.stops.slice(0, 4);
   shown.forEach((s, i) => {
     if (i > 0) {
       w.addSpacer(5);
@@ -286,9 +289,24 @@ function renderLarge(w, data) {
     }
   });
 
+  /* The rest of the day, as a tap rather than a scroll that cannot exist. Its
+     own target, not just a line of text: the sentence "4 of 9" is only useful
+     next to the thing that shows you the other five. */
   if (data.count > shown.length) {
+    w.addSpacer(7);
+    divider(w);
     w.addSpacer(6);
-    txt(w, `+ ${data.count - shown.length} more on the map`, { size: 10, color: FAINT });
+    const more = w.addStack();
+    more.centerAlignContent();
+    more.url = `${NB.base}/nutribiotic/map`;
+    txt(more, `${data.count - shown.length} more stop${data.count - shown.length === 1 ? "" : "s"}`, {
+      size: 11,
+      color: GREEN,
+      bold: true,
+    });
+    more.addSpacer(5);
+    txt(more, "open the route", { size: 11, color: FAINT });
+    more.addSpacer();
   }
   w.addSpacer();
   w.url = `${NB.base}/nutribiotic/map`;
