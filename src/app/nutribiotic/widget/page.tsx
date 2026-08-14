@@ -87,28 +87,46 @@ export default async function WidgetSetupPage() {
                   Free, by Simon Støvring. It is what renders the widget; the design and the data
                   are this OS&apos;s, not its.
                 </Step>
-                <Step n={2} title="Open Scriptable, tap +, and paste this in">
+                <Step n={2} title="Copy the script, then open a blank one in Scriptable">
                   <div className="mt-2.5">
                     <CopyBlock code={bootstrap!} label="Scriptable script" secret={token} />
                   </div>
+                  {/* scriptable:///add opens a NEW empty script, ready to paste
+                      into. The URL scheme cannot carry the source itself (only
+                      /open and /run take parameters), so the clipboard is still
+                      how the code travels; this just removes the app-switch and
+                      the tap on +. */}
+                  <a
+                    href="scriptable:///add"
+                    className="mt-2.5 inline-flex items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white px-3 py-2 text-[12.5px] font-medium text-[#3D4A44] transition-colors hover:bg-[#FAF9F5]"
+                  >
+                    <Ico name="external" size={13} />
+                    Open a new script in Scriptable
+                  </a>
                   <p className="mt-2.5">
-                    Name it <span className="font-medium text-[#3D4A44]">NutriBiotic Route</span>.
+                    Long-press the empty editor, Paste, then name it{" "}
+                    <span className="font-medium text-[#3D4A44]">NutriBiotic Route</span> and tap Done.
                     It carries your widget token, so treat the script the way you treat the PIN.
                   </p>
                 </Step>
                 <Step n={3} title="Long-press the home screen, add a Scriptable widget">
-                  Choose the size you want, then tap the placed widget once and set{" "}
+                  Tap <span className="font-medium text-[#3D4A44]">+</span> at the top left, search
+                  Scriptable, pick a size, Add Widget. Then tap the placed widget once and set{" "}
                   <span className="font-medium text-[#3D4A44]">Script</span> to NutriBiotic Route and{" "}
                   <span className="font-medium text-[#3D4A44]">When Interacting</span> to{" "}
-                  <span className="font-medium text-[#3D4A44]">Run Script</span>.
+                  <span className="font-medium text-[#3D4A44]">Run Script</span>. The GO, Call and See
+                  account buttons keep working under that setting: a URL set on a button always wins
+                  over the script-running behaviour.
                 </Step>
                 <Step n={4} title="Pick the size for what you want to see">
-                  <span className="font-medium text-[#3D4A44]">Small</span> is the next stop alone.{" "}
+                  <span className="font-medium text-[#3D4A44]">Small</span> is the next stop alone, and
+                  the whole tile is one GO button, because iOS allows a small widget exactly one tap
+                  target.{" "}
                   <span className="font-medium text-[#3D4A44]">Medium</span> is the next stop with its
-                  numbers plus a peek at the two after it.{" "}
-                  <span className="font-medium text-[#3D4A44]">Large</span> is up to seven stops with
-                  the facts that decide one at the curb. The Lock Screen rectangle shows the next
-                  stop and the count.
+                  numbers, its three buttons, and a peek at the two after it.{" "}
+                  <span className="font-medium text-[#3D4A44]">Large</span> is four stops with the
+                  facts that decide one at the curb. The Lock Screen rectangle shows the next stop and
+                  the count.
                 </Step>
               </ol>
             )}
