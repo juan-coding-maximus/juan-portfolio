@@ -1,17 +1,25 @@
 /**
- * Google Drive + Sheets, server-side, via a SERVICE ACCOUNT rather than the
- * OAuth user token `bridges/expenses/expense_log.py` runs with on the Mac.
+ * Google Drive + Sheets, server-side, via the SAME OAuth user token
+ * `bridges/expenses/expense_log.py` runs with on the Mac
+ * (`bridges/gdrive/tokens/nutribiotic_drive.json`, `drive.file` +
+ * `spreadsheets` scope, captured once against juan@nutribiotic.com and
+ * non-expiring) rather than a service account of its own.
  *
- * WHY A SEPARATE CREDENTIAL. That script's token lives in a gitignored file
- * on Juan's machine and only exists there; a Vercel function has no such
- * filesystem to read it from. `nutribiotic-expenses-web@agency-gmail.iam
- * .gserviceaccount.com` (2026-08-14) was created for exactly this call site,
- * in the same `agency-gmail` Cloud project the Mac-side token uses, and was
- * given Editor access to the `NutriBiotic Field Expenses 2026` Drive folder
- * directly (Share -> add the service account's email) rather than any
- * broader scope. It can only reach what that folder and its future
- * siblings/children hold, same "not found means we didn't create it, never
- * widen scope" posture as drive_client.py's `drive.file` restriction.
+ * A SERVICE ACCOUNT WAS TRIED FIRST (2026-08-14) and does not work here:
+ * Google's own error, verbatim, on the first real write attempt --
+ * "Service Accounts do not have storage quota. Leverage shared drives...
+ * or use OAuth delegation instead." juan@nutribiotic.com is a personal
+ * Google account wearing a work address (SETUP.md), not a Workspace seat,
+ * so Shared Drives aren't available either. OAuth delegation -- reusing
+ * Juan's own already-consented token -- is the one path left, and it is
+ * also the narrower one: it can only reach what that token's `drive.file`
+ * scope already covers (everything the CLI created), never anything wider,
+ * same boundary the CLI itself operates inside.
+ *
+ * DEPLOYING THAT TOKEN TO VERCEL is the only new thing this adds. No new
+ * consent screen, no new credential Juan has to approve: `client_id` /
+ * `client_secret` / `refresh_token` from that same JSON file, copied into
+ * NB_EXPENSES_GOOGLE_CLIENT_ID / _CLIENT_SECRET / _REFRESH_TOKEN.
  *
  * NO ID CACHE. expense_log.py caches folder/sheet ids in a local
  * config.json between runs; a Vercel function is stateless and often a cold
@@ -33,26 +41,18 @@ const OWNER_EMAIL = "juan@nutribiotic.com";
 const FOLDER_MIME = "application/vnd.google-apps.folder";
 const SHEET_MIME = "application/vnd.google-apps.spreadsheet";
 
-function credentials() {
-  const email = process.env.NB_EXPENSES_SA_EMAIL;
-  const key = process.env.NB_EXPENSES_SA_KEY;
-  if (!email || !key) {
+function auth() {
+  const clientId = process.env.NB_EXPENSES_GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.NB_EXPENSES_GOOGLE_CLIENT_SECRET;
+  const refreshToken = process.env.NB_EXPENSES_GOOGLE_REFRESH_TOKEN;
+  if (!clientId || !clientSecret || !refreshToken) {
     throw new Error(
-      "NB_EXPENSES_SA_EMAIL / NB_EXPENSES_SA_KEY are not set. The expenses UI cannot reach Drive without them.",
+      "NB_EXPENSES_GOOGLE_CLIENT_ID / _CLIENT_SECRET / _REFRESH_TOKEN are not set. The expenses UI cannot reach Drive without them.",
     );
   }
-  // Vercel env values keep literal "\n" in a multi-line secret; PEM parsing
-  // needs real newlines.
-  return { email, key: key.replace(/\\n/g, "\n") };
-}
-
-function auth() {
-  const { email, key } = credentials();
-  return new google.auth.JWT({
-    email,
-    key,
-    scopes: ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"],
-  });
+  const client = new google.auth.OAuth2(clientId, clientSecret);
+  client.setCredentials({ refresh_token: refreshToken });
+  return client;
 }
 
 function drive() {
@@ -76,17 +76,6 @@ async function findChild(
   parent: string | null,
   mime?: string,
 ): Promise<{ id: string; name: string; webViewLink?: string | null } | null> {
-  // No `'root' in parents` fallback for a null parent: this service account
-  // owns nothing of its own (a bare Gmail-project service account has zero
-  // Drive storage quota), it only sees the "NutriBiotic Field Expenses"
-  // folder because Juan shared it directly. That folder is not "in root" of
-  // the service account's own (empty) Drive, so a root-scoped search always
-  // came back empty and `ensureFolder` then tried to CREATE a top-level
-  // folder, which fails outright for the same no-quota reason ("The caller
-  // does not have permission", the exact error this replaced). Searching by
-  // name with no parent filter finds it among everything shared with this
-  // account instead, which for a bare service account is a precise search:
-  // nothing else is visible to it.
   const q = [`name = '${name.replace(/'/g, "\\'")}'`, "trashed = false"];
   if (parent) q.push(`'${parent}' in parents`);
   if (mime) q.push(`mimeType = '${mime}'`);
@@ -95,8 +84,6 @@ async function findChild(
     fields: "files(id,name,webViewLink,mimeType)",
     pageSize: 10,
     spaces: "drive",
-    includeItemsFromAllDrives: true,
-    supportsAllDrives: true,
   });
   const files = res.data.files ?? [];
   return files.length ? (files[0] as { id: string; name: string; webViewLink?: string | null }) : null;
@@ -141,18 +128,32 @@ export async function ensureSpreadsheet(
     await addMissingTabs(got.id, tabs);
     return { id: got.id, webViewLink: got.webViewLink ?? `https://docs.google.com/spreadsheets/d/${got.id}/edit` };
   }
-  const sh = sheets();
-  const created = await sh.spreadsheets.create({
-    requestBody: {
-      properties: { title: name },
-      sheets: Object.keys(tabs).map((t) => ({ properties: { title: t } })),
-    },
-    fields: "spreadsheetId,spreadsheetUrl",
+  // Created via the DRIVE api directly IN the parent folder, not
+  // sheets().spreadsheets.create() (which always lands in the caller's My
+  // Drive root first, requiring a follow-up move). With an OAuth-delegated
+  // user token both paths work, but this one avoids that extra hop.
+  const created = await drive().files.create({
+    requestBody: { name, mimeType: SHEET_MIME, parents: [parent] },
+    fields: "id,webViewLink",
   });
-  const id = created.data.spreadsheetId!;
+  const id = created.data.id!;
+  if (Object.keys(tabs).length) {
+    await sheets().spreadsheets.batchUpdate({
+      spreadsheetId: id,
+      requestBody: { requests: Object.keys(tabs).map((t) => ({ addSheet: { properties: { title: t } } })) },
+    });
+    // A spreadsheet always starts with one default "Sheet1" tab; drop it
+    // once the real tabs exist, so `Log`/`Hours` aren't sharing the file
+    // with an empty third tab nobody asked for.
+    const meta = await sheets().spreadsheets.get({ spreadsheetId: id, fields: "sheets.properties(title,sheetId)" });
+    const stray = (meta.data.sheets ?? []).find((s) => !Object.keys(tabs).includes(s.properties?.title ?? ""));
+    if (stray?.properties?.sheetId != null) {
+      await sheets().spreadsheets.batchUpdate({ spreadsheetId: id, requestBody: { requests: [{ deleteSheet: { sheetId: stray.properties.sheetId } }] } });
+    }
+  }
   for (const [tab, header] of Object.entries(tabs)) {
     if (header.length) {
-      await sh.spreadsheets.values.update({
+      await sheets().spreadsheets.values.update({
         spreadsheetId: id,
         range: `${tab}!A1`,
         valueInputOption: "USER_ENTERED",
@@ -160,14 +161,7 @@ export async function ensureSpreadsheet(
       });
     }
   }
-  // A spreadsheet created through the Sheets API lands in My Drive root; move it
-  // into the period folder. Cosmetic if it fails, so best-effort.
-  try {
-    await drive().files.update({ fileId: id, addParents: parent, fields: "id,parents" });
-  } catch {
-    /* placement only; the sheet exists and works either way */
-  }
-  return { id, webViewLink: created.data.spreadsheetUrl ?? `https://docs.google.com/spreadsheets/d/${id}/edit` };
+  return { id, webViewLink: created.data.webViewLink ?? `https://docs.google.com/spreadsheets/d/${id}/edit` };
 }
 
 async function addMissingTabs(sheetId: string, tabs: Record<string, string[]>): Promise<void> {
