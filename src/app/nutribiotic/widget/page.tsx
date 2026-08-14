@@ -89,7 +89,7 @@ export default async function WidgetSetupPage() {
                 </Step>
                 <Step n={2} title="Open Scriptable, tap +, and paste this in">
                   <div className="mt-2.5">
-                    <CopyBlock code={bootstrap!} label="Scriptable script" />
+                    <CopyBlock code={bootstrap!} label="Scriptable script" secret={token} />
                   </div>
                   <p className="mt-2.5">
                     Name it <span className="font-medium text-[#3D4A44]">NutriBiotic Route</span>.
