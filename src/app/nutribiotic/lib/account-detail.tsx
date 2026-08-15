@@ -284,7 +284,16 @@ export function AccountDetailBody({
 
       <aside className="flex flex-col gap-4">
         <Card>
-          <dl className="flex flex-col gap-2.5 text-[13.5px]">
+          {/* Two stat tiles per row on a phone, label stacked over value, both
+              hard-truncated: a squeezed sidebar row that can't fit its value
+              used to overflow the whole page sideways with body's dark bg
+              bleeding through and the value scrolled out of view entirely,
+              silent because of the site-wide overflow-x:hidden safety net.
+              Truncating instead of wrapping keeps every tile one line at any
+              width, since these values (a state word, "8mo ago", a dollar
+              amount, a date) are always short. Reverts to the original
+              compact single-column list once there is real sidebar width. */}
+          <dl className="grid grid-cols-2 gap-x-5 gap-y-4 text-[13.5px] lg:flex lg:flex-col lg:gap-2.5">
             {[
               ["State", a.lifecycle || "unknown"],
               ["Last order", a.last_order_at ? daysAgo(a.last_order_at) : "never"],
@@ -292,15 +301,24 @@ export function AccountDetailBody({
               ["Trailing 12mo", money(a.trailing_12m_revenue)],
               ["Reorder due", a.expected_reorder_at ?? "not set"],
             ].map(([k, v]) => (
-              <div key={k as string} className="flex justify-between gap-3">
-                <dt className="text-[#8A928C]">{k}</dt>
-                <dd className="text-right">{v}</dd>
+              <div
+                key={k as string}
+                className="flex min-w-0 flex-col gap-1 lg:flex-row lg:items-baseline lg:justify-between lg:gap-3"
+              >
+                <dt className="text-[11px] uppercase tracking-[0.08em] text-[#8A928C] lg:text-[13.5px] lg:normal-case lg:tracking-normal">
+                  {k}
+                </dt>
+                <dd className="truncate text-[15px] font-semibold text-[#14201B] lg:text-right lg:text-[13.5px] lg:font-normal">
+                  {v}
+                </dd>
               </div>
             ))}
             {a.phone && (
-              <div className="flex items-center justify-between gap-3 border-t border-[#EDEBE3] pt-2.5">
-                <dt className="text-[#8A928C]">Phone</dt>
-                <dd className="text-right">
+              <div className="col-span-2 flex items-center justify-between gap-3 border-t border-[#EDEBE3] pt-4 lg:col-span-1 lg:pt-2.5">
+                <dt className="text-[11px] uppercase tracking-[0.08em] text-[#8A928C] lg:text-[13.5px] lg:normal-case lg:tracking-normal">
+                  Phone
+                </dt>
+                <dd className="min-w-0">
                   <PhoneDisplay value={a.phone} />
                 </dd>
               </div>
@@ -337,8 +355,8 @@ export function AccountDetailBody({
             <dl className="flex flex-col gap-1 text-[13px]">
               {Object.entries(a.business_hours).map(([day, ranges]) => (
                 <div key={day} className="flex justify-between gap-3">
-                  <dt className="text-[#8A928C] capitalize">{day}</dt>
-                  <dd className="tabular-nums">
+                  <dt className="w-9 shrink-0 text-[#8A928C] capitalize">{day}</dt>
+                  <dd className="min-w-0 flex-1 text-right break-words tabular-nums">
                     {ranges.length ? ranges.map((r) => r.join(" to ")).join(", ") : "closed"}
                   </dd>
                 </div>
