@@ -16,6 +16,12 @@ export const metadata: Metadata = {
      every morning. Icon comes from apple-icon.tsx in this segment. See
      /nutribiotic/widget for the install steps Juan follows once. */
   appleWebApp: { capable: true, title: "NutriBiotic", statusBarStyle: "default" },
+  /* Next 16 renders appleWebApp.capable as <meta name="mobile-web-app-capable">
+     only. iOS 16.4+ honours that; everything before it looks exclusively for the
+     apple-prefixed name and, not finding it, opens the tile in Safari with an
+     address bar instead of standalone. One duplicated tag is cheaper than a
+     launcher that quietly is not one. */
+  other: { "apple-mobile-web-app-capable": "yes" },
 };
 
 // Every read is request-time; nothing here may be statically cached.

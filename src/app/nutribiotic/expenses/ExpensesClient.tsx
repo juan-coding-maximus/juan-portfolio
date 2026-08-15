@@ -93,6 +93,20 @@ function ReviewCard({ summary, error }: { summary: Summary; error: string | null
   );
 }
 
+/* 0 to 3h. Past three hours it is not a break, it is a split shift, and that
+   is a conversation with payroll rather than a longer dropdown. */
+const BREAK_CHOICES = [0, 30, 60, 90, 120, 150, 180];
+
+/** 0 -> "None", 30 -> "30 min", 90 -> "1h 30m". Hours FLOOR before the
+ *  remainder: dividing by 60 straight through rendered 90 as "1.5h 30m". */
+function breakLabel(m: number): string {
+  if (m === 0) return "None";
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  const rest = m % 60;
+  return rest ? `${h}h ${rest}m` : `${h}h`;
+}
+
 function HoursCard() {
   const [date, setDate] = useState(todayPT());
   const [clockIn, setClockIn] = useState("");
@@ -102,8 +116,22 @@ function HoursCard() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "warn" | "error"; text: string } | null>(null);
 
+  /* Half-hour grid, Juan 2026-08-14. A field day is remembered as "started
+     around nine, knocked off around five", never as 5:23, so a minute-level
+     picker was asking for a precision he does not have and cannot check. The
+     spinner and this button now agree on the same grid, because a "now" that
+     lands off-grid makes the picker look broken the next time it is opened.
+
+     ROUNDS TO NEAREST, NOT DOWN: 5:25pm becomes 5:30pm. Rounding down would
+     shade every entry toward under-reporting his own hours. */
   function markNow(which: "in" | "out") {
-    const hhmm = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "America/Los_Angeles" });
+    const now = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "America/Los_Angeles" });
+    const [h, m] = now.split(":").map(Number);
+    const slot = Math.round((h * 60 + m) / 30) * 30;
+    // 23:45+ rounds to 24:00, which is not a time. Hold at 23:30 rather than
+    // wrapping to 00:00 and filing the shift against the wrong day.
+    const mins = Math.min(slot, 23 * 60 + 30);
+    const hhmm = `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
     if (which === "in") setClockIn(hhmm);
     else setClockOut(hhmm);
   }
@@ -158,7 +186,7 @@ function HoursCard() {
         <div>
           <label className={labelCls}>Clock in</label>
           <div className="flex gap-1.5">
-            <input type="time" value={clockIn} onChange={(e) => setClockIn(e.target.value)} className={inputCls} />
+            <input type="time" step={1800} value={clockIn} onChange={(e) => setClockIn(e.target.value)} className={inputCls} />
             <button type="button" onClick={() => markNow("in")} className={`${ghostBtn} shrink-0 px-2`} title="Now">
               now
             </button>
@@ -167,7 +195,7 @@ function HoursCard() {
         <div>
           <label className={labelCls}>Clock out</label>
           <div className="flex gap-1.5">
-            <input type="time" value={clockOut} onChange={(e) => setClockOut(e.target.value)} className={inputCls} />
+            <input type="time" step={1800} value={clockOut} onChange={(e) => setClockOut(e.target.value)} className={inputCls} />
             <button type="button" onClick={() => markNow("out")} className={`${ghostBtn} shrink-0 px-2`} title="Now">
               now
             </button>
@@ -175,7 +203,13 @@ function HoursCard() {
         </div>
         <div>
           <label className={labelCls}>Break (min)</label>
-          <input type="number" min={0} step={5} value={breakMin} onChange={(e) => setBreakMin(e.target.value)} className={inputCls} />
+          <select value={breakMin} onChange={(e) => setBreakMin(e.target.value)} className={inputCls}>
+            {BREAK_CHOICES.map((m) => (
+              <option key={m} value={String(m)}>
+                {breakLabel(m)}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
       <div className="mt-3">
@@ -321,7 +355,6 @@ function PhotosCard() {
           ref={inputRef}
           type="file"
           accept="image/*"
-          capture="environment"
           multiple
           className="hidden"
           onChange={(e) => {
