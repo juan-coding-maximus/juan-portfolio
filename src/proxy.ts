@@ -36,12 +36,17 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // The home-screen icons (apple-icon.tsx, one per launchable screen). iOS
-  // fetches them while adding a page to the Home Screen and again on later
-  // refreshes, sometimes outside Safari's cookie jar; a redirect to the gate
-  // there yields a blank grey tile. They are generated marks with no data
-  // behind them, so they cost nothing to serve.
-  if (pathname.endsWith("/apple-icon")) {
+  // The home-screen icons, one per launchable screen. iOS fetches them while
+  // adding a page to the Home Screen and again on later refreshes, sometimes
+  // outside Safari's cookie jar; a redirect to the gate there yields a blank
+  // grey tile. They are brand marks with no data behind them, so they cost
+  // nothing to serve.
+  //
+  // THE EXTENSION IS PART OF THE PATH for a static icon and absent for a
+  // generated one: apple-icon.tsx routes at /…/apple-icon, while a committed
+  // apple-icon.png routes at /…/apple-icon.png. An endsWith("/apple-icon")
+  // check silently 307'd both real launcher tiles to the gate.
+  if (/\/apple-icon(\.[a-z0-9]+)?$/.test(pathname)) {
     return NextResponse.next();
   }
 
