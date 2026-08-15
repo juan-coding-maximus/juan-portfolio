@@ -67,6 +67,17 @@ export async function proxy(req: NextRequest) {
     const url = req.nextUrl.clone();
     url.pathname = "/nutribiotic/gate";
     url.search = "";
+    /* CARRY WHERE HE WAS GOING (Juan, 2026-08-14). Without this the gate always
+       finished on /nutribiotic, which permanent-redirects to the map, so every
+       Home Screen tile became a Map tile the moment the eight-hour session
+       lapsed: ExpensOS and ClientOS both opened the same screen, which is the
+       one thing two separate launchers must never do.
+
+       Only the PATH travels, never the query string: this value is echoed into
+       a redirect, and the fewer attacker-shaped parts of a URL that survive a
+       round trip through a login page the better. The gate re-validates it
+       anyway before using it. */
+    if (pathname !== "/nutribiotic") url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
 

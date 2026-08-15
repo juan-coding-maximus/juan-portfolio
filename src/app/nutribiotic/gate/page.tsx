@@ -3,6 +3,26 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+/**
+ * Where to land after the PIN: the screen that was asked for, not a fixed home.
+ *
+ * The proxy puts the intended path in ?next when it bounces an unauthenticated
+ * request here. Without it every Home Screen tile finished on the map once the
+ * eight-hour session lapsed, which made ExpensOS and ClientOS the same app.
+ *
+ * VALIDATED HERE, NOT TRUSTED FROM THE URL. A value that decides a redirect is
+ * attacker-reachable by definition (anyone can hand Juan a gate link), so this
+ * accepts only an absolute path inside this OS. "/nutribiotic/..." cannot begin
+ * with "//", which is what rules out the protocol-relative "//evil.com" form,
+ * and the gate itself is excluded so a bounce cannot loop.
+ */
+function safeNext(search: string): string {
+  const raw = new URLSearchParams(search).get("next");
+  if (!raw || !raw.startsWith("/nutribiotic/")) return "/nutribiotic";
+  if (raw.startsWith("/nutribiotic/gate")) return "/nutribiotic";
+  return raw;
+}
+
 export default function Gate() {
   const router = useRouter();
   const [pin, setPin] = useState("");
@@ -21,7 +41,11 @@ export default function Gate() {
       });
       const j = await res.json();
       if (j.ok) {
-        router.push("/nutribiotic");
+        /* replace, not push: the gate has no business sitting in the back stack
+           of a standalone tile, where Back would return to a login screen the
+           session has already satisfied. Read off window rather than
+           useSearchParams so this needs no Suspense boundary. */
+        router.replace(safeNext(window.location.search));
         router.refresh();
         return;
       }

@@ -178,7 +178,7 @@ function HoursCard() {
         <Ico name="clock" size={13} />
         Hours
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div>
           <label className={labelCls}>Date</label>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
@@ -222,7 +222,7 @@ function HoursCard() {
             {message.text}
           </p>
         ) : (
-          <p className="text-[11.5px] leading-snug text-[#8A928C]">If no break was taken, leave it at 0. That's a fact, not an assumption.</p>
+          <p className="text-[11.5px] leading-snug text-[#8A928C]">If no break was taken, leave it on None. That's a fact, not an assumption.</p>
         )}
         <button type="button" onClick={submit} disabled={busy || !clockIn || !clockOut} className={`${primaryBtn} shrink-0`}>
           {busy ? "Filing..." : "File hours"}
