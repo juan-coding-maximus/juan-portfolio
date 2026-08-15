@@ -38,6 +38,73 @@ function Step({ n, title, children }: { n: number; title: string; children?: Rea
   );
 }
 
+/**
+ * One screen, one Home Screen tile.
+ *
+ * ADD TO HOME SCREEN, NOT A SHORTCUT, and the difference is visible every time:
+ * a Shortcut flashes the Shortcuts app on the way through and lands in Safari
+ * with an address bar, while this opens the screen itself, full bleed, with its
+ * own icon. Same destination, one of them feels like the app it is.
+ *
+ * Each launchable screen carries its own apple-icon.tsx, so two of these sitting
+ * side by side are not two identical NB squares. See lib/launcher-icon.tsx.
+ */
+function Launcher({
+  heading,
+  name,
+  path,
+  icon,
+  blurb,
+}: {
+  heading: string;
+  name: string;
+  path: string;
+  icon: React.ComponentProps<typeof Ico>["name"];
+  blurb: string;
+}) {
+  return (
+    <section>
+      <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8A928C]">
+        {heading}
+      </h2>
+
+      <Card>
+        <p className="max-w-[62ch] text-[13.5px] leading-relaxed text-[#5B6560]">
+          {blurb} No browser chrome, no tab to find.
+        </p>
+
+        <ol className="mt-5 list-none">
+          <Step n={1} title={`Open ${name} in Safari on the phone`}>
+            <a
+              href={path}
+              className="inline-flex items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white px-3 py-2 text-[12.5px] font-medium text-[#3D4A44] transition-colors hover:bg-[#FAF9F5]"
+            >
+              <Ico name={icon} size={13} />
+              {SITE}
+              {path}
+            </a>
+          </Step>
+          <Step n={2} title="Share, then Add to Home Screen">
+            Name it <span className="font-medium text-[#3D4A44]">{name}</span>. It opens full screen
+            with its own icon and keeps the eight-hour session, so it is not a PIN prompt every
+            morning.
+          </Step>
+          <Step n={3} title="If you would rather have a Shortcut">
+            Shortcuts app, +, add the{" "}
+            <span className="font-medium text-[#3D4A44]">Open URLs</span> action, paste{" "}
+            <span className="font-medium text-[#3D4A44]">
+              {SITE}
+              {path}
+            </span>
+            , then Share to Home Screen. Same destination, one extra flash of the Shortcuts app on
+            the way.
+          </Step>
+        </ol>
+      </Card>
+    </section>
+  );
+}
+
 export default async function WidgetSetupPage() {
   const token = process.env.NB_WIDGET_TOKEN ?? null;
 
@@ -133,42 +200,21 @@ export default async function WidgetSetupPage() {
           </Card>
         </section>
 
-        <section>
-          <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8A928C]">
-            Visit icon
-          </h2>
+        <Launcher
+          heading="Visit icon"
+          name="Visit"
+          path="/nutribiotic/visit"
+          icon="mic"
+          blurb="Straight to the capture screen, typed or recorded."
+        />
 
-          <Card>
-            <p className="max-w-[62ch] text-[13.5px] leading-relaxed text-[#5B6560]">
-              Straight to the capture screen, no browser chrome, no tab to find. Safari&apos;s Add to
-              Home Screen beats a Shortcut here for one reason: a Shortcut flashes the Shortcuts app
-              on the way through, and this opens the screen directly.
-            </p>
-
-            <ol className="mt-5 list-none">
-              <Step n={1} title="Open the Visit screen in Safari on the phone">
-                <a
-                  href="/nutribiotic/visit"
-                  className="inline-flex items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white px-3 py-2 text-[12.5px] font-medium text-[#3D4A44] transition-colors hover:bg-[#FAF9F5]"
-                >
-                  <Ico name="mic" size={13} />
-                  {SITE}/nutribiotic/visit
-                </a>
-              </Step>
-              <Step n={2} title="Share, then Add to Home Screen">
-                Name it <span className="font-medium text-[#3D4A44]">Visit</span>. It opens full
-                screen with the OS&apos;s own icon and keeps the eight-hour session, so it is not a
-                PIN prompt every morning.
-              </Step>
-              <Step n={3} title="If you would rather have a Shortcut">
-                Shortcuts app, +, add the <span className="font-medium text-[#3D4A44]">Open URLs</span>{" "}
-                action, paste <span className="font-medium text-[#3D4A44]">{SITE}/nutribiotic/visit</span>,
-                then Share to Home Screen. Same destination, one extra flash of the Shortcuts app on
-                the way.
-              </Step>
-            </ol>
-          </Card>
-        </section>
+        <Launcher
+          heading="Expenses icon"
+          name="Expenses"
+          path="/nutribiotic/expenses"
+          icon="receipt"
+          blurb="Straight to clock in and out and the photo dropzone, which is the whole point of it: a receipt gets filed in the parking lot or it does not get filed."
+        />
       </div>
     </>
   );

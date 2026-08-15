@@ -9,7 +9,10 @@ import { ExpensesClient } from "./ExpensesClient";
 import { PageHead } from "../lib/ui";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Expenses · NutriBiotic OS" };
+/* appleWebApp.title names the Home Screen icon when this exact screen is the
+   one added: an "Expenses" tile that lands on clock-in, not a second "NutriBiotic"
+   tile that lands on the map. See /nutribiotic/widget for the install steps. */
+export const metadata = { title: "Expenses · NutriBiotic OS", appleWebApp: { title: "Expenses" } };
 
 export default function ExpensesPage() {
   return (

@@ -36,11 +36,12 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // The home-screen icon (apple-icon.tsx). iOS fetches it while adding the page
-  // to the Home Screen and again on later refreshes, sometimes outside Safari's
-  // cookie jar; a redirect to the gate there yields a blank grey icon. It is a
-  // generated wordmark with no data behind it, so it costs nothing to serve.
-  if (pathname === "/nutribiotic/apple-icon") {
+  // The home-screen icons (apple-icon.tsx, one per launchable screen). iOS
+  // fetches them while adding a page to the Home Screen and again on later
+  // refreshes, sometimes outside Safari's cookie jar; a redirect to the gate
+  // there yields a blank grey tile. They are generated marks with no data
+  // behind them, so they cost nothing to serve.
+  if (pathname.endsWith("/apple-icon")) {
     return NextResponse.next();
   }
 
