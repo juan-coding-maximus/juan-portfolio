@@ -12,7 +12,15 @@ export const dynamic = "force-dynamic";
 /* appleWebApp.title names the Home Screen icon when this exact screen is the
    one added: an "Expenses" tile that lands on clock-in, not a second "NutriBiotic"
    tile that lands on the map. See /nutribiotic/widget for the install steps. */
-export const metadata = { title: "Expenses · NutriBiotic OS", appleWebApp: { title: "Expenses" } };
+export const metadata = {
+  title: "Expenses · NutriBiotic OS",
+  /* ExpensOS on the Home Screen, Juan's own name for it and the same word the
+     CLI skill answers to. The tile wears NutriBiotic's real logo (apple-icon.png
+     in this folder), not a generated mark: this is the one screen he opens in a
+     parking lot with a receipt in his hand, and it should look like the company
+     he is doing it for. */
+  appleWebApp: { title: "ExpensOS" },
+};
 
 export default function ExpensesPage() {
   return (

@@ -15,10 +15,15 @@ import { CalendarProposalRow, RecordVisit, TouchpointCapture } from "../lib/touc
 import { Empty, PageHead } from "../lib/ui";
 
 export const dynamic = "force-dynamic";
-/* appleWebApp.title is what the home-screen icon is labelled when this exact
-   screen is the one added, which is the point of adding it: a "Visit" icon that
-   lands on capture, not a "NutriBiotic" icon that lands on the map. */
-export const metadata = { title: "Visit · NutriBiotic OS", appleWebApp: { title: "Visit" } };
+/* appleWebApp.title labels the Home Screen icon when this exact screen is the
+   one added, which is the point of adding it: a tile that lands on capture, not
+   a "NutriBiotic" one that lands on the map.
+   ClientOS, not Visit: it is the name Juan already says out loud to file an
+   interaction (the `clientos` keyword), and the tile and the word he uses for
+   the same act should not be two different names. The tab keeps saying Visit,
+   which is what the nav calls it. Icon is apple-icon.png in this folder, the
+   leaves-only brand mark on ink. */
+export const metadata = { title: "Visit · NutriBiotic OS", appleWebApp: { title: "ClientOS" } };
 
 export default async function VisitPage() {
   const [proposals, unfiled] = await Promise.all([

@@ -1,6 +1,6 @@
 /**
- * Home screen. Two things that put the OS on Juan's phone without a browser
- * around it: the route as a real WidgetKit widget, and Visit as an icon.
+ * Home screen. The ways the OS reaches Juan's phone without a browser around
+ * it: the route as a real WidgetKit widget, and ClientOS and ExpensOS as icons.
  *
  * NOT called "Phone", which is already a nav tab and a different thing (the
  * offer-code screen a rep works from in a parking lot).
@@ -46,8 +46,10 @@ function Step({ n, title, children }: { n: number; title: string; children?: Rea
  * with an address bar, while this opens the screen itself, full bleed, with its
  * own icon. Same destination, one of them feels like the app it is.
  *
- * Each launchable screen carries its own apple-icon.tsx, so two of these sitting
- * side by side are not two identical NB squares. See lib/launcher-icon.tsx.
+ * Each launchable screen carries its own apple-icon.png beside its page, so two
+ * of these sitting side by side are not two identical tiles. Both are the real
+ * NutriBiotic mark; the ground is what tells them apart. See apple-icon.tsx at
+ * the segment root for why.
  */
 function Launcher({
   heading,
@@ -126,7 +128,7 @@ export default async function WidgetSetupPage() {
     <>
       <PageHead
         title="Home screen"
-        sub="The route as a widget, and Visit as an icon. Both point at this OS; neither is a second copy of it."
+        sub="The route as a widget, ClientOS and ExpensOS as icons. All three point at this OS; none is a second copy of it."
       />
 
       <div className="flex max-w-[720px] flex-col gap-9">
@@ -139,8 +141,9 @@ export default async function WidgetSetupPage() {
             <p className="max-w-[62ch] text-[13.5px] leading-relaxed text-[#5B6560]">
               A real home-screen widget, drawn by WidgetKit, showing the route exactly as the map
               shows it: your stops, your order, the trading facts, the straight-line legs. Tapping a
-              stop opens turn-by-turn to it. It refreshes about every fifteen minutes and whenever
-              iOS decides to; it never reorders anything and never invents a drive time.
+              stop opens turn-by-turn to it. It asks iOS to redraw every two minutes, which iOS
+              honours on its own budget, so the widget prints the time it read the route rather than
+              implying it is live. It never reorders anything and never invents a drive time.
             </p>
 
             {!token ? (
@@ -201,16 +204,16 @@ export default async function WidgetSetupPage() {
         </section>
 
         <Launcher
-          heading="Visit icon"
-          name="Visit"
+          heading="ClientOS icon"
+          name="ClientOS"
           path="/nutribiotic/visit"
           icon="mic"
-          blurb="Straight to the capture screen, typed or recorded."
+          blurb="Straight to the capture screen, typed or recorded, the same act the clientos keyword performs."
         />
 
         <Launcher
-          heading="Expenses icon"
-          name="Expenses"
+          heading="ExpensOS icon"
+          name="ExpensOS"
           path="/nutribiotic/expenses"
           icon="receipt"
           blurb="Straight to clock in and out and the photo dropzone, which is the whole point of it: a receipt gets filed in the parking lot or it does not get filed."
