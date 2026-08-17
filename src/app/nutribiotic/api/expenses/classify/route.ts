@@ -10,7 +10,7 @@
  * same photo in a CLI session).
  */
 import Anthropic from "@anthropic-ai/sdk";
-import { hasValidSession } from "../../../lib/session";
+import { hasAccess } from "../../../lib/devices";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -45,7 +45,7 @@ const CLASSIFY_TOOL = {
 };
 
 export async function POST(req: Request) {
-  if (!(await hasValidSession())) {
+  if (!(await hasAccess())) {
     return Response.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
   if (!client) {

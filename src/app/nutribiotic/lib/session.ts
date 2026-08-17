@@ -32,6 +32,33 @@ const TTL_SECONDS = 60 * 60 * 8; // 8h, about one working day
 const LOCK_MAX = 5;
 const LOCK_MINUTES = 15;
 
+/**
+ * The remembered-device cookie (2026-08-17). Separate from the session cookie
+ * on purpose, and weaker in exactly one way and stronger in another:
+ *
+ *  - It carries a DEVICE ID, not just an expiry, so what it proves can be looked
+ *    up and taken away. A signed-expiry-only cookie that lasted a year would be
+ *    revocable only by rotating NB_SESSION_SECRET, which also logs out the Mac
+ *    bridges.
+ *  - Its signature is checked here, but a device is only TRUSTED once devices.ts
+ *    confirms the row is still live. This module stays database-free so proxy.ts
+ *    can keep importing it (Proxy may never touch a database — see proxy.ts).
+ *
+ * 400 days is the ceiling browsers now clamp a persistent cookie to, so asking
+ * for more just gets silently trimmed.
+ */
+export const DEVICE_COOKIE = "nb_device";
+const DEVICE_TTL_SECONDS = 60 * 60 * 24 * 400;
+
+/**
+ * How many devices may ever be remembered. Six, not the three Juan named, and
+ * the difference is iOS rather than generosity: every Home Screen web app has
+ * its own cookie jar, so the OS tile, ClientOS and ExpensOS on one phone are
+ * three devices to this table before the work phone or the laptop is counted.
+ * Overridable with NB_DEVICE_LIMIT without a deploy.
+ */
+export const DEVICE_LIMIT = Math.max(1, Number(process.env.NB_DEVICE_LIMIT) || 6);
+
 const enc = new TextEncoder();
 
 function b64url(bytes: Uint8Array): string {
@@ -91,6 +118,46 @@ export async function verifyToken(token: string | undefined): Promise<boolean> {
 
   const exp = Number(payload);
   return Number.isFinite(exp) && Date.now() < exp;
+}
+
+/**
+ * Mint a remembered-device token. Signs `<deviceId>.<expiry>` so neither half
+ * can be edited: an attacker who could rewrite the id would walk into any live
+ * device's slot, and one who could rewrite the expiry would hold it forever.
+ */
+export async function mintDeviceToken(deviceId: string): Promise<string> {
+  const payload = `${deviceId}.${Date.now() + DEVICE_TTL_SECONDS * 1000}`;
+  return `${payload}.${await hmac(payload)}`;
+}
+
+/** The device id a well-signed, unexpired token claims, or null. Says nothing
+ *  about whether that device is still trusted; see devices.ts. */
+export async function readDeviceToken(token: string | undefined): Promise<string | null> {
+  if (!token) return null;
+  const sigAt = token.lastIndexOf(".");
+  if (sigAt < 1) return null;
+  const payload = token.slice(0, sigAt);
+  const sig = token.slice(sigAt + 1);
+
+  let expected: string;
+  try {
+    expected = await hmac(payload);
+  } catch {
+    return null;
+  }
+  if (!timingSafeEqual(sig, expected)) return null;
+
+  const expAt = payload.lastIndexOf(".");
+  if (expAt < 1) return null;
+  const exp = Number(payload.slice(expAt + 1));
+  if (!Number.isFinite(exp) || Date.now() >= exp) return null;
+  return payload.slice(0, expAt);
+}
+
+/** The device id claimed by this request's cookie, signature-checked only. */
+export async function claimedDeviceId(): Promise<string | null> {
+  const jar = await cookies();
+  return readDeviceToken(jar.get(DEVICE_COOKIE)?.value);
 }
 
 /**
@@ -177,4 +244,5 @@ export function checkPin(candidate: string): boolean {
 }
 
 export const SESSION_TTL_SECONDS = TTL_SECONDS;
+export const DEVICE_TTL = DEVICE_TTL_SECONDS;
 export const LOCKOUT_MINUTES = LOCK_MINUTES;

@@ -36,7 +36,8 @@
 import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
-import { hasValidSession, hasWidgetToken } from "./session";
+import { hasAccess } from "./devices";
+import { hasWidgetToken } from "./session";
 
 const SB_URL = process.env.NB_SUPABASE_URL ?? "";
 const SB_KEY = process.env.NB_SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -73,7 +74,12 @@ export const isConfigured = (): boolean => Boolean(SB_URL && SB_KEY);
  * Next 16 auth guide, so many queries on one page do not repeat the check.
  */
 export const verifySession = cache(async (): Promise<true> => {
-  if (!(await hasValidSession())) redirect("/nutribiotic/gate");
+  /* hasAccess, not hasValidSession, since 2026-08-17: a PIN session OR a
+     remembered device (devices.ts). This is also where a REVOKED device is
+     stopped — proxy.ts checks that cookie's signature and nothing else, because
+     Proxy may not touch a database, so revocation has to be enforced by the gate
+     that guards the data rather than by the one that guards the route. */
+  if (!(await hasAccess())) redirect("/nutribiotic/gate");
   return true;
 });
 

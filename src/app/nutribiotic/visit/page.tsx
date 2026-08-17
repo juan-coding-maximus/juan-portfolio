@@ -12,6 +12,7 @@
 import { isConfigured, listCalendarProposals, listUnfiledActivities } from "../lib/dal";
 import { EngagementQueue } from "../lib/engagement-ui";
 import { CalendarProposalRow, RecordVisit, TouchpointCapture } from "../lib/touchpoint-ui";
+import { LAUNCHERS } from "../lib/launchers";
 import { Empty, PageHead } from "../lib/ui";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +24,15 @@ export const dynamic = "force-dynamic";
    the same act should not be two different names. The tab keeps saying Visit,
    which is what the nav calls it. Icon is apple-icon.png in this folder, the
    leaves-only brand mark on ink. */
-export const metadata = { title: "Visit · NutriBiotic OS", appleWebApp: { title: "ClientOS" } };
+/* The manifest is what decides WHERE the tile opens, and it has to be this
+   screen's own: iOS 16.4+ launches the linked manifest's start_url, so while the
+   whole OS shared one, a ClientOS tile with a ClientOS name and a ClientOS icon
+   still opened the map. See ../lib/launchers.ts. */
+export const metadata = {
+  title: "Visit · NutriBiotic OS",
+  appleWebApp: { title: "ClientOS" },
+  manifest: LAUNCHERS.CLIENTOS.href,
+};
 
 export default async function VisitPage() {
   const [proposals, unfiled] = await Promise.all([

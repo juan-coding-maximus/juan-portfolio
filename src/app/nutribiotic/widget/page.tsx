@@ -88,10 +88,19 @@ function Launcher({
           </Step>
           <Step n={2} title="Share, then Add to Home Screen">
             Name it <span className="font-medium text-[#3D4A44]">{name}</span>. It opens full screen
-            with its own icon and keeps the eight-hour session, so it is not a PIN prompt every
-            morning.
+            with its own icon, on <span className="font-medium text-[#3D4A44]">this</span> screen: the
+            tile carries its own manifest now, so it no longer lands on the map the way every tile
+            did until 2026-08-17.
           </Step>
-          <Step n={3} title="If you would rather have a Shortcut">
+          <Step n={3} title="Unlock it once, with Remember this device ticked">
+            iOS gives every Home Screen app its own cookie jar, so each tile asks for the PIN the
+            first time even if the phone is already signed in. Ticked, that is the last time.{" "}
+            <a href="/nutribiotic/devices" className="font-medium text-[#3D4A44] underline underline-offset-2">
+              Devices
+            </a>{" "}
+            lists what is remembered and takes it back.
+          </Step>
+          <Step n={4} title="If you would rather have a Shortcut">
             Shortcuts app, +, add the{" "}
             <span className="font-medium text-[#3D4A44]">Open URLs</span> action, paste{" "}
             <span className="font-medium text-[#3D4A44]">

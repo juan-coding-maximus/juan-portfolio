@@ -6,6 +6,7 @@
  */
 
 import { ExpensesClient } from "./ExpensesClient";
+import { LAUNCHERS } from "../lib/launchers";
 import { PageHead } from "../lib/ui";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,11 @@ export const metadata = {
      parking lot with a receipt in his hand, and it should look like the company
      he is doing it for. */
   appleWebApp: { title: "ExpensOS" },
+  /* And its own manifest, which is the half that decides where the tile OPENS.
+     Until 2026-08-17 the OS had a single site-wide manifest, so this tile
+     launched its start_url (the map) no matter what it was called or what it
+     looked like. See ../lib/launchers.ts. */
+  manifest: LAUNCHERS.EXPENSOS.href,
 };
 
 export default function ExpensesPage() {

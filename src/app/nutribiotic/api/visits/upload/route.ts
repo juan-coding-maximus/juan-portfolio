@@ -17,13 +17,13 @@
  * and storage rows; closed 2026-08-10 alongside the PIN gate's reinstatement.
  */
 import { insertVisitRecording, uploadVisitAudio } from "../../../lib/dal";
-import { hasValidSession } from "../../../lib/session";
+import { hasAccess } from "../../../lib/devices";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  if (!(await hasValidSession())) {
+  if (!(await hasAccess())) {
     return Response.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 

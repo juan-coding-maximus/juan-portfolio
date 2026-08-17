@@ -22,7 +22,7 @@
 
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { COOKIE, verifyToken } from "./app/nutribiotic/lib/session";
+import { COOKIE, DEVICE_COOKIE, readDeviceToken, verifyToken } from "./app/nutribiotic/lib/session";
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -50,6 +50,14 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // The three Home Screen manifests, for the same reason and with the same
+  // stakes: iOS fetches a manifest while installing a tile, and a manifest that
+  // 307s to the gate is a tile installed with the gate's name and the gate's
+  // start_url. They carry names, colors and an icon path — no data.
+  if (pathname.endsWith("/manifest.webmanifest")) {
+    return NextResponse.next();
+  }
+
   // The buyer surface. A store owner holding a handwritten card must never
   // meet a PIN, so /nutribiotic/promo/* passes with no cookie. What keeps it
   // safe is the shape of its data access, not this file: promo-public.ts
@@ -62,7 +70,15 @@ export async function proxy(req: NextRequest) {
     return res;
   }
 
-  const ok = await verifyToken(req.cookies.get(COOKIE)?.value);
+  /* Two proofs, both read optimistically: an eight-hour PIN session, or a
+     remembered device (lib/devices.ts). Only the device cookie's SIGNATURE is
+     checked here — whether that device is still in the registry, and whether it
+     was revoked, is a database question, and Proxy may not ask one (see the
+     header). The DAL asks it on every request, so a revoked device gets exactly
+     as far as this line and no further. */
+  const ok =
+    (await verifyToken(req.cookies.get(COOKIE)?.value)) ||
+    (await readDeviceToken(req.cookies.get(DEVICE_COOKIE)?.value)) !== null;
   if (!ok) {
     const url = req.nextUrl.clone();
     url.pathname = "/nutribiotic/gate";

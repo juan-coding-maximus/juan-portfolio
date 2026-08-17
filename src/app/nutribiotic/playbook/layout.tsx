@@ -11,11 +11,11 @@
  */
 
 import { redirect } from "next/navigation";
-import { hasValidSession } from "../lib/session";
+import { hasAccess } from "../lib/devices";
 
 export default async function PlaybookLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  if (!(await hasValidSession())) redirect("/nutribiotic/gate");
+  if (!(await hasAccess())) redirect("/nutribiotic/gate");
   return <>{children}</>;
 }

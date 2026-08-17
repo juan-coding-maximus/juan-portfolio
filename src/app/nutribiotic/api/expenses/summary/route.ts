@@ -6,13 +6,13 @@
  * provisions that period's folder/sheet, same as the CLI's `setup`.
  */
 import { periodSummary } from "../../../lib/expenses";
-import { hasValidSession } from "../../../lib/session";
+import { hasAccess } from "../../../lib/devices";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
 export async function GET() {
-  if (!(await hasValidSession())) {
+  if (!(await hasAccess())) {
     return Response.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }); // YYYY-MM-DD

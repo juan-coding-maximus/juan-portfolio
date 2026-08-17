@@ -5,13 +5,13 @@
  * because the UI holds the draft client-side until the rep submits once.
  */
 import { fileTrip } from "../../../lib/expenses";
-import { hasValidSession } from "../../../lib/session";
+import { hasAccess } from "../../../lib/devices";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  if (!(await hasValidSession())) {
+  if (!(await hasAccess())) {
     return Response.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 

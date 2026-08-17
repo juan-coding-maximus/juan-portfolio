@@ -25,7 +25,8 @@
  * string, so it stays out of URLs and access logs.
  */
 import { getRouteDraft, listOwnerAccounts, type CustomStop, type MapAccount } from "../../lib/dal";
-import { hasValidSession, hasWidgetToken } from "../../lib/session";
+import { hasAccess } from "../../lib/devices";
+import { hasWidgetToken } from "../../lib/session";
 import { appleMapsUrl, fullAddress, HUBSPOT_COMPANY_URL } from "../../lib/ui";
 
 export const runtime = "nodejs";
@@ -78,7 +79,7 @@ type Stop = {
 };
 
 export async function GET() {
-  if (!(await hasWidgetToken()) && !(await hasValidSession())) {
+  if (!(await hasWidgetToken()) && !(await hasAccess())) {
     return Response.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 

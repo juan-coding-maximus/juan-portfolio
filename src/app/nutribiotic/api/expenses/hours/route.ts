@@ -4,13 +4,13 @@
  * exactly); see that file's header for what does and doesn't carry over.
  */
 import { fileHours } from "../../../lib/expenses";
-import { hasValidSession } from "../../../lib/session";
+import { hasAccess } from "../../../lib/devices";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
 export async function POST(req: Request) {
-  if (!(await hasValidSession())) {
+  if (!(await hasAccess())) {
     return Response.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 

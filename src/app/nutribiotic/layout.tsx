@@ -1,20 +1,30 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getRouteDraft, isConfigured, workspaceMode } from "./lib/dal";
+import { LAUNCHERS } from "./lib/launchers";
 import { ModalProvider } from "./lib/modal";
 import { MobileNav } from "./lib/MobileNav";
 import { RouteProvider } from "./lib/route-context";
-import { hasValidSession } from "./lib/session";
+import { hasAccess } from "./lib/devices";
 import { Ico } from "./lib/ui";
 
 export const metadata: Metadata = {
   title: "NutriBiotic OS",
   robots: { index: false, follow: false },
+  /* The manifest is declared HERE, not by a root app/manifest.ts, and that is
+     the fix for three Home Screen tiles that all opened the map (2026-08-17).
+     Next's root manifest convention injects one <link rel="manifest"> into every
+     page of the site, and iOS 16.4+ launches whatever `start_url` it finds there
+     rather than the page that was added — so one manifest meant one app. This
+     one covers the OS; Visit and Expenses each override it with their own.
+     See lib/launchers.ts. */
+  manifest: LAUNCHERS.OS.href,
   /* Added to Home Screen, this opens standalone: no address bar, no tab strip,
      which on a phone held at a door is the difference between a tool and a web
-     page. The eight-hour session cookie survives it, so it is not a PIN prompt
-     every morning. Icon comes from apple-icon.tsx in this segment. See
-     /nutribiotic/widget for the install steps Juan follows once. */
+     page. Once the tile is remembered as a device (lib/devices.ts) it is not a
+     PIN prompt at all; before that it was one every eight hours, per tile, since
+     each iOS web app carries its own cookie jar. Icon comes from apple-icon.tsx
+     in this segment. See /nutribiotic/widget for the install steps. */
   appleWebApp: { capable: true, title: "NutriBiotic", statusBarStyle: "default" },
   /* Next 16 renders appleWebApp.capable as <meta name="mobile-web-app-capable">
      only. iOS 16.4+ honours that; everything before it looks exclusively for the
@@ -88,7 +98,7 @@ export default async function NutribioticLayout({
   // redirecting, and renders the unauthenticated view bare (no nav, no data
   // reads — workspaceMode()/listDrafts() below touch the DAL, which is the real
   // gate and would redirect to /nutribiotic/gate itself if reached unauthed).
-  if (!(await hasValidSession())) {
+  if (!(await hasAccess())) {
     return <div className="min-h-screen bg-[#F7F6F1] text-[#14201B]">{children}</div>;
   }
 
