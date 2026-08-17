@@ -106,7 +106,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
               </button>
             </div>
 
-            <div className="max-h-[75vh] overflow-y-auto px-6 py-6">
+            <div className="max-h-[75vh] overflow-x-hidden overflow-y-auto px-6 py-6">
               {loading && <div className="py-10 text-center text-[13.5px] text-[#8A928C]">Loading account...</div>}
               {!loading && !data && (
                 <div className="py-10 text-center text-[13.5px] text-[#8A928C]">Account not found.</div>

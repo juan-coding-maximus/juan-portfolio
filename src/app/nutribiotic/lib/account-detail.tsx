@@ -134,8 +134,8 @@ export function AccountDetailBody({
         </button>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
-      <div className="flex flex-col gap-5">
+      <div className="grid min-w-0 gap-5 lg:grid-cols-[1fr_320px]">
+      <div className="flex min-w-0 flex-col gap-5">
         {/* Quirks first. This is what makes or breaks the visit. */}
         {a.quirks && (
           <Card className="border-l-[3px] border-l-[#14201B]">
@@ -246,7 +246,7 @@ export function AccountDetailBody({
               <ul className="flex flex-col divide-y divide-[#EDEBE3]">
                 {items.map(([name, t]) => (
                   <li key={name} className="flex items-baseline justify-between gap-3 py-1.5 text-[13.5px]">
-                    <span>{name}</span>
+                    <span className="min-w-0 truncate">{name}</span>
                     <span className="shrink-0 tabular-nums text-[#5B6560]">
                       ×{t.qty} <span className="text-[#8A928C]">· {money(t.revenueCents / 100)}</span>
                     </span>
@@ -282,7 +282,7 @@ export function AccountDetailBody({
         </section>
       </div>
 
-      <aside className="flex flex-col gap-4">
+      <aside className="flex min-w-0 flex-col gap-4">
         <Card>
           {/* Two stat tiles per row on a phone, label stacked over value, both
               hard-truncated: a squeezed sidebar row that can't fit its value
