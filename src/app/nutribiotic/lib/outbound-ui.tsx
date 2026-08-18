@@ -58,16 +58,25 @@ const COMPOSE_URL_LIMIT = 1900;
  * A body that will not fit is DROPPED RATHER THAN TRUNCATED, and the caller
  * offers a copy button instead. A half-sent email that looks complete is worse
  * than an empty compose window next to a copy button. */
+function owaQuery(params: Record<string, string>): string {
+  // Not URLSearchParams: its toString() encodes spaces as "+" (form
+  // encoding), and the Outlook deep-link endpoint shows that "+" literally
+  // instead of decoding it back to a space. encodeURIComponent emits %20.
+  return Object.entries(params)
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+    .join("&");
+}
+
 function owaComposeLink(toEmail: string, subject: string | null, body: string): { href: string; bodyOmitted: boolean } {
   const base = "https://outlook.cloud.microsoft/mail/deeplink/compose?";
-  const withBody = new URLSearchParams({ to: toEmail, body });
-  if (subject) withBody.set("subject", subject);
-  const full = base + withBody;
+  const withBodyParams: Record<string, string> = { to: toEmail, body };
+  if (subject) withBodyParams.subject = subject;
+  const full = base + owaQuery(withBodyParams);
   if (full.length <= COMPOSE_URL_LIMIT) return { href: full, bodyOmitted: false };
 
-  const withoutBody = new URLSearchParams({ to: toEmail });
-  if (subject) withoutBody.set("subject", subject);
-  return { href: base + withoutBody, bodyOmitted: true };
+  const withoutBodyParams: Record<string, string> = { to: toEmail };
+  if (subject) withoutBodyParams.subject = subject;
+  return { href: base + owaQuery(withoutBodyParams), bodyOmitted: true };
 }
 
 export type DraftLite = {
