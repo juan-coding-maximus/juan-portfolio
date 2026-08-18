@@ -11,7 +11,7 @@
 
 import { isConfigured, listCalendarProposals, listUnfiledActivities } from "../lib/dal";
 import { EngagementQueue } from "../lib/engagement-ui";
-import { CalendarProposalRow, RecordVisit, TouchpointCapture } from "../lib/touchpoint-ui";
+import { CalendarProposalRow, TouchpointCapture } from "../lib/touchpoint-ui";
 import { LAUNCHERS } from "../lib/launchers";
 import { Empty, PageHead } from "../lib/ui";
 
@@ -42,26 +42,20 @@ export default async function VisitPage() {
 
   return (
     <>
-      <PageHead
-        title="Visit"
-        sub="Log what just happened, typed or recorded. It becomes an activity log entry, contact detail, and a HubSpot note right away; any follow-up it hears waits below for your approval before it touches your calendar."
-      />
+      <PageHead title="Visit" />
 
       {!isConfigured() ? (
         <Empty>No data source configured. Nothing is being shown, and nothing is being guessed.</Empty>
       ) : (
         <div className="flex flex-col gap-8">
-          <section className="max-w-[640px]">
-            <TouchpointCapture />
-            <RecordVisit />
-          </section>
+          <TouchpointCapture />
 
-          <div className="max-w-[640px]">
+          <div className="mx-auto w-full max-w-[600px]">
             <EngagementQueue activities={unfiled.data} />
           </div>
 
           {proposals.data.length > 0 && (
-            <section className="max-w-[640px]">
+            <section className="mx-auto w-full max-w-[600px]">
               <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8A928C]">
                 Follow-ups to confirm
               </h2>

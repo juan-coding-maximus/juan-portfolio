@@ -106,6 +106,19 @@ function toCandidate(place: RawPlace): PlaceCandidate {
 
 export class PlacesError extends Error {}
 
+/**
+ * California's bounding box, generous rather than exact (a rectangle can't
+ * trace the state's real border, so this includes a thin sliver of NV/AZ/OR
+ * near the line rather than risk clipping a real CA address). Juan's whole
+ * book is Southern California; a CT/OH result is never useful and was
+ * confirmed happening 2026-08-17 on a plain text search with no geographic
+ * restriction at all.
+ */
+const CALIFORNIA_BOUNDS = {
+  low: { latitude: 32.4, longitude: -124.6 },
+  high: { latitude: 42.1, longitude: -114.0 },
+};
+
 /** Top few candidates for a free-text query ("XCEL Wellness, Huntington Beach, CA"). */
 export async function searchPlaces(query: string, maxResults = 3): Promise<PlaceCandidate[]> {
   const key = process.env.NB_PLACES_API_KEY ?? "";
@@ -118,7 +131,13 @@ export async function searchPlaces(query: string, maxResults = 3): Promise<Place
       "X-Goog-Api-Key": key,
       "X-Goog-FieldMask": FIELD_MASK,
     },
-    body: JSON.stringify({ textQuery: query, maxResultCount: maxResults, languageCode: "en" }),
+    body: JSON.stringify({
+      textQuery: query,
+      maxResultCount: maxResults,
+      languageCode: "en",
+      regionCode: "US",
+      locationRestriction: { rectangle: CALIFORNIA_BOUNDS },
+    }),
     cache: "no-store",
   });
 
