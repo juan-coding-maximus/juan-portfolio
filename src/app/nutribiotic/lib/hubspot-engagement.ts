@@ -157,7 +157,7 @@ function typedProperties(
   const ts = hsTimestamp(activity);
   const kind = activity.kind || "";
   const outcome = (activity.outcome || "").trim();
-  const title = `${KIND_LABEL[kind] ?? kind} — NutriBiotic OS`;
+  const title = KIND_LABEL[kind] ?? kind;
 
   if (otype === "CALL") {
     return {
@@ -276,8 +276,6 @@ function noteLines(
     lines.push(`Spoke with: ${names.join(", ")}`);
   }
 
-  lines.push("");
-  lines.push(`Filed by the NutriBiotic OS from a field note by ${activity.actor ?? "juan"}. ${marker(activity.id)}`);
   return lines;
 }
 
@@ -293,8 +291,16 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function noteBody(lines: string[]): string {
-  return lines.map(escapeHtml).join("<br>");
+/** The dedup marker rides along as an HTML comment, invisible when the note
+ * renders in HubSpot (Juan doesn't want "Filed by the NutriBiotic OS..."
+ * showing up in what a customer-facing rep or HQ reads) but still findable
+ * by alreadyFiled()'s CONTAINS_TOKEN search, which is the whole point of it:
+ * the write-once idempotency layer that catches a POST-succeeded-stamp-
+ * failed race. Comments never render as visible text in HTML, so this is
+ * not "hiding" content from Juan, it's not writing customer-facing content
+ * at all. */
+function noteBody(lines: string[], activityId: number): string {
+  return lines.map(escapeHtml).join("<br>") + `<!--${marker(activityId)}-->`;
 }
 
 // ---------------------------------------------------------------------------
@@ -512,7 +518,7 @@ export async function runEngagement(activityId: number, opts: { write: boolean }
 
   const contactIds = matched.map((m) => m.contact.hubspot_contact_id).filter((v): v is string => Boolean(v));
   const lines = noteLines(activity, matched, etype, otype, parsed?.activity?.hubspot_summary ?? null);
-  const body = noteBody(lines);
+  const body = noteBody(lines, activityId);
   const matchedNames = matched
     .map((m) => [m.contact.first_name, m.contact.last_name].filter(Boolean).join(" ").trim())
     .filter(Boolean);
