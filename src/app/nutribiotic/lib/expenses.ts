@@ -46,10 +46,14 @@ const LOG_TAB = "Log";
 const HOURS_TAB = "Hours";
 const EXPENSE_HEADER = ["Date", "Merchant", "Purpose", "Amount", "Link"];
 const MILES_HEADER = ["Start Odo", "Link", "End Odo", "Link", "Distance", "Compensation"];
-const HOURS_HEADER = ["Date", "Day", "Clock In", "Clock Out", "Break (min)", "Hours Worked", "Regular", "OT 1.5x", "OT 2x", "Notes"];
+const HOURS_HEADER = ["Date", "Day", "Clock In", "Clock Out", "Break (hours)", "Hours Worked", "Regular", "OT 1.5x", "OT 2x", "Notes"];
 const TOTALS_ROW = 2;
 const FIRST_DATA_ROW = 3;
 const LAST_ROW = 2000;
+// Hours-tab-only bound, tighter than the Log tab's LAST_ROW: one row per day, and a
+// semi-monthly period never exceeds 16 days, so this pads past 16 with room to spare.
+// Mirrors bridges/expenses/expense_log.py's HOURS_LAST_ROW (2026-08-18), keep both in sync.
+const HOURS_LAST_ROW = 20;
 const LIGHT_GREEN = { red: 0.91, green: 0.961, blue: 0.914 };
 
 // Paired with bridges/expenses/config.json's "mileage_rate". Change both
@@ -151,11 +155,11 @@ async function ensureTree(dateStr: string): Promise<Tree> {
     await writeRange(sheet.id, `${HOURS_TAB}!A1:J1`, [HOURS_HEADER]);
     await writeRange(sheet.id, `${HOURS_TAB}!A${TOTALS_ROW}:J${TOTALS_ROW}`, [[
       "TOTAL", "", "", "",
-      `=SUM(E${FIRST_DATA_ROW}:E${LAST_ROW})`,
-      `=SUM(F${FIRST_DATA_ROW}:F${LAST_ROW})`,
-      `=MIN(SUM(G${FIRST_DATA_ROW}:G${LAST_ROW}),40)`,
-      `=SUM(H${FIRST_DATA_ROW}:H${LAST_ROW})+MAX(0,SUM(G${FIRST_DATA_ROW}:G${LAST_ROW})-40)`,
-      `=SUM(I${FIRST_DATA_ROW}:I${LAST_ROW})`, "",
+      `=SUM(E${FIRST_DATA_ROW}:E${HOURS_LAST_ROW})`,
+      `=SUM(F${FIRST_DATA_ROW}:F${HOURS_LAST_ROW})`,
+      `=MIN(SUM(G${FIRST_DATA_ROW}:G${HOURS_LAST_ROW}),40)`,
+      `=SUM(H${FIRST_DATA_ROW}:H${HOURS_LAST_ROW})+MAX(0,SUM(G${FIRST_DATA_ROW}:G${HOURS_LAST_ROW})-40)`,
+      `=SUM(I${FIRST_DATA_ROW}:I${HOURS_LAST_ROW})`, "",
     ]]);
     await styleHoursSheet(sheet.id);
   }
@@ -182,8 +186,8 @@ async function styleHoursSheet(sheetId: string): Promise<void> {
   await batchUpdate(sheetId, [
     { repeatCell: { range: { sheetId: gid, startRowIndex: 0, endRowIndex: TOTALS_ROW, startColumnIndex: 0, endColumnIndex: 10 }, cell: { userEnteredFormat: { textFormat: { bold: true } } }, fields: "userEnteredFormat.textFormat.bold" } },
     { updateSheetProperties: { properties: { sheetId: gid, gridProperties: { frozenRowCount: TOTALS_ROW } }, fields: "gridProperties.frozenRowCount" } },
-    { repeatCell: { range: { sheetId: gid, startRowIndex: TOTALS_ROW - 1, endRowIndex: LAST_ROW, startColumnIndex: 5, endColumnIndex: 9 }, cell: { userEnteredFormat: { numberFormat: hrs } }, fields: "userEnteredFormat.numberFormat" } },
-    { addConditionalFormatRule: { index: 0, rule: { ranges: [{ sheetId: gid, startRowIndex: FIRST_DATA_ROW - 1, endRowIndex: LAST_ROW, startColumnIndex: 0, endColumnIndex: 10 }], booleanRule: { condition: { type: "CUSTOM_FORMULA", values: [{ userEnteredValue: "=ISEVEN(ROW())" }] }, format: { backgroundColor: LIGHT_GREEN } } } } },
+    { repeatCell: { range: { sheetId: gid, startRowIndex: TOTALS_ROW - 1, endRowIndex: HOURS_LAST_ROW, startColumnIndex: 4, endColumnIndex: 9 }, cell: { userEnteredFormat: { numberFormat: hrs } }, fields: "userEnteredFormat.numberFormat" } },
+    { addConditionalFormatRule: { index: 0, rule: { ranges: [{ sheetId: gid, startRowIndex: FIRST_DATA_ROW - 1, endRowIndex: HOURS_LAST_ROW, startColumnIndex: 0, endColumnIndex: 10 }], booleanRule: { condition: { type: "CUSTOM_FORMULA", values: [{ userEnteredValue: "=ISEVEN(ROW())" }] }, format: { backgroundColor: LIGHT_GREEN } } } } },
   ]);
 }
 
@@ -219,7 +223,7 @@ export async function fileHours(input: HoursInput): Promise<HoursResult> {
   const { date, clockIn, clockOut, breakMin, notes } = input;
   const tree = await ensureTree(date);
 
-  const existingDates = await readColumn(tree.sheetId, `${HOURS_TAB}!A${FIRST_DATA_ROW}:A${LAST_ROW}`);
+  const existingDates = await readColumn(tree.sheetId, `${HOURS_TAB}!A${FIRST_DATA_ROW}:A${HOURS_LAST_ROW}`);
   if (existingDates.includes(date)) {
     return { status: "duplicate", why: `${date} is already filed for this period. Amend it from the CLI (expensos) instead of re-filing.` };
   }
@@ -236,8 +240,11 @@ export async function fileHours(input: HoursInput): Promise<HoursResult> {
 
   const day = parseDate(date).toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
   const row = Math.max(await nextFreeRow(tree.sheetId, HOURS_TAB, "A"), FIRST_DATA_ROW);
+  // breakMin stays minutes on the wire (that's what the clock-in/out UI collects); the
+  // sheet cell reads hours, matching expense_log.py's 2026-08-18 presentation call.
+  const breakHours = Math.round((breakMin / 60) * 100) / 100;
   await writeRange(tree.sheetId, `${HOURS_TAB}!A${row}:J${row}`, [[
-    date, day, clockIn, clockOut, breakMin, worked,
+    date, day, clockIn, clockOut, breakHours, worked,
     `=MIN(F${row},8)`, `=MAX(0,MIN(F${row},12)-8)`, `=MAX(0,F${row}-12)`, notes,
   ]]);
 
