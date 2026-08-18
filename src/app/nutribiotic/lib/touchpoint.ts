@@ -1,7 +1,8 @@
 /**
  * Record a touchpoint. Juan types what just happened; this turns it into a
- * clean activity log entry, fills contact detail, and drafts calendar
- * follow-ups for him to approve.
+ * clean activity log entry, fills contact detail, files the activity into
+ * HubSpot as a Note/Call/Meeting (autoFileEngagement, below), and drafts
+ * calendar follow-ups for him to approve.
  *
  * NO FABRICATION (agency AGENTS.md principle 2): the extraction prompt is
  * instructed to pull only what the text actually states, never invent a name,
@@ -29,6 +30,35 @@ import {
   listContacts,
   patchContact,
 } from "./dal";
+import { Blocked, runEngagement } from "./hubspot-engagement";
+
+/**
+ * File the just-logged activity straight into HubSpot, no click. One
+ * touchpoint should mean one thing happened: the account, the activity, and
+ * the note, all at once, the same "hands-off" contract the clientos skill
+ * already gives Juan from the CLI (see .claude/skills/clientos/SKILL.md) and
+ * AGENTS.md's "Automate housekeeping" standing order. A filing failure never
+ * unwinds the touchpoint itself, the activity just stays unfiled and drops
+ * into the Visit tab's manual queue below for a retry.
+ */
+async function autoFileEngagement(
+  activityId: number,
+): Promise<{ hubspotFiled: boolean; hubspotNoteId: string | null; hubspotError: string | null }> {
+  try {
+    const filed = await runEngagement(activityId, { write: true });
+    return {
+      hubspotFiled: filed.wrote || Boolean(filed.alreadyFiledId),
+      hubspotNoteId: filed.noteId ?? filed.alreadyFiledId,
+      hubspotError: null,
+    };
+  } catch (e) {
+    return {
+      hubspotFiled: false,
+      hubspotNoteId: null,
+      hubspotError: e instanceof Blocked ? e.message : e instanceof Error ? e.message : String(e),
+    };
+  }
+}
 
 const client = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -165,7 +195,19 @@ RULES, all absolute:
 }
 
 export type RecordTouchpointResult =
-  | { ok: true; touchpoint_id: string; accountName: string | null; needsAccount: false; summary: string; peopleAdded: number; peopleUpdated: number; calendarProposals: number }
+  | {
+      ok: true;
+      touchpoint_id: string;
+      accountName: string | null;
+      needsAccount: false;
+      summary: string;
+      peopleAdded: number;
+      peopleUpdated: number;
+      calendarProposals: number;
+      hubspotFiled: boolean;
+      hubspotNoteId: string | null;
+      hubspotError: string | null;
+    }
   | {
       ok: true;
       touchpoint_id: string;
@@ -183,7 +225,9 @@ export async function recordTouchpoint(
   rawText: string,
   accountIdHint?: string | null,
   occurredAt?: string | null,
+  opts: { autoFileHubspot?: boolean } = {},
 ): Promise<RecordTouchpointResult> {
+  const autoFileHubspot = opts.autoFileHubspot ?? true;
   const text = rawText.trim();
   if (!text) return { ok: false, error: "Nothing to record." };
   if (!client) return { ok: false, error: "ANTHROPIC_API_KEY is not configured on this deployment." };
@@ -315,6 +359,10 @@ export async function recordTouchpoint(
     calendarProposals += 1;
   }
 
+  const hubspot = autoFileHubspot
+    ? await autoFileEngagement(activity.id)
+    : { hubspotFiled: false, hubspotNoteId: null, hubspotError: null };
+
   return {
     ok: true,
     touchpoint_id: tp.id,
@@ -324,6 +372,7 @@ export async function recordTouchpoint(
     peopleAdded,
     peopleUpdated,
     calendarProposals,
+    ...hubspot,
   };
 }
 
@@ -335,6 +384,9 @@ export type ResolveResult =
       peopleAdded: number;
       peopleUpdated: number;
       calendarProposals: number;
+      hubspotFiled: boolean;
+      hubspotNoteId: string | null;
+      hubspotError: string | null;
     }
   | { ok: false; error: string };
 
@@ -421,5 +473,7 @@ export async function resolveTouchpointToAccount(
     calendarProposals += 1;
   }
 
-  return { ok: true, accountName, summary: parsed.activity.detail, peopleAdded, peopleUpdated, calendarProposals };
+  const hubspot = await autoFileEngagement(activity.id);
+
+  return { ok: true, accountName, summary: parsed.activity.detail, peopleAdded, peopleUpdated, calendarProposals, ...hubspot };
 }

@@ -2,12 +2,13 @@
 
 /**
  * The queue of logged activities that have not yet crossed into HubSpot.
- * Enrichment findings (actor "enrichment") are machine-sourced, not Juan's
- * own words, so they file themselves with no click; only a filing failure
- * surfaces, as a reviewable card. Everything else is Juan's own dictated
- * account of a visit/call/text, which still gets the review-then-file card:
- * the preview is the exact same deterministic output hubspot_notes.py would
- * print (see lib/hubspot-engagement.ts), so he reads it before it writes.
+ * Every activity, Juan's own dictated note or an enrichment finding, now
+ * files itself the moment lib/touchpoint.ts records it, no click (see that
+ * file's autoFileEngagement). What lands here is only the activities that
+ * failed to auto-file: a scope block, a missing company link, a HubSpot
+ * error. The preview is the exact same deterministic output
+ * hubspot_notes.py would print (see lib/hubspot-engagement.ts), so Juan can
+ * read why before retrying by hand.
  */
 
 import { useEffect, useRef, useState, useTransition } from "react";

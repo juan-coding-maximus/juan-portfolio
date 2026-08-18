@@ -36,8 +36,9 @@ export function TouchpointCapture() {
       />
       <div className="mt-2 flex items-center justify-between gap-3">
         <p className="max-w-[46ch] text-[11.5px] leading-snug text-[#8A928C]">
-          Log what just happened, typed or recorded. It becomes an activity log entry and contact detail right
-          away; any follow-up it hears waits below for your approval before it touches your calendar or HubSpot.
+          Log what just happened, typed or recorded. It becomes an activity log entry, contact detail, and a
+          HubSpot note right away; any follow-up it hears waits below for your approval before it touches your
+          calendar.
         </p>
         <button
           onClick={submit}
@@ -82,6 +83,21 @@ export function TouchpointCapture() {
           ) : (
             result.error
           )}
+        </div>
+      )}
+
+      {result?.ok && !result.needsAccount && (
+        <div
+          className={`mt-2 flex items-center gap-1.5 rounded-md border px-3 py-2 text-[12.5px] leading-relaxed ${
+            result.hubspotFiled
+              ? "border-[#E2DFD5] bg-[#FAF9F5] text-[#5B6560]"
+              : "border-[#E5D9BF] bg-[#FBF6E9] text-[#8A6D2F]"
+          }`}
+        >
+          <Ico name={result.hubspotFiled ? "check" : "alert"} size={12} />
+          {result.hubspotFiled
+            ? `Filed to HubSpot${result.hubspotNoteId ? ` (${result.hubspotNoteId})` : ""}`
+            : `Not filed to HubSpot yet: ${result.hubspotError ?? "unknown error"}. It's waiting in the queue below to retry.`}
         </div>
       )}
 

@@ -11,13 +11,16 @@
  * this is the business logic that sits on top of it, so a touchpoint typed or
  * recorded from the Visit tab can reach the portal without his laptop.
  *
- * DRY THEN WRITE, JUAN IS THE REVIEWER. The clientos skill has Claude read a
- * dry run and re-issue with --write in the same turn; that is a stand-in for
- * Juan's own judgment. Here there is no stand-in needed: previewEngagement()
- * is read-only (it may still search HubSpot for a duplicate or a phone match,
- * which are reads) and the Visit tab renders its output before Juan ever
- * clicks File to HubSpot, so the write only happens after the person the note
- * is about has actually looked at it.
+ * AUTO-FILED, SAME AS THE CLI. The clientos skill has Claude read a dry run
+ * and re-issue with --write in the same turn, hands-off, because Juan already
+ * asked for hands-off; lib/touchpoint.ts now does the equivalent for the
+ * Visit tab, calling runEngagement(write:true) itself the moment an activity
+ * is logged (typed note, recorded visit, or a just-created new business), no
+ * click. previewEngagement()/fileEngagement() below still exist for the
+ * Visit tab's "Ready to file to HubSpot" queue, which is now only a retry
+ * path: an activity lands there when the automatic file failed (scope block,
+ * missing company link, HubSpot error), so Juan can read why and push it
+ * through by hand, same as the enrichment auto-filer's own failure card.
  *
  * WHAT IT WILL NOT DO, same as the Python original:
  *   - Overwrite a populated HubSpot property. A disagreement is a proposal,

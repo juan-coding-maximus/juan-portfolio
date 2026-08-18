@@ -44,7 +44,7 @@ export default async function VisitPage() {
     <>
       <PageHead
         title="Visit"
-        sub="Log what just happened, typed or recorded. It becomes an activity log entry and contact detail right away; any follow-up it hears waits below for your approval before it touches your calendar or HubSpot."
+        sub="Log what just happened, typed or recorded. It becomes an activity log entry, contact detail, and a HubSpot note right away; any follow-up it hears waits below for your approval before it touches your calendar."
       />
 
       {!isConfigured() ? (

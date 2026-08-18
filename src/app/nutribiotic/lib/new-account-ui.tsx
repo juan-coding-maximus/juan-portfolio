@@ -56,8 +56,11 @@ export function NewBusinessResolver({
             ` · ${created.peopleAdded} contact${created.peopleAdded === 1 ? "" : "s"} added`}
           {created.calendarProposals > 0 && ` · ${created.calendarProposals} follow-up waiting below`}
         </div>
-        <div className="mt-1.5 text-[12px] text-[#8A928C]">
-          It's now in "Ready to file to HubSpot" below to become a Note, Call, or Meeting.
+        <div className={`mt-1.5 flex items-center gap-1.5 text-[12px] ${created.hubspotFiled ? "text-[#8A928C]" : "text-[#8A6D2F]"}`}>
+          <Ico name={created.hubspotFiled ? "check" : "alert"} size={11} />
+          {created.hubspotFiled
+            ? `Filed to HubSpot${created.hubspotNoteId ? ` (${created.hubspotNoteId})` : ""}.`
+            : `Not filed to HubSpot yet: ${created.hubspotError ?? "unknown error"}. It's waiting in the queue below to retry.`}
         </div>
       </div>
     );

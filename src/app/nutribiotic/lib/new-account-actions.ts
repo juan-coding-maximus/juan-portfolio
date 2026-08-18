@@ -40,6 +40,9 @@ export type CreateBusinessOutcome =
       peopleAdded: number;
       peopleUpdated: number;
       calendarProposals: number;
+      hubspotFiled: boolean;
+      hubspotNoteId: string | null;
+      hubspotError: string | null;
     }
   | { ok: false; error: string; duplicates?: DuplicateCandidate[] };
 
@@ -107,6 +110,9 @@ export async function createBusinessFromPlace(
       peopleAdded: filed.peopleAdded,
       peopleUpdated: filed.peopleUpdated,
       calendarProposals: filed.calendarProposals,
+      hubspotFiled: filed.hubspotFiled,
+      hubspotNoteId: filed.hubspotNoteId,
+      hubspotError: filed.hubspotError,
     };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };

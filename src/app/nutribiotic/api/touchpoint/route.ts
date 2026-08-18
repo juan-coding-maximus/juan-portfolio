@@ -38,7 +38,12 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: "text is required." }, { status: 400 });
   }
 
-  const result = await recordTouchpoint(text, accountIdHint, occurredAt);
+  // autoFileHubspot: false preserves this door's documented contract (see the
+  // file docstring): clients.py owns the HubSpot write itself via its own
+  // --hubspot/--write flags and hubspot_notes.py's dry-then-write gate, which
+  // clientos's Claude-mediated review depends on. Filing here too would file
+  // it live before that review ever runs.
+  const result = await recordTouchpoint(text, accountIdHint, occurredAt, { autoFileHubspot: false });
   if (!result.ok) {
     return Response.json({ ok: false, error: result.error }, { status: 422 });
   }
