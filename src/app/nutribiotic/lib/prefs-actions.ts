@@ -1,7 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { setRouteDraft, setShowChainAccounts, setShowPracticeAccounts, type RouteDraftEntry } from "./dal";
+import {
+  setRouteDraft,
+  setRouteSchedulePrefs,
+  setShowChainAccounts,
+  setShowPracticeAccounts,
+  type RouteDraftEntry,
+  type RouteSchedulePrefs,
+} from "./dal";
 
 /** The map's "chains" button. Persists to nb_ui_prefs (see migration 0024)
  * rather than client state, so the undo Juan asked to be semi-permanent
@@ -30,4 +37,28 @@ export async function toggleShowPracticeAccounts(show: boolean): Promise<void> {
  */
 export async function saveRouteDraft(entries: RouteDraftEntry[]): Promise<void> {
   await setRouteDraft(entries);
+}
+
+/**
+ * Departure, dwell, lunch and the home-by target (migration 0037). Persisted
+ * for the same reason the route itself is: a day set up at the kitchen table
+ * has to still be the day when the phone comes out in the car.
+ *
+ * Clamped here rather than trusted from the client, because the column
+ * constraint would reject a bad value with a 400 the panel would have to
+ * explain, and the honest fix for "he typed 900" is 240, not an error dialog.
+ * No revalidatePath, same reason as saveRouteDraft.
+ */
+export async function saveRouteSchedulePrefs(p: RouteSchedulePrefs): Promise<void> {
+  const clamp = (n: number, lo: number, hi: number, fallback: number) =>
+    Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : fallback;
+  const time = (t: string | null, fallback: string | null) =>
+    t && /^([01]\d|2[0-3]):[0-5]\d$/.test(t) ? t : fallback;
+
+  await setRouteSchedulePrefs({
+    depart: time(p.depart, "09:30")!,
+    dwellMinutes: clamp(p.dwellMinutes, 1, 240, 20),
+    lunchMinutes: clamp(p.lunchMinutes, 0, 240, 60),
+    returnBy: time(p.returnBy, null),
+  });
 }

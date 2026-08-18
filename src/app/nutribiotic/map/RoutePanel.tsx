@@ -13,19 +13,32 @@
  * behind him. The two are kept in different places on purpose (see migration
  * 0029) so a planner run can never eat a list he assembled by hand.
  *
- * NO DRIVE TIME, NO OPTIMAL ORDER, NO TOTAL DISTANCE. Every one of those would
- * be a number this screen cannot honestly produce: there is no Directions API
- * call here, and a straight-line sum presented as a route length would read as
- * a drive estimate and be wrong by whatever the streets do. The one figure
- * shown per leg is the straight-line hop from the previous stop, labelled as
- * such, the same honesty the ten-closest list already keeps.
+ * NO OPTIMAL ORDER: nothing here reorders Juan's list, and that is permanent.
+ *
+ * DRIVE TIME AND A CLOCK, added 2026-08-17 on his ask to see the day he plans
+ * in chat on the map itself. The original rule that kept them off this screen
+ * was not "times are unwanted", it was "this screen has no router, and a
+ * straight-line mile dressed up as a drive estimate is read as one". That rule
+ * still holds. What changed is drive-actions.ts, which routes on the real
+ * street network, so the number now has something real behind it.
+ *
+ * Three things keep it honest, and they are load-bearing:
+ *   1. The router returns FREE-FLOW time and is scaled by a single traffic
+ *      factor, so the panel says "planning estimate", never "ETA".
+ *   2. If the router is unreachable the schedule disappears and the panel falls
+ *      back to the straight-line hops it always had, saying so. It never
+ *      invents a leg to keep the layout tidy.
+ *   3. Arrivals are DERIVED from order + departure + dwell on every render.
+ *      Nothing is stored, so a time can never disagree with the list above it.
  */
 
-import { useState } from "react";
-import type { CustomStop, CustomStopKind } from "../lib/dal";
+import { useEffect, useMemo, useState } from "react";
+import type { CustomStop, CustomStopKind, RouteSchedulePrefs } from "../lib/dal";
 import { appleMapsUrl, CUSTOM_STOP_LABEL, fullAddress, Ico, ReachLinks, TierChip } from "../lib/ui";
 import { AccountLink } from "../lib/modal";
 import { resolveStopAddress } from "../lib/stop-actions";
+import { saveRouteSchedulePrefs } from "../lib/prefs-actions";
+import { routeDriveLegs, type DriveLeg } from "./drive-actions";
 import type { RouteStopView } from "./MapScreen";
 
 /* Money, at the grain a rep reads at a door. No cents: the difference between
@@ -60,6 +73,68 @@ function haversineMiles(a: { lat: number; lng: number }, b: { lat: number; lng: 
   const h =
     Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+// ---------------------------------------------------------------------------
+// The clock (migration 0037)
+//
+// A day is: leave at `depart`, drive each leg, spend `dwell` at each account,
+// `lunchMinutes` at a lunch stop, and nothing at a hotel (it is where the day
+// ends, not a call). Everything below is arithmetic on that sentence.
+// ---------------------------------------------------------------------------
+
+/** "09:30" -> 570. Wall-clock minutes; no date and no zone is involved, which
+    is the point: the route is planned in the time the car is driving in. */
+function minutesOfDay(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return (Number.isFinite(h) ? h : 9) * 60 + (Number.isFinite(m) ? m : 30);
+}
+
+function clock(mins: number): string {
+  const t = ((Math.round(mins) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+}
+
+/** "1h 25m" for a total, "6 min" for a leg. Nobody reads "85 minutes". */
+function duration(mins: number): string {
+  const m = Math.round(mins);
+  return m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m` : `${m} min`;
+}
+
+type ScheduleRow = { arrive: number; leave: number; stay: number };
+
+/**
+ * `legs` is the router's answer for the path HOME -> every stop in order ->
+ * HOME when home is known, and just stop-to-stop when it is not. Home is on
+ * both ends because that is what "leave at 09:30, back by 16:45" measures, and
+ * a day whose first drive is invisible reads as thirty free minutes that do
+ * not exist.
+ *
+ * The waypoint account (Juan's apartment, migration 0029) gets no dwell for
+ * the same reason it is not a customer: nothing is sold there.
+ */
+function buildSchedule(
+  stops: RouteStopView[],
+  legs: DriveLeg[],
+  hasHome: boolean,
+  prefs: RouteSchedulePrefs,
+): { rows: ScheduleRow[]; finish: number; toFirst: DriveLeg | null; home: DriveLeg | null } {
+  const toFirst = hasHome ? legs[0] ?? null : null;
+  const home = hasHome ? legs[legs.length - 1] ?? null : null;
+  /* Between consecutive stops: drop the leading home leg when there is one. */
+  const between = hasHome ? legs.slice(1, legs.length - 1) : legs;
+
+  const rows: ScheduleRow[] = [];
+  let t = minutesOfDay(prefs.depart) + (toFirst?.minutes ?? 0);
+  stops.forEach((s, i) => {
+    if (i > 0) t += between[i - 1]?.minutes ?? 0;
+    const kind = s.type === "custom" ? s.custom.kind : null;
+    const stay =
+      kind === "lunch" ? prefs.lunchMinutes : kind === "hotel" ? 0 : prefs.dwellMinutes;
+    rows.push({ arrive: t, leave: t + stay, stay });
+    t += stay;
+  });
+  return { rows, finish: t + (home?.minutes ?? 0), toFirst, home };
 }
 
 /**
@@ -209,8 +284,127 @@ function AddStopForm({ onAdd }: { onAdd: (stop: Omit<CustomStop, "id">) => void 
   );
 }
 
+/**
+ * The strip above the list: the four inputs that define the day, and what they
+ * add up to. Editable in place because the alternative is a settings screen for
+ * three numbers he changes more often than he changes anything else.
+ */
+function DayBar({
+  prefs,
+  onChange,
+  finish,
+  driveMinutes,
+  driveMiles,
+  state,
+}: {
+  prefs: RouteSchedulePrefs;
+  onChange: (p: RouteSchedulePrefs) => void;
+  finish: number | null;
+  driveMinutes: number | null;
+  driveMiles: number | null;
+  state: "loading" | "ok" | "unavailable";
+}) {
+  const over =
+    finish !== null && prefs.returnBy !== null && finish > minutesOfDay(prefs.returnBy);
+
+  const field =
+    "rounded-md border border-[#E2DFD5] bg-[#FCFBF7] px-2 py-1.5 text-[13px] tabular-nums outline-none focus:border-[#8A928C]";
+
+  return (
+    <div className="mb-2 rounded-lg border border-[#E2DFD5] bg-white p-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <label className="flex items-center gap-1.5 text-[12.5px] text-[#5B6560]">
+          Leave
+          <input
+            type="time"
+            value={prefs.depart}
+            onChange={(e) => onChange({ ...prefs, depart: e.target.value })}
+            className={field}
+          />
+        </label>
+        <label className="flex items-center gap-1.5 text-[12.5px] text-[#5B6560]">
+          <input
+            type="number"
+            min={1}
+            max={240}
+            value={prefs.dwellMinutes}
+            onChange={(e) => onChange({ ...prefs, dwellMinutes: Number(e.target.value) })}
+            className={`${field} w-[4.5rem]`}
+          />
+          min per stop
+        </label>
+        <label className="flex items-center gap-1.5 text-[12.5px] text-[#5B6560]">
+          <input
+            type="number"
+            min={0}
+            max={240}
+            value={prefs.lunchMinutes}
+            onChange={(e) => onChange({ ...prefs, lunchMinutes: Number(e.target.value) })}
+            className={`${field} w-[4.5rem]`}
+          />
+          min lunch
+        </label>
+        <label className="flex items-center gap-1.5 text-[12.5px] text-[#5B6560]">
+          Home by
+          <input
+            type="time"
+            value={prefs.returnBy ?? ""}
+            onChange={(e) => onChange({ ...prefs, returnBy: e.target.value || null })}
+            className={field}
+          />
+        </label>
+      </div>
+
+      <div className="mt-2.5 border-t border-[#EEECE3] pt-2.5 text-[12.5px]">
+        {state === "loading" && <span className="text-[#8A928C]">Working out drive times...</span>}
+
+        {/* The router is down, so the day has no clock. Say that, rather than
+            leaving yesterday's numbers on screen or filling in straight lines. */}
+        {state === "unavailable" && (
+          <span className="text-[#8A928C]">
+            Drive times unavailable right now, so there are no arrival times below. The order and
+            the straight-line hops are unaffected.
+          </span>
+        )}
+
+        {state === "ok" && finish !== null && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className={over ? "font-semibold text-[#B5372A]" : "font-semibold text-[#2C6A46]"}>
+              {over ? "Back " : "Back home "}
+              <span className="tabular-nums">{clock(finish)}</span>
+            </span>
+            {over && prefs.returnBy && (
+              <span className="text-[#B5372A]">
+                {duration(finish - minutesOfDay(prefs.returnBy))} past {prefs.returnBy}
+              </span>
+            )}
+            {!over && prefs.returnBy && (
+              <span className="text-[#5B6560]">
+                {duration(minutesOfDay(prefs.returnBy) - finish)} spare
+              </span>
+            )}
+            {driveMinutes !== null && (
+              <span className="text-[#5B6560]">
+                <span className="tabular-nums">{duration(driveMinutes)}</span> driving
+                {driveMiles !== null && (
+                  <>
+                    {" · "}
+                    <span className="tabular-nums">{driveMiles.toFixed(1)} mi</span>
+                  </>
+                )}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function RoutePanel({
   stops,
+  home,
+  initialSchedulePrefs,
   onMove,
   onRemove,
   onClear,
@@ -218,12 +412,84 @@ export function RoutePanel({
   onAddCustomStop,
 }: {
   stops: RouteStopView[];
+  /** Juan's apartment, the waypoint account (0029). Null if it is not on the
+      map, in which case the day simply has no drive out and no drive back. */
+  home: { lat: number; lng: number } | null;
+  initialSchedulePrefs: RouteSchedulePrefs;
   onMove: (id: string, dir: -1 | 1) => void;
   onRemove: (id: string) => void;
   onClear: () => void;
   onShowInMap: (id: string) => void;
   onAddCustomStop: (stop: Omit<CustomStop, "id">) => void;
 }) {
+  const [prefs, setPrefs] = useState<RouteSchedulePrefs>(initialSchedulePrefs);
+  const [legs, setLegs] = useState<DriveLeg[] | null>(null);
+  const [legState, setLegState] = useState<"loading" | "ok" | "unavailable">("loading");
+
+  /* Optimistic, like every other preference on this screen: the field already
+     shows the new value and the schedule already recomputed, so a failed write
+     is a stale row rather than a wrong screen, and the next edit fixes it. */
+  function editPrefs(next: RouteSchedulePrefs) {
+    setPrefs(next);
+    saveRouteSchedulePrefs(next).catch(() => {});
+  }
+
+  /* THE ROUTER IS CALLED ON THE PATH, NOT ON EVERY PAIR: one request for
+     home -> stops in order -> home. Keyed on the coordinates rather than on the
+     stops array so a re-render that does not move anything does not re-ask. */
+  const pathKey = useMemo(
+    () =>
+      [home ? `h:${home.lat},${home.lng}` : "h:-", ...stops.map((s) => `${s.lat},${s.lng}`)].join(
+        "|",
+      ),
+    [stops, home],
+  );
+
+  useEffect(() => {
+    if (stops.length < 1) {
+      setLegs(null);
+      setLegState("ok");
+      return;
+    }
+    const points = home ? [home, ...stops, home] : stops;
+    if (points.length < 2) {
+      setLegs(null);
+      setLegState("ok");
+      return;
+    }
+    let live = true;
+    setLegState("loading");
+    routeDriveLegs(points.map((p) => ({ lat: p.lat, lng: p.lng })))
+      .then((res) => {
+        if (!live) return;
+        setLegs(res);
+        setLegState(res ? "ok" : "unavailable");
+      })
+      .catch(() => {
+        if (!live) return;
+        setLegs(null);
+        setLegState("unavailable");
+      });
+    return () => {
+      live = false;
+    };
+    // pathKey is the real dependency: it changes exactly when a coordinate does.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathKey]);
+
+  const schedule = useMemo(
+    () => (legs ? buildSchedule(stops, legs, home !== null, prefs) : null),
+    [legs, stops, home, prefs],
+  );
+
+  const legBetween = (i: number): DriveLeg | null => {
+    if (!legs || i < 1) return null;
+    return (home ? legs.slice(1, legs.length - 1) : legs)[i - 1] ?? null;
+  };
+
+  const driveMinutes = legs ? legs.reduce((s, l) => s + l.minutes, 0) : null;
+  const driveMiles = legs ? legs.reduce((s, l) => s + l.miles, 0) : null;
+
   const header = (
     <div className="mb-3 mt-6 flex items-baseline justify-between">
       <h2 className="font-[family-name:var(--font-fraunces)] text-[19px] font-semibold tracking-tight">
@@ -257,7 +523,32 @@ export function RoutePanel({
   return (
     <>
       {header}
+
+      <DayBar
+        prefs={prefs}
+        onChange={editPrefs}
+        finish={schedule?.finish ?? null}
+        driveMinutes={driveMinutes}
+        driveMiles={driveMiles}
+        state={legState}
+      />
+
       <div className="overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
+        {/* The drive out. Not a stop, so it is a rule above the first one
+            rather than a numbered row, but it is the reason stop 1 is not at
+            09:30 and leaving it off makes the morning look longer than it is. */}
+        {home && (
+          <div className="flex items-baseline justify-between border-b border-[#EEECE3] bg-[#FAF9F5] px-4 py-2 text-[12.5px] text-[#5B6560]">
+            <span>
+              Leave home <span className="font-medium tabular-nums text-[#3D4A44]">{prefs.depart}</span>
+            </span>
+            {schedule?.toFirst && (
+              <span className="tabular-nums text-[#8A928C]">
+                {duration(schedule.toFirst.minutes)} · {schedule.toFirst.miles.toFixed(1)} mi
+              </span>
+            )}
+          </div>
+        )}
         <ul className="divide-y divide-[#EEECE3]">
           {stops.map((s, i) => {
             const prev = i > 0 ? stops[i - 1] : null;
@@ -276,13 +567,23 @@ export function RoutePanel({
                 {/* An amber square for a lunch or hotel stop, the same shape and
                     colour it gets on the map, so the list and the map agree at a
                     glance about which stops are not accounts. */}
-                <span
-                  className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center text-[11.5px] font-semibold tabular-nums text-[#F7F6F1] ${
-                    c ? "rounded-[4px] bg-[#A0762C]" : "rounded-full bg-[#14201B]"
-                  }`}
-                >
-                  {i + 1}
-                </span>
+                <div className="flex shrink-0 flex-col items-center gap-1">
+                  <span
+                    className={`mt-0.5 flex h-6 w-6 items-center justify-center text-[11.5px] font-semibold tabular-nums text-[#F7F6F1] ${
+                      c ? "rounded-[4px] bg-[#A0762C]" : "rounded-full bg-[#14201B]"
+                    }`}
+                  >
+                    {i + 1}
+                  </span>
+                  {/* When he is there, in the column he is already scanning for
+                      "which stop is this". Absent, not zeroed, when the router
+                      could not answer. */}
+                  {schedule && (
+                    <span className="whitespace-nowrap text-[10.5px] leading-tight tabular-nums text-[#8A928C]">
+                      {clock(schedule.rows[i].arrive)}
+                    </span>
+                  )}
+                </div>
 
                 <div className="min-w-0 flex-1">
                   {c ? (
@@ -292,6 +593,13 @@ export function RoutePanel({
                         <span className="rounded bg-[#F6EEDD] px-1.5 py-0.5 text-[10.5px] font-medium uppercase tracking-wide text-[#7A5A1E]">
                           {CUSTOM_STOP_LABEL[c.kind]}
                         </span>
+                        {/* Lunch is the one stop whose length is not the dwell
+                            everything else uses, so it says how long it is. */}
+                        {schedule && schedule.rows[i].stay > 0 && c.kind !== "stop" && (
+                          <span className="text-[11.5px] tabular-nums text-[#8A928C]">
+                            {clock(schedule.rows[i].arrive)}-{clock(schedule.rows[i].leave)}
+                          </span>
+                        )}
                       </div>
                       <div className="mt-0.5 truncate text-[12.5px] text-[#5B6560]">{c.address}</div>
                     </>
@@ -374,12 +682,24 @@ export function RoutePanel({
                   </>
                   )}
 
-                  {prev && (
-                    <div className="mt-0.5 text-[12px] text-[#8A928C]">
-                      <span className="tabular-nums">{haversineMiles(prev, s).toFixed(1)} mi</span>{" "}
-                      straight-line from stop {i}
-                    </div>
-                  )}
+                  {/* The leg in, then the window. Falls back to the original
+                      straight-line hop whenever the router gave us nothing, so
+                      the row never goes blank and never claims a drive time it
+                      does not have. */}
+                  {prev &&
+                    (legBetween(i) ? (
+                      <div className="mt-0.5 text-[12px] text-[#8A928C]">
+                        <span className="tabular-nums">{duration(legBetween(i)!.minutes)}</span>{" "}
+                        drive ·{" "}
+                        <span className="tabular-nums">{legBetween(i)!.miles.toFixed(1)} mi</span>{" "}
+                        from stop {i}
+                      </div>
+                    ) : (
+                      <div className="mt-0.5 text-[12px] text-[#8A928C]">
+                        <span className="tabular-nums">{haversineMiles(prev, s).toFixed(1)} mi</span>{" "}
+                        straight-line from stop {i}
+                      </div>
+                    ))}
                 </div>
                 </div>
 
@@ -435,6 +755,19 @@ export function RoutePanel({
             );
           })}
         </ul>
+
+        {/* The drive back, for the same reason the drive out is there: the day
+            is not over when the last door closes. */}
+        {home && schedule?.home && (
+          <div className="flex items-baseline justify-between border-t border-[#EEECE3] bg-[#FAF9F5] px-4 py-2 text-[12.5px] text-[#5B6560]">
+            <span>
+              Home <span className="font-medium tabular-nums text-[#3D4A44]">{clock(schedule.finish)}</span>
+            </span>
+            <span className="tabular-nums text-[#8A928C]">
+              {duration(schedule.home.minutes)} · {schedule.home.miles.toFixed(1)} mi
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="mt-2">
@@ -442,8 +775,10 @@ export function RoutePanel({
       </div>
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[12px] leading-relaxed text-[#8A928C]">
-          Straight-line hops, not drive time. Order is yours; nothing reorders it for you.
+        <p className="max-w-[62ch] text-[12px] leading-relaxed text-[#8A928C]">
+          {legState === "ok" && legs
+            ? "Road distances and times, scaled for typical daytime traffic. A planning estimate, not a live ETA. Order is yours; nothing reorders it for you."
+            : "Straight-line hops, not drive time. Order is yours; nothing reorders it for you."}
         </p>
         <div className="flex items-center gap-2">
           {stops.length > 1 && (

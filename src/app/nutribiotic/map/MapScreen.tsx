@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CustomStop, MapAccount, TerritoryArea } from "../lib/dal";
+import type { CustomStop, MapAccount, RouteSchedulePrefs, TerritoryArea } from "../lib/dal";
 import { toggleShowChainAccounts, toggleShowPracticeAccounts } from "../lib/prefs-actions";
 import { useRoute } from "../lib/route-context";
 import { AccountsMap } from "./AccountsMap";
@@ -37,11 +37,13 @@ export function MapScreen({
   areas,
   initialShowChains,
   initialShowPractices,
+  schedulePrefs,
 }: {
   accounts: MapAccount[];
   areas: TerritoryArea[];
   initialShowChains: boolean;
   initialShowPractices: boolean;
+  schedulePrefs: RouteSchedulePrefs;
 }) {
   const [loc, setLoc] = useState<UserLoc | null>(null);
   const [locStatus, setLocStatus] = useState<LocStatus>("pending");
@@ -96,6 +98,16 @@ export function MapScreen({
     () => routeStops.filter((s) => s.type === "custom").map((s) => s.custom),
     [routeStops],
   );
+
+  /* Where the driving starts and ends. The waypoint account is Juan's apartment
+     (migration 0029), and it is identified by lifecycle rather than by its id
+     so this keeps working if the home base ever moves to a different row. It is
+     deliberately NOT a stop: it takes no time and nothing is sold there, it is
+     just the two ends of the day the route panel measures against. */
+  const home = useMemo(() => {
+    const w = accounts.find((a) => a.lifecycle === "waypoint");
+    return w ? { lat: w.lat, lng: w.lng } : null;
+  }, [accounts]);
 
   // A fresh n on every click, even a repeat click on the same account, so the
   // map's focus effect (keyed on this signal) always re-fires and re-zooms
@@ -202,6 +214,8 @@ export function MapScreen({
           next one comes from, so the thing being assembled belongs between. */}
       <RoutePanel
         stops={routeStops}
+        home={home}
+        initialSchedulePrefs={schedulePrefs}
         onMove={moveInRoute}
         onRemove={removeFromRoute}
         onClear={clearRoute}
