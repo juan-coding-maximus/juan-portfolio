@@ -4,6 +4,7 @@ import { getRouteDraft, isConfigured, workspaceMode } from "./lib/dal";
 import { LAUNCHERS } from "./lib/launchers";
 import { ModalProvider } from "./lib/modal";
 import { MobileNav } from "./lib/MobileNav";
+import { MoreMenu } from "./lib/MoreMenu";
 import { RouteProvider } from "./lib/route-context";
 import { hasAccess } from "./lib/devices";
 import { Ico } from "./lib/ui";
@@ -54,7 +55,13 @@ export const dynamic = "force-dynamic";
    for on his own schedule, not a backlog notification, so Outbound moved into
    NAV proper rather than staying conditionally spliced in. Juan was explicit
    this had to be the SAME tab as the existing drafts queue, not a second one
-   ([[nutribiotic-whatsapp-bridge]]). */
+   ([[nutribiotic-whatsapp-bridge]]).
+
+   MORE, 2026-08-18: ten flat items ran the sidebar into a scrollbar and the
+   mobile bar into ten cramped columns, so Goals, Playbook, and the offer-code
+   trio (Phone, Offers, Promo) moved behind a single "More" flyout (lib/MoreMenu.tsx).
+   These five are reference/occasional-use, not the daily loop Map through
+   Expenses is, so folding them costs no reachability, just chrome. */
 const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>["name"] }[] = [
   { href: "/nutribiotic/map", label: "Map", icon: "pin" },
   /* Visit, 2026-08-13: door 3 onto the shared extractor (lib/touchpoint.ts),
@@ -63,13 +70,6 @@ const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>
      See lib/hubspot-engagement.ts. */
   { href: "/nutribiotic/visit", label: "Visit", icon: "mic" },
   { href: "/nutribiotic/clients", label: "Clients", icon: "accounts" },
-  /* Goals earns its slot on the same rule: it is the standing ladder (Director
-     in one, VP in four) and the six SMART goals it decomposes into, content
-     meant to be seen every day, not a promise of a future phase. */
-  { href: "/nutribiotic/goals", label: "Goals", icon: "flag" },
-  /* Playbook is the shelf those goals produce: the strategy docs rendered from
-     the repo's own markdown, so the site and the files can never disagree. */
-  { href: "/nutribiotic/playbook", label: "Playbook", icon: "book" },
   { href: "/nutribiotic/outbound", label: "Outbound", icon: "outbound" },
   /* Expenses, 2026-08-14: the `expensos` CLI skill's Drive/Sheets tree, now
      also reachable by hand: clock in/out with a break in minutes, a photo
@@ -78,6 +78,17 @@ const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>
      has no access to the Mac-side OAuth token the CLI uses); see lib/gdrive.ts
      and lib/expenses.ts. */
   { href: "/nutribiotic/expenses", label: "Expenses", icon: "receipt" },
+];
+
+const MORE_NAV: typeof NAV = [
+  /* Goals earns its slot on the same rule the top-level items do: it is the
+     standing ladder (Director in one, VP in four) and the six SMART goals it
+     decomposes into, content meant to be seen every day, not a promise of a
+     future phase, it just isn't a door-to-door daily tool. */
+  { href: "/nutribiotic/goals", label: "Goals", icon: "flag" },
+  /* Playbook is the shelf those goals produce: the strategy docs rendered from
+     the repo's own markdown, so the site and the files can never disagree. */
+  { href: "/nutribiotic/playbook", label: "Playbook", icon: "book" },
   /* The offer-code trio, added 2026-08-10 at Juan's direction (three tabs, all
      in the directory). Phone issues a handwritten code in a parking lot and
      holds the requests waiting on a relay; Offers is the template builder those
@@ -162,6 +173,7 @@ export default async function NutribioticLayout({
                   {n.label}
                 </Link>
               ))}
+              <MoreMenu items={MORE_NAV} variant="sidebar" />
             </nav>
 
           </aside>
@@ -173,7 +185,7 @@ export default async function NutribioticLayout({
 
         {/* The OS mobile nav: the same items as the sidebar, same gating rules,
             rendered as a bottom tab bar below md where the sidebar disappears. */}
-        <MobileNav items={nav} />
+        <MobileNav items={nav} moreItems={MORE_NAV} />
       </div>
       </ModalProvider>
       </RouteProvider>

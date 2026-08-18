@@ -17,6 +17,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Ico } from "./ui";
+import { MoreMenu } from "./MoreMenu";
 
 export type MobileNavItem = {
   href: string;
@@ -24,8 +25,15 @@ export type MobileNavItem = {
   icon: React.ComponentProps<typeof Ico>["name"];
 };
 
-export function MobileNav({ items }: { items: MobileNavItem[] }) {
+export function MobileNav({
+  items,
+  moreItems = [],
+}: {
+  items: MobileNavItem[];
+  moreItems?: MobileNavItem[];
+}) {
   const pathname = usePathname();
+  const columns = items.length + (moreItems.length ? 1 : 0);
   return (
     <nav
       aria-label="The OS mobile nav"
@@ -33,7 +41,7 @@ export function MobileNav({ items }: { items: MobileNavItem[] }) {
     >
       <div
         className="grid"
-        style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
+        style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
       >
         {items.map((n) => {
           const active = pathname === n.href || pathname.startsWith(`${n.href}/`);
@@ -59,6 +67,7 @@ export function MobileNav({ items }: { items: MobileNavItem[] }) {
             </Link>
           );
         })}
+        {moreItems.length > 0 && <MoreMenu items={moreItems} variant="mobile" />}
       </div>
     </nav>
   );
