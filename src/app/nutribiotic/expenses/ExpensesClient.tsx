@@ -107,6 +107,23 @@ function breakLabel(m: number): string {
   return rest ? `${h}h ${rest}m` : `${h}h`;
 }
 
+/* Same half-hour grid as the Break dropdown (00:00-23:30), so Clock in/out
+   stops handing the browser's native time picker, which lists every single
+   minute regardless of `step`, a 30-min-only field cannot actually be off. */
+const TIME_CHOICES: string[] = Array.from({ length: 48 }, (_, i) => {
+  const h = Math.floor(i / 2);
+  const m = i % 2 === 0 ? "00" : "30";
+  return `${String(h).padStart(2, "0")}:${m}`;
+});
+
+/** "14:30" -> "2:30 PM". */
+function timeLabel(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  const period = h < 12 ? "AM" : "PM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
 function HoursCard() {
   const [date, setDate] = useState(todayPT());
   const [clockIn, setClockIn] = useState("");
@@ -186,7 +203,16 @@ function HoursCard() {
         <div>
           <label className={labelCls}>Clock in</label>
           <div className="flex gap-1.5">
-            <input type="time" step={1800} value={clockIn} onChange={(e) => setClockIn(e.target.value)} className={inputCls} />
+            <select value={clockIn} onChange={(e) => setClockIn(e.target.value)} className={inputCls}>
+              <option value="" disabled>
+                Select
+              </option>
+              {TIME_CHOICES.map((t) => (
+                <option key={t} value={t}>
+                  {timeLabel(t)}
+                </option>
+              ))}
+            </select>
             <button type="button" onClick={() => markNow("in")} className={`${ghostBtn} shrink-0 px-2`} title="Now">
               now
             </button>
@@ -195,7 +221,16 @@ function HoursCard() {
         <div>
           <label className={labelCls}>Clock out</label>
           <div className="flex gap-1.5">
-            <input type="time" step={1800} value={clockOut} onChange={(e) => setClockOut(e.target.value)} className={inputCls} />
+            <select value={clockOut} onChange={(e) => setClockOut(e.target.value)} className={inputCls}>
+              <option value="" disabled>
+                Select
+              </option>
+              {TIME_CHOICES.map((t) => (
+                <option key={t} value={t}>
+                  {timeLabel(t)}
+                </option>
+              ))}
+            </select>
             <button type="button" onClick={() => markNow("out")} className={`${ghostBtn} shrink-0 px-2`} title="Now">
               now
             </button>

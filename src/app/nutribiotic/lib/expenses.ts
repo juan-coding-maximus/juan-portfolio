@@ -41,7 +41,6 @@ import {
 } from "./gdrive";
 
 const ROOT_FOLDER = "NutriBiotic Field Expenses";
-const OWNER = "Juan";
 const LOG_TAB = "Log";
 const HOURS_TAB = "Hours";
 const EXPENSE_HEADER = ["Date", "Merchant", "Purpose", "Amount", "Link"];
@@ -109,7 +108,7 @@ export function periodLabel(dateStr: string): string {
 export function sheetName(dateStr: string): string {
   const d = parseDate(dateStr);
   const half = d.getUTCDate() <= 15 ? "a" : "b";
-  return `${OWNER}-${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}${half} expense log`;
+  return `expense-report-${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}${half}`;
 }
 
 /** The Sunday (UTC-date-math) that starts the fixed 7-day workweek California
