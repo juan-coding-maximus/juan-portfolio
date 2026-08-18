@@ -26,9 +26,13 @@
  *   - Overwrite a populated HubSpot property. A disagreement is a proposal,
  *     never an automatic write.
  *   - Create or merge a company.
- *   - Invent a word of the note body: it is assembled only from the
- *     activity row's own detail/outcome/kind/at plus contacts nb_contacts
- *     already has. No summarizing, no inference.
+ *   - Write anything the rep didn't say. The note body is the touchpoint's
+ *     own hubspot_summary (a condensed rewrite made ONCE, at extraction time
+ *     in touchpoint.ts, under the same no-fabrication rule as the verbatim
+ *     `detail` the OS keeps) or, for activities parsed before that field
+ *     existed, the verbatim detail itself. This module does no summarizing
+ *     or inference of its own; it only assembles what extraction already
+ *     produced plus outcome/kind/at/contacts nb_contacts already has.
  *   - File a synthetic activity into the shared portal.
  */
 
@@ -237,6 +241,7 @@ function noteLines(
   matched: MatchedPerson[],
   etype: EngagementType,
   otype: EngagementType,
+  hubspotSummary: string | null,
 ): string[] {
   const kind = activity.kind || "note";
   const when = (activity.at || "").slice(0, 16).replace("T", " ");
@@ -248,10 +253,15 @@ function noteLines(
   const outcome = (activity.outcome || "").trim();
   if (outcome) lines.push(`Outcome: ${OUTCOME_LABEL[outcome] ?? outcome}`);
 
-  const detail = (activity.detail || "").trim();
-  if (detail) {
+  // The shared portal gets the summary, not Juan's full verbatim account: not
+  // everything said out loud belongs in a record another rep or HQ reads. The
+  // OS keeps the verbatim detail (activity.detail, nb_activities) regardless;
+  // this only ever changes what gets typed into HubSpot. Older activities
+  // parsed before this field existed fall back to the old verbatim body.
+  const body = (hubspotSummary || "").trim() || (activity.detail || "").trim();
+  if (body) {
     lines.push("");
-    lines.push(detail);
+    lines.push(body);
   }
 
   const names = matched
@@ -444,7 +454,7 @@ export async function runEngagement(activityId: number, opts: { write: boolean }
     listContacts(account.id),
     getTouchpointParsedForActivity(activityId),
   ]);
-  const parsed = (parsedRaw ?? null) as { people?: ParsedPerson[] } | null;
+  const parsed = (parsedRaw ?? null) as { people?: ParsedPerson[]; activity?: { hubspot_summary?: string } } | null;
   const { matched, unmatched } = matchPeople(contactsRes.data, activity, parsed);
 
   // A person named with a phone or email but no live HubSpot contact yet:
@@ -501,7 +511,7 @@ export async function runEngagement(activityId: number, opts: { write: boolean }
   }
 
   const contactIds = matched.map((m) => m.contact.hubspot_contact_id).filter((v): v is string => Boolean(v));
-  const lines = noteLines(activity, matched, etype, otype);
+  const lines = noteLines(activity, matched, etype, otype, parsed?.activity?.hubspot_summary ?? null);
   const body = noteBody(lines);
   const matchedNames = matched
     .map((m) => [m.contact.first_name, m.contact.last_name].filter(Boolean).join(" ").trim())

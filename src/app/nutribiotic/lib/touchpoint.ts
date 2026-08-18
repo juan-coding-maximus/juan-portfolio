@@ -92,6 +92,7 @@ type ParsedTouchpoint = {
     direction: "outbound" | "inbound" | "internal";
     outcome: string | null;
     detail: string;
+    hubspot_summary: string;
   };
   people: ParsedPerson[];
   calendar_actions: ParsedCalendarAction[];
@@ -129,10 +130,14 @@ const EXTRACT_TOOL = {
           },
           detail: {
             type: "string",
-            description: "what the rep said, kept in the rep's own first-person words ('I called...', not 'The rep called...'). Trim filler words and clean up punctuation/capitalization/structure, but never paraphrase into third person and never drop a stated fact.",
+            description: "what the rep said, kept in the rep's own first-person words ('I called...', not 'The rep called...'). Trim filler words and clean up punctuation/capitalization/structure, but never paraphrase into third person and never drop a stated fact. This is the full record kept in the OS, not what gets written to HubSpot.",
+          },
+          hubspot_summary: {
+            type: "string",
+            description: "A tight summary for the shared HubSpot record, a few sentences, third person is fine here. Cover: what was done (visited/called/etc, and the outcome), who was talked to (name and role/title if stated), the key talking points, and any communication or product preference the person stated. Leave out filler, asides, and anything not useful to another rep or HQ reading this account later. Grounded only in what the rep actually said, same no-fabrication rule as detail, just shorter.",
           },
         },
-        required: ["kind", "direction", "detail"],
+        required: ["kind", "direction", "detail", "hubspot_summary"],
       },
       people: {
         type: "array",
@@ -189,6 +194,7 @@ RULES, all absolute:
 - If the account is not clearly identifiable from the candidate list, set account_id to null and account_confidence to "none" rather than guessing.
 - business_name_guess is the store/business name as the rep actually said it, verbatim, ALWAYS extracted when one was said, regardless of account_confidence. It is used to search for the business when it turns out to be new, so it must never be normalized, expanded, or guessed at when none was actually stated.
 - activity.detail is what the rep said, kept in the rep's own first-person words ("I called...", not "The rep called..."). You may tidy filler, punctuation, and capitalization, and add light structure, but never rewrite it into third person, never paraphrase away his actual wording, and never drop a fact he stated.
+- activity.hubspot_summary is a different, shorter thing: what actually needs to reach a shared CRM another rep or HQ reads. Not everything the rep said out loud belongs there. Condense to what was done, who was talked to, the talking points, and any preference stated (e.g. "prefers texts, not email"). Still never invent a name, number, date, or fact not in the text.
 - Only include a person in "people" if the note actually names them or clearly describes a specific individual (a title alone like "the manager" with no name is still worth including with first_name/last_name null, if a real detail like an email or a stated preference is attached to them).
 - Only include a calendar_action if the note describes something that should go on a calendar (a scheduled meeting, an explicit follow-up date, a planned return visit). Do not invent a follow-up that was not mentioned.
 - when_iso must be a real resolved timestamp if a specific day/time was stated; if only vague ("follow up soon") leave it null and say so in notes.`;
