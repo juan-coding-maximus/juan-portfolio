@@ -268,7 +268,10 @@ export async function recordTouchpoint(
   }
 
   // Explicit account picked by the rep in the UI always wins over the model's guess.
-  const accountId = accountIdHint || (parsed.account_confidence !== "none" ? parsed.account_id : null);
+  // Only a "high" confidence match auto-files to an existing account; "low" is the
+  // model's own hedge that the name match may be wrong (e.g. a same-named store in a
+  // different city) and must park as needs_account like "none" does, not silently file.
+  const accountId = accountIdHint || (parsed.account_confidence === "high" ? parsed.account_id : null);
 
   if (!accountId) {
     const tp = await insertTouchpoint({
