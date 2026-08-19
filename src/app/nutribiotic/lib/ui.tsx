@@ -56,6 +56,7 @@ const ICONS: Record<string, ReactNode> = {
   tag: <><path d="M2.6 2.6h5.2l5.6 5.6c.5.5.5 1.3 0 1.8l-3.4 3.4c-.5.5-1.3.5-1.8 0L2.6 7.8z" /><circle cx="5.7" cy="5.7" r="0.6" fill="currentColor" stroke="none" /></>,
   external: <><path d="M9 2.6h4.4V7" /><path d="M13.4 2.6 7.6 8.4" /><path d="M11.8 9.4v3.2c0 .5-.4.9-.9.9H3.4c-.5 0-.9-.4-.9-.9V5.1c0-.5.4-.9.9-.9h3.2" /></>,
   whatsapp: <><path d="M2.6 3.4h10.8a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H6.4l-2.8 2.3v-2.3H2.6a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1Z" /><path d="M5.2 6.4h5.6M5.2 8.6h3.6" /></>,
+  imessage: <><path d="M8 2.4c3.5 0 6.2 2.3 6.2 5.2S11.5 12.8 8 12.8c-.6 0-1.2-.07-1.7-.2l-2.9 1.6.6-2.6C2.7 10.6 1.8 9.2 1.8 7.6 1.8 4.7 4.5 2.4 8 2.4Z" /></>,
   plus: <><path d="M8 2.6v10.8M2.6 8h10.8" /></>,
   camera: <><path d="M2.4 5.4h2.2l1-1.6h4.8l1 1.6h2.2v7.2H2.4z" /><circle cx="8" cy="9" r="2.3" /></>,
   gauge: <><circle cx="8" cy="8.6" r="5.8" /><path d="M8 8.6 10.6 6M5.4 8.6h5.2" strokeLinecap="round" /></>,

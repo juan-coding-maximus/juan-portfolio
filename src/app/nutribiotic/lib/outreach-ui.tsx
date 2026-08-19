@@ -34,6 +34,16 @@ export function waLink(phone: string, text: string): string {
   return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
 }
 
+/** Opens Messages.app addressed to this number with the body pre-filled.
+ *  `&` (not the RFC 5724 `?`) is Apple's own deep-link separator on both iOS
+ *  and macOS Messages. This only ADDRESSES the message: which of Juan's
+ *  numbers/Apple IDs it sends FROM is whatever Messages > Settings > iMessage
+ *  > "Start new conversations from" is set to on the Mac he clicks send on,
+ *  no URL can steer that. */
+export function imessageLink(phone: string, text: string): string {
+  return `sms:+${phone}&body=${encodeURIComponent(text)}`;
+}
+
 function fmtWhen(iso: string): string {
   try {
     return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -70,7 +80,7 @@ export function OutreachComposer({
   const [attachmentHint, setAttachmentHint] = useState<string | null>(null);
   const [attached, setAttached] = useState<MarketingFile[]>([]);
   const [draftPending, startDraft] = useTransition();
-  const [opened, setOpened] = useState(false);
+  const [openedChannel, setOpenedChannel] = useState<"whatsapp" | "imessage" | null>(null);
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<RecordTouchpointResult | null>(null);
 
@@ -98,7 +108,7 @@ export function OutreachComposer({
   }, [mode, contacts, search]);
 
   function loadDraftFor(a: OutreachAccount) {
-    setOpened(false);
+    setOpenedChannel(null);
     setResult(null);
     setTemplateId("auto");
     setMessage("");
@@ -159,16 +169,23 @@ export function OutreachComposer({
   function openWhatsApp() {
     if (!waPhone || !message.trim()) return;
     window.open(waLink(waPhone, finalMessage), "_blank", "noopener,noreferrer");
-    setOpened(true);
+    setOpenedChannel("whatsapp");
+    setResult(null);
+  }
+
+  function openIMessage() {
+    if (!waPhone || !message.trim()) return;
+    window.open(imessageLink(waPhone, finalMessage), "_blank", "noopener,noreferrer");
+    setOpenedChannel("imessage");
     setResult(null);
   }
 
   function markSent() {
-    if (!account || pending) return;
+    if (!account || pending || !openedChannel) return;
     startTransition(async () => {
-      const res = await recordOutreachSent(account.id, recipientLabel, finalMessage);
+      const res = await recordOutreachSent(account.id, recipientLabel, finalMessage, openedChannel);
       setResult(res);
-      if (res.ok) setOpened(false);
+      if (res.ok) setOpenedChannel(null);
     });
   }
 
@@ -177,7 +194,7 @@ export function OutreachComposer({
       <Card>
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
-            <Ico name="whatsapp" size={13} />
+            <Ico name="phone" size={13} />
             Who
           </div>
           <div className="flex gap-1 rounded-md border border-[#E2DFD5] p-0.5">
@@ -391,22 +408,37 @@ export function OutreachComposer({
         <Card>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="max-w-[46ch] text-[11.5px] leading-snug text-[#8A928C]">
-              Opens WhatsApp Web/app with this text pre-filled in the chat. Nothing sends until you press send
-              there yourself. Any attachment you picked above already downloaded, drag it into the chat.
+              Opens WhatsApp or Messages with this text pre-filled. Nothing sends until you press send there
+              yourself. iMessage sends from whichever number Messages &gt; Settings &gt; iMessage is set to
+              start new conversations from, check that&apos;s your 707 line before sending. Any attachment you
+              picked above already downloaded, drag it into the chat.
             </p>
-            <button
-              onClick={openWhatsApp}
-              disabled={!waPhone || !message.trim()}
-              className="flex shrink-0 items-center gap-1.5 rounded-md bg-[#25D366] px-3.5 py-2 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
-            >
-              <Ico name="whatsapp" size={13} />
-              Open in WhatsApp
-            </button>
+            <div className="flex shrink-0 gap-2">
+              <button
+                onClick={openWhatsApp}
+                disabled={!waPhone || !message.trim()}
+                className="flex items-center gap-1.5 rounded-md bg-[#25D366] px-3.5 py-2 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+              >
+                <Ico name="whatsapp" size={13} />
+                Open in WhatsApp
+              </button>
+              <button
+                onClick={openIMessage}
+                disabled={!waPhone || !message.trim()}
+                className="flex items-center gap-1.5 rounded-md bg-[#14201B] px-3.5 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
+              >
+                <Ico name="imessage" size={13} />
+                Open in Messages
+              </button>
+            </div>
           </div>
 
-          {opened && !result && (
+          {openedChannel && !result && (
             <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-[#E2DFD5] bg-[#FAF9F5] px-3 py-2.5">
-              <p className="text-[13px] text-[#3D4A44]">Sent it in WhatsApp? File it to the OS and HubSpot queue.</p>
+              <p className="text-[13px] text-[#3D4A44]">
+                Sent it in {openedChannel === "whatsapp" ? "WhatsApp" : "Messages"}? File it to the OS and
+                HubSpot queue.
+              </p>
               <button
                 onClick={markSent}
                 disabled={pending}

@@ -4,11 +4,13 @@
  *
  * Agency principle 1: drafting may be automatic once trusted, SENDING never
  * is. Nothing on this screen sends anything itself: the WhatsApp composer
- * opens a wa.me deep link Juan taps send on himself, and the email queue's
- * "Open in Outlook" opens a compose window he sends from his own mailbox
- * (which holds no Mail.Send scope, so a deep-link is the only path that
- * exists). "Mark sent" is a self-report either way; the OS cannot verify a
- * send on either channel.
+ * opens a wa.me deep link, the iMessage composer opens an sms: deep link into
+ * Messages.app (2026-08-19, addressed only, cannot steer which of Juan's
+ * numbers it sends FROM, that's Messages > Settings > iMessage on his Mac),
+ * and the email queue's "Open in Outlook" opens a compose window he sends
+ * from his own mailbox (which holds no Mail.Send scope, so a deep-link is
+ * the only path that exists). "Mark sent" is a self-report either way; the
+ * OS cannot verify a send on any channel.
  *
  * ONE TAB, ON PURPOSE (2026-08-13): the WhatsApp composer shipped as its own
  * /nutribiotic/outreach page first and Juan asked for it folded in here
@@ -58,11 +60,11 @@ export default async function Outbound() {
     <>
       <PageHead
         title="Outbound"
-        sub="Draft a WhatsApp message and open it pre-filled, or work through drafts waiting on you. Nothing on this screen sends anything."
+        sub="Draft a WhatsApp or iMessage and open it pre-filled, or work through drafts waiting on you. Nothing on this screen sends anything."
       />
 
       <div className="mb-6">
-        <div className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">WhatsApp</div>
+        <div className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">WhatsApp / iMessage</div>
         {accounts.length === 0 ? (
           <Card>
             <p className="text-[13px] text-[#8A928C]">No accounts loaded yet.</p>

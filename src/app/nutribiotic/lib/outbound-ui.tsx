@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AttachmentButton, attachmentNote } from "./attachments-ui";
 import type { MarketingFile } from "./dal";
 import { decideDraft } from "./outbound-actions";
-import { toWhatsAppPhone, waLink } from "./outreach-ui";
+import { imessageLink, toWhatsAppPhone, waLink } from "./outreach-ui";
 
 /**
  * Copy a draft body to the clipboard.
@@ -184,6 +184,18 @@ export function DraftActions({
           className="rounded-md bg-[#25D366] px-3 py-1.5 text-[13px] font-medium text-white"
         >
           Open in WhatsApp
+        </a>
+      )}
+
+      {waPhone && !synthetic && (
+        <a
+          href={imessageLink(waPhone, finalBody)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded-md bg-[#14201B] px-3 py-1.5 text-[13px] font-medium text-[#F7F6F1]"
+          title="Opens Messages addressed to this number. Sends from whichever number Messages is set to start new conversations from."
+        >
+          Open in Messages
         </a>
       )}
 
