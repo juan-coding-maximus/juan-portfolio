@@ -50,7 +50,7 @@ const OS: Launcher = {
   short_name: "NutriBiotic",
   description:
     "Field sales OS for the Southern California territory: today's route, accounts, touchpoint capture and the day's numbers.",
-  start_url: "/nutribiotic/map",
+  start_url: "/nutribiotic/visit",
   icon: "/nutribiotic/apple-icon",
 };
 
