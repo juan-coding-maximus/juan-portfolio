@@ -42,8 +42,10 @@ export function EngagementQueue({ activities }: { activities: EngagementActivity
 }
 
 /** Files enrichment activities the moment they land here, no card, no click.
- * A failure doesn't retry silently in a loop; it drops into the normal
- * review card below so Juan sees why and can push it through by hand. */
+ * A failure that Juan can't act on from here (a scope block, a plain
+ * HubSpot error, one already filed) is just noise on the screen he opens
+ * first; only a failure that resolves to an actual "File to HubSpot" button
+ * is worth a card. See EngagementRow's `actionableOnly`. */
 function AutoFiler({ activities }: { activities: EngagementActivity[] }) {
   const fired = useRef(new Set<number>());
   const [failed, setFailed] = useState<EngagementActivity[]>([]);
@@ -60,20 +62,26 @@ function AutoFiler({ activities }: { activities: EngagementActivity[] }) {
 
   if (failed.length === 0) return null;
   return (
-    <>
-      <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8A928C]">
-        Enrichment note needs a look
-      </h2>
-      <div className="mb-3 flex flex-col gap-3">
-        {failed.map((a) => (
-          <EngagementRow key={a.id} activity={a} />
-        ))}
-      </div>
-    </>
+    <div className="mb-3 flex flex-col gap-3">
+      {failed.map((a) => (
+        <EngagementRow key={a.id} activity={a} actionableOnly />
+      ))}
+    </div>
   );
 }
 
-function EngagementRow({ activity }: { activity: EngagementActivity }) {
+/** `actionableOnly`: render nothing unless there's a "File to HubSpot" button
+ * to click, or Juan already clicked it. A card that only ever says "here's
+ * an error" or "already filed" gives no decision to make; it's noise on the
+ * screen he opens first. Once he's interacted (pending/filed), the result
+ * of that click stays visible regardless. */
+function EngagementRow({
+  activity,
+  actionableOnly = false,
+}: {
+  activity: EngagementActivity;
+  actionableOnly?: boolean;
+}) {
   const [preview, setPreview] = useState<EngagementOutcome | null>(null);
   const [filed, setFiled] = useState<EngagementOutcome | null>(null);
   const [pending, startTransition] = useTransition();
@@ -95,6 +103,10 @@ function EngagementRow({ activity }: { activity: EngagementActivity }) {
   }
 
   const shown = filed ?? preview;
+  const interacted = pending || filed !== null;
+  const hasAction = shown?.ok && !shown.result.alreadyFiledId && !shown.result.wrote;
+
+  if (actionableOnly && !interacted && !hasAction) return null;
 
   return (
     <Card>
