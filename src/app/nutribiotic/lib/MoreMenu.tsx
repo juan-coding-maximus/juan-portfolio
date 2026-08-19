@@ -78,16 +78,16 @@ export function MoreMenu({
   return (
     <div ref={ref} className="relative flex flex-col items-center">
       {open && (
-        <div className="absolute bottom-full right-0 z-50 mb-2 w-[180px] rounded-md border border-[#E2DFD5] bg-white py-1.5 shadow-[0_8px_24px_rgba(20,32,27,0.16)]">
+        <div className="absolute bottom-full right-0 z-50 mb-2 w-[200px] rounded-md border border-[#E2DFD5] bg-white py-1.5 shadow-[0_8px_24px_rgba(20,32,27,0.16)]">
           {items.map((n) => (
             <Link
               key={n.href}
               href={n.href}
-              className={`flex items-center gap-2.5 px-3 py-2 text-[13px] transition-colors ${
+              className={`flex items-center gap-2.5 px-3.5 py-3 text-[14.5px] transition-colors ${
                 isActive(pathname, n.href) ? "text-[#14201B]" : "text-[#3D4A44]"
               }`}
             >
-              <Ico name={n.icon} size={16} />
+              <Ico name={n.icon} size={18} />
               {n.label}
             </Link>
           ))}
@@ -97,17 +97,17 @@ export function MoreMenu({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className={`flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium tracking-wide transition-colors ${
+        className={`flex min-h-[64px] flex-col items-center justify-center gap-1.5 py-3 text-[11.5px] font-medium tracking-wide transition-colors ${
           active || open ? "text-[#14201B]" : "text-[#8A928C]"
         }`}
       >
         <span
           aria-hidden
-          className={`-mt-2.5 mb-0.5 h-[2px] w-7 rounded-full ${
+          className={`-mt-3 mb-0.5 h-[2px] w-8 rounded-full ${
             active ? "bg-[#2C6A46]" : "bg-transparent"
           }`}
         />
-        <Ico name="more" size={17} />
+        <Ico name="more" size={22} />
         More
       </button>
     </div>

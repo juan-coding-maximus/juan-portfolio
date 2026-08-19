@@ -5,6 +5,7 @@ import { LAUNCHERS } from "./lib/launchers";
 import { ModalProvider } from "./lib/modal";
 import { MobileNav } from "./lib/MobileNav";
 import { MoreMenu } from "./lib/MoreMenu";
+import { RefreshOnForeground } from "./lib/RefreshOnForeground";
 import { RouteProvider } from "./lib/route-context";
 import { hasAccess } from "./lib/devices";
 import { Ico } from "./lib/ui";
@@ -61,7 +62,11 @@ export const dynamic = "force-dynamic";
    mobile bar into ten cramped columns, so Goals, Playbook, and the offer-code
    trio (Phone, Offers, Promo) moved behind a single "More" flyout (lib/MoreMenu.tsx).
    These five are reference/occasional-use, not the daily loop Map through
-   Expenses is, so folding them costs no reachability, just chrome. */
+   Expenses is, so folding them costs no reachability, just chrome.
+
+   Clients joined More, 2026-08-19: it's the one item on the daily bar Juan
+   opens far less than the door-to-door four, and dropping it to four items
+   let the mobile bar's touch targets grow instead of splitting six ways. */
 const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>["name"] }[] = [
   { href: "/nutribiotic/map", label: "Map", icon: "pin" },
   /* Visit, 2026-08-13: door 3 onto the shared extractor (lib/touchpoint.ts),
@@ -69,7 +74,6 @@ const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>
      own click on the preview standing in for the CLI skill's dry-run review.
      See lib/hubspot-engagement.ts. */
   { href: "/nutribiotic/visit", label: "Visit", icon: "mic" },
-  { href: "/nutribiotic/clients", label: "Clients", icon: "accounts" },
   { href: "/nutribiotic/outbound", label: "Outbound", icon: "outbound" },
   /* Expenses, 2026-08-14: the `expensos` CLI skill's Drive/Sheets tree, now
      also reachable by hand: clock in/out with a break in minutes, a photo
@@ -81,6 +85,7 @@ const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>
 ];
 
 const MORE_NAV: typeof NAV = [
+  { href: "/nutribiotic/clients", label: "Clients", icon: "accounts" },
   /* Goals earns its slot on the same rule the top-level items do: it is the
      standing ladder (Director in one, VP in four) and the six SMART goals it
      decomposes into, content meant to be seen every day, not a promise of a
@@ -127,6 +132,7 @@ export default async function NutribioticLayout({
     <div className="min-h-screen bg-[#F7F6F1] text-[#14201B]">
       <RouteProvider initial={routeDraft}>
       <ModalProvider>
+      <RefreshOnForeground />
       <div className="min-h-screen bg-[#F7F6F1]">
         {/* Synthetic-data signal, redesigned 2026-07-18.
             The hazard tape was correct in substance and ugly in practice, and an

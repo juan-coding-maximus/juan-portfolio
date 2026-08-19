@@ -50,19 +50,19 @@ export function MobileNav({
               key={n.href}
               href={n.href}
               aria-current={active ? "page" : undefined}
-              className={`flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium tracking-wide transition-colors ${
+              className={`flex min-h-[64px] flex-col items-center justify-center gap-1.5 py-3 text-[11.5px] font-medium tracking-wide transition-colors ${
                 active ? "text-[#14201B]" : "text-[#8A928C]"
               }`}
             >
               {/* The active signal is a filled top hairline plus ink, readable in
-                  sunlight on a phone; color alone would be too quiet at 10px. */}
+                  sunlight on a phone; color alone would be too quiet at this size. */}
               <span
                 aria-hidden
-                className={`-mt-2.5 mb-0.5 h-[2px] w-7 rounded-full ${
+                className={`-mt-3 mb-0.5 h-[2px] w-8 rounded-full ${
                   active ? "bg-[#2C6A46]" : "bg-transparent"
                 }`}
               />
-              <Ico name={n.icon} size={17} />
+              <Ico name={n.icon} size={22} />
               {n.label}
             </Link>
           );

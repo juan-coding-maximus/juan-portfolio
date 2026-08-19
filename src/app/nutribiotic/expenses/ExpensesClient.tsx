@@ -201,6 +201,9 @@ function HoursCard() {
       setClockOut("");
       setBreakMin("0");
       setNotes("");
+      // Confirmation stands until the next filing starts or clears itself,
+      // by which point the form below is already back to a blank start.
+      if (!flags.length) setTimeout(() => setMessage((m) => (m?.text.startsWith("Filed") ? null : m)), 4000);
     } catch {
       setMessage({ kind: "error", text: "Network error." });
     } finally {
@@ -278,7 +281,8 @@ function HoursCard() {
       </div>
       <div className="mt-3 flex items-center justify-between gap-3">
         {message ? (
-          <p className={`text-[12.5px] leading-snug ${message.kind === "error" ? "text-[#8A2E2E]" : message.kind === "warn" ? "text-[#8A6D2F]" : "text-[#2C6A46]"}`}>
+          <p className={`flex items-center gap-1.5 text-[12.5px] leading-snug ${message.kind === "error" ? "text-[#8A2E2E]" : message.kind === "warn" ? "text-[#8A6D2F]" : "text-[#2C6A46]"}`}>
+            {message.kind === "ok" && <Ico name="check" size={13} />}
             {message.text}
           </p>
         ) : (
@@ -367,6 +371,10 @@ function PhotosCard() {
         return;
       }
       update(card.id, { status: "filed" });
+      // Confirmation shows as the "Filed" pill below; once Juan has had a
+      // beat to see it, the card clears itself so the dropzone is a new
+      // start rather than a growing pile of filed receipts.
+      setTimeout(() => remove(card.id), 2200);
     } catch {
       update(card.id, { status: "ready", message: "Network error." });
     }
@@ -393,6 +401,10 @@ function PhotosCard() {
       }
       update(start.id, { status: "filed" });
       update(end.id, { status: "filed" });
+      setTimeout(() => {
+        remove(start.id);
+        remove(end.id);
+      }, 2200);
     } catch {
       update(start.id, { status: "ready", message: "Network error." });
       update(end.id, { status: "ready", message: "Network error." });
@@ -491,7 +503,10 @@ function PhotoCardView({
               <option value="statement">Statement (use the CLI)</option>
               <option value="unsure">Not sure</option>
             </select>
-            <span className={`text-[11.5px] ${pill.cls}`}>{pill.text}</span>
+            <span className={`flex items-center gap-1 text-[11.5px] ${pill.cls}`}>
+              {filed && <Ico name="check" size={11} />}
+              {pill.text}
+            </span>
           </div>
           {!filed && (
             <button type="button" onClick={() => onRemove(card.id)} className="text-[#8A928C] hover:text-[#8A2E2E]">
