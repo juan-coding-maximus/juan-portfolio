@@ -31,6 +31,7 @@ type PhotoCard = {
   merchant: string;
   purpose: string;
   amount: string;
+  companyCard: boolean;
   date: string;
   // odometer fields
   moment: "start" | "end" | "";
@@ -306,6 +307,7 @@ function PhotosCard() {
       merchant: "",
       purpose: "",
       amount: "",
+      companyCard: false,
       date: todayPT(),
       moment: "",
       odo: "",
@@ -356,6 +358,7 @@ function PhotosCard() {
     form.append("merchant", card.merchant);
     form.append("purpose", card.purpose);
     form.append("amount", card.amount);
+    form.append("companyCard", String(card.companyCard));
     try {
       const res = await fetch("/nutribiotic/api/expenses/receipt", { method: "POST", body: form });
       const j = await res.json();
@@ -504,6 +507,15 @@ function PhotoCardView({
             <input placeholder="Merchant" value={card.merchant} disabled={filed} onChange={(e) => onEdit(card.id, { merchant: e.target.value })} className={inputCls} />
             <input placeholder="Amount" value={card.amount} disabled={filed} onChange={(e) => onEdit(card.id, { amount: e.target.value })} className={inputCls} />
             <input placeholder="Purpose (e.g. Lunch, burger)" value={card.purpose} disabled={filed} onChange={(e) => onEdit(card.id, { purpose: e.target.value })} className={`${inputCls} col-span-2`} />
+            <label className="col-span-2 flex items-center gap-1.5 text-[12.5px] text-[#5B6560]">
+              <input
+                type="checkbox"
+                checked={card.companyCard}
+                disabled={filed}
+                onChange={(e) => onEdit(card.id, { companyCard: e.target.checked })}
+              />
+              Company card, no reimbursement owed
+            </label>
             <input
               type="date"
               value={card.date}

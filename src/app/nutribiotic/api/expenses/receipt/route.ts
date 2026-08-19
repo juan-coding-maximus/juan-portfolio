@@ -29,6 +29,7 @@ export async function POST(req: Request) {
   const merchant = ((form.get("merchant") as string | null) ?? "").trim();
   const purpose = ((form.get("purpose") as string | null) ?? "").trim();
   const amount = ((form.get("amount") as string | null) ?? "").trim();
+  const companyCard = (form.get("companyCard") as string | null) === "true";
 
   if (!date) {
     return Response.json({ ok: false, error: "date is required." }, { status: 400 });
@@ -41,6 +42,8 @@ export async function POST(req: Request) {
     const bytes = await photo.arrayBuffer();
     const result = await fileReceipt({
       date, merchant, purpose, amount,
+      // Real spend either way; a company-card charge just owes nothing back.
+      reimbursement: companyCard ? "0" : amount,
       photo: { bytes, mimeType: photo.type || "image/jpeg", filename: photo.name || "receipt.jpg" },
     });
     return Response.json({ ok: true, result });

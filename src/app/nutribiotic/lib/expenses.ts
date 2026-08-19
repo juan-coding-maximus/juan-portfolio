@@ -43,8 +43,11 @@ import {
 const ROOT_FOLDER = "NutriBiotic Field Expenses";
 const LOG_TAB = "Log";
 const HOURS_TAB = "Hours";
-const EXPENSE_HEADER = ["Date", "Merchant", "Purpose", "Amount", "Link"];
-const MILES_HEADER = ["Start Odo", "Link", "End Odo", "Link", "Distance", "Compensation"];
+// Cost/Reimbursement split 2026-08-19, mirrors expense_log.py: Cost is what was actually
+// spent, Reimbursement is what NutriBiotic owes back, they differ only on a company-card
+// charge (Reimbursement 0). G is the gap/DAY column between the two tables.
+const EXPENSE_HEADER = ["Date", "Merchant", "Purpose", "Cost", "Reimbursement", "Link"];
+const MILES_HEADER = ["Start Odo", "Link", "End Odo", "Link", "Distance", "Mileage Comp"];
 const HOURS_HEADER = ["Date", "Day", "Clock In", "Clock Out", "Break (hours)", "Hours Worked", "Regular", "OT 1.5x", "OT 2x", "Notes"];
 const TOTALS_ROW = 2;
 const FIRST_DATA_ROW = 3;
@@ -138,13 +141,17 @@ async function ensureTree(dateStr: string): Promise<Tree> {
 
   const logHeaderCol = await readColumn(sheet.id, `${LOG_TAB}!A1:A1`);
   if (logHeaderCol.length === 0) {
-    await writeRange(sheet.id, `${LOG_TAB}!A1:E1`, [EXPENSE_HEADER]);
-    await writeRange(sheet.id, `${LOG_TAB}!G1:L1`, [MILES_HEADER]);
-    await writeRange(sheet.id, `${LOG_TAB}!A${TOTALS_ROW}:L${TOTALS_ROW}`, [[
+    await writeRange(sheet.id, `${LOG_TAB}!A1:F1`, [EXPENSE_HEADER]);
+    await writeRange(sheet.id, `${LOG_TAB}!G1:N1`, [["DAY", ...MILES_HEADER, "Total Field Comp"]]);
+    // Total Field Comp sums Reimbursement (E), not Cost (D): the claim is what's owed
+    // back, a company-card charge sits in Cost without inflating it.
+    await writeRange(sheet.id, `${LOG_TAB}!A${TOTALS_ROW}:N${TOTALS_ROW}`, [[
       "TOTAL", "", "",
-      `=SUM(D${FIRST_DATA_ROW}:D${LAST_ROW})`, "", "", "", "", "", "",
-      `=SUM(K${FIRST_DATA_ROW}:K${LAST_ROW})`,
+      `=SUM(D${FIRST_DATA_ROW}:D${LAST_ROW})`,
+      `=SUM(E${FIRST_DATA_ROW}:E${LAST_ROW})`, "", "", "", "", "", "",
       `=SUM(L${FIRST_DATA_ROW}:L${LAST_ROW})`,
+      `=ROUND(L${TOTALS_ROW}*${MILEAGE_RATE},2)`,
+      `=E${TOTALS_ROW}+M${TOTALS_ROW}`,
     ]]);
     await styleLogSheet(sheet.id);
   }
@@ -170,12 +177,15 @@ async function styleLogSheet(sheetId: string): Promise<void> {
   const gid = await tabId(sheetId, LOG_TAB);
   const money = { type: "CURRENCY", pattern: '"$"#,##0.00' };
   await batchUpdate(sheetId, [
-    { repeatCell: { range: { sheetId: gid, startRowIndex: 0, endRowIndex: TOTALS_ROW, startColumnIndex: 0, endColumnIndex: 12 }, cell: { userEnteredFormat: { textFormat: { bold: true } } }, fields: "userEnteredFormat.textFormat.bold" } },
+    { repeatCell: { range: { sheetId: gid, startRowIndex: 0, endRowIndex: TOTALS_ROW, startColumnIndex: 0, endColumnIndex: 14 }, cell: { userEnteredFormat: { textFormat: { bold: true } } }, fields: "userEnteredFormat.textFormat.bold" } },
     { updateSheetProperties: { properties: { sheetId: gid, gridProperties: { frozenRowCount: TOTALS_ROW } }, fields: "gridProperties.frozenRowCount" } },
-    { repeatCell: { range: { sheetId: gid, startRowIndex: TOTALS_ROW - 1, endRowIndex: LAST_ROW, startColumnIndex: 3, endColumnIndex: 4 }, cell: { userEnteredFormat: { numberFormat: money } }, fields: "userEnteredFormat.numberFormat" } },
-    { repeatCell: { range: { sheetId: gid, startRowIndex: TOTALS_ROW - 1, endRowIndex: LAST_ROW, startColumnIndex: 11, endColumnIndex: 12 }, cell: { userEnteredFormat: { numberFormat: money } }, fields: "userEnteredFormat.numberFormat" } },
-    { repeatCell: { range: { sheetId: gid, startRowIndex: TOTALS_ROW - 1, endRowIndex: LAST_ROW, startColumnIndex: 10, endColumnIndex: 11 }, cell: { userEnteredFormat: { numberFormat: { type: "NUMBER", pattern: "0.0" } } }, fields: "userEnteredFormat.numberFormat" } },
-    { addConditionalFormatRule: { index: 0, rule: { ranges: [{ sheetId: gid, startRowIndex: FIRST_DATA_ROW - 1, endRowIndex: LAST_ROW, startColumnIndex: 0, endColumnIndex: 12 }], booleanRule: { condition: { type: "CUSTOM_FORMULA", values: [{ userEnteredValue: "=ISEVEN(ROW())" }] }, format: { backgroundColor: LIGHT_GREEN } } } } },
+    // Cost (D) and Reimbursement (E)
+    { repeatCell: { range: { sheetId: gid, startRowIndex: TOTALS_ROW - 1, endRowIndex: LAST_ROW, startColumnIndex: 3, endColumnIndex: 5 }, cell: { userEnteredFormat: { numberFormat: money } }, fields: "userEnteredFormat.numberFormat" } },
+    // Mileage Comp (M) and Total Field Comp (N)
+    { repeatCell: { range: { sheetId: gid, startRowIndex: TOTALS_ROW - 1, endRowIndex: LAST_ROW, startColumnIndex: 12, endColumnIndex: 14 }, cell: { userEnteredFormat: { numberFormat: money } }, fields: "userEnteredFormat.numberFormat" } },
+    // Distance (L)
+    { repeatCell: { range: { sheetId: gid, startRowIndex: TOTALS_ROW - 1, endRowIndex: LAST_ROW, startColumnIndex: 11, endColumnIndex: 12 }, cell: { userEnteredFormat: { numberFormat: { type: "NUMBER", pattern: "0.0" } } }, fields: "userEnteredFormat.numberFormat" } },
+    { addConditionalFormatRule: { index: 0, rule: { ranges: [{ sheetId: gid, startRowIndex: FIRST_DATA_ROW - 1, endRowIndex: LAST_ROW, startColumnIndex: 0, endColumnIndex: 14 }], booleanRule: { condition: { type: "CUSTOM_FORMULA", values: [{ userEnteredValue: "=ISEVEN(ROW())" }] }, format: { backgroundColor: LIGHT_GREEN } } } } },
   ]);
 }
 
@@ -275,6 +285,9 @@ export async function fileHours(input: HoursInput): Promise<HoursResult> {
 
 export type ReceiptInput = {
   date: string; merchant: string; purpose: string; amount: string;
+  // Defaults to `amount` (fully reimbursable) when omitted. Pass "0" for a
+  // company-card charge: real spend, nothing owed back.
+  reimbursement?: string;
   photo: { bytes: ArrayBuffer; mimeType: string; filename: string };
 };
 
@@ -284,10 +297,11 @@ export async function fileReceipt(input: ReceiptInput): Promise<{ sheetLink: str
   const stamp = input.date.replace(/-/g, "");
   const uploaded = await uploadFile(input.photo.bytes, input.photo.mimeType, tree.periodFolderId, `${stamp}_receipt_${randomSuffix()}${ext}`);
   const photoLink = asOwnerLink(uploaded.webViewLink);
+  const reimbursement = input.reimbursement ?? input.amount;
 
   const row = Math.max(await nextFreeRow(tree.sheetId, LOG_TAB, "A"), FIRST_DATA_ROW);
-  await writeRange(tree.sheetId, `${LOG_TAB}!A${row}:E${row}`, [[
-    input.date, input.merchant, input.purpose, input.amount, hyperlink(photoLink, "receipt"),
+  await writeRange(tree.sheetId, `${LOG_TAB}!A${row}:F${row}`, [[
+    input.date, input.merchant, input.purpose, input.amount, reimbursement, hyperlink(photoLink, "receipt"),
   ]]);
 
   return { sheetLink: asOwnerLink(tree.sheetLink), photoLink };
@@ -318,12 +332,15 @@ export async function fileTrip(input: TripInput): Promise<{ sheetLink: string; m
   const startLink = asOwnerLink(startUp.webViewLink);
   const endLink = asOwnerLink(endUp.webViewLink);
 
-  const row = Math.max(await nextFreeRow(tree.sheetId, LOG_TAB, "G"), FIRST_DATA_ROW);
-  await writeRange(tree.sheetId, `${LOG_TAB}!G${row}:L${row}`, [[
+  // H:M, not G:L: G is the gap/DAY column between the two tables (2026-08-19). Mileage
+  // Comp (M) stays blank per row, a totals-row-only figure since 2026-08-17, matching
+  // expense_log.py, a per-drive dollar figure read as more precision than the claim needs.
+  const row = Math.max(await nextFreeRow(tree.sheetId, LOG_TAB, "H"), FIRST_DATA_ROW);
+  await writeRange(tree.sheetId, `${LOG_TAB}!H${row}:M${row}`, [[
     input.startOdo, hyperlink(startLink, "photo"),
     input.endOdo, hyperlink(endLink, "photo"),
-    `=IF(OR(G${row}="",I${row}=""),"",I${row}-G${row})`,
-    `=IF(K${row}="","",ROUND(K${row}*${MILEAGE_RATE},2))`,
+    `=IF(OR(H${row}="",J${row}=""),"",J${row}-H${row})`,
+    "",
   ]]);
 
   return { sheetLink: asOwnerLink(tree.sheetLink), miles: Math.round((endNum - startNum) * 10) / 10 };
