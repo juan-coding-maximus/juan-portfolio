@@ -19,6 +19,7 @@
 "use server";
 
 import Anthropic from "@anthropic-ai/sdk";
+import { revalidatePath } from "next/cache";
 import {
   finalizeTouchpointAccount,
   getTouchpointById,
@@ -83,7 +84,7 @@ type ParsedCalendarAction = {
   notes: string | null;
 };
 
-type ParsedTouchpoint = {
+export type ParsedTouchpoint = {
   account_id: string | null;
   account_confidence: "high" | "low" | "none";
   business_name_guess: string | null;
@@ -221,6 +222,13 @@ export type RecordTouchpointResult =
       needsAccount: true;
       summary: string;
       businessNameGuess: string | null;
+      // The model's own low-confidence guess at an EXISTING account, surfaced
+      // as the "Client Match:" pill (see AccountMatchResolver) rather than
+      // discarded. Only ever set when account_confidence is "low": "none"
+      // means the model found no plausible candidate at all, and a "high"
+      // match auto-files below rather than landing here.
+      matchAccountId: string | null;
+      matchAccountName: string | null;
       peopleAdded: 0;
       peopleUpdated: 0;
       calendarProposals: 0;
@@ -281,6 +289,13 @@ export async function recordTouchpoint(
       account_match_confidence: parsed.account_confidence,
       parsed,
     });
+    // A "low" guess still names a real candidate id; "none" never does (see
+    // the extraction prompt above). Resolve it to a name now, once, rather
+    // than making the client look it up.
+    const matchAccount =
+      parsed.account_confidence === "low" && parsed.account_id
+        ? accountsRes.data.find((a) => a.account_id === parsed.account_id)
+        : null;
     return {
       ok: true,
       touchpoint_id: tp.id,
@@ -288,6 +303,8 @@ export async function recordTouchpoint(
       needsAccount: true,
       summary: parsed.activity?.detail ?? text.slice(0, 140),
       businessNameGuess: parsed.business_name_guess ?? null,
+      matchAccountId: matchAccount?.account_id ?? null,
+      matchAccountName: matchAccount?.name ?? null,
       peopleAdded: 0,
       peopleUpdated: 0,
       calendarProposals: 0,
@@ -484,5 +501,6 @@ export async function resolveTouchpointToAccount(
 
   const hubspot = await autoFileEngagement(activity.id);
 
+  revalidatePath("/nutribiotic/visit");
   return { ok: true, accountName, summary: parsed.activity.detail, peopleAdded, peopleUpdated, calendarProposals, ...hubspot };
 }

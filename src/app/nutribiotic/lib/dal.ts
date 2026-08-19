@@ -801,6 +801,38 @@ export async function getTouchpointParsedForActivity(activityId: number): Promis
   return res.data[0]?.parsed ?? null;
 }
 
+/**
+ * Every touchpoint still parked as needs_account, oldest first (a rep reads
+ * a queue top-down, same as the calendar-proposals list below it).
+ *
+ * WHY THIS EXISTS SEPARATELY FROM THE JUST-TYPED RESULT. The Visit tab's
+ * TouchpointCapture only shows the AccountMatchResolver for the note Juan
+ * just typed in that exact page load. A voice-recorded visit resolves
+ * async, after transcription, on nobody's screen, so without this list it
+ * parks invisibly until someone opens Claude Code and asks for it by hand
+ * (confirmed 2026-08-19, t_345d5c). This list is what a recorded visit's
+ * pending match surfaces on, same pills, same "YES!", same SuccessNote.
+ */
+export async function listPendingAccountMatches(limit = 10): Promise<Result<Touchpoint>> {
+  return query<Touchpoint>("nb_touchpoints", {
+    select: "id,account_id,raw_text,status,account_match_confidence,activity_id,parsed,origin,created_at",
+    status: "eq.needs_account",
+    order: "created_at.asc",
+    limit,
+  });
+}
+
+/** id -> name for a handful of accounts, to label a "Client Match:" pill
+ * without pulling the whole 500-row book the way recordTouchpoint() does. */
+export async function getAccountNames(ids: string[]): Promise<Record<string, string>> {
+  if (ids.length === 0) return {};
+  const res = await query<{ id: string; name: string; origin?: Origin }>("nb_accounts", {
+    select: "id,name",
+    id: `in.(${ids.join(",")})`,
+  });
+  return Object.fromEntries(res.data.map((a) => [a.id, a.name]));
+}
+
 export async function getTouchpointById(id: string): Promise<Touchpoint | null> {
   const res = await query<Touchpoint>("nb_touchpoints", {
     select: "*",

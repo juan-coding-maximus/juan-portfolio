@@ -1,157 +1,264 @@
 "use client";
 
 /**
- * The new-business path off a needs_account touchpoint. Search Google Places
- * by name, confirm the right one, and the visit already recorded gets filed
- * against a freshly created OS account + HubSpot company. See
- * lib/new-account-actions.ts for the actual pipeline; this is presentation.
+ * What shows under a touchpoint that parked as needs_account (Visit tab).
+ * Two pill rows, each candidate a tap away from done:
+ *
+ *   Client Match:  the model's own low-confidence guess at an account
+ *                  already in the book (see touchpoint.ts's matchAccountId),
+ *                  surfaced instead of silently discarded.
+ *   New Client:    up to 3 Google Places results for the name Juan said,
+ *                  California-bound, fetched the moment this mounts so
+ *                  there is something to tap without typing first.
+ *
+ * ONE-TAP CONFIRM, ALWAYS A SUCCESS NOTE (Juan, 2026-08-19, now a standing
+ * agency-wide UI rule, see AGENTS.md): every "YES!" ends in ui.tsx's
+ * SuccessNote, inline, in place of the pills that were just tapped. A tap
+ * that changes real data is not trustworthy unless it visibly says so.
+ *
+ * A manual search stays underneath, collapsed, for when none of the 3 Places
+ * guesses or the 1 client guess is actually the right one.
  */
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   createBusinessFromPlace,
   searchNewBusiness,
   type BusinessSearchOutcome,
   type CreateBusinessOutcome,
 } from "./new-account-actions";
+import { resolveTouchpointToAccount, type ResolveResult } from "./touchpoint";
 import type { PlaceCandidate } from "./places";
-import { Ico } from "./ui";
+import { Ico, SuccessNote } from "./ui";
 
-export function NewBusinessResolver({
+/** One rounded chip: a name to confirm and the YES! that confirms it. */
+function MatchPill({
+  label,
+  sub,
+  onYes,
+  pending,
+  disabled,
+}: {
+  label: string;
+  sub?: string | null;
+  onYes: () => void;
+  pending: boolean;
+  disabled: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-full border border-[#E2DFD5] bg-white py-1 pl-3 pr-1.5">
+      <span className="min-w-0 truncate text-[12.5px] text-[#14201B]">
+        {label}
+        {sub && <span className="text-[#8A928C]"> · {sub}</span>}
+      </span>
+      <button
+        onClick={onYes}
+        disabled={pending || disabled}
+        className="shrink-0 rounded-full bg-[#14201B] px-2.5 py-1 text-[11.5px] font-semibold tracking-wide text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
+      >
+        {pending ? "..." : "YES!"}
+      </button>
+    </div>
+  );
+}
+
+export function AccountMatchResolver({
   touchpointId,
   nameGuess,
+  matchAccountId,
+  matchAccountName,
 }: {
   touchpointId: string;
   nameGuess: string | null;
+  matchAccountId: string | null;
+  matchAccountName: string | null;
 }) {
-  const [query, setQuery] = useState(nameGuess ?? "");
+  const [matchResult, setMatchResult] = useState<ResolveResult | null>(null);
+  const [matching, startMatching] = useTransition();
+
   const [search, setSearch] = useState<BusinessSearchOutcome | null>(null);
-  const [created, setCreated] = useState<CreateBusinessOutcome | null>(null);
   const [searching, startSearch] = useTransition();
+  const [query, setQuery] = useState(nameGuess ?? "");
+  const [manualOpen, setManualOpen] = useState(false);
+
+  const [created, setCreated] = useState<CreateBusinessOutcome | null>(null);
+  const [creatingId, setCreatingId] = useState<string | null>(null);
   const [creating, startCreate] = useTransition();
 
-  function doSearch() {
-    if (!query.trim() || searching) return;
+  // The 3 Places candidates load the moment this mounts, from the name Juan
+  // already said. Nothing to type before there's something to tap.
+  useEffect(() => {
+    if (!nameGuess || search) return;
     startSearch(async () => {
-      setSearch(await searchNewBusiness(query));
+      setSearch(await searchNewBusiness(nameGuess));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nameGuess]);
+
+  function confirmMatch() {
+    if (!matchAccountId || !matchAccountName || matching) return;
+    startMatching(async () => {
+      setMatchResult(await resolveTouchpointToAccount(touchpointId, matchAccountId, matchAccountName));
     });
   }
 
   function pick(place: PlaceCandidate, force = false) {
+    setCreatingId(place.placeId);
     startCreate(async () => {
       setCreated(await createBusinessFromPlace(touchpointId, place, { force }));
     });
   }
 
+  function doManualSearch() {
+    if (!query.trim() || searching) return;
+    startSearch(async () => {
+      setCreated(null);
+      setSearch(await searchNewBusiness(query));
+    });
+  }
+
+  // Resolved: show the one success note in place of everything else.
+  if (matchResult?.ok) {
+    return (
+      <div className="mt-3">
+        <SuccessNote
+          title={`Matched ${matchResult.accountName}`}
+          detail={matchResult.summary}
+          hubspotFiled={matchResult.hubspotFiled}
+          hubspotId={matchResult.hubspotNoteId}
+          hubspotError={matchResult.hubspotError}
+          meta={
+            (matchResult.peopleAdded > 0 || matchResult.peopleUpdated > 0) && (
+              <div className="mt-1.5 text-[12px] text-[#8A928C]">
+                {matchResult.peopleAdded > 0 && `${matchResult.peopleAdded} contact${matchResult.peopleAdded === 1 ? "" : "s"} added`}
+                {matchResult.peopleAdded > 0 && matchResult.peopleUpdated > 0 && ", "}
+                {matchResult.peopleUpdated > 0 && `${matchResult.peopleUpdated} updated`}
+              </div>
+            )
+          }
+        />
+      </div>
+    );
+  }
+
   if (created?.ok) {
     return (
-      <div className="mt-3 rounded-md border border-[#E2DFD5] bg-[#FAF9F5] px-3 py-2.5 text-[13px] leading-relaxed text-[#3D4A44]">
-        <div className="flex items-center gap-1.5 font-medium text-[#2C6A46]">
-          <Ico name="check" size={13} />
-          Created {created.accountName} and filed the visit
-        </div>
-        <div className="mt-1 text-[#5B6560]">
-          {created.summary}
-          {(created.peopleAdded > 0 || created.peopleUpdated > 0) &&
-            ` · ${created.peopleAdded} contact${created.peopleAdded === 1 ? "" : "s"} added`}
-          {created.calendarProposals > 0 && ` · ${created.calendarProposals} follow-up waiting below`}
-        </div>
-        <div className={`mt-1.5 flex items-center gap-1.5 text-[12px] ${created.hubspotFiled ? "text-[#8A928C]" : "text-[#8A6D2F]"}`}>
-          <Ico name={created.hubspotFiled ? "check" : "alert"} size={11} />
-          {created.hubspotFiled
-            ? `Filed to HubSpot${created.hubspotNoteId ? ` (${created.hubspotNoteId})` : ""}.`
-            : `Not filed to HubSpot yet: ${created.hubspotError ?? "unknown error"}. It's waiting in the queue below to retry.`}
-        </div>
+      <div className="mt-3">
+        <SuccessNote
+          title={`Created ${created.accountName} and filed the visit`}
+          detail={created.summary}
+          hubspotFiled={created.hubspotFiled}
+          hubspotId={created.hubspotNoteId}
+          hubspotError={created.hubspotError}
+          meta={
+            (created.peopleAdded > 0 || created.peopleUpdated > 0 || created.calendarProposals > 0) && (
+              <div className="mt-1.5 text-[12px] text-[#8A928C]">
+                {created.peopleAdded > 0 && `${created.peopleAdded} contact${created.peopleAdded === 1 ? "" : "s"} added`}
+                {created.peopleAdded > 0 && created.peopleUpdated > 0 && ", "}
+                {created.peopleUpdated > 0 && `${created.peopleUpdated} updated`}
+                {created.calendarProposals > 0 &&
+                  `${created.peopleAdded || created.peopleUpdated ? " · " : ""}${created.calendarProposals} follow-up waiting below`}
+              </div>
+            )
+          }
+        />
       </div>
     );
   }
 
   return (
-    <div className="mt-3 rounded-md border border-[#E2DFD5] bg-[#FAF9F5] p-3">
-      <div className="mb-1.5 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
-        Couldn't confidently match an account. New business?
+    <div className="mt-3 flex flex-col gap-3 rounded-md border border-[#E2DFD5] bg-[#FAF9F5] p-3">
+      <div className="text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
+        Couldn&apos;t confidently match an account.
       </div>
 
-      {!search?.ok && (
-        <div className="flex items-center gap-2">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && doSearch()}
-            placeholder="Business name"
-            className="min-w-0 flex-1 rounded-md border border-[#E2DFD5] bg-white px-3 py-2 text-[13.5px] text-[#14201B] placeholder:text-[#A9AFA9] focus:border-[#14201B] focus:outline-none"
-          />
-          <button
-            onClick={doSearch}
-            disabled={searching || !query.trim()}
-            className="shrink-0 rounded-md bg-[#14201B] px-3.5 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
-          >
-            {searching ? "Searching..." : "Search"}
-          </button>
-        </div>
-      )}
-
-      {search && !search.ok && (
-        <div className="mt-2 text-[13px] text-[#8A6D2F]">{search.error}</div>
-      )}
-
-      {search?.ok && !created && (
-        <div className="mt-2 flex flex-col gap-2">
-          {search.candidates.map((c) => (
-            <div key={c.placeId} className="flex items-start justify-between gap-3 rounded-md border border-[#E2DFD5] bg-white p-2.5">
-              <div className="min-w-0 text-[13px]">
-                <div className="font-medium">{c.name}</div>
-                <div className="mt-0.5 text-[12px] text-[#5B6560]">
-                  {c.formattedAddress ?? "no address on file"}
-                  {c.phone && ` · ${c.phone}`}
-                </div>
-                {c.businessStatus && c.businessStatus !== "OPERATIONAL" && (
-                  <div className="mt-0.5 text-[12px] text-[#8A6D2F]">{c.businessStatus.replace(/_/g, " ").toLowerCase()}</div>
-                )}
-              </div>
-              <button
-                onClick={() => pick(c)}
-                disabled={creating}
-                className="shrink-0 rounded-md bg-[#14201B] px-3 py-1.5 text-[12.5px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
-              >
-                {creating ? "..." : "This is it"}
-              </button>
-            </div>
-          ))}
-          <button
-            onClick={() => setSearch(null)}
-            className="self-start text-[12px] text-[#8A928C] underline-offset-2 hover:underline"
-          >
-            None of these, search again
-          </button>
-        </div>
-      )}
-
-      {created && !created.ok && (
-        <div className="mt-2 rounded-md border border-[#E5D9BF] bg-[#FBF6E9] px-3 py-2.5 text-[13px] text-[#8A6D2F]">
-          {created.error}
-          {created.duplicates && created.duplicates.length > 0 && (
-            <>
-              <ul className="mt-2 flex flex-col gap-1">
-                {created.duplicates.map((d) => (
-                  <li key={d.id} className="text-[12.5px]">
-                    {d.name ?? d.id} {d.city ? `· ${d.city}` : ""} · owner {d.owner ?? "(unowned)"}
-                  </li>
-                ))}
-              </ul>
-              {search?.ok && (
-                <button
-                  onClick={() => pick(search.candidates[0], true)}
-                  disabled={creating}
-                  className="mt-2 rounded-md border border-[#E5D9BF] bg-white px-3 py-1.5 text-[12.5px] font-medium text-[#8A6D2F] transition-colors hover:bg-[#FBF6E9] disabled:opacity-40"
-                >
-                  {creating ? "..." : "None of these are it, create anyway"}
-                </button>
-              )}
-            </>
+      {matchAccountId && matchAccountName && (
+        <div>
+          <div className="mb-1.5 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">Client Match:</div>
+          <div className="flex flex-wrap gap-2">
+            <MatchPill label={matchAccountName} onYes={confirmMatch} pending={matching} disabled={creating} />
+          </div>
+          {matchResult && !matchResult.ok && (
+            <div className="mt-1.5 text-[12px] text-[#8A6D2F]">{matchResult.error}</div>
           )}
         </div>
       )}
+
+      <div>
+        <div className="mb-1.5 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">New Client:</div>
+
+        {searching && !search && <div className="text-[12.5px] text-[#8A928C]">Looking up nearby businesses…</div>}
+
+        {search?.ok && (
+          <div className="flex flex-wrap gap-2">
+            {search.candidates.map((c) => (
+              <MatchPill
+                key={c.placeId}
+                label={c.name}
+                sub={c.city}
+                onYes={() => pick(c)}
+                pending={creating && creatingId === c.placeId}
+                disabled={matching || (creating && creatingId !== c.placeId)}
+              />
+            ))}
+          </div>
+        )}
+
+        {search && !search.ok && <div className="text-[12.5px] text-[#8A6D2F]">{search.error}</div>}
+
+        {created && !created.ok && (
+          <div className="mt-2 rounded-md border border-[#E5D9BF] bg-[#FBF6E9] px-3 py-2.5 text-[13px] text-[#8A6D2F]">
+            {created.error}
+            {created.duplicates && created.duplicates.length > 0 && (
+              <>
+                <ul className="mt-2 flex flex-col gap-1">
+                  {created.duplicates.map((d) => (
+                    <li key={d.id} className="text-[12.5px]">
+                      {d.name ?? d.id} {d.city ? `· ${d.city}` : ""} · owner {d.owner ?? "(unowned)"}
+                    </li>
+                  ))}
+                </ul>
+                {search?.ok && (
+                  <button
+                    onClick={() => pick(search.candidates[0], true)}
+                    disabled={creating}
+                    className="mt-2 rounded-md border border-[#E5D9BF] bg-white px-3 py-1.5 text-[12.5px] font-medium text-[#8A6D2F] transition-colors hover:bg-[#FBF6E9] disabled:opacity-40"
+                  >
+                    {creating ? "..." : "None of these are it, create anyway"}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        <button
+          onClick={() => setManualOpen((v) => !v)}
+          className="mt-2 flex items-center gap-1 text-[12px] text-[#8A928C] underline-offset-2 hover:underline"
+        >
+          <Ico name={manualOpen ? "chevron-up" : "chevron-down"} size={11} />
+          Search a different name
+        </button>
+
+        {manualOpen && (
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && doManualSearch()}
+              placeholder="Business name"
+              className="min-w-0 flex-1 rounded-md border border-[#E2DFD5] bg-white px-3 py-2 text-[13.5px] text-[#14201B] placeholder:text-[#A9AFA9] focus:border-[#14201B] focus:outline-none"
+            />
+            <button
+              onClick={doManualSearch}
+              disabled={searching || !query.trim()}
+              className="shrink-0 rounded-md bg-[#14201B] px-3.5 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
+            >
+              {searching ? "Searching..." : "Search"}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

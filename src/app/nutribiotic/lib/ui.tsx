@@ -113,6 +113,49 @@ export function fullAddress(a: {
   return [a.street, a.city, a.state, a.postal].filter(Boolean).join(", ");
 }
 
+/**
+ * The confirmation beat every "YES!"-style write ends in (Juan, 2026-08-19:
+ * a one-tap confirm button is only trustworthy if the tap visibly did
+ * something). Inline, in the surface the tap happened on, never a toast that
+ * can be missed. `hubspotFiled` is optional: some confirms (a calendar
+ * approval, a dismiss) never touch the portal at all, and the HubSpot line
+ * only renders when the caller passes it.
+ */
+export function SuccessNote({
+  title,
+  detail,
+  hubspotFiled,
+  hubspotId,
+  hubspotError,
+  meta,
+}: {
+  title: string;
+  detail?: string | null;
+  hubspotFiled?: boolean;
+  hubspotId?: string | null;
+  hubspotError?: string | null;
+  meta?: ReactNode;
+}) {
+  return (
+    <div className="rounded-md border border-[#E2DFD5] bg-[#FAF9F5] px-3 py-2.5 text-[13px] leading-relaxed text-[#3D4A44]">
+      <div className="flex items-center gap-1.5 font-medium text-[#2C6A46]">
+        <Ico name="check" size={13} />
+        {title}
+      </div>
+      {detail && <div className="mt-1 text-[#5B6560]">{detail}</div>}
+      {hubspotFiled !== undefined && (
+        <div className={`mt-1.5 flex items-center gap-1.5 text-[12px] ${hubspotFiled ? "text-[#8A928C]" : "text-[#8A6D2F]"}`}>
+          <Ico name={hubspotFiled ? "check" : "alert"} size={11} />
+          {hubspotFiled
+            ? `Filed to HubSpot${hubspotId ? ` (${hubspotId})` : ""}.`
+            : `Not filed to HubSpot yet: ${hubspotError ?? "unknown error"}. It's waiting in the queue below to retry.`}
+        </div>
+      )}
+      {meta}
+    </div>
+  );
+}
+
 export function Ico({ name, size = 16 }: { name: string; size?: number }) {
   return (
     <svg
@@ -257,6 +300,28 @@ export function Stat({
 export function Empty({ children }: { children: ReactNode }) {
   return (
     <Card className="text-[14px] text-[#5B6560]">{children}</Card>
+  );
+}
+
+/** One pulsing placeholder bar, for loading.tsx skeletons. */
+export function SkeletonBar({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse rounded-md bg-[#EDEBE3] ${className}`} />;
+}
+
+/**
+ * A loading.tsx skeleton for a title plus a stack of card-shaped bars. Used
+ * across the bottom-nav routes so each gets a real Suspense boundary: without
+ * one, Next prefetches the whole dynamic page and holds it client-side until
+ * the app reloads, which is why the tab bar's targets need this, not polish.
+ */
+export function PageSkeleton({ rows = 4 }: { rows?: number }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <SkeletonBar className="mb-4 h-7 w-40" />
+      {Array.from({ length: rows }).map((_, i) => (
+        <SkeletonBar key={i} className="h-16 w-full" />
+      ))}
+    </div>
   );
 }
 

@@ -9,9 +9,17 @@
  * bridges/nutribiotic/hubspot_notes.py.
  */
 
-import { isConfigured, listCalendarProposals, listUnfiledActivities } from "../lib/dal";
+import {
+  getAccountNames,
+  isConfigured,
+  listCalendarProposals,
+  listPendingAccountMatches,
+  listUnfiledActivities,
+} from "../lib/dal";
 import { EngagementQueue } from "../lib/engagement-ui";
+import { AccountMatchResolver } from "../lib/new-account-ui";
 import { CalendarProposalRow, TouchpointCapture } from "../lib/touchpoint-ui";
+import type { ParsedTouchpoint } from "../lib/touchpoint";
 import { LAUNCHERS } from "../lib/launchers";
 import { Empty, PageHead } from "../lib/ui";
 
@@ -35,10 +43,21 @@ export const metadata = {
 };
 
 export default async function VisitPage() {
-  const [proposals, unfiled] = await Promise.all([
+  const [proposals, unfiled, pending] = await Promise.all([
     isConfigured() ? listCalendarProposals() : Promise.resolve({ data: [] }),
     isConfigured() ? listUnfiledActivities() : Promise.resolve({ data: [] }),
+    isConfigured() ? listPendingAccountMatches() : Promise.resolve({ data: [] }),
   ]);
+
+  // A recorded (spoken) visit that parks as needs_account resolves after
+  // transcription, on nobody's screen, so it needs its own name lookup
+  // rather than the one recordTouchpoint() already did for a same-page typed
+  // note (see AccountMatchResolver in touchpoint-ui.tsx).
+  const lowConfidenceIds = pending.data
+    .map((tp) => (tp.parsed as ParsedTouchpoint | null))
+    .filter((p): p is ParsedTouchpoint => p != null && p.account_confidence === "low" && !!p.account_id)
+    .map((p) => p.account_id as string);
+  const accountNames = isConfigured() ? await getAccountNames([...new Set(lowConfidenceIds)]) : {};
 
   return (
     <>
@@ -49,6 +68,32 @@ export default async function VisitPage() {
       ) : (
         <div className="flex flex-col gap-8">
           <TouchpointCapture />
+
+          {pending.data.length > 0 && (
+            <section className="mx-auto w-full max-w-[600px]">
+              <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8A928C]">
+                Needs a match
+              </h2>
+              <div className="flex flex-col gap-4">
+                {pending.data.map((tp) => {
+                  const parsed = tp.parsed as ParsedTouchpoint | null;
+                  const matchAccountId =
+                    parsed?.account_confidence === "low" && parsed.account_id ? parsed.account_id : null;
+                  return (
+                    <div key={tp.id} className="rounded-xl border border-[#E2DFD5] bg-white p-4">
+                      <p className="line-clamp-3 text-[13px] leading-relaxed text-[#3D4A44]">{tp.raw_text}</p>
+                      <AccountMatchResolver
+                        touchpointId={tp.id}
+                        nameGuess={parsed?.business_name_guess ?? null}
+                        matchAccountId={matchAccountId}
+                        matchAccountName={matchAccountId ? (accountNames[matchAccountId] ?? null) : null}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
           <div className="mx-auto w-full max-w-[600px]">
             <EngagementQueue activities={unfiled.data} />

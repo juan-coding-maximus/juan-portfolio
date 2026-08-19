@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { decideCalendarProposal } from "./calendar-actions";
-import { NewBusinessResolver } from "./new-account-ui";
+import { AccountMatchResolver } from "./new-account-ui";
 import { recordTouchpoint, type RecordTouchpointResult } from "./touchpoint";
 import { Ico } from "./ui";
 
@@ -13,6 +14,8 @@ function mtMimeType(): string {
   }
   return "";
 }
+
+type FiledTouchpoint = Extract<RecordTouchpointResult, { ok: true; needsAccount: false }>;
 
 function fmtTimer(ms: number): string {
   const s = Math.floor(ms / 1000);
@@ -33,12 +36,19 @@ function fmtTimer(ms: number): string {
  * as every voice-memo and camera app.
  */
 export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | null }) {
+  const router = useRouter();
   const [text, setText] = useState("");
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<RecordTouchpointResult | null>(null);
+  // A clean file (matched, no follow-up needed) gets its own confirmation
+  // beat instead of sitting in `result` indefinitely: show it, refresh the
+  // lists below so the just-filed activity is already gone from the queue,
+  // then drop back to a blank capture on its own. needsAccount/error stay in
+  // `result` since those need Juan to read and act, not a timed dismiss.
+  const [success, setSuccess] = useState<FiledTouchpoint | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const [voice, setVoice] = useState<"idle" | "recording" | "uploading" | "error">("idle");
+  const [voice, setVoice] = useState<"idle" | "recording" | "uploading" | "uploaded" | "error">("idle");
   const [elapsedMs, setElapsedMs] = useState(0);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
@@ -46,6 +56,19 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
   const chunksRef = useRef<Blob[]>([]);
   const t0Ref = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!success) return;
+    router.refresh();
+    const t = setTimeout(() => setSuccess(null), 2200);
+    return () => clearTimeout(t);
+  }, [success, router]);
+
+  useEffect(() => {
+    if (voice !== "uploaded") return;
+    const t = setTimeout(() => setVoice("idle"), 1800);
+    return () => clearTimeout(t);
+  }, [voice]);
 
   function autosize(el: HTMLTextAreaElement) {
     el.style.height = "auto";
@@ -57,10 +80,12 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
     if (!value.trim() || pending) return;
     startTransition(async () => {
       const res = await recordTouchpoint(value, accountIdHint);
-      setResult(res);
-      if (res.ok) {
+      if (res.ok && !res.needsAccount) {
         setText("");
         requestAnimationFrame(() => textareaRef.current && autosize(textareaRef.current));
+        setSuccess(res);
+      } else {
+        setResult(res);
       }
     });
   }
@@ -92,7 +117,7 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
       const res = await fetch("/nutribiotic/api/visits/upload", { method: "POST", body: form });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Upload failed.");
-      setVoice("idle");
+      setVoice("uploaded");
     } catch (err) {
       setVoice("error");
       setVoiceError(err instanceof Error ? err.message : "Upload failed.");
@@ -133,51 +158,95 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
   return (
     <div className="mx-auto w-full max-w-[600px]">
       <div className="rounded-xl border border-[#E2DFD5] bg-white p-4 sm:p-5">
-        <div className="relative">
-          <textarea
-            ref={textareaRef}
-            value={text}
-            onChange={(e) => {
-              setText(e.target.value);
-              autosize(e.target);
-            }}
-            placeholder="What just happened?"
-            rows={5}
-            className="min-h-[132px] w-full resize-none border-none bg-transparent p-0 pr-14 text-[16px] leading-relaxed text-[#14201B] placeholder:text-[#A9AFA9] focus:outline-none"
-          />
-
-          {recording && (
-            <span className="pointer-events-none absolute bottom-1 right-[60px] text-[12.5px] font-medium tabular-nums text-[#8A2E2E]">
-              {fmtTimer(elapsedMs)}
+        {success ? (
+          // The confirmation beat: tappable to skip the wait and start the
+          // next one immediately, otherwise clears itself (see the effect
+          // above) once the lists below have had a chance to refresh.
+          <button
+            onClick={() => setSuccess(null)}
+            className="flex w-full flex-col items-center gap-2 py-6 text-center"
+          >
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#E4EEE7] text-[#2C6A46]">
+              <Ico name="check" size={20} />
             </span>
-          )}
-
-          <button
-            onClick={recording ? stopRecording : startRecording}
-            disabled={uploading}
-            aria-label={recording ? "Stop recording" : "Record a visit"}
-            className={`absolute bottom-0 right-0 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white shadow-sm transition-all disabled:opacity-50 ${
-              recording ? "scale-105 bg-[#B23B3B]" : "bg-[#8A2E2E] hover:opacity-90"
-            }`}
-          >
-            {uploading ? (
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-            ) : (
-              <Ico name={recording ? "stop" : "mic"} size={17} />
+            <span className="text-[15px] font-medium text-[#14201B]">
+              Logged{success.accountName ? `: ${success.accountName}` : ""}
+            </span>
+            {success.summary && (
+              <span className="max-w-[46ch] text-[13px] leading-relaxed text-[#5B6560]">{success.summary}</span>
             )}
+            <span
+              className={`flex items-center gap-1.5 text-[12px] leading-relaxed ${
+                success.hubspotFiled ? "text-[#8A928C]" : "text-[#8A6D2F]"
+              }`}
+            >
+              <Ico name={success.hubspotFiled ? "check" : "alert"} size={12} />
+              {success.hubspotFiled
+                ? `Filed to HubSpot${success.hubspotNoteId ? ` (${success.hubspotNoteId})` : ""}`
+                : `Not filed yet: ${success.hubspotError ?? "unknown error"}. Waiting below to retry.`}
+            </span>
+            {(success.peopleAdded > 0 || success.peopleUpdated > 0 || success.calendarProposals > 0) && (
+              <span className="text-[12px] text-[#8A928C]">
+                {success.peopleAdded > 0 && `${success.peopleAdded} contact${success.peopleAdded === 1 ? "" : "s"} added`}
+                {success.peopleAdded > 0 && success.peopleUpdated > 0 && ", "}
+                {success.peopleUpdated > 0 && `${success.peopleUpdated} updated`}
+                {success.calendarProposals > 0 &&
+                  `${success.peopleAdded || success.peopleUpdated ? " · " : ""}${success.calendarProposals} follow-up${success.calendarProposals === 1 ? "" : "s"} waiting below`}
+              </span>
+            )}
+            <span className="mt-1 text-[11px] uppercase tracking-[0.1em] text-[#A9AFA9]">Tap for the next one</span>
           </button>
-        </div>
+        ) : (
+          <>
+            <div className="relative">
+              <textarea
+                ref={textareaRef}
+                value={text}
+                onChange={(e) => {
+                  setText(e.target.value);
+                  autosize(e.target);
+                }}
+                placeholder="What just happened?"
+                rows={5}
+                className="min-h-[132px] w-full resize-none border-none bg-transparent p-0 pr-14 text-[16px] leading-relaxed text-[#14201B] placeholder:text-[#A9AFA9] focus:outline-none"
+              />
 
-        <div className="mt-3 flex items-center justify-between gap-3">
-          <span className="min-h-[1em] text-[12px] leading-relaxed text-[#8A6D2F]">{voiceError}</span>
-          <button
-            onClick={submit}
-            disabled={pending || !text.trim()}
-            className="shrink-0 rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-30"
-          >
-            {pending ? "Logging…" : "Log"}
-          </button>
-        </div>
+              {recording && (
+                <span className="pointer-events-none absolute bottom-1 right-[60px] text-[12.5px] font-medium tabular-nums text-[#8A2E2E]">
+                  {fmtTimer(elapsedMs)}
+                </span>
+              )}
+
+              <button
+                onClick={recording ? stopRecording : startRecording}
+                disabled={uploading}
+                aria-label={recording ? "Stop recording" : "Record a visit"}
+                className={`absolute bottom-0 right-0 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white shadow-sm transition-all disabled:opacity-50 ${
+                  recording ? "scale-105 bg-[#B23B3B]" : "bg-[#8A2E2E] hover:opacity-90"
+                }`}
+              >
+                {uploading ? (
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                ) : (
+                  <Ico name={recording ? "stop" : "mic"} size={17} />
+                )}
+              </button>
+            </div>
+
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <span className="min-h-[1em] text-[12px] leading-relaxed text-[#8A6D2F]">
+                {voice === "uploaded" ? "Recording sent, transcribing." : voiceError}
+              </span>
+              <button
+                onClick={submit}
+                disabled={pending || !text.trim()}
+                className="shrink-0 rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-30"
+              >
+                {pending ? "Logging…" : "Log"}
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {result && (
@@ -188,44 +257,17 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
               : "border-[#E5D9BF] bg-[#FBF6E9] text-[#8A6D2F]"
           }`}
         >
-          {result.ok ? (
-            result.needsAccount ? (
-              <>Logged, couldn&apos;t confidently match an account.</>
-            ) : (
-              <>
-                <span className="font-medium">{result.accountName}</span>: {result.summary}
-                {(result.peopleAdded > 0 || result.peopleUpdated > 0) && (
-                  <>
-                    {" · "}
-                    {result.peopleAdded > 0 && `${result.peopleAdded} contact${result.peopleAdded === 1 ? "" : "s"} added`}
-                    {result.peopleAdded > 0 && result.peopleUpdated > 0 && ", "}
-                    {result.peopleUpdated > 0 && `${result.peopleUpdated} updated`}
-                  </>
-                )}
-                {result.calendarProposals > 0 && ` · ${result.calendarProposals} follow-up${result.calendarProposals === 1 ? "" : "s"} waiting below`}
-              </>
-            )
-          ) : (
-            result.error
-          )}
-        </div>
-      )}
-
-      {result?.ok && !result.needsAccount && (
-        <div
-          className={`mt-2 flex items-center gap-1.5 text-[12px] leading-relaxed ${
-            result.hubspotFiled ? "text-[#8A928C]" : "text-[#8A6D2F]"
-          }`}
-        >
-          <Ico name={result.hubspotFiled ? "check" : "alert"} size={12} />
-          {result.hubspotFiled
-            ? `Filed to HubSpot${result.hubspotNoteId ? ` (${result.hubspotNoteId})` : ""}`
-            : `Not filed yet: ${result.hubspotError ?? "unknown error"}. Waiting below to retry.`}
+          {result.ok ? <>Logged, couldn&apos;t confidently match an account.</> : result.error}
         </div>
       )}
 
       {result?.ok && result.needsAccount && (
-        <NewBusinessResolver touchpointId={result.touchpoint_id} nameGuess={result.businessNameGuess} />
+        <AccountMatchResolver
+          touchpointId={result.touchpoint_id}
+          nameGuess={result.businessNameGuess}
+          matchAccountId={result.matchAccountId}
+          matchAccountName={result.matchAccountName}
+        />
       )}
     </div>
   );
