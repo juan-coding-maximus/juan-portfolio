@@ -107,14 +107,24 @@ function breakLabel(m: number): string {
   return rest ? `${h}h ${rest}m` : `${h}h`;
 }
 
-/* Same half-hour grid as the Break dropdown (00:00-23:30), so Clock in/out
+/* Half-hour grid, same increment as the Break dropdown, so Clock in/out
    stops handing the browser's native time picker, which lists every single
-   minute regardless of `step`, a 30-min-only field cannot actually be off. */
-const TIME_CHOICES: string[] = Array.from({ length: 48 }, (_, i) => {
-  const h = Math.floor(i / 2);
-  const m = i % 2 === 0 ? "00" : "30";
-  return `${String(h).padStart(2, "0")}:${m}`;
-});
+   minute regardless of `step`, a 30-min-only field cannot actually be off.
+   Juan's field day starts 5am-2pm and ends 2pm-2am (2026-08-19), so the two
+   fields get their own windows rather than one 00:00-23:30 list for both;
+   an out time before 2pm or an in time before 5am was never a real reading. */
+function halfHourRange(startMin: number, endMin: number): string[] {
+  const out: string[] = [];
+  for (let m = startMin; m <= endMin; m += 30) {
+    const hh = Math.floor((m % 1440) / 60);
+    const mm = m % 60 === 0 ? "00" : "30";
+    out.push(`${String(hh).padStart(2, "0")}:${mm}`);
+  }
+  return out;
+}
+const CLOCK_IN_CHOICES: string[] = halfHourRange(5 * 60, 14 * 60);
+// Wraps past midnight: 14:00 through 23:30, then 00:00 through 02:00.
+const CLOCK_OUT_CHOICES: string[] = halfHourRange(14 * 60, 26 * 60);
 
 /** "14:30" -> "2:30 PM". */
 function timeLabel(hhmm: string): string {
@@ -144,13 +154,21 @@ function HoursCard() {
   function markNow(which: "in" | "out") {
     const now = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "America/Los_Angeles" });
     const [h, m] = now.split(":").map(Number);
-    const slot = Math.round((h * 60 + m) / 30) * 30;
+    let mins = Math.round((h * 60 + m) / 30) * 30;
     // 23:45+ rounds to 24:00, which is not a time. Hold at 23:30 rather than
     // wrapping to 00:00 and filing the shift against the wrong day.
-    const mins = Math.min(slot, 23 * 60 + 30);
-    const hhmm = `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
-    if (which === "in") setClockIn(hhmm);
-    else setClockOut(hhmm);
+    mins = Math.min(mins, 23 * 60 + 30);
+    if (which === "in") {
+      // Clamp into the 5am-2pm window; "now" outside it is not a real read.
+      mins = Math.min(Math.max(mins, 5 * 60), 14 * 60);
+      setClockIn(`${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`);
+    } else {
+      // Clock-out window is 2pm through 2am, so a time before 2pm is either
+      // the early-morning wrap (00:00-02:00, already in range) or genuinely
+      // too early, clamp forward to 2pm rather than snapping back to 2am.
+      if (mins >= 2 * 60 && mins < 14 * 60) mins = 14 * 60;
+      setClockOut(`${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`);
+    }
   }
 
   async function submit() {
@@ -198,7 +216,13 @@ function HoursCard() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div>
           <label className={labelCls}>Date</label>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            onBlur={(e) => { if (!e.target.value) setDate(todayPT()); }}
+            className={inputCls}
+          />
         </div>
         <div>
           <label className={labelCls}>Clock in</label>
@@ -207,7 +231,7 @@ function HoursCard() {
               <option value="" disabled>
                 Select
               </option>
-              {TIME_CHOICES.map((t) => (
+              {CLOCK_IN_CHOICES.map((t) => (
                 <option key={t} value={t}>
                   {timeLabel(t)}
                 </option>
@@ -225,7 +249,7 @@ function HoursCard() {
               <option value="" disabled>
                 Select
               </option>
-              {TIME_CHOICES.map((t) => (
+              {CLOCK_OUT_CHOICES.map((t) => (
                 <option key={t} value={t}>
                   {timeLabel(t)}
                 </option>
@@ -480,7 +504,14 @@ function PhotoCardView({
             <input placeholder="Merchant" value={card.merchant} disabled={filed} onChange={(e) => onEdit(card.id, { merchant: e.target.value })} className={inputCls} />
             <input placeholder="Amount" value={card.amount} disabled={filed} onChange={(e) => onEdit(card.id, { amount: e.target.value })} className={inputCls} />
             <input placeholder="Purpose (e.g. Lunch, burger)" value={card.purpose} disabled={filed} onChange={(e) => onEdit(card.id, { purpose: e.target.value })} className={`${inputCls} col-span-2`} />
-            <input type="date" value={card.date} disabled={filed} onChange={(e) => onEdit(card.id, { date: e.target.value })} className={inputCls} />
+            <input
+              type="date"
+              value={card.date}
+              disabled={filed}
+              onChange={(e) => onEdit(card.id, { date: e.target.value })}
+              onBlur={(e) => { if (!e.target.value) onEdit(card.id, { date: todayPT() }); }}
+              className={inputCls}
+            />
             <button
               type="button"
               disabled={filed || busy || !card.amount}
@@ -505,7 +536,14 @@ function PhotoCardView({
               <option value="end">End of drive</option>
             </select>
             <input placeholder="Odometer reading" value={card.odo} disabled={filed} onChange={(e) => onEdit(card.id, { odo: e.target.value })} className={inputCls} />
-            <input type="date" value={card.date} disabled={filed} onChange={(e) => onEdit(card.id, { date: e.target.value })} className={`${inputCls} col-span-2`} />
+            <input
+              type="date"
+              value={card.date}
+              disabled={filed}
+              onChange={(e) => onEdit(card.id, { date: e.target.value })}
+              onBlur={(e) => { if (!e.target.value) onEdit(card.id, { date: todayPT() }); }}
+              className={`${inputCls} col-span-2`}
+            />
             <p className="col-span-2 text-[11.5px] leading-snug text-[#8A928C]">
               Add the matching {card.moment === "end" ? "start" : "end"} photo and a Trip card appears below to file both together.
             </p>

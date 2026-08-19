@@ -228,9 +228,12 @@ export async function fileHours(input: HoursInput): Promise<HoursResult> {
   }
 
   const inAt = parseClock(date, clockIn);
-  const outAt = parseClock(date, clockOut);
+  let outAt = parseClock(date, clockOut);
+  // The web picker's clock-out window is 2pm-2am (2026-08-19), so a clock out
+  // at/before clock in always means the 2am wrap into the next calendar day,
+  // not a bad reading, roll it forward rather than rejecting it.
   if (outAt.getTime() <= inAt.getTime()) {
-    throw new Error(`Clock out (${clockOut}) is not after clock in (${clockIn}). An overnight shift crossing midnight needs two rows, one per date, filed from the CLI.`);
+    outAt = new Date(outAt.getTime() + 24 * 3_600_000);
   }
   const worked = Math.round(((outAt.getTime() - inAt.getTime()) / 3_600_000 - breakMin / 60) * 100) / 100;
   if (worked <= 0) {
