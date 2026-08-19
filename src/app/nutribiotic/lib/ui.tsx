@@ -5,6 +5,10 @@
  *   - Editorial SVG icons only. Never emoji. Never a spark/sparkle/star-burst.
  *   - No em dashes in any UI copy.
  *   - One accent; signals live in labels, not in a rainbow of colors.
+ *   - Every one-tap confirm (a candidate pill, a "YES!", an "Approve") ends in
+ *     SuccessNote below, inline, in place, never a silent success or a toast
+ *     that can be missed. Agency-wide rule, Juan 2026-08-19: see
+ *     AccountMatchResolver in ./new-account-ui.tsx for the reference use.
  */
 
 import type { ReactNode } from "react";
