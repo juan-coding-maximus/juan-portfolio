@@ -63,20 +63,44 @@ const CALL_TO_COMPANY = 182;
 const CALL_TO_CONTACT = 194;
 const MEETING_TO_COMPANY = 188;
 const MEETING_TO_CONTACT = 200;
+// Confirmed live against this portal 2026-08-19 (GET
+// /crm/v4/associations/emails/{companies,contacts}/labels), not taken from
+// docs alone: HubSpot's association type IDs are per-portal-consistent
+// defaults, but the whole point of the two-source pattern the NOTE/CALL/
+// MEETING constants above already follow is that a wrong id here silently
+// mislinks an engagement rather than erroring.
+const EMAIL_TO_COMPANY = 186;
+const EMAIL_TO_CONTACT = 198;
 const CONTACT_TO_COMPANY = 279;
 
-type EngagementType = "NOTE" | "CALL" | "MEETING";
+// EMAIL and INCOMING_EMAIL are the same HubSpot object (emails, 0-49); the
+// direction is a property (hs_email_direction) on that one object, not a
+// second object type. Both keys exist here, not just EMAIL, because
+// hubspot_fields.json's activity_kind_map already names both (email_out ->
+// EMAIL, email_in -> INCOMING_EMAIL) — email_in has no writer yet, but the
+// engine is correct for it now rather than only for the one case in use.
+type EngagementType = "NOTE" | "CALL" | "MEETING" | "EMAIL" | "INCOMING_EMAIL";
 
-const ENGAGEMENT_OBJECT: Record<EngagementType, string> = { NOTE: "notes", CALL: "calls", MEETING: "meetings" };
+const ENGAGEMENT_OBJECT: Record<EngagementType, string> = {
+  NOTE: "notes",
+  CALL: "calls",
+  MEETING: "meetings",
+  EMAIL: "emails",
+  INCOMING_EMAIL: "emails",
+};
 const ENGAGEMENT_TO_COMPANY: Record<EngagementType, number> = {
   NOTE: NOTE_TO_COMPANY,
   CALL: CALL_TO_COMPANY,
   MEETING: MEETING_TO_COMPANY,
+  EMAIL: EMAIL_TO_COMPANY,
+  INCOMING_EMAIL: EMAIL_TO_COMPANY,
 };
 const ENGAGEMENT_TO_CONTACT: Record<EngagementType, number> = {
   NOTE: NOTE_TO_CONTACT,
   CALL: CALL_TO_CONTACT,
   MEETING: MEETING_TO_CONTACT,
+  EMAIL: EMAIL_TO_CONTACT,
+  INCOMING_EMAIL: EMAIL_TO_CONTACT,
 };
 
 // HubSpot's own fixed hs_call_disposition GUIDs (external_options, not listed
@@ -153,12 +177,30 @@ function typedProperties(
   otype: EngagementType,
   activity: EngagementActivity,
   body: string,
+  plainBody: string,
 ): Record<string, string | number | null> {
   const ts = hsTimestamp(activity);
   const kind = activity.kind || "";
   const outcome = (activity.outcome || "").trim();
   const title = KIND_LABEL[kind] ?? kind;
 
+  if (otype === "EMAIL" || otype === "INCOMING_EMAIL") {
+    return {
+      hs_timestamp: ts,
+      // The real subject line isn't its own field yet (nb_activities has no
+      // subject column), so this is a generic label; the actual subject is
+      // still readable verbatim inside the body noteLines() already builds
+      // ('Emailed "<subject>": ...', see outbound-actions.ts).
+      hs_email_subject: title,
+      hs_email_html: body,
+      hs_email_text: plainBody,
+      hs_email_direction: otype === "INCOMING_EMAIL" ? "INCOMING_EMAIL" : "EMAIL",
+      // SENT, not SCHEDULED/SENDING: this logs an email Juan already sent
+      // through his own mailbox, never one HubSpot itself dispatches.
+      hs_email_status: "SENT",
+      hubspot_owner_id: OWNER_ID,
+    };
+  }
   if (otype === "CALL") {
     return {
       hs_timestamp: ts,
@@ -341,7 +383,14 @@ async function findContactByPhone(phone: string | null | undefined): Promise<str
  * marker: catches the POST-succeeded-stamp-failed window. Advisory only. */
 async function alreadyFiled(activityId: number, otype: EngagementType): Promise<string | null> {
   const objectType = ENGAGEMENT_OBJECT[otype];
-  const bodyProp = otype === "CALL" ? "hs_call_body" : otype === "MEETING" ? "hs_meeting_body" : "hs_note_body";
+  const bodyProp =
+    otype === "CALL"
+      ? "hs_call_body"
+      : otype === "MEETING"
+        ? "hs_meeting_body"
+        : otype === "EMAIL" || otype === "INCOMING_EMAIL"
+          ? "hs_email_html"
+          : "hs_note_body";
   try {
     const res = await request<{ results?: Array<{ id: string; properties?: Record<string, string | null> }> }>({
       method: "POST",
@@ -553,7 +602,7 @@ export async function runEngagement(activityId: number, opts: { write: boolean }
         types: [{ associationCategory: "HUBSPOT_DEFINED", associationTypeId: ENGAGEMENT_TO_CONTACT[otype] }],
       })),
     ];
-    const props = typedProperties(otype, activity, body);
+    const props = typedProperties(otype, activity, body, lines.join("\n"));
     const writeProps = Object.fromEntries(Object.entries(props).filter(([, v]) => v !== null));
     const res = await request<{ id?: string }>({
       method: "POST",
