@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { decideCalendarProposal } from "./calendar-actions";
 import { AccountMatchResolver } from "./new-account-ui";
 import { recordTouchpoint, type RecordTouchpointResult } from "./touchpoint";
-import { Ico } from "./ui";
+import { Ico, SuccessNote } from "./ui";
 
 function mtMimeType(): string {
   if (typeof MediaRecorder === "undefined") return "";
@@ -162,39 +162,28 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
           // The confirmation beat: tappable to skip the wait and start the
           // next one immediately, otherwise clears itself (see the effect
           // above) once the lists below have had a chance to refresh.
-          <button
-            onClick={() => setSuccess(null)}
-            className="flex w-full flex-col items-center gap-2 py-6 text-center"
-          >
-            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#E4EEE7] text-[#2C6A46]">
-              <Ico name="check" size={20} />
-            </span>
-            <span className="text-[15px] font-medium text-[#14201B]">
-              Logged{success.accountName ? `: ${success.accountName}` : ""}
-            </span>
-            {success.summary && (
-              <span className="max-w-[46ch] text-[13px] leading-relaxed text-[#5B6560]">{success.summary}</span>
-            )}
-            <span
-              className={`flex items-center gap-1.5 text-[12px] leading-relaxed ${
-                success.hubspotFiled ? "text-[#8A928C]" : "text-[#8A6D2F]"
-              }`}
-            >
-              <Ico name={success.hubspotFiled ? "check" : "alert"} size={12} />
-              {success.hubspotFiled
-                ? `Filed to HubSpot${success.hubspotNoteId ? ` (${success.hubspotNoteId})` : ""}`
-                : `Not filed yet: ${success.hubspotError ?? "unknown error"}. Waiting below to retry.`}
-            </span>
-            {(success.peopleAdded > 0 || success.peopleUpdated > 0 || success.calendarProposals > 0) && (
-              <span className="text-[12px] text-[#8A928C]">
-                {success.peopleAdded > 0 && `${success.peopleAdded} contact${success.peopleAdded === 1 ? "" : "s"} added`}
-                {success.peopleAdded > 0 && success.peopleUpdated > 0 && ", "}
-                {success.peopleUpdated > 0 && `${success.peopleUpdated} updated`}
-                {success.calendarProposals > 0 &&
-                  `${success.peopleAdded || success.peopleUpdated ? " · " : ""}${success.calendarProposals} follow-up${success.calendarProposals === 1 ? "" : "s"} waiting below`}
-              </span>
-            )}
-            <span className="mt-1 text-[11px] uppercase tracking-[0.1em] text-[#A9AFA9]">Tap for the next one</span>
+          <button onClick={() => setSuccess(null)} className="block w-full text-left">
+            <SuccessNote
+              title={`Logged${success.accountName ? `: ${success.accountName}` : ""}`}
+              detail={success.summary}
+              hubspotFiled={success.hubspotFiled}
+              hubspotId={success.hubspotNoteId}
+              hubspotError={success.hubspotError}
+              meta={
+                <>
+                  {(success.peopleAdded > 0 || success.peopleUpdated > 0 || success.calendarProposals > 0) && (
+                    <div className="mt-1.5 text-[12px] text-[#8A928C]">
+                      {success.peopleAdded > 0 && `${success.peopleAdded} contact${success.peopleAdded === 1 ? "" : "s"} added`}
+                      {success.peopleAdded > 0 && success.peopleUpdated > 0 && ", "}
+                      {success.peopleUpdated > 0 && `${success.peopleUpdated} updated`}
+                      {success.calendarProposals > 0 &&
+                        `${success.peopleAdded || success.peopleUpdated ? " · " : ""}${success.calendarProposals} follow-up${success.calendarProposals === 1 ? "" : "s"} waiting below`}
+                    </div>
+                  )}
+                  <div className="mt-1.5 text-[11px] uppercase tracking-[0.1em] text-[#A9AFA9]">Tap for the next one</div>
+                </>
+              }
+            />
           </button>
         ) : (
           <>

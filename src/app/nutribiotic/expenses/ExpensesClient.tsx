@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { Card, Ico } from "../lib/ui";
+import { Card, Ico, SuccessNote } from "../lib/ui";
 
 type Summary = { period: string; label: string; sheetLink: string } | null;
 
@@ -280,18 +280,24 @@ function HoursCard() {
         <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Field day, SoCal loop" className={inputCls} />
       </div>
       <div className="mt-3 flex items-center justify-between gap-3">
-        {message ? (
-          <p className={`flex items-center gap-1.5 text-[12.5px] leading-snug ${message.kind === "error" ? "text-[#8A2E2E]" : message.kind === "warn" ? "text-[#8A6D2F]" : "text-[#2C6A46]"}`}>
-            {message.kind === "ok" && <Ico name="check" size={13} />}
+        {message && message.kind !== "ok" ? (
+          <p className={`text-[12.5px] leading-snug ${message.kind === "error" ? "text-[#8A2E2E]" : "text-[#8A6D2F]"}`}>
             {message.text}
           </p>
-        ) : (
+        ) : !message ? (
           <p className="text-[11.5px] leading-snug text-[#8A928C]">If no break was taken, leave it on None. That's a fact, not an assumption.</p>
+        ) : (
+          <span />
         )}
         <button type="button" onClick={submit} disabled={busy || !clockIn || !clockOut} className={`${primaryBtn} shrink-0`}>
           {busy ? "Filing..." : "File hours"}
         </button>
       </div>
+      {message?.kind === "ok" && (
+        <div className="mt-3">
+          <SuccessNote title="Hours filed" detail={message.text} />
+        </div>
+      )}
     </Card>
   );
 }
@@ -503,10 +509,7 @@ function PhotoCardView({
               <option value="statement">Statement (use the CLI)</option>
               <option value="unsure">Not sure</option>
             </select>
-            <span className={`flex items-center gap-1 text-[11.5px] ${pill.cls}`}>
-              {filed && <Ico name="check" size={11} />}
-              {pill.text}
-            </span>
+            {!filed && <span className={`text-[11.5px] ${pill.cls}`}>{pill.text}</span>}
           </div>
           {!filed && (
             <button type="button" onClick={() => onRemove(card.id)} className="text-[#8A928C] hover:text-[#8A2E2E]">
@@ -517,16 +520,22 @@ function PhotoCardView({
 
         {card.message && <p className="mt-1 text-[11.5px] text-[#8A6D2F]">{card.message}</p>}
 
-        {card.type === "receipt" && (
+        {card.type === "receipt" && (filed ? (
+          <div className="mt-2">
+            <SuccessNote
+              title="Filed"
+              detail={`${card.merchant || "Receipt"}${card.amount ? `, $${card.amount}` : ""}${card.purpose ? `, ${card.purpose}` : ""}`}
+            />
+          </div>
+        ) : (
           <div className="mt-2 grid grid-cols-2 gap-2">
-            <input placeholder="Merchant" value={card.merchant} disabled={filed} onChange={(e) => onEdit(card.id, { merchant: e.target.value })} className={inputCls} />
-            <input placeholder="Amount" value={card.amount} disabled={filed} onChange={(e) => onEdit(card.id, { amount: e.target.value })} className={inputCls} />
-            <input placeholder="Purpose (e.g. Lunch, burger)" value={card.purpose} disabled={filed} onChange={(e) => onEdit(card.id, { purpose: e.target.value })} className={`${inputCls} col-span-2`} />
+            <input placeholder="Merchant" value={card.merchant} onChange={(e) => onEdit(card.id, { merchant: e.target.value })} className={inputCls} />
+            <input placeholder="Amount" value={card.amount} onChange={(e) => onEdit(card.id, { amount: e.target.value })} className={inputCls} />
+            <input placeholder="Purpose (e.g. Lunch, burger)" value={card.purpose} onChange={(e) => onEdit(card.id, { purpose: e.target.value })} className={`${inputCls} col-span-2`} />
             <label className="col-span-2 flex items-center gap-1.5 text-[12.5px] text-[#5B6560]">
               <input
                 type="checkbox"
                 checked={card.companyCard}
-                disabled={filed}
                 onChange={(e) => onEdit(card.id, { companyCard: e.target.checked })}
               />
               Company card, no reimbursement owed
@@ -534,21 +543,20 @@ function PhotoCardView({
             <input
               type="date"
               value={card.date}
-              disabled={filed}
               onChange={(e) => onEdit(card.id, { date: e.target.value })}
               onBlur={(e) => { if (!e.target.value) onEdit(card.id, { date: todayPT() }); }}
               className={inputCls}
             />
             <button
               type="button"
-              disabled={filed || busy || !card.amount}
+              disabled={busy || !card.amount}
               onClick={() => onFileReceipt(card)}
               className={`${primaryBtn} justify-self-end`}
             >
-              {filed ? "Filed" : "File it"}
+              File it
             </button>
           </div>
-        )}
+        ))}
 
         {card.type === "odometer" && (
           <div className="mt-2 grid grid-cols-2 gap-2">
@@ -627,23 +635,28 @@ function TripPairCard({
           </div>
         ))}
       </div>
-      <div className="mt-2 flex items-center gap-2">
-        <input
-          value={purpose}
-          disabled={filed}
-          onChange={(e) => setPurpose(e.target.value)}
-          placeholder="Purpose, e.g. Santa Monica cluster, 6 accounts"
-          className={`${inputCls} flex-1`}
-        />
-        <button
-          type="button"
-          disabled={filed || busy || !start.odo || !end.odo || !purpose}
-          onClick={() => onFile(start, end, purpose)}
-          className={`${primaryBtn} shrink-0`}
-        >
-          {filed ? "Filed" : busy ? "Filing..." : "File trip"}
-        </button>
-      </div>
+      {filed ? (
+        <div className="mt-2">
+          <SuccessNote title="Trip filed" detail={`${start.odo} to ${end.odo}${purpose ? `, ${purpose}` : ""}`} />
+        </div>
+      ) : (
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            value={purpose}
+            onChange={(e) => setPurpose(e.target.value)}
+            placeholder="Purpose, e.g. Santa Monica cluster, 6 accounts"
+            className={`${inputCls} flex-1`}
+          />
+          <button
+            type="button"
+            disabled={busy || !start.odo || !end.odo || !purpose}
+            onClick={() => onFile(start, end, purpose)}
+            className={`${primaryBtn} shrink-0`}
+          >
+            {busy ? "Filing..." : "File trip"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
