@@ -833,6 +833,121 @@ export async function getAccountNames(ids: string[]): Promise<Record<string, str
   return Object.fromEntries(res.data.map((a) => [a.id, a.name]));
 }
 
+/**
+ * The Outlook poller's atomic claim on one Graph message id (see migration
+ * 0038). The INSERT itself is the dedup guard: nb_email_poll_log.message_id
+ * carries a bare unique index, so a second claim of the same message, from an
+ * overlapping poller run after a laptop sleep/wake or a retried request,
+ * fails at the database rather than risking a second HubSpot filing. `status`
+ * starts as 'error' and is corrected by updateEmailPollLog once the caller
+ * knows the real outcome; a process that crashes between the two leaves an
+ * honest 'error' row rather than a silently-abandoned claim that never
+ * resolves either way.
+ */
+export async function claimEmailMessage(input: {
+  message_id: string;
+  sent_at: string;
+  direction: "outbound" | "inbound";
+  to_addresses: string[];
+}): Promise<{ claimed: boolean; id: number | null }> {
+  await verifySession();
+  if (!isConfigured()) {
+    throw new Error("Cannot write to nb_email_poll_log: no data source configured.");
+  }
+
+  const res = await fetch(`${SB_URL}/rest/v1/nb_email_poll_log`, {
+    method: "POST",
+    headers: {
+      apikey: SB_KEY,
+      Authorization: `Bearer ${SB_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify({ ...input, status: "error" }),
+  });
+
+  if (res.status === 409) return { claimed: false, id: null };
+  if (!res.ok) {
+    throw new Error(
+      `Supabase nb_email_poll_log POST -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`,
+    );
+  }
+  const [row] = (await res.json()) as { id: number }[];
+  return { claimed: true, id: row.id };
+}
+
+export async function updateEmailPollLog(
+  id: number,
+  patch: {
+    status: "filed" | "skipped_no_match" | "skipped_ambiguous" | "skipped_not_juans_book" | "error";
+    matched_account_id?: string | null;
+    matched_contact_id?: string | null;
+    activity_id?: number | null;
+    hubspot_note_id?: string | null;
+    error?: string | null;
+  },
+): Promise<void> {
+  await mutate("nb_email_poll_log", "PATCH", patch, { id: `eq.${id}` });
+}
+
+/**
+ * The poller's cursor: the newest sent_at it has already claimed, so a run
+ * only asks Graph for messages after this point instead of re-fetching (and
+ * re-claiming, no-op or not) the whole Sent folder every 10 minutes. Derived
+ * from the log itself rather than stored separately, same "don't keep a
+ * second copy of a fact a table already determines" reasoning as 0037's route
+ * schedule.
+ */
+export async function latestEmailPollCursor(): Promise<string | null> {
+  const rows = await raw<{ sent_at: string }>(
+    `nb_email_poll_log?select=sent_at&order=sent_at.desc&limit=1`,
+  );
+  return rows[0]?.sent_at ?? null;
+}
+
+/**
+ * Match a Sent email's recipients to Juan's book WITHOUT guessing. Exact
+ * contact-email match only, never a domain match: a shared/chain domain
+ * (2026-08-17, lazyacres.com) is exactly how a wrong-owner company got
+ * silently linked in HubSpot from a matching heuristic, and code doing that
+ * unattended every 10 minutes is at least as dangerous as a human typing a
+ * new contact by hand. Zero matched accounts, more than one distinct matched
+ * account, an account outside Juan's book, or an account never linked to a
+ * real HubSpot company all come back null: "no confident match" is a finding
+ * the poller skips and logs, never a guess it files. This is scope check #1
+ * of 2 -- runEngagement's assertJuansBook re-verifies live against HubSpot
+ * before anything is actually written, same as every other capture door.
+ *
+ * Match is exact-string, not case-folded server-side: a casing mismatch
+ * between how a contact's email was entered and how Outlook renders it
+ * produces a missed match (skipped_no_match), never a wrong one. That is the
+ * safe direction to fail in.
+ */
+export async function resolveAccountForEmail(
+  addresses: string[],
+): Promise<{ account_id: string; contact_id: string } | null> {
+  const clean = [...new Set(addresses.map((a) => a.trim().toLowerCase()).filter(Boolean))];
+  if (clean.length === 0) return null;
+
+  const contacts = await raw<{ id: string; account_id: string; email: string | null }>(
+    `nb_contacts?select=id,account_id,email&email=in.(${clean.map((a) => encodeURIComponent(a)).join(",")})`,
+  );
+  if (contacts.length === 0) return null;
+
+  const accountIds = [...new Set(contacts.map((c) => c.account_id))];
+  if (accountIds.length !== 1) return null; // two different companies on one email: ambiguous, not a coin flip
+
+  const [accountId] = accountIds;
+  const [account] = await raw<{ id: string; hubspot_owner_id: string | null; hubspot_company_id: string | null }>(
+    `nb_accounts?select=id,hubspot_owner_id,hubspot_company_id&id=eq.${accountId}`,
+  );
+  if (!account) return null;
+  if (account.hubspot_owner_id !== JUAN_OWNER_ID) return null;
+  if (!account.hubspot_company_id) return null; // never linked to a real portal company; nothing to file to
+
+  return { account_id: accountId, contact_id: contacts[0].id };
+}
+
 export async function getTouchpointById(id: string): Promise<Touchpoint | null> {
   const res = await query<Touchpoint>("nb_touchpoints", {
     select: "*",
