@@ -60,3 +60,39 @@ export async function decideDraft(
 
   return { filed: true, accountName: names[context.accountId] ?? null, ...hubspot };
 }
+
+/**
+ * Log an email that happened entirely outside this screen, sent or received
+ * straight in Outlook with no drafted row here to "Mark sent" against. Same
+ * exact-text contract as decideDraft's sent path: the body Juan pastes in is
+ * filed verbatim, never summarized, and lands in HubSpot as the same typed
+ * Email engagement (EMAIL for a send, INCOMING_EMAIL for a receive) via
+ * autoFileEngagement. A filing failure never unwinds the OS-side log; it just
+ * stays unfiled and drops into the Visit tab's retry queue like every other
+ * capture door.
+ */
+export async function recordManualEmail(input: {
+  accountId: string;
+  contactId: string | null;
+  direction: "outbound" | "inbound";
+  subject: string | null;
+  body: string;
+}): Promise<DraftSentResult> {
+  const detail =
+    input.direction === "outbound"
+      ? `Emailed${input.subject ? ` "${input.subject}"` : ""}: ${input.body}`
+      : `Received an email${input.subject ? ` "${input.subject}"` : ""}: ${input.body}`;
+
+  const activity = await insertActivity({
+    account_id: input.accountId,
+    contact_id: input.contactId,
+    kind: input.direction === "outbound" ? "email_out" : "email_in",
+    direction: input.direction,
+    detail,
+  });
+  const hubspot = await autoFileEngagement(activity.id);
+  const names = await getAccountNames([input.accountId]);
+  revalidatePath("/nutribiotic/outbound");
+
+  return { filed: true, accountName: names[input.accountId] ?? null, ...hubspot };
+}

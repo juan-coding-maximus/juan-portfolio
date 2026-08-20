@@ -31,6 +31,7 @@ import {
   listOwnerContactPhones,
   isConfigured,
 } from "../lib/dal";
+import { ManualEmailComposer } from "../lib/manual-email-ui";
 import { DraftActions } from "../lib/outbound-ui";
 import { OutreachComposer } from "../lib/outreach-ui";
 import { Card, Empty, PageHead, daysAgo } from "../lib/ui";
@@ -75,6 +76,12 @@ export default async function Outbound() {
       </div>
 
       <div className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">Waiting on you</div>
+
+      {accounts.length > 0 && (
+        <div className="mb-3">
+          <ManualEmailComposer accounts={accounts} contacts={contacts} />
+        </div>
+      )}
 
       {synthetic && (
         <Card className="mb-5 border-l-[3px] border-l-[#E8A33D]">
