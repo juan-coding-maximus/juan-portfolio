@@ -1,6 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Every deploy otherwise generates a fresh Server Actions encryption key, so
+  // any tab left open across a deploy gets "Failed to find Server Action" on
+  // its next click (confirmed 2026-08-19: Outbound's Mark sent). Vercel sets
+  // VERCEL_GIT_COMMIT_SHA at build time; pairing that with a stable
+  // NEXT_SERVER_ACTIONS_ENCRYPTION_KEY (set in Vercel env, not here) lets
+  // Server Actions keep working across a deploy when their code didn't
+  // change, and turns the cases that DO mismatch into an automatic hard
+  // reload instead of a dead click. See self-hosting.md's Version Skew section.
+  deploymentId: process.env.VERCEL_GIT_COMMIT_SHA,
   // The playbook pages read their markdown from src/.../playbook/content at
   // request time (fs.readFile on a manifest-driven path), which the static
   // tracer cannot see. Without this, the files exist locally and 404 on Vercel.
