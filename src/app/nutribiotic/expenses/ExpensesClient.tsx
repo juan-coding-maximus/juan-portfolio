@@ -608,7 +608,7 @@ function TripPairCard({
   onEdit: (id: string, patch: Partial<PhotoCard>) => void;
   onRemove: (id: string) => void;
 }) {
-  const [purpose, setPurpose] = useState("");
+  const [purpose, setPurpose] = useState("Client visits");
   const filed = start.status === "filed" && end.status === "filed";
   const busy = start.status === "filing" || end.status === "filing";
 
