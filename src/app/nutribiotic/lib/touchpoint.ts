@@ -42,7 +42,7 @@ import { Blocked, runEngagement } from "./hubspot-engagement";
  * unwinds the touchpoint itself, the activity just stays unfiled and drops
  * into the Visit tab's manual queue below for a retry.
  */
-async function autoFileEngagement(
+export async function autoFileEngagement(
   activityId: number,
 ): Promise<{ hubspotFiled: boolean; hubspotNoteId: string | null; hubspotError: string | null }> {
   try {

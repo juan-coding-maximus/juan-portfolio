@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { AttachmentButton, attachmentNote } from "./attachments-ui";
 import type { MarketingFile } from "./dal";
-import { decideDraft } from "./outbound-actions";
+import { decideDraft, type DraftSentResult } from "./outbound-actions";
 import { imessageLink, toWhatsAppPhone, waLink } from "./outreach-ui";
+import { SuccessNote } from "./ui";
 
 /**
  * Copy a draft body to the clipboard.
@@ -81,6 +82,7 @@ function owaComposeLink(toEmail: string, subject: string | null, body: string): 
 
 export type DraftLite = {
   id: string;
+  account_id: string | null;
   channel: string;
   subject: string | null;
   body_md: string;
@@ -121,6 +123,7 @@ export function DraftActions({
   // error, never silence.
   const [pending, setPending] = useState<"sent" | "dismissed" | null>(null);
   const [decided, setDecided] = useState<"sent" | "dismissed" | null>(null);
+  const [sentResult, setSentResult] = useState<DraftSentResult>(null);
   const [error, setError] = useState<string | null>(null);
   const waPhone = toWhatsAppPhone(phone);
   const finalBody = draft.body_md + attachmentNote(attached);
@@ -131,7 +134,14 @@ export function DraftActions({
     setPending(status);
     setError(null);
     try {
-      await decideDraft(draft.id, status);
+      const result = await decideDraft(
+        draft.id,
+        status,
+        status === "sent"
+          ? { accountId: draft.account_id, channel: draft.channel, subject: draft.subject, body: finalBody }
+          : undefined,
+      );
+      setSentResult(result);
       setDecided(status);
     } catch (e) {
       setError(e instanceof Error ? e.message : "That didn't go through, try again.");
@@ -140,10 +150,26 @@ export function DraftActions({
     }
   }
 
-  if (decided) {
+  if (decided === "dismissed") {
+    return <div className="mt-3.5 text-[12px] text-[#8A928C]">Dismissed.</div>;
+  }
+
+  if (decided === "sent") {
     return (
-      <div className="mt-3.5 text-[12px] text-[#8A928C]">
-        {decided === "sent" ? "Marked sent." : "Dismissed."}
+      <div className="mt-3.5">
+        {sentResult?.filed ? (
+          <SuccessNote
+            title={`Marked sent${sentResult.accountName ? `: ${sentResult.accountName}` : ""}`}
+            hubspotFiled={sentResult.hubspotFiled}
+            hubspotId={sentResult.hubspotNoteId}
+            hubspotError={sentResult.hubspotError}
+          />
+        ) : (
+          <SuccessNote
+            title="Marked sent"
+            detail="No account linked to this draft, so there was nowhere to file the note. Link it from the Clients screen and log it from there."
+          />
+        )}
       </div>
     );
   }
