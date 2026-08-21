@@ -239,7 +239,7 @@ export async function recordTouchpoint(
   rawText: string,
   accountIdHint?: string | null,
   occurredAt?: string | null,
-  opts: { autoFileHubspot?: boolean } = {},
+  opts: { autoFileHubspot?: boolean; kindOverride?: "meeting" | "call" | "email" } = {},
 ): Promise<RecordTouchpointResult> {
   const autoFileHubspot = opts.autoFileHubspot ?? true;
   const text = rawText.trim();
@@ -273,6 +273,16 @@ export async function recordTouchpoint(
     parsed = toolUse.input as ParsedTouchpoint;
   } catch (err) {
     return { ok: false, error: `Parse failed: ${err instanceof Error ? err.message : String(err)}` };
+  }
+
+  // The rep's own Meeting/Call/Email pick (touchpoint-ui.tsx's toggle) always
+  // wins over the model's kind guess, the same way an explicit account pick
+  // always wins over account_confidence above: it decides which typed
+  // HubSpot object autoFileEngagement files (Call vs Meeting; Email has none
+  // yet and falls to Note), so a rep's own word for what just happened should
+  // never be second-guessed by the extraction.
+  if (opts.kindOverride) {
+    parsed.activity.kind = opts.kindOverride === "email" ? "email_out" : opts.kindOverride;
   }
 
   // Explicit account picked by the rep in the UI always wins over the model's guess.

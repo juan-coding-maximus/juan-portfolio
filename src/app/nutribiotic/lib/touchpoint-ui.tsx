@@ -35,9 +35,17 @@ function fmtTimer(ms: number): string {
  * no label at all: red and round is the whole affordance, same convention
  * as every voice-memo and camera app.
  */
+const KIND_OPTIONS = [
+  { value: "meeting", label: "Meeting" },
+  { value: "call", label: "Call" },
+  { value: "email", label: "Email" },
+] as const;
+type KindOption = (typeof KIND_OPTIONS)[number]["value"];
+
 export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | null }) {
   const router = useRouter();
   const [text, setText] = useState("");
+  const [kind, setKind] = useState<KindOption>("meeting");
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<RecordTouchpointResult | null>(null);
   // A clean file (matched, no follow-up needed) gets its own confirmation
@@ -79,9 +87,10 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
     const value = text;
     if (!value.trim() || pending) return;
     startTransition(async () => {
-      const res = await recordTouchpoint(value, accountIdHint);
+      const res = await recordTouchpoint(value, accountIdHint, null, { kindOverride: kind });
       if (res.ok && !res.needsAccount) {
         setText("");
+        setKind("meeting");
         requestAnimationFrame(() => textareaRef.current && autosize(textareaRef.current));
         setSuccess(res);
       } else {
@@ -187,6 +196,22 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
           </button>
         ) : (
           <>
+            <div className="mb-3 flex gap-1.5">
+              {KIND_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setKind(opt.value)}
+                  className={`flex-1 rounded-md border px-3 py-1.5 text-[13px] font-medium transition-colors ${
+                    kind === opt.value
+                      ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
+                      : "border-[#E2DFD5] bg-transparent text-[#5B6560] hover:bg-[#FAF9F5]"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
             <div className="relative">
               <textarea
                 ref={textareaRef}
