@@ -414,6 +414,7 @@ export function RoutePanel({
   prefs,
   onChangePrefs,
   onMove,
+  onMoveToTop,
   onRemove,
   onClear,
   onShowInMap,
@@ -427,6 +428,7 @@ export function RoutePanel({
   prefs: RouteSchedulePrefs;
   onChangePrefs: (p: RouteSchedulePrefs) => void;
   onMove: (id: string, dir: -1 | 1) => void;
+  onMoveToTop: (id: string) => void;
   onRemove: (id: string) => void;
   onClear: () => void;
   onShowInMap: (id: string) => void;
@@ -721,6 +723,20 @@ export function RoutePanel({
                 </div>
 
                 <div className="flex shrink-0 items-center justify-end gap-1">
+                  {/* MOVE TO TOP (2026-08-21): a stop found deep on the
+                      ten-closest list otherwise costs one tap of the chevron
+                      per position to become the day's first door. Same
+                      disabled-at-the-top rule as the single-step button next
+                      to it, since "move to top" from the top is a no-op. */}
+                  <button
+                    type="button"
+                    onClick={() => onMoveToTop(s.id)}
+                    disabled={i === 0}
+                    aria-label={`Move ${title} to the top of the route`}
+                    className="rounded-md border border-[#E2DFD5] bg-white px-2 py-2 text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    <Ico name="chevrons-up" size={13} />
+                  </button>
                   {/* Up/down rather than drag: this is used one-handed in a
                       parked car, where a 44px button beats a drag target. */}
                   <button

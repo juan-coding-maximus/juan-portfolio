@@ -75,8 +75,16 @@ export function MapScreen({
      the ids are what the row stores and resolving them against `accounts` on
      every render means a stop that gets closed or leaves Juan's book simply
      stops being a stop, rather than sitting there as an unclickable blank. */
-  const { routeDraft, inRoute, addToRoute, addCustomStop, removeFromRoute, moveInRoute, clearRoute } =
-    useRoute();
+  const {
+    routeDraft,
+    inRoute,
+    addToRoute,
+    addCustomStop,
+    removeFromRoute,
+    moveInRoute,
+    moveToTop,
+    clearRoute,
+  } = useRoute();
 
   /* An account entry that no longer resolves drops out here (see getRouteDraft);
      a custom stop cannot drop out, because it carries everything it needs. */
@@ -243,6 +251,7 @@ export function MapScreen({
         prefs={prefs}
         onChangePrefs={editPrefs}
         onMove={moveInRoute}
+        onMoveToTop={moveToTop}
         onRemove={removeFromRoute}
         onClear={clearRoute}
         onShowInMap={showInMap}

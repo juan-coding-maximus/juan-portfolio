@@ -25,6 +25,7 @@ type RouteCtx = {
   addCustomStop: (stop: Omit<CustomStop, "id">) => void;
   removeFromRoute: (id: string) => void;
   moveInRoute: (id: string, dir: -1 | 1) => void;
+  moveToTop: (id: string) => void;
   clearRoute: () => void;
 };
 
@@ -76,13 +77,35 @@ export function RouteProvider({
     commit(next);
   }
 
+  // Lifts one stop straight to position 1, the rest sliding down in place
+  // rather than swapping pairwise -- Juan's ask 2026-08-21, so a stop found
+  // six deep on the ten-closest list does not cost six taps of the single-step
+  // chevron to become the day's first door.
+  function moveToTop(id: string) {
+    const i = routeDraft.findIndex((e) => entryId(e) === id);
+    if (i <= 0) return;
+    const next = [...routeDraft];
+    const [entry] = next.splice(i, 1);
+    next.unshift(entry);
+    commit(next);
+  }
+
   function clearRoute() {
     commit([]);
   }
 
   return (
     <Ctx.Provider
-      value={{ routeDraft, inRoute, addToRoute, addCustomStop, removeFromRoute, moveInRoute, clearRoute }}
+      value={{
+        routeDraft,
+        inRoute,
+        addToRoute,
+        addCustomStop,
+        removeFromRoute,
+        moveInRoute,
+        moveToTop,
+        clearRoute,
+      }}
     >
       {children}
     </Ctx.Provider>
