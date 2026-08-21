@@ -5,11 +5,13 @@ import {
   listActivities,
   listContacts,
   listPurchases,
+  setAccountPotentialJuan,
   type Account,
   type Activity,
   type Contact,
   type PurchaseLine,
   type PurchaseOrder,
+  type Tier,
 } from "./dal";
 
 export type AccountDetailData = {
@@ -32,4 +34,9 @@ export async function getAccountDetail(id: string): Promise<AccountDetailData> {
   const a = acc.data[0];
   if (!a) return null;
   return { account: a, activities: acts.data, contacts: contacts.data, orders: purchases.orders, lines: purchases.lines };
+}
+
+/** Sets (or clears, grade=null) Juan's own potential read from the account card. */
+export async function setPotentialJuan(id: string, grade: Tier | null): Promise<void> {
+  await setAccountPotentialJuan(id, grade);
 }

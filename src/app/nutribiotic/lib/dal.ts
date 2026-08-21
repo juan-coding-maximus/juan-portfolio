@@ -369,11 +369,21 @@ export type Account = {
   business_hours: Record<string, string[][]> | null;
   /** HubSpot company record id. Null = this account has no company in the portal. */
   hubspot_company_id: string | null;
+  /** HQ's own potential grade (HubSpot's potential__cloned_), pull-only, A-G with a label ("B - medium"). See ui.tsx's TierChip. */
+  potential_hq: string | null;
+  /** Juan's own read of potential, A-G, set by hand on the account card. Local-only, never synced to HubSpot (migration 0039). */
+  potential_juan: Tier | null;
   origin: Origin;
 };
 
 export async function getAccount(id: string): Promise<Result<Account>> {
   return query<Account>("nb_accounts", { select: "*", id: `eq.${id}`, limit: 1 });
+}
+
+/** Sets or clears Juan's own potential read (see Account.potential_juan). Never touches HubSpot. */
+export async function setAccountPotentialJuan(id: string, grade: Tier | null): Promise<Account | null> {
+  const rows = await mutate<Account>("nb_accounts", "PATCH", { potential_juan: grade }, { id: `eq.${id}` });
+  return rows[0] ?? null;
 }
 
 export type NewAccount = {

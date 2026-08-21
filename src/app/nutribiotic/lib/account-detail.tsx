@@ -11,7 +11,9 @@
  * this as a client child.
  */
 
-import type { Account, Activity, Contact, PurchaseLine, PurchaseOrder } from "./dal";
+import { useState, useTransition } from "react";
+import type { Account, Activity, Contact, PurchaseLine, PurchaseOrder, Tier } from "./dal";
+import { setPotentialJuan } from "./account-actions";
 import { useRoute } from "./route-context";
 import {
   Card,
@@ -19,12 +21,79 @@ import {
   HUBSPOT_COMPANY_URL,
   Ico,
   PhoneDisplay,
+  TierChip,
   absoluteUrl,
   daysAgo,
   money,
   prettyPhone,
   prettyUrl,
 } from "./ui";
+
+const POTENTIAL_LETTERS: Tier[] = ["A", "B", "C", "D", "E", "F", "G"];
+
+/**
+ * HQ's grade beside Juan's own read, same two-scale rule as TierChip
+ * (ui.tsx): never a bare letter, always which scale it came from. HQ's is
+ * read-only here on purpose, the mirror stays pull-only (0021); Juan's is a
+ * toggle, PATCHed straight to nb_accounts.potential_juan and never synced
+ * out (0039). Tapping the active letter clears it back to "defer to HQ."
+ */
+function PotentialGrade({
+  accountId,
+  hq,
+  juan,
+}: {
+  accountId: string;
+  hq: string | null;
+  juan: Tier | null;
+}) {
+  const [value, setValue] = useState<Tier | null>(juan);
+  const [pending, startTransition] = useTransition();
+  const hqLetter = hq ? hq.split(" ")[0] || null : null;
+
+  return (
+    <Card>
+      <div className="mb-2.5 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">Potential</div>
+      <div className="flex items-center justify-between gap-3 text-[13px]">
+        <span className="text-[#5B6560]">HQ grade</span>
+        {hqLetter ? <TierChip tier={hqLetter} scale="hq" /> : <span className="text-[#A9AFA9]">unknown</span>}
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <span className="text-[13px] text-[#5B6560]">Your read</span>
+        <div className="flex gap-1">
+          {POTENTIAL_LETTERS.map((t) => {
+            const active = value === t;
+            return (
+              <button
+                key={t}
+                type="button"
+                disabled={pending}
+                aria-pressed={active}
+                onClick={() => {
+                  const next = active ? null : t;
+                  setValue(next);
+                  startTransition(() => {
+                    void setPotentialJuan(accountId, next);
+                  });
+                }}
+                className={`h-6 w-6 rounded text-[11.5px] font-semibold transition-colors ${
+                  active
+                    ? "bg-[#14201B] text-[#F7F6F1]"
+                    : "bg-[#ECEAE1] text-[#3D4A44] hover:bg-[#E2DFD5]"
+                }`}
+              >
+                {t}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {value && (
+        <p className="mt-2 text-[11.5px] text-[#8A928C]">Stays local. Never pushed to HubSpot.</p>
+      )}
+    </Card>
+  );
+}
 
 // Website is NOT here: it graduated to the action row at the top of the profile
 // (2026-08-05) and listing it twice would make the same link look like two.
@@ -283,6 +352,8 @@ export function AccountDetailBody({
       </div>
 
       <aside className="flex min-w-0 flex-col gap-4">
+        <PotentialGrade accountId={a.id} hq={a.potential_hq} juan={a.potential_juan} />
+
         <Card>
           {/* Two stat tiles per row on a phone, label stacked over value, both
               hard-truncated: a squeezed sidebar row that can't fit its value
