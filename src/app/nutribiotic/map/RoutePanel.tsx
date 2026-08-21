@@ -33,13 +33,13 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import type { CustomStop, CustomStopKind, RouteSchedulePrefs } from "../lib/dal";
+import type { CustomStop, CustomStopKind, RouteEndpoint, RouteSchedulePrefs } from "../lib/dal";
 import { appleMapsUrl, CUSTOM_STOP_LABEL, fullAddress, Ico, ReachLinks, TierChip } from "../lib/ui";
 import { AccountLink } from "../lib/modal";
 import { resolveStopAddress } from "../lib/stop-actions";
-import { saveRouteSchedulePrefs } from "../lib/prefs-actions";
 import { routeDriveLegs, type DriveLeg } from "./drive-actions";
 import type { RouteStopView } from "./MapScreen";
+import { RouteEndpointField } from "./RouteEndpointField";
 
 /* Money, at the grain a rep reads at a door. No cents: the difference between
    $1,518 and $1,518.00 is noise on a phone held at arm's length, and rounding
@@ -104,25 +104,29 @@ function duration(mins: number): string {
 type ScheduleRow = { arrive: number; leave: number; stay: number };
 
 /**
- * `legs` is the router's answer for the path HOME -> every stop in order ->
- * HOME when home is known, and just stop-to-stop when it is not. Home is on
- * both ends because that is what "leave at 09:30, back by 16:45" measures, and
- * a day whose first drive is invisible reads as thirty free minutes that do
- * not exist.
+ * `legs` is the router's answer for the path START -> every stop in order ->
+ * END, START and END each present only when that side is known (0040: either
+ * can be the waypoint, an overridden address, or absent). Whichever ends are
+ * known bound the schedule, because that is what "leave at 09:30, back by
+ * 16:45" measures, and a day whose first drive is invisible reads as thirty
+ * free minutes that do not exist.
  *
- * The waypoint account (Juan's apartment, migration 0029) gets no dwell for
- * the same reason it is not a customer: nothing is sold there.
+ * The waypoint account (Juan's apartment, migration 0029) and any overridden
+ * start/end get no dwell for the same reason neither is a customer: nothing
+ * is sold there.
  */
 function buildSchedule(
   stops: RouteStopView[],
   legs: DriveLeg[],
-  hasHome: boolean,
+  hasStart: boolean,
+  hasEnd: boolean,
   prefs: RouteSchedulePrefs,
-): { rows: ScheduleRow[]; finish: number; toFirst: DriveLeg | null; home: DriveLeg | null } {
-  const toFirst = hasHome ? legs[0] ?? null : null;
-  const home = hasHome ? legs[legs.length - 1] ?? null : null;
-  /* Between consecutive stops: drop the leading home leg when there is one. */
-  const between = hasHome ? legs.slice(1, legs.length - 1) : legs;
+): { rows: ScheduleRow[]; finish: number; toFirst: DriveLeg | null; end: DriveLeg | null } {
+  const toFirst = hasStart ? legs[0] ?? null : null;
+  const endLeg = hasEnd ? legs[legs.length - 1] ?? null : null;
+  /* Between consecutive stops: drop the leading/trailing legs that belong to
+     the start/end rather than to a stop-to-stop hop. */
+  const between = legs.slice(hasStart ? 1 : 0, legs.length - (hasEnd ? 1 : 0));
 
   const rows: ScheduleRow[] = [];
   let t = minutesOfDay(prefs.depart) + (toFirst?.minutes ?? 0);
@@ -134,7 +138,7 @@ function buildSchedule(
     rows.push({ arrive: t, leave: t + stay, stay });
     t += stay;
   });
-  return { rows, finish: t + (home?.minutes ?? 0), toFirst, home };
+  return { rows, finish: t + (endLeg?.minutes ?? 0), toFirst, end: endLeg };
 }
 
 /**
@@ -296,6 +300,7 @@ function DayBar({
   driveMinutes,
   driveMiles,
   state,
+  endLabel,
 }: {
   prefs: RouteSchedulePrefs;
   onChange: (p: RouteSchedulePrefs) => void;
@@ -303,6 +308,8 @@ function DayBar({
   driveMinutes: number | null;
   driveMiles: number | null;
   state: "loading" | "ok" | "unavailable";
+  /** The end location's own name ("Home", or an overridden hotel/address). */
+  endLabel: string;
 }) {
   const over =
     finish !== null && prefs.returnBy !== null && finish > minutesOfDay(prefs.returnBy);
@@ -345,7 +352,7 @@ function DayBar({
           min lunch
         </label>
         <label className="flex items-center gap-1.5 text-[12.5px] text-[#5B6560]">
-          Home by
+          {endLabel} by
           <input
             type="time"
             value={prefs.returnBy ?? ""}
@@ -370,7 +377,7 @@ function DayBar({
         {state === "ok" && finish !== null && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className={over ? "font-semibold text-[#B5372A]" : "font-semibold text-[#2C6A46]"}>
-              {over ? "Back " : "Back home "}
+              {over ? "Back " : endLabel === "Home" ? "Back home " : `Back at ${endLabel} `}
               <span className="tabular-nums">{clock(finish)}</span>
             </span>
             {over && prefs.returnBy && (
@@ -404,7 +411,8 @@ function DayBar({
 export function RoutePanel({
   stops,
   home,
-  initialSchedulePrefs,
+  prefs,
+  onChangePrefs,
   onMove,
   onRemove,
   onClear,
@@ -412,37 +420,38 @@ export function RoutePanel({
   onAddCustomStop,
 }: {
   stops: RouteStopView[];
-  /** Juan's apartment, the waypoint account (0029). Null if it is not on the
-      map, in which case the day simply has no drive out and no drive back. */
-  home: { lat: number; lng: number } | null;
-  initialSchedulePrefs: RouteSchedulePrefs;
+  /** Juan's apartment, the waypoint account (0029), the default start/end.
+      Null if it is not on the map, in which case a day with no override on
+      that side simply has no drive out and/or no drive back. */
+  home: RouteEndpoint | null;
+  prefs: RouteSchedulePrefs;
+  onChangePrefs: (p: RouteSchedulePrefs) => void;
   onMove: (id: string, dir: -1 | 1) => void;
   onRemove: (id: string) => void;
   onClear: () => void;
   onShowInMap: (id: string) => void;
   onAddCustomStop: (stop: Omit<CustomStop, "id">) => void;
 }) {
-  const [prefs, setPrefs] = useState<RouteSchedulePrefs>(initialSchedulePrefs);
   const [legs, setLegs] = useState<DriveLeg[] | null>(null);
   const [legState, setLegState] = useState<"loading" | "ok" | "unavailable">("loading");
 
-  /* Optimistic, like every other preference on this screen: the field already
-     shows the new value and the schedule already recomputed, so a failed write
-     is a stale row rather than a wrong screen, and the next edit fixes it. */
-  function editPrefs(next: RouteSchedulePrefs) {
-    setPrefs(next);
-    saveRouteSchedulePrefs(next).catch(() => {});
-  }
+  /* Where the day actually starts/ends (0040): Juan's override if he picked
+     one at either end, else the waypoint. Independent of each other. */
+  const start = prefs.start ?? home;
+  const end = prefs.end ?? home;
 
   /* THE ROUTER IS CALLED ON THE PATH, NOT ON EVERY PAIR: one request for
-     home -> stops in order -> home. Keyed on the coordinates rather than on the
-     stops array so a re-render that does not move anything does not re-ask. */
+     start -> stops in order -> end. Keyed on the coordinates rather than on
+     the stops array so a re-render that does not move anything does not
+     re-ask. */
   const pathKey = useMemo(
     () =>
-      [home ? `h:${home.lat},${home.lng}` : "h:-", ...stops.map((s) => `${s.lat},${s.lng}`)].join(
-        "|",
-      ),
-    [stops, home],
+      [
+        start ? `s:${start.lat},${start.lng}` : "s:-",
+        ...stops.map((s) => `${s.lat},${s.lng}`),
+        end ? `e:${end.lat},${end.lng}` : "e:-",
+      ].join("|"),
+    [stops, start, end],
   );
 
   useEffect(() => {
@@ -451,7 +460,7 @@ export function RoutePanel({
       setLegState("ok");
       return;
     }
-    const points = home ? [home, ...stops, home] : stops;
+    const points = [...(start ? [start] : []), ...stops, ...(end ? [end] : [])];
     if (points.length < 2) {
       setLegs(null);
       setLegState("ok");
@@ -478,17 +487,18 @@ export function RoutePanel({
   }, [pathKey]);
 
   const schedule = useMemo(
-    () => (legs ? buildSchedule(stops, legs, home !== null, prefs) : null),
-    [legs, stops, home, prefs],
+    () => (legs ? buildSchedule(stops, legs, start !== null, end !== null, prefs) : null),
+    [legs, stops, start, end, prefs],
   );
 
   const legBetween = (i: number): DriveLeg | null => {
     if (!legs || i < 1) return null;
-    return (home ? legs.slice(1, legs.length - 1) : legs)[i - 1] ?? null;
+    return legs.slice(start ? 1 : 0, legs.length - (end ? 1 : 0))[i - 1] ?? null;
   };
 
   const driveMinutes = legs ? legs.reduce((s, l) => s + l.minutes, 0) : null;
   const driveMiles = legs ? legs.reduce((s, l) => s + l.miles, 0) : null;
+  const endLabel = end?.label ?? "Home";
 
   const header = (
     <div className="mb-3 mt-6 flex items-baseline justify-between">
@@ -526,21 +536,28 @@ export function RoutePanel({
 
       <DayBar
         prefs={prefs}
-        onChange={editPrefs}
+        onChange={onChangePrefs}
         finish={schedule?.finish ?? null}
         driveMinutes={driveMinutes}
         driveMiles={driveMiles}
         state={legState}
+        endLabel={endLabel}
       />
 
       <div className="overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
         {/* The drive out. Not a stop, so it is a rule above the first one
             rather than a numbered row, but it is the reason stop 1 is not at
             09:30 and leaving it off makes the morning look longer than it is. */}
-        {home && (
+        {start && (
           <div className="flex items-baseline justify-between border-b border-[#EEECE3] bg-[#FAF9F5] px-4 py-2 text-[12.5px] text-[#5B6560]">
-            <span>
-              Leave home <span className="font-medium tabular-nums text-[#3D4A44]">{prefs.depart}</span>
+            <span className="inline-flex items-center gap-1">
+              Leave{" "}
+              <RouteEndpointField
+                value={prefs.start}
+                home={home}
+                onChange={(ep) => onChangePrefs({ ...prefs, start: ep })}
+              />
+              <span className="font-medium tabular-nums text-[#3D4A44]">{prefs.depart}</span>
             </span>
             {schedule?.toFirst && (
               <span className="tabular-nums text-[#8A928C]">
@@ -758,13 +775,18 @@ export function RoutePanel({
 
         {/* The drive back, for the same reason the drive out is there: the day
             is not over when the last door closes. */}
-        {home && schedule?.home && (
+        {end && schedule?.end && (
           <div className="flex items-baseline justify-between border-t border-[#EEECE3] bg-[#FAF9F5] px-4 py-2 text-[12.5px] text-[#5B6560]">
-            <span>
-              Home <span className="font-medium tabular-nums text-[#3D4A44]">{clock(schedule.finish)}</span>
+            <span className="inline-flex items-center gap-1">
+              <RouteEndpointField
+                value={prefs.end}
+                home={home}
+                onChange={(ep) => onChangePrefs({ ...prefs, end: ep })}
+              />
+              <span className="font-medium tabular-nums text-[#3D4A44]">{clock(schedule.finish)}</span>
             </span>
             <span className="tabular-nums text-[#8A928C]">
-              {duration(schedule.home.minutes)} · {schedule.home.miles.toFixed(1)} mi
+              {duration(schedule.end.minutes)} · {schedule.end.miles.toFixed(1)} mi
             </span>
           </div>
         )}

@@ -92,3 +92,54 @@ export async function resolveStopAddress(
     },
   };
 }
+
+/**
+ * The live-typing variant of resolveStopAddress, for the route start/end
+ * autocomplete (0040): several candidates as Juan types, rather than one
+ * candidate resolved on submit. Same endpoint, same key, same SoCal bias.
+ * "HOM" typing towards "Home" never lands here at all -- that suggestion is
+ * synthesized in RouteEndpointField from the waypoint account itself, since
+ * Google has no idea Juan's apartment is called that.
+ */
+export async function searchRouteAddresses(query: string): Promise<ResolvedPlace[]> {
+  const q = query.trim();
+  if (q.length < 3) return [];
+
+  const key = process.env.NB_PLACES_API_KEY;
+  if (!key) return [];
+
+  let res: Response;
+  try {
+    res = await fetch(PLACES_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": key,
+        "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.location",
+      },
+      body: JSON.stringify({
+        textQuery: q,
+        maxResultCount: 5,
+        regionCode: "US",
+        locationBias: SOCAL_BIAS,
+      }),
+      cache: "no-store",
+    });
+  } catch {
+    return [];
+  }
+  if (!res.ok) return [];
+
+  const data = (await res.json()) as PlacesResponse;
+  return (data.places ?? [])
+    .filter(
+      (hit): hit is typeof hit & { location: { latitude: number; longitude: number } } =>
+        typeof hit.location?.latitude === "number" && typeof hit.location?.longitude === "number",
+    )
+    .map((hit) => ({
+      label: hit.displayName?.text?.trim() || hit.formattedAddress || q,
+      address: hit.formattedAddress || q,
+      lat: hit.location.latitude,
+      lng: hit.location.longitude,
+    }));
+}

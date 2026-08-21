@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  sanitizeRouteEndpoint,
   setRouteDraft,
   setRouteSchedulePrefs,
   setShowChainAccounts,
@@ -60,5 +61,10 @@ export async function saveRouteSchedulePrefs(p: RouteSchedulePrefs): Promise<voi
     dwellMinutes: clamp(p.dwellMinutes, 1, 240, 20),
     lunchMinutes: clamp(p.lunchMinutes, 0, 240, 60),
     returnBy: time(p.returnBy, null),
+    // Re-validated rather than trusted, same as route_draft's custom stops:
+    // this crossed the network as JSON once already and a malformed shape
+    // here should fall back to the waypoint default, not get written as-is.
+    start: sanitizeRouteEndpoint(p.start),
+    end: sanitizeRouteEndpoint(p.end),
   });
 }

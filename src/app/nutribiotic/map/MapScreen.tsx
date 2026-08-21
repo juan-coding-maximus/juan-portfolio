@@ -11,8 +11,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CustomStop, MapAccount, RouteSchedulePrefs, TerritoryArea } from "../lib/dal";
-import { toggleShowChainAccounts, toggleShowPracticeAccounts } from "../lib/prefs-actions";
+import type { CustomStop, MapAccount, RouteEndpoint, RouteSchedulePrefs, TerritoryArea } from "../lib/dal";
+import { fullAddress } from "../lib/ui";
+import { saveRouteSchedulePrefs, toggleShowChainAccounts, toggleShowPracticeAccounts } from "../lib/prefs-actions";
 import { useRoute } from "../lib/route-context";
 import { AccountsMap } from "./AccountsMap";
 import { NearestClients } from "./NearestClients";
@@ -99,15 +100,36 @@ export function MapScreen({
     [routeStops],
   );
 
-  /* Where the driving starts and ends. The waypoint account is Juan's apartment
-     (migration 0029), and it is identified by lifecycle rather than by its id
-     so this keeps working if the home base ever moves to a different row. It is
-     deliberately NOT a stop: it takes no time and nothing is sold there, it is
-     just the two ends of the day the route panel measures against. */
-  const home = useMemo(() => {
+  /* Where the driving starts and ends BY DEFAULT. The waypoint account is
+     Juan's apartment (migration 0029), identified by lifecycle rather than by
+     its id so this keeps working if the home base ever moves to a different
+     row. It is deliberately NOT a stop: it takes no time and nothing is sold
+     there, it is just the two ends of the day the route panel measures
+     against -- unless overridden below. */
+  const home = useMemo<RouteEndpoint | null>(() => {
     const w = accounts.find((a) => a.lifecycle === "waypoint");
-    return w ? { lat: w.lat, lng: w.lng } : null;
+    if (!w) return null;
+    return { label: "Home", address: fullAddress(w) ?? w.name, lat: w.lat, lng: w.lng };
   }, [accounts]);
+
+  /* THE SCHEDULE PREFS, including the start/end overrides (0040), lifted here
+     rather than left inside RoutePanel: AccountsMap's route-chain toggle needs
+     the SAME live start/end RoutePanel is showing, including an edit Juan just
+     made and hasn't reloaded to see, so both have to read one piece of state
+     rather than the map re-deriving its own copy. Optimistic, like every other
+     write on this screen. */
+  const [prefs, setPrefsState] = useState<RouteSchedulePrefs>(schedulePrefs);
+  function editPrefs(next: RouteSchedulePrefs) {
+    const prev = prefs;
+    setPrefsState(next);
+    saveRouteSchedulePrefs(next).catch(() => setPrefsState(prev));
+  }
+
+  // What the day actually starts/ends at: Juan's override if he picked one
+  // (see RouteEndpointField), else the waypoint. Independent of each other --
+  // a run can leave home and end at a hotel, or the reverse.
+  const routeStart = prefs.start ?? home;
+  const routeEnd = prefs.end ?? home;
 
   // A fresh n on every click, even a repeat click on the same account, so the
   // map's focus effect (keyed on this signal) always re-fires and re-zooms
@@ -206,6 +228,9 @@ export function MapScreen({
           onAddToRoute={addToRoute}
           inRoute={inRoute}
           customStops={customStops}
+          routeStops={routeStops}
+          routeStart={routeStart}
+          routeEnd={routeEnd}
         />
       </div>
 
@@ -215,7 +240,8 @@ export function MapScreen({
       <RoutePanel
         stops={routeStops}
         home={home}
-        initialSchedulePrefs={schedulePrefs}
+        prefs={prefs}
+        onChangePrefs={editPrefs}
         onMove={moveInRoute}
         onRemove={removeFromRoute}
         onClear={clearRoute}

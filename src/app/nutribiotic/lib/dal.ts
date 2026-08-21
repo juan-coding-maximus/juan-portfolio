@@ -1471,11 +1471,24 @@ export async function setShowPracticeAccounts(show: boolean): Promise<void> {
  * moved. The panel derives them on render. `returnBy` is a target the screen
  * reports against, not a constraint anything enforces.
  */
+/**
+ * Where a route starts or ends, when it is not the waypoint account (0040).
+ * Resolved once from Google Places when Juan picks it (see
+ * lib/stop-actions.ts's searchRouteAddresses) and then frozen, same as a
+ * custom stop: a hotel that silently moved mid-plan would be worse than one
+ * that is simply wrong until re-picked.
+ */
+export type RouteEndpoint = { label: string; address: string; lat: number; lng: number };
+
 export type RouteSchedulePrefs = {
   depart: string;          // "09:30", local, no zone: it is a wall clock
   dwellMinutes: number;
   lunchMinutes: number;
   returnBy: string | null;
+  /** Override for the route's start. Null = use the waypoint account (Home). */
+  start: RouteEndpoint | null;
+  /** Override for the route's end. Null = use the waypoint account (Home). */
+  end: RouteEndpoint | null;
 };
 
 /** Postgres hands back "09:30:00"; the inputs and the display want "09:30". */
@@ -1485,14 +1498,30 @@ function hhmm(t: string | null): string | null {
   return m ? `${m[1]}:${m[2]}` : null;
 }
 
+/* A route_start/route_end column is jsonb written by a browser, same trust
+   level as route_draft's custom stops: a half-shaped object here would become
+   a start/end the panel cannot draw a leg to and the day silently loses its
+   first or last drive time. Anything that doesn't fully match the shape is
+   dropped back to null (the waypoint default) rather than repaired. */
+export function sanitizeRouteEndpoint(x: unknown): RouteEndpoint | null {
+  if (!x || typeof x !== "object") return null;
+  const o = x as Record<string, unknown>;
+  if (typeof o.label !== "string" || typeof o.address !== "string") return null;
+  if (typeof o.lat !== "number" || typeof o.lng !== "number") return null;
+  if (!Number.isFinite(o.lat) || !Number.isFinite(o.lng)) return null;
+  return { label: o.label, address: o.address, lat: o.lat, lng: o.lng };
+}
+
 export async function getRouteSchedulePrefs(): Promise<RouteSchedulePrefs> {
   const rows = await raw<{
     route_depart: string | null;
     route_dwell_minutes: number | null;
     route_lunch_minutes: number | null;
     route_return_by: string | null;
+    route_start: unknown;
+    route_end: unknown;
   }>(
-    "nb_ui_prefs?select=route_depart,route_dwell_minutes,route_lunch_minutes,route_return_by&id=eq.1",
+    "nb_ui_prefs?select=route_depart,route_dwell_minutes,route_lunch_minutes,route_return_by,route_start,route_end&id=eq.1",
   );
   const r = rows[0];
   return {
@@ -1500,6 +1529,8 @@ export async function getRouteSchedulePrefs(): Promise<RouteSchedulePrefs> {
     dwellMinutes: r?.route_dwell_minutes ?? 20,
     lunchMinutes: r?.route_lunch_minutes ?? 60,
     returnBy: hhmm(r?.route_return_by ?? null),
+    start: sanitizeRouteEndpoint(r?.route_start),
+    end: sanitizeRouteEndpoint(r?.route_end),
   };
 }
 
@@ -1512,6 +1543,8 @@ export async function setRouteSchedulePrefs(p: RouteSchedulePrefs): Promise<void
       route_dwell_minutes: p.dwellMinutes,
       route_lunch_minutes: p.lunchMinutes,
       route_return_by: p.returnBy,
+      route_start: p.start,
+      route_end: p.end,
       updated_at: new Date().toISOString(),
     },
     { id: "eq.1" },

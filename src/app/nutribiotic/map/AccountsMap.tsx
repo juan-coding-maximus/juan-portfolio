@@ -12,11 +12,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GoogleMap, MarkerF, InfoWindowF, PolygonF, useLoadScript } from "@react-google-maps/api";
+import { GoogleMap, MarkerF, InfoWindowF, PolygonF, PolylineF, useLoadScript } from "@react-google-maps/api";
 import type { CustomStop, MapAccount, TerritoryArea, Tier } from "../lib/dal";
 import { AccountLink } from "../lib/modal";
 import { appleMapsUrl, CUSTOM_STOP_LABEL, Ico, ReachLinks, realChannel } from "../lib/ui";
-import type { FocusRequest } from "./MapScreen";
+import type { FocusRequest, RouteStopView } from "./MapScreen";
 
 const CONTAINER_STYLE = { width: "100%", height: "100%" };
 
@@ -105,6 +105,9 @@ export function AccountsMap({
   onAddToRoute,
   inRoute,
   customStops,
+  routeStops,
+  routeStart,
+  routeEnd,
 }: {
   accounts: MapAccount[];
   areas: TerritoryArea[];
@@ -118,6 +121,13 @@ export function AccountsMap({
   onToggleShowPractices: () => void;
   onAddToRoute: (id: string) => void;
   inRoute: Set<string>;
+  /** The hand-built route, in Juan's order, same array RoutePanel numbers. */
+  routeStops: RouteStopView[];
+  /** Where the day starts/ends (0040): the waypoint by default, or whatever
+      Juan picked in RoutePanel's start/end fields. Drawn as the chain's two
+      ends when the route-line toggle is on; independent of each other. */
+  routeStart: { lat: number; lng: number } | null;
+  routeEnd: { lat: number; lng: number } | null;
 }) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const { isLoaded, loadError } = useLoadScript({ googleMapsApiKey: apiKey ?? "" });
@@ -145,6 +155,32 @@ export function AccountsMap({
   // Closed by default: on a phone the map is what you came for. Desktop
   // ignores this entirely (md:contents), so the state is mobile-only.
   const [filtersOpen, setFiltersOpen] = useState(false);
+
+  /* THE ROUTE CHAIN, Juan's ask 2026-08-21: a toggle that draws the hand-built
+     route as straight lines between the stops in the order he tapped them,
+     each pin wearing that same order as a number. Off by default and not
+     persisted -- this is a look-at-it-then-drop-it view of a route he is
+     still assembling, not a display preference like showChains/showPractices.
+     Straight lines on purpose, same honesty rule as the old ten-closest list:
+     this map has no router, so a real driving path belongs to RoutePanel's
+     drive-actions.ts leg times, not to a line here pretending to be one. */
+  const [showRouteChain, setShowRouteChain] = useState(false);
+
+  const routeNumberById = useMemo(() => {
+    const m = new Map<string, number>();
+    routeStops.forEach((s, i) => m.set(s.id, i + 1));
+    return m;
+  }, [routeStops]);
+
+  const chainPath = useMemo(() => {
+    if (!showRouteChain || routeStops.length === 0) return [];
+    const pts = [
+      ...(routeStart ? [routeStart] : []),
+      ...routeStops,
+      ...(routeEnd ? [routeEnd] : []),
+    ];
+    return pts.map((p) => ({ lat: p.lat, lng: p.lng }));
+  }, [showRouteChain, routeStops, routeStart, routeEnd]);
 
   function toggleLeadStatus(v: string) {
     setSelected(null);
@@ -594,6 +630,30 @@ export function AccountsMap({
             <span className="tabular-nums opacity-70">{practiceExcludedCount}</span>
           </button>
         )}
+        {/* THE CHAIN TOGGLE. Only offered once there is a route to chain --
+            two straight lines to nowhere is not a control worth showing on an
+            empty map. */}
+        {routeStops.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowRouteChain((v) => !v)}
+            aria-pressed={showRouteChain}
+            title={
+              showRouteChain
+                ? "Hide the route line and stop numbers"
+                : "Draw straight lines between the route stops, in order, numbered"
+            }
+            className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
+              showRouteChain
+                ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
+                : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
+            }`}
+          >
+            <Ico name="route" size={12} />
+            {showRouteChain ? "Route line on" : "Route line"}{" "}
+            <span className="tabular-nums opacity-70">{routeStops.length}</span>
+          </button>
+        )}
         <span className="ml-auto hidden text-[12px] text-[#8A928C] md:inline">
           {filtered.length} of {accounts.length}
         </span>
@@ -677,6 +737,7 @@ export function AccountsMap({
 
           {filtered.map((a) => {
             const potential = a.tier ? POTENTIAL_COLOR[a.tier] : undefined;
+            const routeNum = showRouteChain ? routeNumberById.get(a.id) : undefined;
             return (
               <MarkerF
                 key={a.id}
@@ -686,18 +747,55 @@ export function AccountsMap({
                   setSelectedStop(null);
                   setSelected(a);
                 }}
-                zIndex={potential ? 3 : 2}
+                zIndex={routeNum ? 5 : potential ? 3 : 2}
                 icon={{
                   path: google.maps.SymbolPath.CIRCLE,
-                  scale: potential ? 7 : 6,
-                  fillColor: potential ?? ((a.area && areaById.get(a.area)?.color) || "#5B6560"),
+                  scale: routeNum ? 11 : potential ? 7 : 6,
+                  fillColor: routeNum ? "#14201B" : potential ?? ((a.area && areaById.get(a.area)?.color) || "#5B6560"),
                   fillOpacity: 1,
                   strokeColor: "#F7F6F1",
-                  strokeWeight: 1.5,
+                  strokeWeight: routeNum ? 2 : 1.5,
                 }}
+                label={
+                  routeNum
+                    ? { text: String(routeNum), color: "#F7F6F1", fontSize: "11px", fontWeight: "700" }
+                    : undefined
+                }
               />
             );
           })}
+
+          {/* THE ROUTE CHAIN: straight lines, start -> stops in order -> end
+              (0040: each defaults to the waypoint, either can be overridden),
+              matching exactly what RoutePanel numbers and what its start/end
+              rows measure. No routing engine here, so this is deliberately
+              the honest straight-line hop, not a driving path -- see
+              drive-actions.ts for the real one. */}
+          {chainPath.length > 1 && (
+            <PolylineF
+              path={chainPath}
+              options={{
+                strokeColor: "#14201B",
+                strokeOpacity: 0.85,
+                strokeWeight: 2.5,
+                zIndex: 4,
+                clickable: false,
+                icons: [
+                  {
+                    icon: {
+                      path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                      scale: 3,
+                      strokeColor: "#14201B",
+                      fillColor: "#14201B",
+                      fillOpacity: 1,
+                    },
+                    offset: "50%",
+                    repeat: "110px",
+                  },
+                ],
+              }}
+            />
+          )}
 
           {/* ROUTE STOPS THAT ARE NOT ACCOUNTS: lunch, the hotel, a warehouse.
               Drawn as a square, never a circle, because every circle on this
@@ -705,26 +803,34 @@ export function AccountsMap({
               Amber rather than an area or potential colour for the same reason:
               nothing on this map should read as "an account we have not graded
               yet" unless it is one. Above the pins, below "you are here". */}
-          {customStops.map((s) => (
-            <MarkerF
-              key={s.id}
-              position={{ lat: s.lat, lng: s.lng }}
-              onClick={() => {
-                setSelected(null);
-                setSelectedStop(s);
-              }}
-              zIndex={3}
-              title={s.label}
-              icon={{
-                path: "M -6 -6 L 6 -6 L 6 6 L -6 6 Z",
-                scale: 1,
-                fillColor: "#A0762C",
-                fillOpacity: 1,
-                strokeColor: "#F7F6F1",
-                strokeWeight: 1.5,
-              }}
-            />
-          ))}
+          {customStops.map((s) => {
+            const routeNum = showRouteChain ? routeNumberById.get(s.id) : undefined;
+            return (
+              <MarkerF
+                key={s.id}
+                position={{ lat: s.lat, lng: s.lng }}
+                onClick={() => {
+                  setSelected(null);
+                  setSelectedStop(s);
+                }}
+                zIndex={routeNum ? 5 : 3}
+                title={s.label}
+                icon={{
+                  path: "M -6 -6 L 6 -6 L 6 6 L -6 6 Z",
+                  scale: routeNum ? 1.9 : 1,
+                  fillColor: "#A0762C",
+                  fillOpacity: 1,
+                  strokeColor: "#F7F6F1",
+                  strokeWeight: routeNum ? 2 : 1.5,
+                }}
+                label={
+                  routeNum
+                    ? { text: String(routeNum), color: "#F7F6F1", fontSize: "11px", fontWeight: "700" }
+                    : undefined
+                }
+              />
+            );
+          })}
 
           {selectedStop && (
             <InfoWindowF
