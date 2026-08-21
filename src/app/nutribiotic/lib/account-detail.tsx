@@ -13,7 +13,7 @@
 
 import { useState, useTransition } from "react";
 import type { Account, Activity, Contact, PurchaseLine, PurchaseOrder, Tier } from "./dal";
-import { setPotentialJuan, type PotentialPushOutcome } from "./account-actions";
+import { setPotentialJuan } from "./account-actions";
 import { useRoute } from "./route-context";
 import {
   Card,
@@ -21,13 +21,13 @@ import {
   HUBSPOT_COMPANY_URL,
   Ico,
   PhoneDisplay,
-  SuccessNote,
   TierChip,
   absoluteUrl,
   daysAgo,
   money,
   prettyPhone,
   prettyUrl,
+  withinTrailing12mo,
 } from "./ui";
 
 const POTENTIAL_LETTERS: Tier[] = ["A", "B", "C", "D", "E", "F", "G"];
@@ -36,12 +36,14 @@ const POTENTIAL_LETTERS: Tier[] = ["A", "B", "C", "D", "E", "F", "G"];
  * HQ's grade beside Juan's own read, same two-scale rule as TierChip
  * (ui.tsx): never a bare letter, always which scale it came from. HQ's is
  * read-only here on purpose, the mirror stays pull-only (0021). Juan's is a
- * toggle, PATCHed to nb_accounts.potential_juan and, as of 2026-08-21, pushed
- * straight onto HubSpot's potential__cloned_ the moment he sets a letter,
- * overwriting whatever HQ has there (setPotentialJuan in account-actions.ts;
- * his explicit call, made in full knowledge that field is pull-only
- * everywhere else in this department). Tapping the active letter clears it
- * back to "defer to HQ" locally only, it does not blank the portal.
+ * toggle, PATCHed to nb_accounts.potential_juan by setPotentialJuan
+ * (account-actions.ts), local only. HubSpot never enters this component: the
+ * push is bridges/nutribiotic/hubspot_sync.py's --watch loop picking up the
+ * new value on its own 60-second cycle and overwriting HQ's grade on
+ * potential__cloned_ (nutribiotic/config/hubspot_fields.json's push-only
+ * potential_juan entry), Juan's explicit call, 2026-08-21. Tapping the active
+ * letter clears it back to "defer to HQ" locally only, the loop never blanks
+ * the portal.
  */
 function PotentialGrade({
   accountId,
@@ -53,7 +55,6 @@ function PotentialGrade({
   juan: Tier | null;
 }) {
   const [value, setValue] = useState<Tier | null>(juan);
-  const [pushResult, setPushResult] = useState<PotentialPushOutcome | null>(null);
   const [pending, startTransition] = useTransition();
   const hqLetter = hq ? hq.split(" ")[0] || null : null;
 
@@ -78,9 +79,8 @@ function PotentialGrade({
                 onClick={() => {
                   const next = active ? null : t;
                   setValue(next);
-                  setPushResult(null);
                   startTransition(() => {
-                    void setPotentialJuan(accountId, next).then(setPushResult);
+                    void setPotentialJuan(accountId, next);
                   });
                 }}
                 className={`h-6 w-6 rounded text-[11.5px] font-semibold transition-colors ${
@@ -95,16 +95,10 @@ function PotentialGrade({
           })}
         </div>
       </div>
-      {pushResult && (
-        <div className="mt-2.5">
-          <SuccessNote
-            title={`Read set to ${value}.`}
-            hubspotFiled={pushResult.hubspotFiled}
-            hubspotError={pushResult.hubspotError}
-            hubspotFiledLabel="Pushed to HubSpot, overwriting HQ's Potential (new)."
-            hubspotErrorLabel={`Not pushed to HubSpot: ${pushResult.hubspotError ?? "unknown error"}.`}
-          />
-        </div>
+      {value && (
+        <p className="mt-2 text-[11.5px] text-[#8A928C]">
+          Syncs to HubSpot within a minute, overwriting HQ&rsquo;s Potential (new).
+        </p>
       )}
     </Card>
   );
@@ -322,9 +316,6 @@ export function AccountDetailBody({
             .filter(([, t]) => t.qty !== 0)
             .sort((a, b) => b[1].qty - a[1].qty);
 
-          // 12 months back from now, for the "Recent" pill below.
-          const trailing12mo = Date.now() - 365 * 86_400_000;
-
           return (
             <Card>
               <div className="mb-3 flex items-baseline justify-between gap-3 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
@@ -335,7 +326,7 @@ export function AccountDetailBody({
               </div>
               <ul className="flex flex-col divide-y divide-[#EDEBE3]">
                 {items.map(([name, t]) => {
-                  const recent = Boolean(t.lastOrderedAt && new Date(t.lastOrderedAt).getTime() >= trailing12mo);
+                  const recent = withinTrailing12mo(t.lastOrderedAt);
                   return (
                     <li key={name} className="flex items-baseline justify-between gap-3 py-1.5 text-[13.5px]">
                       <span className="flex min-w-0 items-baseline gap-1.5">

@@ -131,8 +131,6 @@ export function SuccessNote({
   hubspotFiled,
   hubspotId,
   hubspotError,
-  hubspotFiledLabel,
-  hubspotErrorLabel,
   meta,
 }: {
   title: string;
@@ -140,12 +138,6 @@ export function SuccessNote({
   hubspotFiled?: boolean;
   hubspotId?: string | null;
   hubspotError?: string | null;
-  /** Overrides the default "Filed to HubSpot" line, for confirms that aren't
-   * filing a touchpoint (e.g. pushing a single property). */
-  hubspotFiledLabel?: string;
-  /** Overrides the default "queue below to retry" line, which is only true
-   * for touchpoint filing. */
-  hubspotErrorLabel?: string;
   meta?: ReactNode;
 }) {
   return (
@@ -159,8 +151,8 @@ export function SuccessNote({
         <div className={`mt-1.5 flex items-center gap-1.5 text-[12px] ${hubspotFiled ? "text-[#8A928C]" : "text-[#8A6D2F]"}`}>
           <Ico name={hubspotFiled ? "check" : "alert"} size={11} />
           {hubspotFiled
-            ? (hubspotFiledLabel ?? `Filed to HubSpot${hubspotId ? ` (${hubspotId})` : ""}.`)
-            : (hubspotErrorLabel ?? `Not filed to HubSpot yet: ${hubspotError ?? "unknown error"}. It's waiting in the queue below to retry.`)}
+            ? `Filed to HubSpot${hubspotId ? ` (${hubspotId})` : ""}.`
+            : `Not filed to HubSpot yet: ${hubspotError ?? "unknown error"}. It's waiting in the queue below to retry.`}
         </div>
       )}
       {meta}
@@ -345,6 +337,12 @@ export function daysAgo(iso: string | null): string {
   if (d < 60) return `${d}d ago`;
   if (d < 730) return `${Math.round(d / 30)}mo ago`;
   return `${Math.round(d / 365)}y ago`;
+}
+
+/** Whether a date falls in the trailing 12 months from now. */
+export function withinTrailing12mo(iso: string | null): boolean {
+  if (!iso) return false;
+  return new Date(iso).getTime() >= Date.now() - 365 * 86_400_000;
 }
 
 /**

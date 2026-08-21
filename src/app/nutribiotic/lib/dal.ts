@@ -371,7 +371,7 @@ export type Account = {
   hubspot_company_id: string | null;
   /** HQ's own potential grade (HubSpot's potential__cloned_), pull-only, A-G with a label ("B - medium"). See ui.tsx's TierChip. */
   potential_hq: string | null;
-  /** Juan's own read of potential, A-G, set by hand on the account card (migration 0039). Setting a letter also pushes it onto HubSpot's potential__cloned_, overwriting HQ's grade (account-actions.ts:setPotentialJuan, 2026-08-21); clearing stays local only. */
+  /** Juan's own read of potential, A-G, set by hand on the account card (migration 0039). A non-null value is picked up within a minute by bridges/nutribiotic/hubspot_sync.py's --watch loop and pushed onto HubSpot's potential__cloned_, overwriting HQ's grade there (hubspot_fields.json's potential_juan entry, 2026-08-21); clearing stays local only, the loop never fires on null. */
   potential_juan: Tier | null;
   origin: Origin;
 };
@@ -380,7 +380,7 @@ export async function getAccount(id: string): Promise<Result<Account>> {
   return query<Account>("nb_accounts", { select: "*", id: `eq.${id}`, limit: 1 });
 }
 
-/** Sets or clears Juan's own potential read (see Account.potential_juan) in nb_accounts only. Never touches HubSpot itself; the caller (account-actions.ts:setPotentialJuan) pushes to HubSpot afterward when a letter is set. */
+/** Sets or clears Juan's own potential read (see Account.potential_juan). Local only, in nb_accounts; never touches HubSpot itself, see the column's own comment above for how it gets there. */
 export async function setAccountPotentialJuan(id: string, grade: Tier | null): Promise<Account | null> {
   const rows = await mutate<Account>("nb_accounts", "PATCH", { potential_juan: grade }, { id: `eq.${id}` });
   return rows[0] ?? null;
