@@ -14,7 +14,8 @@
  */
 
 import "server-only";
-import { batchRead, OWNER_ID, request } from "./hubspot";
+import { assertJuansBook, batchRead, OWNER_ID, request, ScopeError } from "./hubspot";
+import type { Tier } from "./dal";
 
 export type DuplicateCandidate = { id: string; name: string | null; city: string | null; owner: string | null };
 
@@ -120,4 +121,59 @@ export async function ensureCompanyDomainForEmail(companyId: string, email: stri
     entity: "companies",
     operation: "upsert",
   });
+}
+
+/** HubSpot's live dropdown options for potential__cloned_ ("Potential (new)"),
+ * read verbatim from the portal 2026-08-21 (crm/v3/properties/companies/potential__cloned_).
+ * The value sent must match one of these exactly or HubSpot rejects the write. */
+const POTENTIAL_LABELS: Record<Tier, string> = {
+  A: "A - very big",
+  B: "B - big",
+  C: "C - medium",
+  D: "D - small",
+  E: "E - very small",
+  F: "F - no at all",
+  G: "G - personal use through wholesale line",
+};
+
+export type PotentialPushResult =
+  | { ok: true }
+  | { ok: false; reason: "not_juans" | "not_configured" | "error"; error?: string };
+
+/**
+ * Juan's own potential read, pushed straight onto potential__cloned_ the moment
+ * he sets a letter on the account card, overwriting whatever is there, HQ's
+ * grade included. Juan's explicit call, 2026-08-21: potential__cloned_ is
+ * owner:hubspot everywhere else in this department (the one field the sync
+ * layer treats as pull-only), and grade_potential.py refuses on principle to
+ * overwrite anything HQ set by hand, which is exactly the write this makes on
+ * every tap. He chose it anyway, in full knowledge of both.
+ *
+ * Deliberately NOT wired into hubspot_fields.json / hubspot_sync.py's generic
+ * `push`, which reads one local column per property and runs unattended across
+ * the whole book every cycle: that would either push the already-equal
+ * potential_hq mirror (a no-op) or push potential_juan for every account on a
+ * schedule, not just the one Juan just graded. This is a single, human-
+ * initiated write, same shape as createCompany/repairDerivedDomain above.
+ *
+ * Fires only when Juan SETS a letter, never on clear: toggling back to "defer
+ * to HQ" locally must not blank a value HQ or Kyle can see in the portal.
+ */
+export async function pushPotentialRead(companyId: string, grade: Tier): Promise<PotentialPushResult> {
+  try {
+    const scope = await assertJuansBook([companyId]);
+    if (scope.allowed.length === 0) return { ok: false, reason: "not_juans" };
+
+    await request({
+      method: "PATCH",
+      path: `/crm/v3/objects/companies/${companyId}`,
+      body: { properties: { potential__cloned_: POTENTIAL_LABELS[grade] } },
+      entity: "companies",
+      operation: "upsert",
+    });
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof ScopeError) return { ok: false, reason: "not_configured", error: e.message };
+    return { ok: false, reason: "error", error: e instanceof Error ? e.message : String(e) };
+  }
 }

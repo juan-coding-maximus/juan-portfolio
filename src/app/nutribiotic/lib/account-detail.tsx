@@ -13,7 +13,7 @@
 
 import { useState, useTransition } from "react";
 import type { Account, Activity, Contact, PurchaseLine, PurchaseOrder, Tier } from "./dal";
-import { setPotentialJuan } from "./account-actions";
+import { setPotentialJuan, type PotentialPushOutcome } from "./account-actions";
 import { useRoute } from "./route-context";
 import {
   Card,
@@ -21,6 +21,7 @@ import {
   HUBSPOT_COMPANY_URL,
   Ico,
   PhoneDisplay,
+  SuccessNote,
   TierChip,
   absoluteUrl,
   daysAgo,
@@ -34,9 +35,13 @@ const POTENTIAL_LETTERS: Tier[] = ["A", "B", "C", "D", "E", "F", "G"];
 /**
  * HQ's grade beside Juan's own read, same two-scale rule as TierChip
  * (ui.tsx): never a bare letter, always which scale it came from. HQ's is
- * read-only here on purpose, the mirror stays pull-only (0021); Juan's is a
- * toggle, PATCHed straight to nb_accounts.potential_juan and never synced
- * out (0039). Tapping the active letter clears it back to "defer to HQ."
+ * read-only here on purpose, the mirror stays pull-only (0021). Juan's is a
+ * toggle, PATCHed to nb_accounts.potential_juan and, as of 2026-08-21, pushed
+ * straight onto HubSpot's potential__cloned_ the moment he sets a letter,
+ * overwriting whatever HQ has there (setPotentialJuan in account-actions.ts;
+ * his explicit call, made in full knowledge that field is pull-only
+ * everywhere else in this department). Tapping the active letter clears it
+ * back to "defer to HQ" locally only, it does not blank the portal.
  */
 function PotentialGrade({
   accountId,
@@ -48,6 +53,7 @@ function PotentialGrade({
   juan: Tier | null;
 }) {
   const [value, setValue] = useState<Tier | null>(juan);
+  const [pushResult, setPushResult] = useState<PotentialPushOutcome | null>(null);
   const [pending, startTransition] = useTransition();
   const hqLetter = hq ? hq.split(" ")[0] || null : null;
 
@@ -72,8 +78,9 @@ function PotentialGrade({
                 onClick={() => {
                   const next = active ? null : t;
                   setValue(next);
+                  setPushResult(null);
                   startTransition(() => {
-                    void setPotentialJuan(accountId, next);
+                    void setPotentialJuan(accountId, next).then(setPushResult);
                   });
                 }}
                 className={`h-6 w-6 rounded text-[11.5px] font-semibold transition-colors ${
@@ -88,8 +95,16 @@ function PotentialGrade({
           })}
         </div>
       </div>
-      {value && (
-        <p className="mt-2 text-[11.5px] text-[#8A928C]">Stays local. Never pushed to HubSpot.</p>
+      {pushResult && (
+        <div className="mt-2.5">
+          <SuccessNote
+            title={`Read set to ${value}.`}
+            hubspotFiled={pushResult.hubspotFiled}
+            hubspotError={pushResult.hubspotError}
+            hubspotFiledLabel="Pushed to HubSpot, overwriting HQ's Potential (new)."
+            hubspotErrorLabel={`Not pushed to HubSpot: ${pushResult.hubspotError ?? "unknown error"}.`}
+          />
+        </div>
       )}
     </Card>
   );
