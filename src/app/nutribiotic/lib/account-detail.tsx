@@ -306,18 +306,24 @@ export function AccountDetailBody({
             Summing net (not gross) matters: a credit line has negative qty,
             and a return should pull an item's rank down, not inflate it. */}
         {orders.length > 0 && (() => {
-          const totals = new Map<string, { qty: number; revenueCents: number }>();
+          const orderedAt = new Map(orders.map((o) => [o.id, o.ordered_at]));
+          const totals = new Map<string, { qty: number; revenueCents: number; lastOrderedAt: string | null }>();
           for (const l of lines) {
             const name = l.product_name ?? "Item";
-            const prev = totals.get(name) ?? { qty: 0, revenueCents: 0 };
+            const prev = totals.get(name) ?? { qty: 0, revenueCents: 0, lastOrderedAt: null };
+            const at = orderedAt.get(l.order_id) ?? null;
             totals.set(name, {
               qty: prev.qty + (l.qty ?? 0),
               revenueCents: prev.revenueCents + l.line_revenue_cents,
+              lastOrderedAt: at && (!prev.lastOrderedAt || at > prev.lastOrderedAt) ? at : prev.lastOrderedAt,
             });
           }
           const items = [...totals.entries()]
             .filter(([, t]) => t.qty !== 0)
             .sort((a, b) => b[1].qty - a[1].qty);
+
+          // 12 months back from now, for the "Recent" pill below.
+          const trailing12mo = Date.now() - 365 * 86_400_000;
 
           return (
             <Card>
@@ -328,14 +334,24 @@ export function AccountDetailBody({
                 </span>
               </div>
               <ul className="flex flex-col divide-y divide-[#EDEBE3]">
-                {items.map(([name, t]) => (
-                  <li key={name} className="flex items-baseline justify-between gap-3 py-1.5 text-[13.5px]">
-                    <span className="min-w-0 truncate">{name}</span>
-                    <span className="shrink-0 tabular-nums text-[#5B6560]">
-                      ×{t.qty} <span className="text-[#8A928C]">· {money(t.revenueCents / 100)}</span>
-                    </span>
-                  </li>
-                ))}
+                {items.map(([name, t]) => {
+                  const recent = Boolean(t.lastOrderedAt && new Date(t.lastOrderedAt).getTime() >= trailing12mo);
+                  return (
+                    <li key={name} className="flex items-baseline justify-between gap-3 py-1.5 text-[13.5px]">
+                      <span className="flex min-w-0 items-baseline gap-1.5">
+                        <span className="min-w-0 truncate">{name}</span>
+                        {recent && (
+                          <span className="shrink-0 rounded-full bg-[#B3452C] px-1.5 py-0.5 text-[9.5px] font-semibold tracking-wide text-white uppercase">
+                            Recent
+                          </span>
+                        )}
+                      </span>
+                      <span className="shrink-0 tabular-nums text-[#5B6560]">
+                        ×{t.qty} <span className="text-[#8A928C]">· {money(t.revenueCents / 100)}</span>
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             </Card>
           );
