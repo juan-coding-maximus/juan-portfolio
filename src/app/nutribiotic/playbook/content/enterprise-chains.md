@@ -19,7 +19,7 @@ store in the chain at once. This needs a packet, not a visit, and one
 open question decides whether it's even Juan's to run (see "Before Track
 B" below).
 
-Last built: 2026-08-23, from `nb_activities` and live web research.
+Last built: 2026-08-24, from `nb_activities` and live web research.
 
 ---
 
@@ -268,23 +268,53 @@ until proven otherwise.
 **Success story**: TODO, none found.
 **Sources**: [Hand & Stone - health, wellness, and beauty](https://businessviewmagazine.com/hand-stone-massage-facial-spa-health-wellness-beauty/)
 
----
+### Gelson's Markets
+**Status**: not yet in the OS. 26 CA locations.
+**Tip**: this is the single best local-fit door on the whole list.
+Gelson's runs an actual **pitch event for local vendors**, open to brands
+within 50 miles of a store, spanning LA, Orange, San Diego, Ventura,
+Santa Barbara, and San Bernardino counties, essentially Juan's entire
+territory. ~60 local contenders each get 25 minutes in front of senior
+buyers.
+**Links**: [New Suppliers](https://www.gelsons.com/new-suppliers) · [Vendor Partnerships](https://www.gelsons.com/vendor-partnerships)
+**Process**: submit through the New Suppliers form on the site, or the
+local pitch event when it runs; be ready to state what distinguishes the
+product (organic, gluten-free, etc.).
+**Success story**: TODO, no specific post-2021 named brand confirmed in
+this pass, the pitch-event program itself is documented and current.
+**Sources**: [Gelson's Gives Small Producers a Shot at the Big Time](https://www.supermarketnews.com/foodservice-retail/gelson-s-gives-small-producers-a-shot-at-the-big-time), [Gelson's asks local brands to submit new product proposals](https://www.supermarketperimeter.com/articles/7365-gelsons-asks-local-brands-to-submit-new-product-proposals)
 
-## Local-vendor-friendly, worth prioritizing inside Track B
+### Mother's Market & Kitchen
+**Status**: not yet in the OS. 11-12 CA locations, all Orange County/LA.
+Added as a full entry 8/23, previously only mentioned in passing.
+**Tip**: built explicitly as a "fast-track" online process for local
+producers, stated directly by their CEO as a stated priority, not a
+generic vendor form. Strongest fit alongside Gelson's given the OC-heavy
+footprint overlaps Juan's territory directly.
+**Links**: [New Vendors](https://www.mothersmarket.com/new-vendors/)
+**Process**: submit through the New Vendors page; the fast-track was
+built to move qualified local product onto shelves quickly.
+**Success story**: the clearest documented case is **BREAD Artisan
+Bakery** (Santa Ana), which went from outreach to featured shelf provider
+in under a week, but that's dated **March 2020**, before this list's
+2021 bar, kept here as evidence the fast-track is real, not as the
+qualifying success story. TODO for a post-2021 named example.
+**Sources**: [BREAD Artisan Bakery now on shelves](https://www.mothersmarket.com/bread-artisan-bakery-now-on-shelves/)
 
-Two chains explicitly built a fast lane for local SoCal brands, both
-strong fits given NutriBiotic's actual footprint here:
-
-- **Gelson's** hosts a local-vendor pitch event for brands within 50
-  miles of a store, spanning LA, Orange, San Diego, Ventura, Santa
-  Barbara, and San Bernardino counties, exactly Juan's territory.
-  [New Suppliers](https://www.gelsons.com/new-suppliers) · [Vendor Partnerships](https://www.gelsons.com/vendor-partnerships)
-- **Mother's Market & Kitchen** runs a "fast-track" online process built
-  specifically for qualified local producers, stated explicitly by their
-  CEO as a priority. [New Vendors](https://www.mothersmarket.com/new-vendors/)
-
-Neither has a confirmed post-2021 named NutriBiotic-category success
-story in this research pass, TODO before either gets pitched as proven.
+### Super King Markets
+**Status**: not yet in the OS. Added 8/23. 11 CA locations, all within
+Juan's territory (Anaheim, Santa Ana, Culver City, Glendale, LA,
+Northridge, Van Nuys x2, North Hills, Altadena, Claremont), HQ'd in LA.
+**Tip**: international/specialty grocery chain with its own dedicated
+Vitamins & Supplements section already live on their online shop, real
+category fit, not a guess. No incubator or accelerator found, this is a
+straight buyer relationship, same shape as GNC/Erewhon/Bristol Farms.
+**Links**: [Corporate Office / Contact](https://superkingmarkets.com/pages/corporate-office) · [Supply Chain Transparency](https://superkingmarkets.com/pages/supply-chain)
+**Process**: no public submission form found, the documented path is
+calling corporate for the category buyer's name, then RangeMe or
+LinkedIn to follow up.
+**Success story**: TODO, none found post-2021 in this pass.
+**Sources**: [Super King Markets vitamins & supplements](https://shop.superkingmarkets.com/store/super-king/collections/n-vitamins-supplements-53498), [How To Get Into Super King Market](https://mrcheckout.net/how-to-get-into-super-king-market/)
 
 ---
 
@@ -292,6 +322,22 @@ story in this research pass, TODO before either gets pitched as proven.
 Track A is just field work, more visits, same play as Sports Basement.
 Track B's real bottleneck is the HQ question above, not this document,
 that call determines whether Sprouts and Whole Foods (the two strongest
-fits) are a rep-level push or a manufacturer-level one. Nothing here gets
-submitted by anyone but Juan; per the department's sending rule, an
-application is a send, and sends are never automatic.
+category fits) are a rep-level push or a manufacturer-level one. Inside
+Track B, Gelson's, Mother's Market, and Super King are the fastest local
+doors, all three sit inside Juan's actual territory and don't need HQ's
+answer to start (a local pitch/buyer relationship, not a national vendor
+number). Nothing here gets submitted by anyone but Juan; per the
+department's sending rule, an application is a send, and sends are never
+automatic.
+
+---
+
+## Not on this list: Super Irvine International Market
+Researched 8/23 alongside Super King (similar name, easy to conflate).
+This is a single independent Persian grocery/deli in Irvine, not a
+multi-store chain (a second Mission Viejo location closed years ago), so
+it doesn't fit this document's definition. Added as a normal lead
+instead: Places-verified and staged through the standard import queue,
+promoted to `nb_accounts` (`a_1c125d`) and pushed as HubSpot company
+444614294731, owned by Juan, 8/23. Not a Track A or B chain play, just a
+new prospect in the book like any other.
