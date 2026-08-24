@@ -158,43 +158,73 @@ export function MapScreen({
   }
 
   /* START/END OVERRIDES (0040), DAY-PARTITIONED alongside route_draft
-     (2026-08-23): each field day keeps its own start and end rather than one
-     pair shared by the whole week, which is what makes a real multi-day run
-     (drive out Monday, sleep at the cluster, drive home Wednesday) expressible
-     at all -- a single shared override could never have Monday end at a hotel
-     while Thursday ends at home. */
+     (2026-08-23): each field day keeps its own end rather than one pair
+     shared by the whole week, which is what makes a real multi-day run (drive
+     out Monday, sleep at the cluster, drive home Wednesday) expressible at
+     all -- a single shared override could never have Monday end at a hotel
+     while Thursday ends at home.
+     `startByDay` only ever holds an entry for the FIRST day on the horizon
+     now (2026-08-24): every later day's start IS the previous day's end, the
+     same physical fact -- where Juan slept -- not a second copy of it that
+     could quietly disagree. See editStart below. */
   const [startByDay, setStartByDay] = useState<RouteEndpointsByDay>(endpointsByDay.start);
-  const [endByDay, setEndByDay] = useState<RouteEndpointsByDay>(endpointsByDay.end);
+  const [endByDay, setEndByDay] = useState<RouteEndpointsByDay>(() => {
+    // One-time fold (2026-08-24): a start override on a day after the first,
+    // from just before start/end shared one fact, becomes THAT DAY'S
+    // PREVIOUS DAY's end -- the same physical location, read from the other
+    // side. Only fills a gap; never overwrites an end Juan already set.
+    const merged = { ...endpointsByDay.end };
+    days.forEach((day, i) => {
+      if (i === 0) return;
+      const legacyStart = endpointsByDay.start[day];
+      const prev = days[i - 1];
+      if (legacyStart && !merged[prev]) merged[prev] = legacyStart;
+    });
+    return merged;
+  });
 
-  const activeStart = startByDay[activeDay] ?? null;
-  const activeEnd = endByDay[activeDay] ?? null;
-
-  /* THE CHAIN: a day with no start override of its own does not fall straight
-     to home, it falls to the PREVIOUS field-day tab's resolved end (that
-     day's own override, else home). This is the whole point of splitting
-     start/end by day -- Tuesday leaving from wherever Monday's route actually
-     finished, with nothing re-typed, unless Tuesday says otherwise. The first
-     tab has no previous day, so it is unaffected and still defaults to home. */
   const dayIndex = days.indexOf(activeDay);
   const prevDay = dayIndex > 0 ? days[dayIndex - 1] : null;
+
+  // The first day on the horizon has no previous day to share a start with,
+  // so it keeps its own independent override. Every later day's start reads
+  // straight off the previous day's end -- there is nothing separate to read.
+  const activeStart = prevDay ? (endByDay[prevDay] ?? null) : (startByDay[activeDay] ?? null);
+  const activeEnd = endByDay[activeDay] ?? null;
   const startFallback = prevDay ? (endByDay[prevDay] ?? home) : home;
 
+  function setEndForDay(day: string, ep: RouteEndpoint | null) {
+    const prev = endByDay;
+    const next = { ...endByDay };
+    if (ep) next[day] = ep;
+    else delete next[day];
+    setEndByDay(next);
+    saveRouteEndByDay(next).catch(() => setEndByDay(prev));
+  }
+
+  function editEnd(ep: RouteEndpoint | null) {
+    setEndForDay(activeDay, ep);
+  }
+
+  // AUTO-SYNCED TO THE PREVIOUS DAY (Juan's ask 2026-08-24): "where today
+  // starts" and "where yesterday ended" are the same fact, so this writes the
+  // previous day's end, not a separate start for today. Picking Home here
+  // freezes the previous day's end AT home explicitly -- "I actually drove
+  // all the way back before starting today" -- same as everywhere else on
+  // this screen, home is the lowest-priority default, never a value that
+  // silently wins over something Juan actually picked. Only the first day on
+  // the horizon, with no previous day, keeps its own independent override.
   function editStart(ep: RouteEndpoint | null) {
+    if (prevDay) {
+      setEndForDay(prevDay, ep);
+      return;
+    }
     const prev = startByDay;
     const next = { ...startByDay };
     if (ep) next[activeDay] = ep;
     else delete next[activeDay];
     setStartByDay(next);
     saveRouteStartByDay(next).catch(() => setStartByDay(prev));
-  }
-
-  function editEnd(ep: RouteEndpoint | null) {
-    const prev = endByDay;
-    const next = { ...endByDay };
-    if (ep) next[activeDay] = ep;
-    else delete next[activeDay];
-    setEndByDay(next);
-    saveRouteEndByDay(next).catch(() => setEndByDay(prev));
   }
 
   // What the day actually starts/ends at: Juan's override if he picked one

@@ -296,27 +296,62 @@ function AddStopForm({ onAdd }: { onAdd: (stop: Omit<CustomStop, "id">) => void 
 }
 
 /**
- * The strip above the list: the four inputs that define the day, and what they
- * add up to. Editable in place because the alternative is a settings screen for
- * three numbers he changes more often than he changes anything else.
+ * The strip above the list: where the day starts, where it ends, and the four
+ * inputs that turn that into a clock. Editable in place because the
+ * alternative is a settings screen for numbers he changes more often than he
+ * changes anything else.
+ *
+ * ALWAYS ON SCREEN, EVEN WITH NO STOPS (Juan's ask 2026-08-24): a day with
+ * nothing planned yet is exactly when he's most likely to be setting up where
+ * it starts and ends, so this used to live only inside the stop-list card,
+ * which meant an empty day showed no way to touch start/end at all. It now
+ * renders for every day, stops or not; only the clock summary at the bottom
+ * needs an actual leg to measure and stays hidden without one (`hasStops`).
+ *
+ * ONE EDITABLE COPY. Start and end used to have a second, editable picker
+ * repeated in the rows above/below the stop list -- same fact, two places to
+ * touch it, so this is now the only one that writes. Those rows still show
+ * the resolved name, just as plain text next to the leg's drive time.
  */
 function DayBar({
   prefs,
   onChange,
+  start,
+  startFallback,
+  end,
+  home,
+  onChangeStart,
+  onChangeEnd,
   finish,
   driveMinutes,
   driveMiles,
   state,
   endLabel,
+  hasStops,
 }: {
   prefs: RouteSchedulePrefs;
   onChange: (p: RouteSchedulePrefs) => void;
+  /** This day's own start override, or null (see startFallback). */
+  start: RouteEndpoint | null;
+  /** What Leave shows/resolves to with no override: the PREVIOUS day's end
+      for every day after the first (2026-08-24: they are literally the same
+      fact, where Juan slept, so editing either one writes the other), else
+      home on the first tab. */
+  startFallback: RouteEndpoint | null;
+  /** This day's own end override, or null -- end never chains forward from a
+      day that hasn't happened yet, so its fallback is always home. */
+  end: RouteEndpoint | null;
+  home: RouteEndpoint | null;
+  onChangeStart: (ep: RouteEndpoint | null) => void;
+  onChangeEnd: (ep: RouteEndpoint | null) => void;
   finish: number | null;
   driveMinutes: number | null;
   driveMiles: number | null;
   state: "loading" | "ok" | "unavailable";
   /** The end location's own name ("Home", or an overridden hotel/address). */
   endLabel: string;
+  /** Whether the day has stops to measure a schedule from. */
+  hasStops: boolean;
 }) {
   const over =
     finish !== null && prefs.returnBy !== null && finish > minutesOfDay(prefs.returnBy);
@@ -329,6 +364,8 @@ function DayBar({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <label className="flex items-center gap-1.5 text-[12.5px] text-[#5B6560]">
           Leave
+          <RouteEndpointField value={start} fallback={startFallback} home={home} onChange={onChangeStart} />
+          at
           <input
             type="time"
             value={prefs.depart}
@@ -359,7 +396,9 @@ function DayBar({
           min lunch
         </label>
         <label className="flex items-center gap-1.5 text-[12.5px] text-[#5B6560]">
-          {endLabel} by
+          Arrive
+          <RouteEndpointField value={end} fallback={home} home={home} onChange={onChangeEnd} />
+          by
           <input
             type="time"
             value={prefs.returnBy ?? ""}
@@ -369,48 +408,50 @@ function DayBar({
         </label>
       </div>
 
-      <div className="mt-2.5 border-t border-[#EEECE3] pt-2.5 text-[12.5px]">
-        {state === "loading" && <span className="text-[#8A928C]">Working out drive times...</span>}
+      {hasStops && (
+        <div className="mt-2.5 border-t border-[#EEECE3] pt-2.5 text-[12.5px]">
+          {state === "loading" && <span className="text-[#8A928C]">Working out drive times...</span>}
 
-        {/* The router is down, so the day has no clock. Say that, rather than
-            leaving yesterday's numbers on screen or filling in straight lines. */}
-        {state === "unavailable" && (
-          <span className="text-[#8A928C]">
-            Drive times unavailable right now, so there are no arrival times below. The order and
-            the straight-line hops are unaffected.
-          </span>
-        )}
-
-        {state === "ok" && finish !== null && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className={over ? "font-semibold text-[#B5372A]" : "font-semibold text-[#2C6A46]"}>
-              {over ? "Back " : endLabel === "Home" ? "Back home " : `Back at ${endLabel} `}
-              <span className="tabular-nums">{clock(finish)}</span>
+          {/* The router is down, so the day has no clock. Say that, rather than
+              leaving yesterday's numbers on screen or filling in straight lines. */}
+          {state === "unavailable" && (
+            <span className="text-[#8A928C]">
+              Drive times unavailable right now, so there are no arrival times below. The order and
+              the straight-line hops are unaffected.
             </span>
-            {over && prefs.returnBy && (
-              <span className="text-[#B5372A]">
-                {duration(finish - minutesOfDay(prefs.returnBy))} past {prefs.returnBy}
+          )}
+
+          {state === "ok" && finish !== null && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className={over ? "font-semibold text-[#B5372A]" : "font-semibold text-[#2C6A46]"}>
+                {over ? "Back " : endLabel === "Home" ? "Back home " : `Back at ${endLabel} `}
+                <span className="tabular-nums">{clock(finish)}</span>
               </span>
-            )}
-            {!over && prefs.returnBy && (
-              <span className="text-[#5B6560]">
-                {duration(minutesOfDay(prefs.returnBy) - finish)} spare
-              </span>
-            )}
-            {driveMinutes !== null && (
-              <span className="text-[#5B6560]">
-                <span className="tabular-nums">{duration(driveMinutes)}</span> driving
-                {driveMiles !== null && (
-                  <>
-                    {" · "}
-                    <span className="tabular-nums">{driveMiles.toFixed(1)} mi</span>
-                  </>
-                )}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
+              {over && prefs.returnBy && (
+                <span className="text-[#B5372A]">
+                  {duration(finish - minutesOfDay(prefs.returnBy))} past {prefs.returnBy}
+                </span>
+              )}
+              {!over && prefs.returnBy && (
+                <span className="text-[#5B6560]">
+                  {duration(minutesOfDay(prefs.returnBy) - finish)} spare
+                </span>
+              )}
+              {driveMinutes !== null && (
+                <span className="text-[#5B6560]">
+                  <span className="tabular-nums">{duration(driveMinutes)}</span> driving
+                  {driveMiles !== null && (
+                    <>
+                      {" · "}
+                      <span className="tabular-nums">{driveMiles.toFixed(1)} mi</span>
+                    </>
+                  )}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -612,11 +653,31 @@ export function RoutePanel({
     </div>
   );
 
+  const dayBar = (
+    <DayBar
+      prefs={prefs}
+      onChange={onChangePrefs}
+      start={startOverride}
+      startFallback={startFallback}
+      end={endOverride}
+      home={home}
+      onChangeStart={onChangeStart}
+      onChangeEnd={onChangeEnd}
+      finish={schedule?.finish ?? null}
+      driveMinutes={driveMinutes}
+      driveMiles={driveMiles}
+      state={legState}
+      endLabel={endLabel}
+      hasStops={stops.length > 0}
+    />
+  );
+
   if (stops.length === 0) {
     return (
       <>
         {header}
         <DayTabs days={days} active={activeDay} onSelect={onSelectDay} />
+        {dayBar}
         <div className="rounded-lg border border-dashed border-[#E2DFD5] bg-white p-5 text-[13.5px] leading-relaxed text-[#5B6560]">
           Nothing planned for {dayLabel(activeDay).weekday} yet. Tap a pin on the map and choose{" "}
           <span className="font-medium text-[#3D4A44]">Add to route</span> to start one, or add a
@@ -636,15 +697,7 @@ export function RoutePanel({
 
       <DayTabs days={days} active={activeDay} onSelect={onSelectDay} />
 
-      <DayBar
-        prefs={prefs}
-        onChange={onChangePrefs}
-        finish={schedule?.finish ?? null}
-        driveMinutes={driveMinutes}
-        driveMiles={driveMiles}
-        state={legState}
-        endLabel={endLabel}
-      />
+      {dayBar}
 
       {/* OPTIMIZE ROUTE, above stop 1 (Juan's ask 2026-08-23): the graph
           problem solved on demand, never automatically. Needs three stops to
@@ -667,17 +720,12 @@ export function RoutePanel({
       <div className="overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
         {/* The drive out. Not a stop, so it is a rule above the first one
             rather than a numbered row, but it is the reason stop 1 is not at
-            09:30 and leaving it off makes the morning look longer than it is. */}
+            09:30 and leaving it off makes the morning look longer than it is.
+            Read-only here: DayBar above is the one place that edits start. */}
         {start && (
           <div className="flex items-baseline justify-between border-b border-[#EEECE3] bg-[#FAF9F5] px-4 py-2 text-[12.5px] text-[#5B6560]">
             <span className="inline-flex items-center gap-1">
-              Leave{" "}
-              <RouteEndpointField
-                value={startOverride}
-                fallback={startFallback}
-                home={home}
-                onChange={onChangeStart}
-              />
+              Leave {start.label}{" "}
               <span className="font-medium tabular-nums text-[#3D4A44]">{prefs.depart}</span>
             </span>
             {schedule?.toFirst && (
@@ -924,15 +972,12 @@ export function RoutePanel({
         </ul>
 
         {/* The drive back, for the same reason the drive out is there: the day
-            is not over when the last door closes. */}
+            is not over when the last door closes. Read-only, same as the
+            drive-out row above -- DayBar is the one place that edits end. */}
         {end && schedule?.end && (
           <div className="flex items-baseline justify-between border-t border-[#EEECE3] bg-[#FAF9F5] px-4 py-2 text-[12.5px] text-[#5B6560]">
             <span className="inline-flex items-center gap-1">
-              <RouteEndpointField
-                value={endOverride}
-                home={home}
-                onChange={onChangeEnd}
-              />
+              {end.label}
               <span className="font-medium tabular-nums text-[#3D4A44]">{clock(schedule.finish)}</span>
             </span>
             <span className="tabular-nums text-[#8A928C]">
