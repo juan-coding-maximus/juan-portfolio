@@ -50,6 +50,14 @@ export const DOCS: PlaybookDoc[] = [
     group: "Playbooks",
   },
   {
+    slug: "enterprise-chains",
+    file: "enterprise-chains.md",
+    title: "Enterprise Chains",
+    blurb:
+      "The hit list: multi-store chains split by store-level vs central/HQ decision making, with tips, links, process, and sourced success stories per chain.",
+    group: "Playbooks",
+  },
+  {
     slug: "marketing-seasonal",
     file: "marketing-seasonal.md",
     title: "Seasonal Marketing",
