@@ -40,8 +40,8 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import type { CustomStop, CustomStopKind, RouteEndpoint, RouteSchedulePrefs } from "../lib/dal";
-import { appleMapsUrl, CUSTOM_STOP_LABEL, fullAddress, Ico, ReachLinks, TierChip } from "../lib/ui";
+import type { CallEntry, CustomStop, CustomStopKind, RouteEndpoint, RouteSchedulePrefs } from "../lib/dal";
+import { appleMapsUrl, CUSTOM_STOP_LABEL, fullAddress, Ico, prettyPhone, ReachLinks, TierChip } from "../lib/ui";
 import { AccountLink } from "../lib/modal";
 import { resolveStopAddress } from "../lib/stop-actions";
 import { routeDriveLegs, type DriveLeg } from "./drive-actions";
@@ -296,6 +296,156 @@ function AddStopForm({ onAdd }: { onAdd: (stop: Omit<CustomStop, "id">) => void 
 }
 
 /**
+ * The calls on this day (migration 0041): phone-only follow-ups, no address,
+ * no drive position, added and removed the same way a lunch/hotel stop is but
+ * never among them, never costed against traffic, never part of Optimize
+ * route's reorder maths. Sits between the day tabs and the stop list, where
+ * Juan asked for it: between the map above and the list of places to hit
+ * below.
+ */
+function AddCallForm({ onAdd }: { onAdd: (call: Omit<CallEntry, "id">) => void }) {
+  const [open, setOpen] = useState(false);
+  const [label, setLabel] = useState("");
+  const [phone, setPhone] = useState("");
+  const [note, setNote] = useState("");
+
+  function reset() {
+    setLabel("");
+    setPhone("");
+    setNote("");
+  }
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!label.trim() || !phone.trim()) return;
+    onAdd({ label: label.trim(), phone: phone.trim(), ...(note.trim() ? { note: note.trim() } : {}) });
+    reset();
+    setOpen(false);
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white px-3 py-2 text-[12.5px] font-medium text-[#3D4A44] transition-colors hover:bg-[#FAF9F5]"
+      >
+        <Ico name="phone" size={13} />
+        Add a call
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="rounded-lg border border-[#E2DFD5] bg-white p-3.5">
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          placeholder="Who, e.g. Alex Conrad, Vasari Plaster"
+          autoFocus
+          className="min-w-0 flex-[2] rounded-md border border-[#E2DFD5] bg-[#FCFBF7] px-3 py-2 text-[13.5px] outline-none placeholder:text-[#A9AFA9] focus:border-[#8A928C]"
+        />
+        <input
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="Phone"
+          className="min-w-0 flex-1 rounded-md border border-[#E2DFD5] bg-[#FCFBF7] px-3 py-2 text-[13.5px] tabular-nums outline-none placeholder:text-[#A9AFA9] focus:border-[#8A928C]"
+        />
+      </div>
+      <textarea
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="Why you're calling (optional)"
+        rows={2}
+        className="mt-2 w-full resize-none rounded-md border border-[#E2DFD5] bg-[#FCFBF7] px-3 py-2 text-[13px] outline-none placeholder:text-[#A9AFA9] focus:border-[#8A928C]"
+      />
+      <div className="mt-2.5 flex items-center gap-2">
+        <button
+          type="submit"
+          disabled={!label.trim() || !phone.trim()}
+          className="rounded-md bg-[#2C6A46] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Add call
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            reset();
+            setOpen(false);
+          }}
+          className="rounded-md border border-[#E2DFD5] bg-white px-3 py-2 text-[12.5px] font-medium text-[#8A928C] transition-colors hover:text-[#3D4A44]"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function CallsList({ calls, onRemove }: { calls: CallEntry[]; onRemove: (id: string) => void }) {
+  if (calls.length === 0) return null;
+  return (
+    <ul className="divide-y divide-[#EEECE3] overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
+      {calls.map((c) => (
+        <li key={c.id} className="flex items-start gap-3 px-4 py-3">
+          <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#2C6A46] text-[#F7F6F1]">
+            <Ico name="phone" size={12} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              <span className="truncate text-[14px] font-medium leading-snug">{c.label}</span>
+              <a
+                href={`tel:${c.phone}`}
+                className="text-[12.5px] font-medium tabular-nums text-[#3D4A44] underline-offset-2 hover:underline"
+              >
+                {prettyPhone(c.phone)}
+              </a>
+            </div>
+            {c.note && <p className="mt-0.5 text-[12.5px] leading-snug text-[#5B6560]">{c.note}</p>}
+          </div>
+          <button
+            type="button"
+            onClick={() => onRemove(c.id)}
+            aria-label={`Remove ${c.label}`}
+            className="shrink-0 rounded-md p-1.5 text-[#A9AFA9] transition-colors hover:bg-[#FAF9F5] hover:text-[#B5372A]"
+          >
+            <Ico name="close" size={13} />
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function CallsSection({
+  calls,
+  onAdd,
+  onRemove,
+}: {
+  calls: CallEntry[];
+  onAdd: (call: Omit<CallEntry, "id">) => void;
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <div className="mb-3">
+      <div className="mb-2 flex items-baseline justify-between">
+        <h3 className="text-[13.5px] font-semibold text-[#3D4A44]">Calls</h3>
+        {calls.length > 0 && (
+          <span className="text-[11.5px] text-[#8A928C]">
+            {calls.length} call{calls.length === 1 ? "" : "s"}, no drive
+          </span>
+        )}
+      </div>
+      <div className="flex flex-col gap-2">
+        <CallsList calls={calls} onRemove={onRemove} />
+        <AddCallForm onAdd={onAdd} />
+      </div>
+    </div>
+  );
+}
+
+/**
  * The strip above the list: where the day starts, where it ends, and the four
  * inputs that turn that into a clock. Editable in place because the
  * alternative is a settings screen for numbers he changes more often than he
@@ -528,6 +678,9 @@ export function RoutePanel({
   onClear,
   onShowInMap,
   onAddCustomStop,
+  calls,
+  onAddCall,
+  onRemoveCall,
   days,
   activeDay,
   onSelectDay,
@@ -559,6 +712,10 @@ export function RoutePanel({
   onClear: () => void;
   onShowInMap: (id: string) => void;
   onAddCustomStop: (stop: Omit<CustomStop, "id">) => void;
+  /** This day's calls (0041): phone-only, no drive position. */
+  calls: CallEntry[];
+  onAddCall: (call: Omit<CallEntry, "id">) => void;
+  onRemoveCall: (id: string) => void;
   /** The rolling ten-weekday horizon (Mon-Fri), the one Juan's on, and the switch. */
   days: string[];
   activeDay: string;
@@ -653,6 +810,8 @@ export function RoutePanel({
     </div>
   );
 
+  const callsSection = <CallsSection calls={calls} onAdd={onAddCall} onRemove={onRemoveCall} />;
+
   const dayBar = (
     <DayBar
       prefs={prefs}
@@ -677,6 +836,7 @@ export function RoutePanel({
       <>
         {header}
         <DayTabs days={days} active={activeDay} onSelect={onSelectDay} />
+        {callsSection}
         {dayBar}
         <div className="rounded-lg border border-dashed border-[#E2DFD5] bg-white p-5 text-[13.5px] leading-relaxed text-[#5B6560]">
           Nothing planned for {dayLabel(activeDay).weekday} yet. Tap a pin on the map and choose{" "}
@@ -696,6 +856,8 @@ export function RoutePanel({
       {header}
 
       <DayTabs days={days} active={activeDay} onSelect={onSelectDay} />
+
+      {callsSection}
 
       {dayBar}
 

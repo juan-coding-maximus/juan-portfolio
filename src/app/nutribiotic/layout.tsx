@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getRouteDraftByDay, isConfigured, workspaceMode } from "./lib/dal";
+import { getRouteCallsByDay, getRouteDraftByDay, isConfigured, workspaceMode } from "./lib/dal";
 import { LAUNCHERS } from "./lib/launchers";
 import { ModalProvider } from "./lib/modal";
 import { MobileNav } from "./lib/MobileNav";
@@ -126,7 +126,9 @@ export default async function NutribioticLayout({
   const mode = await workspaceMode();
   const synthetic = mode === "synthetic";
 
-  const routeDraft = isConfigured() ? await getRouteDraftByDay() : {};
+  const [routeDraft, routeCalls] = isConfigured()
+    ? await Promise.all([getRouteDraftByDay(), getRouteCallsByDay()])
+    : [{}, {}];
   const nav = NAV;
 
   /* Review left the nav for good, 2026-08-02: the page stays reachable at
@@ -135,7 +137,7 @@ export default async function NutribioticLayout({
 
   return (
     <div className="min-h-screen bg-[#F7F6F1] text-[#14201B]">
-      <RouteProvider initial={routeDraft}>
+      <RouteProvider initial={routeDraft} initialCalls={routeCalls}>
       <ModalProvider>
       <RefreshOnForeground />
       <div className="min-h-screen bg-[#F7F6F1]">

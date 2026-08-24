@@ -1705,6 +1705,66 @@ export async function setRouteEndByDay(byDay: RouteEndpointsByDay): Promise<void
   });
 }
 
+/**
+ * A call on the route (migration 0041), day-partitioned like route_draft but
+ * a wholly separate list: a call has no drive position, so it never enters
+ * route_draft, the drive-leg matrix, or Optimize route's reorder maths. See
+ * the migration header for why this is its own column.
+ */
+export type CallEntry = {
+  /** Always prefixed "call:", same convention as a CustomStop's "custom:". */
+  id: string;
+  /** Who/where, e.g. "Alex Conrad, Vasari Plaster". */
+  label: string;
+  phone: string;
+  /** Optional context: last touchpoint, what's open, why this call. */
+  note?: string;
+  /** Optional link back to the nb_accounts row this call is about, so the
+   *  app can offer a HubSpot link alongside it. Absent for a call to a
+   *  number with no account behind it. */
+  accountId?: string;
+};
+
+export type RouteCallsByDay = Record<string, CallEntry[]>;
+
+/* Anything that is not exactly a call entry is dropped, not repaired, same
+   discipline asDraftEntry uses: this column is jsonb written by a browser. */
+function asCallEntry(x: unknown): CallEntry | null {
+  if (!x || typeof x !== "object") return null;
+  const o = x as Record<string, unknown>;
+  if (typeof o.id !== "string" || !o.id.startsWith("call:")) return null;
+  if (typeof o.label !== "string" || !o.label.trim()) return null;
+  if (typeof o.phone !== "string" || !o.phone.trim()) return null;
+  const note = typeof o.note === "string" && o.note.trim() ? o.note : undefined;
+  const accountId = typeof o.accountId === "string" && o.accountId.trim() ? o.accountId : undefined;
+  return {
+    id: o.id,
+    label: o.label,
+    phone: o.phone,
+    ...(note ? { note } : {}),
+    ...(accountId ? { accountId } : {}),
+  };
+}
+
+export async function getRouteCallsByDay(): Promise<RouteCallsByDay> {
+  const rows = await raw<{ route_calls: unknown }>("nb_ui_prefs?select=route_calls&id=eq.1");
+  const stored = rows[0]?.route_calls;
+  if (!stored || typeof stored !== "object") return {};
+  const out: RouteCallsByDay = {};
+  for (const [day, entries] of Object.entries(stored as Record<string, unknown>)) {
+    if (!ISO_DATE_RE.test(day) || !Array.isArray(entries)) continue;
+    const calls = entries.map(asCallEntry).filter((c): c is CallEntry => c !== null);
+    if (calls.length > 0) out[day] = calls;
+  }
+  return out;
+}
+
+export async function setRouteCalls(byDay: RouteCallsByDay): Promise<void> {
+  await mutate("nb_ui_prefs", "PATCH", { route_calls: byDay, updated_at: new Date().toISOString() }, {
+    id: "eq.1",
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Route plans (phase 5 · nb_route_plans / nb_route_days / nb_route_stops)
 //

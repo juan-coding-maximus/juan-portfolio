@@ -33,6 +33,7 @@
 import {
   defaultActiveDay,
   planningHorizonDates,
+  getRouteCallsByDay,
   getRouteDraftByDay,
   listOwnerAccounts,
   type CustomStop,
@@ -96,13 +97,28 @@ export async function GET(request: Request) {
     return Response.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 
-  const [byDay, accounts] = await Promise.all([getRouteDraftByDay(), listOwnerAccounts()]);
+  const [byDay, callsByDay, accounts] = await Promise.all([
+    getRouteDraftByDay(),
+    getRouteCallsByDay(),
+    listOwnerAccounts(),
+  ]);
   const byId = new Map(accounts.data.map((a) => [a.id, a]));
 
   const days = planningHorizonDates();
   const requested = new URL(request.url).searchParams.get("day");
   const day = requested && days.includes(requested) ? requested : defaultActiveDay(byDay, days);
   const draft = byDay[day] ?? [];
+  /* Calls (0041) are a separate, day-partitioned column, never mixed into
+     route_draft: same mirror-not-second-source rule as the stops above, just
+     over the other column. */
+  const calls = (callsByDay[day] ?? []).map((c) => ({
+    id: c.id,
+    name: c.label,
+    phone: c.phone,
+    note: c.note ?? null,
+    call_url: `tel:${c.phone.replace(/[^\d+]/g, "")}`,
+    account_url: c.accountId ? `${SITE}/nutribiotic/account/${c.accountId}` : null,
+  }));
 
   const stops: Stop[] = [];
   for (const e of draft) {
@@ -178,6 +194,7 @@ export async function GET(request: Request) {
       days,
       count: stops.length,
       stops,
+      calls,
       total_straight_line_miles: stops.length > 1 ? Number(total.toFixed(1)) : null,
       maps_all_url:
         stops.length > 1

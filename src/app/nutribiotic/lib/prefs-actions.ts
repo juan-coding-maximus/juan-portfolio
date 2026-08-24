@@ -3,12 +3,14 @@
 import { revalidatePath } from "next/cache";
 import {
   sanitizeRouteEndpoint,
+  setRouteCalls,
   setRouteDraft,
   setRouteEndByDay,
   setRouteSchedulePrefs,
   setRouteStartByDay,
   setShowChainAccounts,
   setShowPracticeAccounts,
+  type RouteCallsByDay,
   type RouteDraftByDay,
   type RouteEndpointsByDay,
   type RouteSchedulePrefs,
@@ -42,6 +44,16 @@ export async function toggleShowPracticeAccounts(show: boolean): Promise<void> {
  */
 export async function saveRouteDraft(byDay: RouteDraftByDay): Promise<void> {
   await setRouteDraft(byDay);
+}
+
+/**
+ * The route's call list (migration 0041), day-partitioned and independent of
+ * route_draft, same optimistic contract as saveRouteDraft: the click already
+ * moved the list on screen, this just makes it durable. No revalidatePath,
+ * same reason as saveRouteDraft.
+ */
+export async function saveRouteCalls(byDay: RouteCallsByDay): Promise<void> {
+  await setRouteCalls(byDay);
 }
 
 /**

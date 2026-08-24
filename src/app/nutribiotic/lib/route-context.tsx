@@ -30,9 +30,9 @@
  */
 
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
-import type { CustomStop, RouteDraftByDay, RouteDraftEntry } from "./dal";
+import type { CallEntry, CustomStop, RouteCallsByDay, RouteDraftByDay, RouteDraftEntry } from "./dal";
 import { defaultActiveDay, planningHorizonDates } from "./field-week";
-import { saveRouteDraft } from "./prefs-actions";
+import { saveRouteCalls, saveRouteDraft } from "./prefs-actions";
 
 type RouteCtx = {
   routeDraft: RouteDraftEntry[];
@@ -48,6 +48,11 @@ type RouteCtx = {
   reorderRoute: (idsInOrder: string[]) => void;
   postponeToNextDay: (id: string) => void;
   clearRoute: () => void;
+  /** The active day's calls (0041): phone-only, no drive position, never
+   *  reordered, never part of route_draft. See dal.ts's CallEntry. */
+  calls: CallEntry[];
+  addCall: (call: Omit<CallEntry, "id">) => void;
+  removeCall: (id: string) => void;
 };
 
 const Ctx = createContext<RouteCtx | null>(null);
@@ -58,16 +63,20 @@ function entryId(e: RouteDraftEntry): string {
 
 export function RouteProvider({
   initial,
+  initialCalls,
   children,
 }: {
   initial: RouteDraftByDay;
+  initialCalls?: RouteCallsByDay;
   children: ReactNode;
 }) {
   const days = useMemo(() => planningHorizonDates(), []);
   const [draftByDay, setDraftByDay] = useState<RouteDraftByDay>(initial);
   const [activeDay, setActiveDay] = useState<string>(() => defaultActiveDay(initial, days));
+  const [callsByDay, setCallsByDay] = useState<RouteCallsByDay>(initialCalls ?? {});
 
   const routeDraft = useMemo(() => draftByDay[activeDay] ?? [], [draftByDay, activeDay]);
+  const calls = useMemo(() => callsByDay[activeDay] ?? [], [callsByDay, activeDay]);
 
   // Optimistic, same as every other prefs write on this OS: the list moves
   // now and the row catches up, reverted if the write fails. Always the whole
@@ -165,6 +174,26 @@ export function RouteProvider({
     commitDay(activeDay, []);
   }
 
+  // Same optimistic-write shape as commitDay, over the calls column instead
+  // of route_draft (0041). A separate function rather than a generic
+  // "commit either column" helper, because the two lists have nothing in
+  // common once you are past "day-partitioned jsonb on nb_ui_prefs".
+  function commitCalls(day: string, next: CallEntry[]) {
+    const prev = callsByDay;
+    const nextByDay = { ...callsByDay, [day]: next };
+    setCallsByDay(nextByDay);
+    saveRouteCalls(nextByDay).catch(() => setCallsByDay(prev));
+  }
+
+  function addCall(call: Omit<CallEntry, "id">) {
+    const id = `call:${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+    commitCalls(activeDay, [...calls, { ...call, id }]);
+  }
+
+  function removeCall(id: string) {
+    commitCalls(activeDay, calls.filter((c) => c.id !== id));
+  }
+
   return (
     <Ctx.Provider
       value={{
@@ -181,6 +210,9 @@ export function RouteProvider({
         reorderRoute,
         postponeToNextDay,
         clearRoute,
+        calls,
+        addCall,
+        removeCall,
       }}
     >
       {children}
