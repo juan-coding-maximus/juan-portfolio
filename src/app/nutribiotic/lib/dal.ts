@@ -2202,8 +2202,9 @@ export async function logHubspotCall(row: HubspotLogRow): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Playbook > Reports. The latest daily and weekly field-report PDFs, one
-// click away from the shelf, plus an archive of every prior one.
+// Reports (its own tab under More since 2026-08-23, split out of Playbook).
+// The latest daily and weekly field-report PDFs, one click away, plus an
+// archive of every prior one.
 // bridges/nutribiotic/field_report.py and weekly_report.py upload each run's
 // PDF to this bucket under a date-stamped name and never delete an older one
 // (see sb.storage_publish_archived; Juan's ask 2026-08-23, this used to

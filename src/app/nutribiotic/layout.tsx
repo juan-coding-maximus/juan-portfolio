@@ -94,6 +94,11 @@ const MORE_NAV: typeof NAV = [
   /* Playbook is the shelf those goals produce: the strategy docs rendered from
      the repo's own markdown, so the site and the files can never disagree. */
   { href: "/nutribiotic/playbook", label: "Playbook", icon: "book" },
+  /* Reports split out of Playbook, 2026-08-23 (Juan's ask): a generated PDF
+     refreshed by a script is a different thing from a hand-maintained
+     strategy doc, and it was getting lost as one section on a reference
+     page instead of its own stop. */
+  { href: "/nutribiotic/reports", label: "Reports", icon: "review" },
   /* The offer-code trio, added 2026-08-10 at Juan's direction (three tabs, all
      in the directory). Phone issues a handwritten code in a parking lot and
      holds the requests waiting on a relay; Offers is the template builder those
