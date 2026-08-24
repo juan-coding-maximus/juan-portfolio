@@ -9,7 +9,7 @@
 
 import Link from "next/link";
 import { PageHead, Card, Ico } from "../lib/ui";
-import { listPlaybookReports } from "../lib/dal";
+import { listPlaybookReports, listPlaybookReportArchive } from "../lib/dal";
 import { DOCS, GROUPS } from "./manifest";
 
 export const metadata = { title: "Playbook · NutriBiotic OS" };
@@ -20,7 +20,7 @@ const REPORT_TITLE: Record<"daily" | "weekly", string> = {
 };
 
 export default async function PlaybookIndex() {
-  const reports = await listPlaybookReports();
+  const [reports, archive] = await Promise.all([listPlaybookReports(), listPlaybookReportArchive()]);
 
   return (
     <>
@@ -67,6 +67,40 @@ export default async function PlaybookIndex() {
             );
           })}
         </div>
+        {archive.reports.length > 0 && (
+          <details className="mt-3">
+            <summary className="cursor-pointer text-[11.5px] text-[#8A928C]">
+              Archive ({archive.reports.length} earlier report{archive.reports.length === 1 ? "" : "s"})
+            </summary>
+            <div className="mt-2 grid gap-3.5 md:grid-cols-2">
+              {(["daily", "weekly"] as const).map((kind) => {
+                const items = archive.reports.filter((r) => r.kind === kind);
+                const hidden = archive.truncated[kind];
+                if (!items.length && !hidden) return null;
+                return (
+                  <div key={kind}>
+                    <ul className="space-y-1">
+                      {items.map((r) => (
+                        <li key={r.url} className="flex items-baseline justify-between gap-3 text-[13px]">
+                          <span className="text-[#5B6560]">{r.label}</span>
+                          <a
+                            href={r.url}
+                            className="shrink-0 font-medium text-[#2C6A46] underline decoration-[#2C6A46]/40 underline-offset-2 hover:decoration-[#2C6A46]"
+                          >
+                            Open PDF
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                    {hidden ? (
+                      <p className="mt-1 text-[12px] text-[#8A928C]">+{hidden} more not shown</p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </details>
+        )}
       </section>
 
       {GROUPS.map((group) => (
@@ -99,7 +133,9 @@ export default async function PlaybookIndex() {
         files as-is; the Desktop bundle&apos;s 09-playbook folder is a derived copy rebuilt by the
         dossier export. The goal ladder moved to its own Goals tab; GOALS.md is still there if a
         link points to it. Reports above are read straight from Supabase storage, published by the
-        field-report scripts, never edited by hand. Edit a file, and every copy follows.
+        field-report scripts, never edited by hand. Every run archives rather than replaces, the
+        cards show the latest of each kind, the Archive disclosure holds the rest. Edit a file, and
+        every copy follows.
       </p>
     </>
   );

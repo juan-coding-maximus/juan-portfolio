@@ -2119,13 +2119,16 @@ export async function logHubspotCall(row: HubspotLogRow): Promise<void> {
 
 // ---------------------------------------------------------------------------
 // Playbook > Reports. The latest daily and weekly field-report PDFs, one
-// click away from the shelf. bridges/nutribiotic/field_report.py and
-// weekly_report.py upload the PDF to this bucket and delete any older file
-// of the same kind on every run (see sb.storage_publish_latest), so the
-// bucket itself is the version-pruning: at most one daily-*.pdf and one
-// weekly-*.pdf exist at a time, and this just reads whichever is there.
-// Private bucket, signed URL per render, same posture as the session gate on
-// the rest of the OS rather than a public link that outlives this page view.
+// click away from the shelf, plus an archive of every prior one.
+// bridges/nutribiotic/field_report.py and weekly_report.py upload each run's
+// PDF to this bucket under a date-stamped name and never delete an older one
+// (see sb.storage_publish_archived; Juan's ask 2026-08-23, this used to
+// prune to one file per kind). The bucket is flat and its filenames sort
+// correctly as dates (daily-2026-08-20.pdf, weekly-2026-08-17_to_2026-08-20.pdf),
+// so "latest" is just the top of a name-descending sort, no date parsing
+// needed. Private bucket, signed URL per render, same posture as the
+// session gate on the rest of the OS rather than a public link that
+// outlives this page view.
 // ---------------------------------------------------------------------------
 
 const REPORTS_BUCKET = "nb-reports";
@@ -2151,34 +2154,35 @@ function reportLabel(kind: "daily" | "weekly", name: string): string {
   return `${fmt(start)} – ${fmt(end)}`;
 }
 
-/** Latest report of each kind found in the bucket. Never throws: an unreachable
- *  or empty bucket just means the Reports section shows nothing rather than
- *  the whole Playbook page failing to render. */
-export async function listPlaybookReports(): Promise<PlaybookReport[]> {
-  await verifySession();
-  if (!isConfigured()) return [];
+/** Every object in the reports bucket, newest-first within each kind. Name-
+ *  descending sort is enough, the date-stamped filenames already sort as
+ *  dates (ISO year-month-day). Not exported: both functions below build on
+ *  this one list call rather than each hitting Storage separately. */
+async function listReportObjectsByKind(): Promise<Record<"daily" | "weekly", string[]>> {
+  const listRes = await fetch(`${SB_URL}/storage/v1/object/list/${REPORTS_BUCKET}`, {
+    method: "POST",
+    headers: {
+      apikey: SB_KEY,
+      Authorization: `Bearer ${SB_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ prefix: "", limit: 100, sortBy: { column: "name", order: "desc" } }),
+    cache: "no-store",
+  });
+  if (!listRes.ok) return { daily: [], weekly: [] };
+  const objects = (await listRes.json()) as Array<{ name: string }>;
+  return {
+    daily: objects.filter((o) => o.name.startsWith("daily-")).map((o) => o.name),
+    weekly: objects.filter((o) => o.name.startsWith("weekly-")).map((o) => o.name),
+  };
+}
 
-  try {
-    const listRes = await fetch(`${SB_URL}/storage/v1/object/list/${REPORTS_BUCKET}`, {
-      method: "POST",
-      headers: {
-        apikey: SB_KEY,
-        Authorization: `Bearer ${SB_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ prefix: "", limit: 100, sortBy: { column: "name", order: "asc" } }),
-      cache: "no-store",
-    });
-    if (!listRes.ok) return [];
-    const objects = (await listRes.json()) as Array<{ name: string }>;
-
-    const reports: PlaybookReport[] = [];
-    for (const kind of ["daily", "weekly"] as const) {
-      const obj = objects.find((o) => o.name.startsWith(`${kind}-`));
-      if (!obj) continue;
-
+async function signReportNames(names: string[]): Promise<PlaybookReport[]> {
+  const signed = await Promise.all(
+    names.map(async (name) => {
+      const kind = name.startsWith("daily-") ? ("daily" as const) : ("weekly" as const);
       const signRes = await fetch(
-        `${SB_URL}/storage/v1/object/sign/${REPORTS_BUCKET}/${encodeURIComponent(obj.name)}`,
+        `${SB_URL}/storage/v1/object/sign/${REPORTS_BUCKET}/${encodeURIComponent(name)}`,
         {
           method: "POST",
           headers: {
@@ -2190,14 +2194,58 @@ export async function listPlaybookReports(): Promise<PlaybookReport[]> {
           cache: "no-store",
         },
       );
-      if (!signRes.ok) continue;
+      if (!signRes.ok) return null;
       const { signedURL } = (await signRes.json()) as { signedURL: string };
+      return { kind, label: reportLabel(kind, name), url: `${SB_URL}/storage/v1${signedURL}` };
+    }),
+  );
+  return signed.filter((r): r is PlaybookReport => r !== null);
+}
 
-      reports.push({ kind, label: reportLabel(kind, obj.name), url: `${SB_URL}/storage/v1${signedURL}` });
-    }
-    return reports;
+/** Latest report of each kind. Never throws: an unreachable or empty bucket
+ *  just means the Reports section shows nothing rather than the whole
+ *  Playbook page failing to render. */
+export async function listPlaybookReports(): Promise<PlaybookReport[]> {
+  await verifySession();
+  if (!isConfigured()) return [];
+  try {
+    const byKind = await listReportObjectsByKind();
+    const latestNames = (["daily", "weekly"] as const)
+      .map((kind) => byKind[kind][0])
+      .filter((n): n is string => Boolean(n));
+    return await signReportNames(latestNames);
   } catch {
     return [];
+  }
+}
+
+/** Every report older than the latest of its kind, newest-first, capped so a
+ *  year of dailies doesn't turn one page load into dozens of sequential
+ *  signs. The cap is stated in the return so the page can say what it's not
+ *  showing rather than truncating silently. */
+const ARCHIVE_CAP_PER_KIND = 20;
+
+export type PlaybookReportArchive = {
+  reports: PlaybookReport[];
+  truncated: Partial<Record<"daily" | "weekly", number>>; // count hidden past the cap, per kind
+};
+
+export async function listPlaybookReportArchive(): Promise<PlaybookReportArchive> {
+  await verifySession();
+  if (!isConfigured()) return { reports: [], truncated: {} };
+  try {
+    const byKind = await listReportObjectsByKind();
+    const truncated: PlaybookReportArchive["truncated"] = {};
+    const names: string[] = [];
+    for (const kind of ["daily", "weekly"] as const) {
+      const older = byKind[kind].slice(1); // drop the latest, that's the card above
+      names.push(...older.slice(0, ARCHIVE_CAP_PER_KIND));
+      if (older.length > ARCHIVE_CAP_PER_KIND) truncated[kind] = older.length - ARCHIVE_CAP_PER_KIND;
+    }
+    const reports = await signReportNames(names);
+    return { reports, truncated };
+  } catch {
+    return { reports: [], truncated: {} };
   }
 }
 
@@ -2208,8 +2256,8 @@ export async function listPlaybookReports(): Promise<PlaybookReport[]> {
  * each object, 300s expiry), the one difference being this bucket keeps
  * TWO real folders (marketing/, field/) rather than a flat, one-per-kind
  * shelf, so the Storage list API's own delimiter semantics are used
- * directly instead of the client-side prefix filter storage_publish_latest
- * needs for a flat bucket. Source of truth is Juan's own Desktop, synced in
+ * directly instead of the client-side prefix filter this file's report
+ * functions use for a flat bucket. Source of truth is Juan's own Desktop, synced in
  * by bridges/nutribiotic/sync_marketing_files.py; this DAL function only
  * ever reads what that script has already uploaded.
  * ---------------------------------------------------------------------- */
