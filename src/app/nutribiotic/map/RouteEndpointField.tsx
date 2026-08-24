@@ -24,6 +24,17 @@
  * way, invisible or a sliver under the input instead of floating over the
  * stop list. Rendering it into a portal, positioned from the trigger's own
  * bounding rect, escapes that ancestor's clip.
+ *
+ * `fallback` (2026-08-23, the day-chain): what this field shows and resolves
+ * to when there is no explicit override -- ordinarily `home`, but the START
+ * field on a day after the first can instead be the previous day's resolved
+ * end (see MapScreen's startFallback), so a route left unset just continues
+ * from wherever yesterday's route actually stopped. `home` itself stays a
+ * SEPARATE prop rather than folding into fallback, because it has a second
+ * job independent of what the default is: it is always the thing the
+ * synthesized quick-pick row and "home"/"apartment" typed matching resolve
+ * to, so literal home is always one click away even on a day whose default
+ * has become a hotel two states away.
  */
 
 import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
@@ -47,12 +58,18 @@ function matchesHome(home: RouteEndpoint, q: string): boolean {
 export function RouteEndpointField({
   value,
   home,
+  fallback = home,
   onChange,
 }: {
-  /** The override Juan picked, if any. Null means "use `home`". */
+  /** The override Juan picked, if any. Null means "use `fallback`". */
   value: RouteEndpoint | null;
-  /** The waypoint account, or null if none is on the map. */
+  /** The waypoint account, or null if none is on the map. Always the target
+      of the synthesized quick-pick row, regardless of `fallback`. */
   home: RouteEndpoint | null;
+  /** What an unset value resolves to. Defaults to `home`, which reproduces
+      the pre-chain behaviour exactly (used as-is by the END field). The
+      START field passes the chained default instead. */
+  fallback?: RouteEndpoint | null;
   onChange: (ep: RouteEndpoint | null) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -64,8 +81,15 @@ export function RouteEndpointField({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
-  const current = value ?? home;
+  const current = value ?? fallback;
   const label = current?.label ?? "start/end";
+  // Whether picking "Home" from the dropdown has to write home explicitly.
+  // When fallback IS home (the common case, and always true for the END
+  // field), clearing to null already means home, so it stays the cheaper
+  // write with nothing stored. Only a fallback that has actually diverged
+  // (the chain landed on a hotel) needs the explicit override to escape it.
+  const fallbackIsHome =
+    !fallback || (home !== null && fallback.lat === home.lat && fallback.lng === home.lng);
 
   useEffect(() => {
     if (!open) return;
@@ -168,7 +192,11 @@ export function RouteEndpointField({
             {homeMatches && (
               <button
                 type="button"
-                onClick={() => pick(null)}
+                // fallbackIsHome: clearing already means home, cheapest write.
+                // Otherwise the chain default is something else, so picking
+                // Home here has to freeze it explicitly or the field would
+                // silently snap back to the hotel on the next render.
+                onClick={() => pick(fallbackIsHome ? null : home)}
                 className="flex w-full flex-col items-start px-3 py-1.5 text-left hover:bg-[#FAF9F5]"
               >
                 <span className="flex items-center gap-1.5 text-[13px] font-medium text-[#14201B]">

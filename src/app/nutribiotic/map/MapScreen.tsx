@@ -11,12 +11,27 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CustomStop, MapAccount, RouteEndpoint, RouteSchedulePrefs, TerritoryArea } from "../lib/dal";
+import type {
+  CustomStop,
+  MapAccount,
+  RouteEndpoint,
+  RouteEndpointsByDay,
+  RouteSchedulePrefs,
+  TerritoryArea,
+} from "../lib/dal";
 import { fullAddress } from "../lib/ui";
-import { saveRouteSchedulePrefs, toggleShowChainAccounts, toggleShowPracticeAccounts } from "../lib/prefs-actions";
+import {
+  saveRouteEndByDay,
+  saveRouteSchedulePrefs,
+  saveRouteStartByDay,
+  toggleShowChainAccounts,
+  toggleShowPracticeAccounts,
+} from "../lib/prefs-actions";
 import { useRoute } from "../lib/route-context";
 import { AccountsMap } from "./AccountsMap";
+import { routeDriveMatrix } from "./drive-actions";
 import { NearestClients } from "./NearestClients";
+import { cheapestGap, haversineMatrix, optimizedStopOrder, type Matrix } from "./route-optimize";
 import { RoutePanel } from "./RoutePanel";
 
 export type UserLoc = { lat: number; lng: number };
@@ -39,12 +54,14 @@ export function MapScreen({
   initialShowChains,
   initialShowPractices,
   schedulePrefs,
+  endpointsByDay,
 }: {
   accounts: MapAccount[];
   areas: TerritoryArea[];
   initialShowChains: boolean;
   initialShowPractices: boolean;
   schedulePrefs: RouteSchedulePrefs;
+  endpointsByDay: { start: RouteEndpointsByDay; end: RouteEndpointsByDay };
 }) {
   const [loc, setLoc] = useState<UserLoc | null>(null);
   const [locStatus, setLocStatus] = useState<LocStatus>("pending");
@@ -78,11 +95,16 @@ export function MapScreen({
   const {
     routeDraft,
     inRoute,
+    days,
+    activeDay,
+    setActiveDay,
     addToRoute,
     addCustomStop,
     removeFromRoute,
     moveInRoute,
     moveToTop,
+    reorderRoute,
+    postponeToNextDay,
     clearRoute,
   } = useRoute();
 
@@ -120,12 +142,14 @@ export function MapScreen({
     return { label: "Home", address: fullAddress(w) ?? w.name, lat: w.lat, lng: w.lng };
   }, [accounts]);
 
-  /* THE SCHEDULE PREFS, including the start/end overrides (0040), lifted here
-     rather than left inside RoutePanel: AccountsMap's route-chain toggle needs
-     the SAME live start/end RoutePanel is showing, including an edit Juan just
-     made and hasn't reloaded to see, so both have to read one piece of state
-     rather than the map re-deriving its own copy. Optimistic, like every other
-     write on this screen. */
+  /* THE SCHEDULE PREFS (depart/dwell/lunch/return-by, migration 0037), lifted
+     here rather than left inside RoutePanel: AccountsMap's route-chain toggle
+     needs the SAME live prefs RoutePanel is showing, including an edit Juan
+     just made and hasn't reloaded to see, so both have to read one piece of
+     state rather than the map re-deriving its own copy. Optimistic, like
+     every other write on this screen. Global across the field week (unlike
+     start/end below) -- when he leaves and how long a door takes doesn't vary
+     by day the way where he sleeps does. */
   const [prefs, setPrefsState] = useState<RouteSchedulePrefs>(schedulePrefs);
   function editPrefs(next: RouteSchedulePrefs) {
     const prev = prefs;
@@ -133,11 +157,133 @@ export function MapScreen({
     saveRouteSchedulePrefs(next).catch(() => setPrefsState(prev));
   }
 
+  /* START/END OVERRIDES (0040), DAY-PARTITIONED alongside route_draft
+     (2026-08-23): each field day keeps its own start and end rather than one
+     pair shared by the whole week, which is what makes a real multi-day run
+     (drive out Monday, sleep at the cluster, drive home Wednesday) expressible
+     at all -- a single shared override could never have Monday end at a hotel
+     while Thursday ends at home. */
+  const [startByDay, setStartByDay] = useState<RouteEndpointsByDay>(endpointsByDay.start);
+  const [endByDay, setEndByDay] = useState<RouteEndpointsByDay>(endpointsByDay.end);
+
+  const activeStart = startByDay[activeDay] ?? null;
+  const activeEnd = endByDay[activeDay] ?? null;
+
+  /* THE CHAIN: a day with no start override of its own does not fall straight
+     to home, it falls to the PREVIOUS field-day tab's resolved end (that
+     day's own override, else home). This is the whole point of splitting
+     start/end by day -- Tuesday leaving from wherever Monday's route actually
+     finished, with nothing re-typed, unless Tuesday says otherwise. The first
+     tab has no previous day, so it is unaffected and still defaults to home. */
+  const dayIndex = days.indexOf(activeDay);
+  const prevDay = dayIndex > 0 ? days[dayIndex - 1] : null;
+  const startFallback = prevDay ? (endByDay[prevDay] ?? home) : home;
+
+  function editStart(ep: RouteEndpoint | null) {
+    const prev = startByDay;
+    const next = { ...startByDay };
+    if (ep) next[activeDay] = ep;
+    else delete next[activeDay];
+    setStartByDay(next);
+    saveRouteStartByDay(next).catch(() => setStartByDay(prev));
+  }
+
+  function editEnd(ep: RouteEndpoint | null) {
+    const prev = endByDay;
+    const next = { ...endByDay };
+    if (ep) next[activeDay] = ep;
+    else delete next[activeDay];
+    setEndByDay(next);
+    saveRouteEndByDay(next).catch(() => setEndByDay(prev));
+  }
+
   // What the day actually starts/ends at: Juan's override if he picked one
-  // (see RouteEndpointField), else the waypoint. Independent of each other --
-  // a run can leave home and end at a hotel, or the reverse.
-  const routeStart = prefs.start ?? home;
-  const routeEnd = prefs.end ?? home;
+  // (see RouteEndpointField), else the chain default for start / the waypoint
+  // for end. Independent of each other -- a run can leave home and end at a
+  // hotel, or the reverse.
+  const routeStart = activeStart ?? startFallback;
+  const routeEnd = activeEnd ?? home;
+
+  /* SMART INSERT AND OPTIMIZE (2026-08-23, route-optimize.ts). Both need a
+     distance matrix over the active day's stops, which only this screen has
+     resolved coordinates for (routeStops). The real road matrix first (OSRM's
+     /table via routeDriveMatrix), straight-line if that fails -- same honesty
+     split as every other drive number on this screen, just never left blank:
+     an add or an optimize still has to land somewhere, so the fallback is a
+     worse answer, not a stalled button. */
+  const [routeBusy, setRouteBusy] = useState(false);
+
+  async function costMatrix(points: { lat: number; lng: number }[]): Promise<Matrix> {
+    const live = await routeDriveMatrix(points).catch(() => null);
+    return live ?? haversineMatrix(points);
+  }
+
+  async function handleAddToRoute(id: string, lat: number, lng: number) {
+    if (inRoute.has(id)) return;
+    if (routeStops.length === 0) {
+      addToRoute(id);
+      return;
+    }
+    setRouteBusy(true);
+    try {
+      const points = [
+        ...(routeStart ? [routeStart] : []),
+        ...routeStops,
+        ...(routeEnd ? [routeEnd] : []),
+        { lat, lng },
+      ];
+      const matrix = await costMatrix(points);
+      const gap = cheapestGap(matrix, routeStops.length, routeStart !== null, routeEnd !== null);
+      addToRoute(id, gap);
+    } catch {
+      addToRoute(id);
+    } finally {
+      setRouteBusy(false);
+    }
+  }
+
+  async function handleAddCustomStop(stop: Omit<CustomStop, "id">) {
+    if (routeStops.length === 0) {
+      addCustomStop(stop);
+      return;
+    }
+    setRouteBusy(true);
+    try {
+      const points = [
+        ...(routeStart ? [routeStart] : []),
+        ...routeStops,
+        ...(routeEnd ? [routeEnd] : []),
+        { lat: stop.lat, lng: stop.lng },
+      ];
+      const matrix = await costMatrix(points);
+      const gap = cheapestGap(matrix, routeStops.length, routeStart !== null, routeEnd !== null);
+      addCustomStop(stop, gap);
+    } catch {
+      addCustomStop(stop);
+    } finally {
+      setRouteBusy(false);
+    }
+  }
+
+  // The graph-theory ask (Juan, 2026-08-23): the order that makes the day's
+  // total driving shortest, start and end pinned wherever they're real.
+  // Nothing below two stops to reorder, so the button that calls this stays
+  // disabled under three.
+  async function handleOptimizeRoute() {
+    if (routeStops.length < 3) return;
+    setRouteBusy(true);
+    try {
+      const points = [...(routeStart ? [routeStart] : []), ...routeStops, ...(routeEnd ? [routeEnd] : [])];
+      const matrix = await costMatrix(points);
+      const order = optimizedStopOrder(matrix, routeStops.length, routeStart !== null, routeEnd !== null);
+      reorderRoute(order.map((i) => routeStops[i].id));
+    } catch {
+      // Optimize is opt-in and all-or-nothing: a failure here leaves the
+      // order exactly as it was rather than applying half a result.
+    } finally {
+      setRouteBusy(false);
+    }
+  }
 
   // A fresh n on every click, even a repeat click on the same account, so the
   // map's focus effect (keyed on this signal) always re-fires and re-zooms
@@ -233,7 +379,7 @@ export function MapScreen({
           onToggleShowChains={toggleChains}
           showPractices={showPractices}
           onToggleShowPractices={togglePractices}
-          onAddToRoute={addToRoute}
+          onAddToRoute={handleAddToRoute}
           inRoute={inRoute}
           customStops={customStops}
           routeStops={routeStops}
@@ -250,12 +396,23 @@ export function MapScreen({
         home={home}
         prefs={prefs}
         onChangePrefs={editPrefs}
+        start={activeStart}
+        startFallback={startFallback}
+        end={activeEnd}
+        onChangeStart={editStart}
+        onChangeEnd={editEnd}
         onMove={moveInRoute}
         onMoveToTop={moveToTop}
         onRemove={removeFromRoute}
         onClear={clearRoute}
         onShowInMap={showInMap}
-        onAddCustomStop={addCustomStop}
+        onAddCustomStop={handleAddCustomStop}
+        days={days}
+        activeDay={activeDay}
+        onSelectDay={setActiveDay}
+        onPostpone={postponeToNextDay}
+        onOptimize={handleOptimizeRoute}
+        busy={routeBusy}
       />
 
       <NearestClients

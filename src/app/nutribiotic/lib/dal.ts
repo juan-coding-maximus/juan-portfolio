@@ -1485,10 +1485,6 @@ export type RouteSchedulePrefs = {
   dwellMinutes: number;
   lunchMinutes: number;
   returnBy: string | null;
-  /** Override for the route's start. Null = use the waypoint account (Home). */
-  start: RouteEndpoint | null;
-  /** Override for the route's end. Null = use the waypoint account (Home). */
-  end: RouteEndpoint | null;
 };
 
 /** Postgres hands back "09:30:00"; the inputs and the display want "09:30". */
@@ -1518,10 +1514,8 @@ export async function getRouteSchedulePrefs(): Promise<RouteSchedulePrefs> {
     route_dwell_minutes: number | null;
     route_lunch_minutes: number | null;
     route_return_by: string | null;
-    route_start: unknown;
-    route_end: unknown;
   }>(
-    "nb_ui_prefs?select=route_depart,route_dwell_minutes,route_lunch_minutes,route_return_by,route_start,route_end&id=eq.1",
+    "nb_ui_prefs?select=route_depart,route_dwell_minutes,route_lunch_minutes,route_return_by&id=eq.1",
   );
   const r = rows[0];
   return {
@@ -1529,8 +1523,6 @@ export async function getRouteSchedulePrefs(): Promise<RouteSchedulePrefs> {
     dwellMinutes: r?.route_dwell_minutes ?? 20,
     lunchMinutes: r?.route_lunch_minutes ?? 60,
     returnBy: hhmm(r?.route_return_by ?? null),
-    start: sanitizeRouteEndpoint(r?.route_start),
-    end: sanitizeRouteEndpoint(r?.route_end),
   };
 }
 
@@ -1543,8 +1535,6 @@ export async function setRouteSchedulePrefs(p: RouteSchedulePrefs): Promise<void
       route_dwell_minutes: p.dwellMinutes,
       route_lunch_minutes: p.lunchMinutes,
       route_return_by: p.returnBy,
-      route_start: p.start,
-      route_end: p.end,
       updated_at: new Date().toISOString(),
     },
     { id: "eq.1" },
@@ -1607,16 +1597,110 @@ function asDraftEntry(x: unknown): RouteDraftEntry | null {
  * the tombstone case: an account in the draft that gets closed, or falls out of
  * Juan's book, stops being a stop, and the alternative is a route with a hole
  * in it that cannot be clicked or removed.
+ *
+ * DAY-PARTITIONED since 2026-08-23 (Juan's ask: plan the whole field week, not
+ * one undated list). `route_draft` is now an object keyed by ISO date rather
+ * than a bare array, still one row, still written whole. `getRouteDraftByDay`
+ * migrates the old flat-array shape in memory, on read, onto the current field
+ * week's Wednesday: the day Juan had already mostly built stays exactly what
+ * it was, it just gets a date.
  */
-export async function getRouteDraft(): Promise<RouteDraftEntry[]> {
-  const rows = await raw<{ route_draft: unknown[] | null }>("nb_ui_prefs?select=route_draft&id=eq.1");
-  const entries = rows[0]?.route_draft;
-  if (!Array.isArray(entries)) return [];
-  return entries.map(asDraftEntry).filter((e): e is RouteDraftEntry => e !== null);
+export type RouteDraftByDay = Record<string, RouteDraftEntry[]>;
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// fieldWeekDates/defaultActiveDay live in field-week.ts, not here: that file
+// carries no "server-only" tag, so route-context.tsx (a client component) can
+// import the date math directly instead of pulling this whole server module
+// into the browser bundle. Imported (used below) and re-exported, so every
+// existing "./dal" import site (layout.tsx, api/widget/route.ts) keeps
+// working unchanged.
+import { fieldWeekDates, defaultActiveDay } from "./field-week";
+export { fieldWeekDates, defaultActiveDay };
+
+export async function getRouteDraftByDay(): Promise<RouteDraftByDay> {
+  const rows = await raw<{ route_draft: unknown }>("nb_ui_prefs?select=route_draft&id=eq.1");
+  const stored = rows[0]?.route_draft;
+
+  if (Array.isArray(stored)) {
+    const stops = stored.map(asDraftEntry).filter((e): e is RouteDraftEntry => e !== null);
+    return stops.length > 0 ? { [fieldWeekDates()[2]]: stops } : {};
+  }
+
+  if (!stored || typeof stored !== "object") return {};
+  const out: RouteDraftByDay = {};
+  for (const [day, entries] of Object.entries(stored as Record<string, unknown>)) {
+    if (!ISO_DATE_RE.test(day) || !Array.isArray(entries)) continue;
+    const stops = entries.map(asDraftEntry).filter((e): e is RouteDraftEntry => e !== null);
+    if (stops.length > 0) out[day] = stops;
+  }
+  return out;
 }
 
-export async function setRouteDraft(entries: RouteDraftEntry[]): Promise<void> {
-  await mutate("nb_ui_prefs", "PATCH", { route_draft: entries, updated_at: new Date().toISOString() }, {
+export async function setRouteDraft(byDay: RouteDraftByDay): Promise<void> {
+  await mutate("nb_ui_prefs", "PATCH", { route_draft: byDay, updated_at: new Date().toISOString() }, {
+    id: "eq.1",
+  });
+}
+
+/**
+ * Route start/end (0040), DAY-PARTITIONED alongside route_draft (2026-08-23):
+ * one entry per field day, keyed the same as RouteDraftByDay, present only for
+ * a day Juan actually overrode. Split into two columns rather than one, same
+ * as before the day-partition, because a day's start and end are independent
+ * facts (a run can leave home and end at a hotel, or the reverse) and folding
+ * them into one object per day would make "override the end only" a
+ * read-modify-write instead of a single key write.
+ *
+ * THE CHAIN. A day with no start override does not fall straight to home
+ * anymore, it falls to the PREVIOUS field day's resolved end (that day's own
+ * override, else home) -- see MapScreen's `startFallback`. This is what makes
+ * "leave the Hampton Inn Carlsbad" on Tuesday morning automatic once Monday's
+ * end was set to it, without Juan re-entering the same hotel twice. Nothing
+ * is written for the chase: Tuesday's row stays empty, so if Monday's hotel
+ * is later corrected, Tuesday's default corrects with it. A day that WANTS to
+ * break the chain (fly out from the hotel, drive straight home the next
+ * morning) still overrides its own start explicitly, same as always.
+ */
+export type RouteEndpointsByDay = Record<string, RouteEndpoint>;
+
+function asRouteEndpointsByDay(stored: unknown): RouteEndpointsByDay {
+  if (!stored || typeof stored !== "object") return {};
+  const o = stored as Record<string, unknown>;
+  // Legacy single-endpoint shape, from before the day-partition: {label,
+  // address, lat, lng} sitting at the top level of the column. Migrated onto
+  // the field week's Wednesday in memory, same landing spot
+  // getRouteDraftByDay uses for the old flat route_draft array, so a start or
+  // end Juan had already picked keeps working rather than silently vanishing.
+  if (typeof o.label === "string" && typeof o.address === "string") {
+    const ep = sanitizeRouteEndpoint(o);
+    return ep ? { [fieldWeekDates()[2]]: ep } : {};
+  }
+  const out: RouteEndpointsByDay = {};
+  for (const [day, v] of Object.entries(o)) {
+    if (!ISO_DATE_RE.test(day)) continue;
+    const ep = sanitizeRouteEndpoint(v);
+    if (ep) out[day] = ep;
+  }
+  return out;
+}
+
+export async function getRouteEndpointsByDay(): Promise<{ start: RouteEndpointsByDay; end: RouteEndpointsByDay }> {
+  const rows = await raw<{ route_start: unknown; route_end: unknown }>(
+    "nb_ui_prefs?select=route_start,route_end&id=eq.1",
+  );
+  const r = rows[0];
+  return { start: asRouteEndpointsByDay(r?.route_start), end: asRouteEndpointsByDay(r?.route_end) };
+}
+
+export async function setRouteStartByDay(byDay: RouteEndpointsByDay): Promise<void> {
+  await mutate("nb_ui_prefs", "PATCH", { route_start: byDay, updated_at: new Date().toISOString() }, {
+    id: "eq.1",
+  });
+}
+
+export async function setRouteEndByDay(byDay: RouteEndpointsByDay): Promise<void> {
+  await mutate("nb_ui_prefs", "PATCH", { route_end: byDay, updated_at: new Date().toISOString() }, {
     id: "eq.1",
   });
 }
@@ -2256,8 +2340,8 @@ export async function listPlaybookReportArchive(): Promise<PlaybookReportArchive
  * each object, 300s expiry), the one difference being this bucket keeps
  * TWO real folders (marketing/, field/) rather than a flat, one-per-kind
  * shelf, so the Storage list API's own delimiter semantics are used
- * directly instead of the client-side prefix filter this file's report
- * functions use for a flat bucket. Source of truth is Juan's own Desktop, synced in
+ * directly instead of the client-side prefix filter storage_publish_latest
+ * needs for a flat bucket. Source of truth is Juan's own Desktop, synced in
  * by bridges/nutribiotic/sync_marketing_files.py; this DAL function only
  * ever reads what that script has already uploaded.
  * ---------------------------------------------------------------------- */

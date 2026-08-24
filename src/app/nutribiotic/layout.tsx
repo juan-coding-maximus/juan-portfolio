@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getRouteDraft, isConfigured, workspaceMode } from "./lib/dal";
+import { getRouteDraftByDay, isConfigured, workspaceMode } from "./lib/dal";
 import { LAUNCHERS } from "./lib/launchers";
 import { ModalProvider } from "./lib/modal";
 import { MobileNav } from "./lib/MobileNav";
@@ -121,7 +121,7 @@ export default async function NutribioticLayout({
   const mode = await workspaceMode();
   const synthetic = mode === "synthetic";
 
-  const routeDraft = isConfigured() ? await getRouteDraft() : [];
+  const routeDraft = isConfigured() ? await getRouteDraftByDay() : {};
   const nav = NAV;
 
   /* Review left the nav for good, 2026-08-02: the page stays reachable at

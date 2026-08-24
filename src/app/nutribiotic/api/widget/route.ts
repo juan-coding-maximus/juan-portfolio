@@ -13,6 +13,12 @@
  * book drops out of the widget the same turn it drops off the map. Nothing here
  * recomputes, reorders, or optimizes anything.
  *
+ * ONE DAY, DAY-PARTITIONED since 2026-08-23: ?day=YYYY-MM-DD picks which of
+ * the four field-day tabs to render, defaulting the same way the route panel
+ * does (today if it's one of the four, else the first tab with stops in it).
+ * The response says which day it picked, so the widget never shows a route
+ * without saying whose.
+ *
  * NO DRIVE TIME, NO ETA. Same rule as the panel: there is no Directions call
  * behind this, so the one number per leg is the straight-line hop, labelled as
  * such in the payload's own field name.
@@ -24,7 +30,14 @@
  * Vercel without logging Juan out of anything. Sent as a header, never a query
  * string, so it stays out of URLs and access logs.
  */
-import { getRouteDraft, listOwnerAccounts, type CustomStop, type MapAccount } from "../../lib/dal";
+import {
+  defaultActiveDay,
+  fieldWeekDates,
+  getRouteDraftByDay,
+  listOwnerAccounts,
+  type CustomStop,
+  type MapAccount,
+} from "../../lib/dal";
 import { hasAccess } from "../../lib/devices";
 import { hasWidgetToken } from "../../lib/session";
 import { appleMapsUrl, fullAddress, HUBSPOT_COMPANY_URL } from "../../lib/ui";
@@ -78,13 +91,18 @@ type Stop = {
   account_url: string | null;
 };
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!(await hasWidgetToken()) && !(await hasAccess())) {
     return Response.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 
-  const [draft, accounts] = await Promise.all([getRouteDraft(), listOwnerAccounts()]);
+  const [byDay, accounts] = await Promise.all([getRouteDraftByDay(), listOwnerAccounts()]);
   const byId = new Map(accounts.data.map((a) => [a.id, a]));
+
+  const days = fieldWeekDates();
+  const requested = new URL(request.url).searchParams.get("day");
+  const day = requested && days.includes(requested) ? requested : defaultActiveDay(byDay, days);
+  const draft = byDay[day] ?? [];
 
   const stops: Stop[] = [];
   for (const e of draft) {
@@ -156,6 +174,8 @@ export async function GET() {
     {
       ok: true,
       generated_at: new Date().toISOString(),
+      day,
+      days,
       count: stops.length,
       stops,
       total_straight_line_miles: stops.length > 1 ? Number(total.toFixed(1)) : null,

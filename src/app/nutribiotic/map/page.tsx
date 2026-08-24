@@ -10,6 +10,7 @@
 
 import {
   getMapDisplayPrefs,
+  getRouteEndpointsByDay,
   getRouteSchedulePrefs,
   isConfigured,
   listAreas,
@@ -21,11 +22,12 @@ import { MapScreen } from "./MapScreen";
 export const dynamic = "force-dynamic";
 
 export default async function MapPage() {
-  const [accounts, areas, displayPrefs, schedulePrefs] = await Promise.all([
+  const [accounts, areas, displayPrefs, schedulePrefs, endpointsByDay] = await Promise.all([
     listOwnerAccounts(),
     listAreas(),
     getMapDisplayPrefs(),
     getRouteSchedulePrefs(),
+    getRouteEndpointsByDay(),
   ]);
 
   return (
@@ -56,6 +58,7 @@ export default async function MapPage() {
             initialShowChains={displayPrefs.showChains}
             initialShowPractices={displayPrefs.showPractices}
             schedulePrefs={schedulePrefs}
+            endpointsByDay={endpointsByDay}
           />
         </>
       )}

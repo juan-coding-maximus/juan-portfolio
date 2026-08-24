@@ -13,7 +13,14 @@
  * behind him. The two are kept in different places on purpose (see migration
  * 0029) so a planner run can never eat a list he assembled by hand.
  *
- * NO OPTIMAL ORDER: nothing here reorders Juan's list, and that is permanent.
+ * ORDER IS JUAN'S UNLESS HE ASKS OTHERWISE. Nothing here reorders his list on
+ * its own. "Optimize route" (2026-08-23) is the one exception, and it is
+ * exactly that: a button he presses, not something that runs behind him. It
+ * solves the graph problem, shortest total driving for the day's stops, via
+ * route-optimize.ts, and only ever replaces the WHOLE order in one commit --
+ * never a silent partial reorder. "Add to route" drops a new stop into the
+ * cheapest gap in the existing order rather than always last, same math,
+ * same never-partial rule.
  *
  * DRIVE TIME AND A CLOCK, added 2026-08-17 on his ask to see the day he plans
  * in chat on the map itself. The original rule that kept them off this screen
@@ -408,39 +415,126 @@ function DayBar({
   );
 }
 
+// "2026-08-25" -> { weekday: "Tue", short: "8/25" }. Parsed as parts and
+// anchored at UTC noon, same trick as fieldWeekDates() in dal.ts: parsing the
+// bare date directly would read it as UTC midnight and roll the weekday back
+// a day anywhere west of Greenwich.
+const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+function dayLabel(iso: string): { weekday: string; short: string } {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d, 12));
+  return { weekday: WEEKDAY_NAMES[dt.getUTCDay()], short: `${m}/${d}` };
+}
+
+/**
+ * The toggle at the top of Route (Juan's ask 2026-08-23): four tabs, Monday
+ * through Thursday, the field week's own rhythm. Switching tabs switches which
+ * day every control below acts on -- add, reorder, postpone, optimize, all of
+ * it. Always four tabs, even on a day with nothing planned yet, so an empty
+ * Wednesday is still one tap away rather than looking like it doesn't exist.
+ */
+function DayTabs({
+  days,
+  active,
+  onSelect,
+}: {
+  days: string[];
+  active: string;
+  onSelect: (day: string) => void;
+}) {
+  return (
+    <div role="tablist" aria-label="Route day" className="mb-2 flex flex-wrap items-center gap-1.5">
+      {days.map((day) => {
+        const { weekday, short } = dayLabel(day);
+        const isActive = day === active;
+        return (
+          <button
+            key={day}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onSelect(day)}
+            className={`rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
+              isActive
+                ? "bg-[#14201B] text-[#F7F6F1]"
+                : "border border-[#E2DFD5] bg-white text-[#5B6560] hover:bg-[#FAF9F5]"
+            }`}
+          >
+            {weekday} <span className="tabular-nums opacity-80">{short}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function RoutePanel({
   stops,
   home,
   prefs,
   onChangePrefs,
+  start: startOverride,
+  startFallback,
+  end: endOverride,
+  onChangeStart,
+  onChangeEnd,
   onMove,
   onMoveToTop,
   onRemove,
   onClear,
   onShowInMap,
   onAddCustomStop,
+  days,
+  activeDay,
+  onSelectDay,
+  onPostpone,
+  onOptimize,
+  busy,
 }: {
   stops: RouteStopView[];
-  /** Juan's apartment, the waypoint account (0029), the default start/end.
-      Null if it is not on the map, in which case a day with no override on
-      that side simply has no drive out and/or no drive back. */
+  /** Juan's apartment, the waypoint account (0029), the ultimate default for
+      both ends. Null if it is not on the map, in which case a day with no
+      override and no chained default simply has no drive out and/or back. */
   home: RouteEndpoint | null;
   prefs: RouteSchedulePrefs;
   onChangePrefs: (p: RouteSchedulePrefs) => void;
+  /** This day's own start override (0040), day-partitioned (2026-08-23). Null
+      means "use startFallback", not "use home" -- see startFallback. */
+  start: RouteEndpoint | null;
+  /** Where this day starts when it has no override of its own: the previous
+      field-day tab's resolved end, or home on the first tab. */
+  startFallback: RouteEndpoint | null;
+  /** This day's own end override. Null means "use home" -- end never chains
+      forward from a day that hasn't happened yet. */
+  end: RouteEndpoint | null;
+  onChangeStart: (ep: RouteEndpoint | null) => void;
+  onChangeEnd: (ep: RouteEndpoint | null) => void;
   onMove: (id: string, dir: -1 | 1) => void;
   onMoveToTop: (id: string) => void;
   onRemove: (id: string) => void;
   onClear: () => void;
   onShowInMap: (id: string) => void;
   onAddCustomStop: (stop: Omit<CustomStop, "id">) => void;
+  /** The four field-day tabs (Mon-Thu), the one Juan's on, and the switch. */
+  days: string[];
+  activeDay: string;
+  onSelectDay: (day: string) => void;
+  /** Push one stop to the next day's tab. Disabled on the last tab. */
+  onPostpone: (id: string) => void;
+  /** Reorder the whole day for the least total driving (route-optimize.ts). */
+  onOptimize: () => void;
+  /** True while a smart-insert or an optimize is computing. */
+  busy: boolean;
 }) {
+  const isLastDay = days.length === 0 || activeDay === days[days.length - 1];
   const [legs, setLegs] = useState<DriveLeg[] | null>(null);
   const [legState, setLegState] = useState<"loading" | "ok" | "unavailable">("loading");
 
   /* Where the day actually starts/ends (0040): Juan's override if he picked
-     one at either end, else the waypoint. Independent of each other. */
-  const start = prefs.start ?? home;
-  const end = prefs.end ?? home;
+     one at either end, else the chain default for start / the waypoint for
+     end. Independent of each other. */
+  const start = startOverride ?? startFallback;
+  const end = endOverride ?? home;
 
   /* THE ROUTER IS CALLED ON THE PATH, NOT ON EVERY PAIR: one request for
      start -> stops in order -> end. Keyed on the coordinates rather than on
@@ -519,8 +613,9 @@ export function RoutePanel({
     return (
       <>
         {header}
+        <DayTabs days={days} active={activeDay} onSelect={onSelectDay} />
         <div className="rounded-lg border border-dashed border-[#E2DFD5] bg-white p-5 text-[13.5px] leading-relaxed text-[#5B6560]">
-          No stops yet. Tap a pin on the map and choose{" "}
+          Nothing planned for {dayLabel(activeDay).weekday} yet. Tap a pin on the map and choose{" "}
           <span className="font-medium text-[#3D4A44]">Add to route</span> to start one, or add a
           lunch or hotel stop below. The list stays put until you remove a stop, so a route you
           build in the morning is still here later.
@@ -536,6 +631,8 @@ export function RoutePanel({
     <>
       {header}
 
+      <DayTabs days={days} active={activeDay} onSelect={onSelectDay} />
+
       <DayBar
         prefs={prefs}
         onChange={onChangePrefs}
@@ -546,6 +643,24 @@ export function RoutePanel({
         endLabel={endLabel}
       />
 
+      {/* OPTIMIZE ROUTE, above stop 1 (Juan's ask 2026-08-23): the graph
+          problem solved on demand, never automatically. Needs three stops to
+          have anything worth reordering -- two stops have exactly one order. */}
+      <div className="mb-2 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onOptimize}
+          disabled={busy || stops.length < 3}
+          className="inline-flex items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white px-3 py-2 text-[12.5px] font-medium text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Ico name="gauge" size={13} />
+          {busy ? "Working it out..." : "Optimize route"}
+        </button>
+        {stops.length > 0 && stops.length < 3 && (
+          <span className="text-[11.5px] text-[#8A928C]">Needs 3+ stops to reorder</span>
+        )}
+      </div>
+
       <div className="overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
         {/* The drive out. Not a stop, so it is a rule above the first one
             rather than a numbered row, but it is the reason stop 1 is not at
@@ -555,9 +670,10 @@ export function RoutePanel({
             <span className="inline-flex items-center gap-1">
               Leave{" "}
               <RouteEndpointField
-                value={prefs.start}
+                value={startOverride}
+                fallback={startFallback}
                 home={home}
-                onChange={(ep) => onChangePrefs({ ...prefs, start: ep })}
+                onChange={onChangeStart}
               />
               <span className="font-medium tabular-nums text-[#3D4A44]">{prefs.depart}</span>
             </span>
@@ -757,6 +873,21 @@ export function RoutePanel({
                   >
                     <Ico name="chevron-down" size={13} />
                   </button>
+                  {/* POSTPONE (2026-08-23): push this stop to the next day's
+                      tab. Disabled on the last tab -- there is nowhere on this
+                      screen for it to land, so it stays put rather than
+                      wrapping to a day nobody's looking at. */}
+                  <button
+                    type="button"
+                    onClick={() => onPostpone(s.id)}
+                    disabled={isLastDay}
+                    aria-label={
+                      isLastDay ? `${title} is already on the last day` : `Push ${title} to the next day`
+                    }
+                    className="rounded-md border border-[#E2DFD5] bg-white px-2 py-2 text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    <Ico name="chevrons-right" size={13} />
+                  </button>
                   <button
                     type="button"
                     onClick={() => onShowInMap(s.id)}
@@ -795,9 +926,9 @@ export function RoutePanel({
           <div className="flex items-baseline justify-between border-t border-[#EEECE3] bg-[#FAF9F5] px-4 py-2 text-[12.5px] text-[#5B6560]">
             <span className="inline-flex items-center gap-1">
               <RouteEndpointField
-                value={prefs.end}
+                value={endOverride}
                 home={home}
-                onChange={(ep) => onChangePrefs({ ...prefs, end: ep })}
+                onChange={onChangeEnd}
               />
               <span className="font-medium tabular-nums text-[#3D4A44]">{clock(schedule.finish)}</span>
             </span>
@@ -815,8 +946,8 @@ export function RoutePanel({
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <p className="max-w-[62ch] text-[12px] leading-relaxed text-[#8A928C]">
           {legState === "ok" && legs
-            ? "Road distances and times, scaled for typical daytime traffic. A planning estimate, not a live ETA. Order is yours; nothing reorders it for you."
-            : "Straight-line hops, not drive time. Order is yours; nothing reorders it for you."}
+            ? "Road distances and times, scaled for typical daytime traffic. A planning estimate, not a live ETA. Order is yours; Optimize route only runs when you tap it."
+            : "Straight-line hops, not drive time. Order is yours; Optimize route only runs when you tap it."}
         </p>
         <div className="flex items-center gap-2">
           {stops.length > 1 && (

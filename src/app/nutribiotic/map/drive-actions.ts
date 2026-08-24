@@ -82,3 +82,47 @@ export async function routeDriveLegs(
   }
   return out;
 }
+
+/**
+ * Every point to every other point, in one call: OSRM's /table service, not
+ * N calls to /route. This is what "where does a new stop fit" and "what's the
+ * shortest order" both need (route-optimize.ts) and neither is answerable from
+ * routeDriveLegs, which only ever returns a path's consecutive legs.
+ *
+ * Road-network meters, the same honesty rule as routeDriveLegs: free-flow, no
+ * traffic factor applied (a factor scales every cell the same way and cannot
+ * change which order is shortest, so there is nothing to correct here that
+ * would change the answer). A null return means the caller falls back to
+ * straight-line distance, same as everywhere else drive time can go quiet.
+ */
+export async function routeDriveMatrix(
+  points: { lat: number; lng: number }[],
+): Promise<number[][] | null> {
+  if (points.length < 2 || points.length > MAX_STOPS) return null;
+  if (points.some((p) => !Number.isFinite(p.lat) || !Number.isFinite(p.lng))) return null;
+
+  const path = points.map((p) => `${p.lng},${p.lat}`).join(";");
+  const url = `https://router.project-osrm.org/table/v1/driving/${path}?annotations=distance`;
+
+  let res: Response;
+  try {
+    res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(15_000) });
+  } catch {
+    return null;
+  }
+  if (!res.ok) return null;
+
+  let data: { code?: string; distances?: (number | null)[][] };
+  try {
+    data = await res.json();
+  } catch {
+    return null;
+  }
+  if (data.code !== "Ok" || !Array.isArray(data.distances)) return null;
+  if (data.distances.length !== points.length) return null;
+  for (const row of data.distances) {
+    if (!Array.isArray(row) || row.length !== points.length) return null;
+    if (row.some((v) => typeof v !== "number" || !Number.isFinite(v))) return null;
+  }
+  return data.distances as number[][];
+}

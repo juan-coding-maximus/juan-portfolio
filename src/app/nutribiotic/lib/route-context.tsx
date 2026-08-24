@@ -12,20 +12,35 @@
  * modal's dialog renders as a sibling of `children` inside ModalProvider, not
  * nested under whatever page mounted it: a provider scoped to MapScreen would
  * never wrap the modal's own contents.
+ *
+ * DAY-PARTITIONED since 2026-08-23 (Juan's ask: plan the whole field week, one
+ * toggle to switch which day he's editing, a way to push a stop to the next
+ * one). `routeDraft` below is a VIEW onto the active day's slice of
+ * `draftByDay`, kept for every existing caller that only ever knew one route.
+ * `addToRoute` and `addCustomStop` take an optional insert index -- MapScreen
+ * computes the cheapest gap (route-optimize.ts) when it has coordinates to
+ * work with and passes it in; a caller with no coordinates in hand (the
+ * account profile page) omits it and gets the old behaviour, appended last.
  */
 
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
-import type { CustomStop, RouteDraftEntry } from "./dal";
+import type { CustomStop, RouteDraftByDay, RouteDraftEntry } from "./dal";
+import { defaultActiveDay, fieldWeekDates } from "./field-week";
 import { saveRouteDraft } from "./prefs-actions";
 
 type RouteCtx = {
   routeDraft: RouteDraftEntry[];
   inRoute: Set<string>;
-  addToRoute: (id: string) => void;
-  addCustomStop: (stop: Omit<CustomStop, "id">) => void;
+  days: string[];
+  activeDay: string;
+  setActiveDay: (day: string) => void;
+  addToRoute: (id: string, atIndex?: number) => void;
+  addCustomStop: (stop: Omit<CustomStop, "id">, atIndex?: number) => void;
   removeFromRoute: (id: string) => void;
   moveInRoute: (id: string, dir: -1 | 1) => void;
   moveToTop: (id: string) => void;
+  reorderRoute: (idsInOrder: string[]) => void;
+  postponeToNextDay: (id: string) => void;
   clearRoute: () => void;
 };
 
@@ -39,33 +54,45 @@ export function RouteProvider({
   initial,
   children,
 }: {
-  initial: RouteDraftEntry[];
+  initial: RouteDraftByDay;
   children: ReactNode;
 }) {
-  const [routeDraft, setRouteDraft] = useState<RouteDraftEntry[]>(initial);
+  const days = useMemo(() => fieldWeekDates(), []);
+  const [draftByDay, setDraftByDay] = useState<RouteDraftByDay>(initial);
+  const [activeDay, setActiveDay] = useState<string>(() => defaultActiveDay(initial, days));
+
+  const routeDraft = useMemo(() => draftByDay[activeDay] ?? [], [draftByDay, activeDay]);
 
   // Optimistic, same as every other prefs write on this OS: the list moves
-  // now and the row catches up, reverted if the write fails.
-  function commit(next: RouteDraftEntry[]) {
-    const prev = routeDraft;
-    setRouteDraft(next);
-    saveRouteDraft(next).catch(() => setRouteDraft(prev));
+  // now and the row catches up, reverted if the write fails. Always the whole
+  // week's object, because that is the row's one column.
+  function commitDay(day: string, next: RouteDraftEntry[]) {
+    const prev = draftByDay;
+    const nextByDay = { ...draftByDay, [day]: next };
+    setDraftByDay(nextByDay);
+    saveRouteDraft(nextByDay).catch(() => setDraftByDay(prev));
   }
 
   const inRoute = useMemo(() => new Set(routeDraft.map(entryId)), [routeDraft]);
 
-  function addToRoute(id: string) {
+  function addToRoute(id: string, atIndex?: number) {
     if (inRoute.has(id)) return; // adding twice is a mis-tap, not a second visit
-    commit([...routeDraft, id]);
+    const next = [...routeDraft];
+    const i = atIndex !== undefined && atIndex >= 0 && atIndex <= next.length ? atIndex : next.length;
+    next.splice(i, 0, id);
+    commitDay(activeDay, next);
   }
 
-  function addCustomStop(stop: Omit<CustomStop, "id">) {
+  function addCustomStop(stop: Omit<CustomStop, "id">, atIndex?: number) {
     const id = `custom:${stop.kind}:${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
-    commit([...routeDraft, { ...stop, id }]);
+    const next = [...routeDraft];
+    const i = atIndex !== undefined && atIndex >= 0 && atIndex <= next.length ? atIndex : next.length;
+    next.splice(i, 0, { ...stop, id });
+    commitDay(activeDay, next);
   }
 
   function removeFromRoute(id: string) {
-    commit(routeDraft.filter((e) => entryId(e) !== id));
+    commitDay(activeDay, routeDraft.filter((e) => entryId(e) !== id));
   }
 
   function moveInRoute(id: string, dir: -1 | 1) {
@@ -74,7 +101,7 @@ export function RouteProvider({
     if (i < 0 || j < 0 || j >= routeDraft.length) return;
     const next = [...routeDraft];
     [next[i], next[j]] = [next[j], next[i]];
-    commit(next);
+    commitDay(activeDay, next);
   }
 
   // Lifts one stop straight to position 1, the rest sliding down in place
@@ -87,11 +114,49 @@ export function RouteProvider({
     const next = [...routeDraft];
     const [entry] = next.splice(i, 1);
     next.unshift(entry);
-    commit(next);
+    commitDay(activeDay, next);
+  }
+
+  // The whole day reordered at once (Optimize route, 2026-08-23): MapScreen
+  // hands back the same ids it was given, just in the order route-optimize.ts
+  // found shortest. Anything not in the current list (stale computation racing
+  // a manual edit) is dropped rather than trusted, and anything missing from
+  // the new order stays out rather than getting silently re-appended.
+  function reorderRoute(idsInOrder: string[]) {
+    const byId = new Map(routeDraft.map((e) => [entryId(e), e]));
+    const next = idsInOrder.map((id) => byId.get(id)).filter((e): e is RouteDraftEntry => e !== undefined);
+    if (next.length !== routeDraft.length) return; // ids didn't match this day's list; do nothing rather than guess
+    commitDay(activeDay, next);
+  }
+
+  // Push one stop to the next field-day tab, dropped onto the end of that
+  // day's list (2026-08-23). A no-op past the last tab -- there is nowhere on
+  // this screen to show it landing, so the button that calls this is disabled
+  // there rather than silently wrapping to a day nobody's looking at.
+  function postponeToNextDay(id: string) {
+    const dayIdx = days.indexOf(activeDay);
+    if (dayIdx < 0 || dayIdx >= days.length - 1) return;
+    const entry = routeDraft.find((e) => entryId(e) === id);
+    if (!entry) return;
+    const nextDay = days[dayIdx + 1];
+    const nextDayList = draftByDay[nextDay] ?? [];
+    if (nextDayList.some((e) => entryId(e) === id)) {
+      // already on tomorrow's list too -- just drop it from today's
+      commitDay(activeDay, routeDraft.filter((e) => entryId(e) !== id));
+      return;
+    }
+    const prev = draftByDay;
+    const nextByDay = {
+      ...draftByDay,
+      [activeDay]: routeDraft.filter((e) => entryId(e) !== id),
+      [nextDay]: [...nextDayList, entry],
+    };
+    setDraftByDay(nextByDay);
+    saveRouteDraft(nextByDay).catch(() => setDraftByDay(prev));
   }
 
   function clearRoute() {
-    commit([]);
+    commitDay(activeDay, []);
   }
 
   return (
@@ -99,11 +164,16 @@ export function RouteProvider({
       value={{
         routeDraft,
         inRoute,
+        days,
+        activeDay,
+        setActiveDay,
         addToRoute,
         addCustomStop,
         removeFromRoute,
         moveInRoute,
         moveToTop,
+        reorderRoute,
+        postponeToNextDay,
         clearRoute,
       }}
     >

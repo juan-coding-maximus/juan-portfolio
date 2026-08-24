@@ -119,7 +119,7 @@ export function AccountsMap({
   onToggleShowChains: () => void;
   showPractices: boolean;
   onToggleShowPractices: () => void;
-  onAddToRoute: (id: string) => void;
+  onAddToRoute: (id: string, lat: number, lng: number) => void;
   inRoute: Set<string>;
   /** The hand-built route, in Juan's order, same array RoutePanel numbers. */
   routeStops: RouteStopView[];
@@ -904,7 +904,7 @@ export function AccountsMap({
                     job, where the stop and its position are both visible. */}
                 <button
                   type="button"
-                  onClick={() => onAddToRoute(selected.id)}
+                  onClick={() => onAddToRoute(selected.id, selected.lat, selected.lng)}
                   disabled={inRoute.has(selected.id)}
                   className={`mt-2 flex w-full items-center justify-center gap-1.5 rounded-md px-3 py-2 text-[12.5px] font-semibold transition-opacity ${
                     inRoute.has(selected.id)

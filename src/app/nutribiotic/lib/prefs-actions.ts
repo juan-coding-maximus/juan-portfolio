@@ -4,10 +4,13 @@ import { revalidatePath } from "next/cache";
 import {
   sanitizeRouteEndpoint,
   setRouteDraft,
+  setRouteEndByDay,
   setRouteSchedulePrefs,
+  setRouteStartByDay,
   setShowChainAccounts,
   setShowPracticeAccounts,
-  type RouteDraftEntry,
+  type RouteDraftByDay,
+  type RouteEndpointsByDay,
   type RouteSchedulePrefs,
 } from "./dal";
 
@@ -27,17 +30,18 @@ export async function toggleShowPracticeAccounts(show: boolean): Promise<void> {
 }
 
 /**
- * Save the hand-built route (migration 0029). The whole ordered list every
- * time, because that is what an add / reorder / remove each produce and it
- * keeps the client and the row from ever disagreeing about position.
+ * Save the hand-built route (migration 0029), day-partitioned since
+ * 2026-08-23. The whole object every time, every day at once, because that is
+ * what an add / reorder / remove / postpone each produce and it keeps the
+ * client and the row from ever disagreeing about position.
  *
  * DELIBERATELY NO revalidatePath. The route panel is optimistic: the click
  * already moved the stop on screen, and re-rendering the server component
  * would throw the map's pan, zoom and open InfoWindow away every time Juan
  * nudged a stop. The row is the durable copy, the screen is already right.
  */
-export async function saveRouteDraft(entries: RouteDraftEntry[]): Promise<void> {
-  await setRouteDraft(entries);
+export async function saveRouteDraft(byDay: RouteDraftByDay): Promise<void> {
+  await setRouteDraft(byDay);
 }
 
 /**
@@ -61,10 +65,30 @@ export async function saveRouteSchedulePrefs(p: RouteSchedulePrefs): Promise<voi
     dwellMinutes: clamp(p.dwellMinutes, 1, 240, 20),
     lunchMinutes: clamp(p.lunchMinutes, 0, 240, 60),
     returnBy: time(p.returnBy, null),
-    // Re-validated rather than trusted, same as route_draft's custom stops:
-    // this crossed the network as JSON once already and a malformed shape
-    // here should fall back to the waypoint default, not get written as-is.
-    start: sanitizeRouteEndpoint(p.start),
-    end: sanitizeRouteEndpoint(p.end),
   });
+}
+
+/**
+ * Route start/end overrides, day-partitioned same as route_draft
+ * (2026-08-23). Each entry is re-validated rather than trusted, same as
+ * route_draft's custom stops: this crossed the network as JSON once already,
+ * and a malformed entry here should drop out of the map (falling back to the
+ * chain default, see MapScreen's startFallback) rather than get written as-is.
+ * No revalidatePath, same reason as saveRouteDraft.
+ */
+export async function saveRouteStartByDay(byDay: RouteEndpointsByDay): Promise<void> {
+  await setRouteStartByDay(sanitizeEndpointsByDay(byDay));
+}
+
+export async function saveRouteEndByDay(byDay: RouteEndpointsByDay): Promise<void> {
+  await setRouteEndByDay(sanitizeEndpointsByDay(byDay));
+}
+
+function sanitizeEndpointsByDay(byDay: RouteEndpointsByDay): RouteEndpointsByDay {
+  const out: RouteEndpointsByDay = {};
+  for (const [day, ep] of Object.entries(byDay)) {
+    const clean = sanitizeRouteEndpoint(ep);
+    if (clean) out[day] = clean;
+  }
+  return out;
 }
