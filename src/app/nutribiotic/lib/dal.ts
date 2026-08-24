@@ -1598,25 +1598,25 @@ function asDraftEntry(x: unknown): RouteDraftEntry | null {
  * Juan's book, stops being a stop, and the alternative is a route with a hole
  * in it that cannot be clicked or removed.
  *
- * DAY-PARTITIONED since 2026-08-23 (Juan's ask: plan the whole field week, not
+ * DAY-PARTITIONED since 2026-08-23 (Juan's ask: plan the whole horizon, not
  * one undated list). `route_draft` is now an object keyed by ISO date rather
  * than a bare array, still one row, still written whole. `getRouteDraftByDay`
- * migrates the old flat-array shape in memory, on read, onto the current field
- * week's Wednesday: the day Juan had already mostly built stays exactly what
- * it was, it just gets a date.
+ * migrates the old flat-array shape in memory, on read, onto the next
+ * Wednesday: the day Juan had already mostly built stays exactly what it was,
+ * it just gets a date.
  */
 export type RouteDraftByDay = Record<string, RouteDraftEntry[]>;
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-// fieldWeekDates/defaultActiveDay live in field-week.ts, not here: that file
-// carries no "server-only" tag, so route-context.tsx (a client component) can
-// import the date math directly instead of pulling this whole server module
-// into the browser bundle. Imported (used below) and re-exported, so every
-// existing "./dal" import site (layout.tsx, api/widget/route.ts) keeps
-// working unchanged.
-import { fieldWeekDates, defaultActiveDay } from "./field-week";
-export { fieldWeekDates, defaultActiveDay };
+// planningHorizonDates/nextWeekday/defaultActiveDay live in field-week.ts, not
+// here: that file carries no "server-only" tag, so route-context.tsx (a
+// client component) can import the date math directly instead of pulling
+// this whole server module into the browser bundle. Imported (used below)
+// and re-exported, so every existing "./dal" import site (layout.tsx,
+// api/widget/route.ts) keeps working unchanged.
+import { planningHorizonDates, nextWeekday, defaultActiveDay } from "./field-week";
+export { planningHorizonDates, defaultActiveDay };
 
 export async function getRouteDraftByDay(): Promise<RouteDraftByDay> {
   const rows = await raw<{ route_draft: unknown }>("nb_ui_prefs?select=route_draft&id=eq.1");
@@ -1624,7 +1624,7 @@ export async function getRouteDraftByDay(): Promise<RouteDraftByDay> {
 
   if (Array.isArray(stored)) {
     const stops = stored.map(asDraftEntry).filter((e): e is RouteDraftEntry => e !== null);
-    return stops.length > 0 ? { [fieldWeekDates()[2]]: stops } : {};
+    return stops.length > 0 ? { [nextWeekday(3)]: stops } : {};
   }
 
   if (!stored || typeof stored !== "object") return {};
@@ -1669,12 +1669,12 @@ function asRouteEndpointsByDay(stored: unknown): RouteEndpointsByDay {
   const o = stored as Record<string, unknown>;
   // Legacy single-endpoint shape, from before the day-partition: {label,
   // address, lat, lng} sitting at the top level of the column. Migrated onto
-  // the field week's Wednesday in memory, same landing spot
-  // getRouteDraftByDay uses for the old flat route_draft array, so a start or
-  // end Juan had already picked keeps working rather than silently vanishing.
+  // the next Wednesday in memory, same landing spot getRouteDraftByDay uses
+  // for the old flat route_draft array, so a start or end Juan had already
+  // picked keeps working rather than silently vanishing.
   if (typeof o.label === "string" && typeof o.address === "string") {
     const ep = sanitizeRouteEndpoint(o);
-    return ep ? { [fieldWeekDates()[2]]: ep } : {};
+    return ep ? { [nextWeekday(3)]: ep } : {};
   }
   const out: RouteEndpointsByDay = {};
   for (const [day, v] of Object.entries(o)) {

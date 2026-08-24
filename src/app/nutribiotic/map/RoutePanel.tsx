@@ -416,9 +416,9 @@ function DayBar({
 }
 
 // "2026-08-25" -> { weekday: "Tue", short: "8/25" }. Parsed as parts and
-// anchored at UTC noon, same trick as fieldWeekDates() in dal.ts: parsing the
-// bare date directly would read it as UTC midnight and roll the weekday back
-// a day anywhere west of Greenwich.
+// anchored at UTC noon, same trick as planningHorizonDates() in field-week.ts:
+// parsing the bare date directly would read it as UTC midnight and roll the
+// weekday back a day anywhere west of Greenwich.
 const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 function dayLabel(iso: string): { weekday: string; short: string } {
   const [y, m, d] = iso.split("-").map(Number);
@@ -427,11 +427,14 @@ function dayLabel(iso: string): { weekday: string; short: string } {
 }
 
 /**
- * The toggle at the top of Route (Juan's ask 2026-08-23): four tabs, Monday
- * through Thursday, the field week's own rhythm. Switching tabs switches which
+ * The toggle at the top of Route: a rolling ten-weekday horizon, Monday
+ * through Friday, always (2026-08-23, extended to a real rolling window
+ * 2026-08-24 after four fixed Mon-Thu tabs turned out to be a wall -- Juan
+ * postponing off Thursday had nowhere to land). Switching tabs switches which
  * day every control below acts on -- add, reorder, postpone, optimize, all of
- * it. Always four tabs, even on a day with nothing planned yet, so an empty
- * Wednesday is still one tap away rather than looking like it doesn't exist.
+ * it. Always ten tabs, even on a day with nothing planned yet, so an empty
+ * day further out is still one tap away rather than looking like it doesn't
+ * exist.
  */
 function DayTabs({
   days,
@@ -515,7 +518,7 @@ export function RoutePanel({
   onClear: () => void;
   onShowInMap: (id: string) => void;
   onAddCustomStop: (stop: Omit<CustomStop, "id">) => void;
-  /** The four field-day tabs (Mon-Thu), the one Juan's on, and the switch. */
+  /** The rolling ten-weekday horizon (Mon-Fri), the one Juan's on, and the switch. */
   days: string[];
   activeDay: string;
   onSelectDay: (day: string) => void;

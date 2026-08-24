@@ -13,11 +13,11 @@
  * book drops out of the widget the same turn it drops off the map. Nothing here
  * recomputes, reorders, or optimizes anything.
  *
- * ONE DAY, DAY-PARTITIONED since 2026-08-23: ?day=YYYY-MM-DD picks which of
- * the four field-day tabs to render, defaulting the same way the route panel
- * does (today if it's one of the four, else the first tab with stops in it).
- * The response says which day it picked, so the widget never shows a route
- * without saying whose.
+ * ONE DAY, DAY-PARTITIONED since 2026-08-23: ?day=YYYY-MM-DD picks which day
+ * on the rolling ten-weekday horizon to render (see field-week.ts), defaulting
+ * the same way the route panel does (today if it's on the horizon, else the
+ * first day on it with stops in it). The response says which day it picked,
+ * so the widget never shows a route without saying whose.
  *
  * NO DRIVE TIME, NO ETA. Same rule as the panel: there is no Directions call
  * behind this, so the one number per leg is the straight-line hop, labelled as
@@ -32,7 +32,7 @@
  */
 import {
   defaultActiveDay,
-  fieldWeekDates,
+  planningHorizonDates,
   getRouteDraftByDay,
   listOwnerAccounts,
   type CustomStop,
@@ -99,7 +99,7 @@ export async function GET(request: Request) {
   const [byDay, accounts] = await Promise.all([getRouteDraftByDay(), listOwnerAccounts()]);
   const byId = new Map(accounts.data.map((a) => [a.id, a]));
 
-  const days = fieldWeekDates();
+  const days = planningHorizonDates();
   const requested = new URL(request.url).searchParams.get("day");
   const day = requested && days.includes(requested) ? requested : defaultActiveDay(byDay, days);
   const draft = byDay[day] ?? [];

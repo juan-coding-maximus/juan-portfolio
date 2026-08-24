@@ -13,7 +13,7 @@
  * nested under whatever page mounted it: a provider scoped to MapScreen would
  * never wrap the modal's own contents.
  *
- * DAY-PARTITIONED since 2026-08-23 (Juan's ask: plan the whole field week, one
+ * DAY-PARTITIONED since 2026-08-23 (Juan's ask: plan the whole horizon, one
  * toggle to switch which day he's editing, a way to push a stop to the next
  * one). `routeDraft` below is a VIEW onto the active day's slice of
  * `draftByDay`, kept for every existing caller that only ever knew one route.
@@ -21,11 +21,17 @@
  * computes the cheapest gap (route-optimize.ts) when it has coordinates to
  * work with and passes it in; a caller with no coordinates in hand (the
  * account profile page) omits it and gets the old behaviour, appended last.
+ *
+ * ROLLING HORIZON, not a fixed week (2026-08-24, Juan's ask: postponing off
+ * the last tab hit a wall with only four). `days` is the next ten weekdays
+ * from today, Monday-Friday, always -- see field-week.ts. It slides forward
+ * with the calendar rather than snapping to "this week"/"next week", so a
+ * stop can always be postponed one more tab over.
  */
 
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import type { CustomStop, RouteDraftByDay, RouteDraftEntry } from "./dal";
-import { defaultActiveDay, fieldWeekDates } from "./field-week";
+import { defaultActiveDay, planningHorizonDates } from "./field-week";
 import { saveRouteDraft } from "./prefs-actions";
 
 type RouteCtx = {
@@ -57,7 +63,7 @@ export function RouteProvider({
   initial: RouteDraftByDay;
   children: ReactNode;
 }) {
-  const days = useMemo(() => fieldWeekDates(), []);
+  const days = useMemo(() => planningHorizonDates(), []);
   const [draftByDay, setDraftByDay] = useState<RouteDraftByDay>(initial);
   const [activeDay, setActiveDay] = useState<string>(() => defaultActiveDay(initial, days));
 
