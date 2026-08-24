@@ -16,9 +16,18 @@
  * street) is matched here against `home` directly, live results underneath
  * come from Google. Nothing is looked up until three characters exist, the
  * same floor resolveStopAddress uses, so "an", "sb" etc. do not fire a call.
+ *
+ * THE DROPDOWN IS PORTALED TO <body> (fixed 2026-08-23). This field sits
+ * inside the route card, which is `overflow-hidden` so its rounded corners
+ * clip square-cornered rows, not because Juan should never see a dropdown.
+ * A dropdown positioned `absolute` inside that card was clipped the same
+ * way, invisible or a sliver under the input instead of floating over the
+ * stop list. Rendering it into a portal, positioned from the trigger's own
+ * bounding rect, escapes that ancestor's clip.
  */
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import type { RouteEndpoint } from "../lib/dal";
 import { searchRouteAddresses } from "../lib/stop-actions";
 import { Ico } from "../lib/ui";
@@ -51,7 +60,9 @@ export function RouteEndpointField({
   const [results, setResults] = useState<RouteEndpoint[]>([]);
   const [searching, startSearch] = useTransition();
   const boxRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
   const current = value ?? home;
   const label = current?.label ?? "start/end";
@@ -59,10 +70,36 @@ export function RouteEndpointField({
   useEffect(() => {
     if (!open) return;
     function onOutside(e: MouseEvent) {
-      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      // The menu lives in a portal now, outside boxRef in the DOM, so an
+      // outside click has to be checked against both roots.
+      if (boxRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      setOpen(false);
     }
     document.addEventListener("mousedown", onOutside);
     return () => document.removeEventListener("mousedown", onOutside);
+  }, [open]);
+
+  // Tracks the trigger across scroll/resize while open, since a portal
+  // positioned `fixed` has no other way to follow it.
+  useLayoutEffect(() => {
+    if (!open) {
+      setMenuPos(null);
+      return;
+    }
+    function place() {
+      const r = boxRef.current?.getBoundingClientRect();
+      if (!r) return;
+      setMenuPos({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, 256) });
+    }
+    place();
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
   }, [open]);
 
   useEffect(() => {
@@ -121,39 +158,47 @@ export function RouteEndpointField({
         placeholder={label}
         className="w-44 rounded-md border border-[#8A928C] bg-white px-2 py-1 text-[13px] outline-none"
       />
-      <div className="absolute left-0 top-full z-20 mt-1 max-h-64 w-64 overflow-auto rounded-md border border-[#E2DFD5] bg-white py-1 text-left shadow-lg">
-        {homeMatches && (
-          <button
-            type="button"
-            onClick={() => pick(null)}
-            className="flex w-full flex-col items-start px-3 py-1.5 text-left hover:bg-[#FAF9F5]"
+      {menuPos &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{ top: menuPos.top, left: menuPos.left, width: menuPos.width }}
+            className="fixed z-50 max-h-64 overflow-auto rounded-md border border-[#E2DFD5] bg-white py-1 text-left shadow-lg"
           >
-            <span className="flex items-center gap-1.5 text-[13px] font-medium text-[#14201B]">
-              <Ico name="pin" size={11} />
-              {home!.label}
-            </span>
-            <span className="truncate text-[11.5px] text-[#8A928C]">{home!.address}</span>
-          </button>
+            {homeMatches && (
+              <button
+                type="button"
+                onClick={() => pick(null)}
+                className="flex w-full flex-col items-start px-3 py-1.5 text-left hover:bg-[#FAF9F5]"
+              >
+                <span className="flex items-center gap-1.5 text-[13px] font-medium text-[#14201B]">
+                  <Ico name="pin" size={11} />
+                  {home!.label}
+                </span>
+                <span className="truncate text-[11.5px] text-[#8A928C]">{home!.address}</span>
+              </button>
+            )}
+            {searching && <div className="px-3 py-1.5 text-[12px] text-[#8A928C]">Searching...</div>}
+            {!searching && q.length >= 3 && results.length === 0 && !homeMatches && (
+              <div className="px-3 py-1.5 text-[12px] text-[#8A928C]">No match. Try the city name too.</div>
+            )}
+            {q.length > 0 && q.length < 3 && !homeMatches && (
+              <div className="px-3 py-1.5 text-[12px] text-[#8A928C]">Keep typing...</div>
+            )}
+            {results.map((r, i) => (
+              <button
+                key={`${r.lat},${r.lng},${i}`}
+                type="button"
+                onClick={() => pick(r)}
+                className="flex w-full flex-col items-start px-3 py-1.5 text-left hover:bg-[#FAF9F5]"
+              >
+                <span className="truncate text-[13px] font-medium text-[#14201B]">{r.label}</span>
+                <span className="truncate text-[11.5px] text-[#8A928C]">{r.address}</span>
+              </button>
+            ))}
+          </div>,
+          document.body,
         )}
-        {searching && <div className="px-3 py-1.5 text-[12px] text-[#8A928C]">Searching...</div>}
-        {!searching && q.length >= 3 && results.length === 0 && !homeMatches && (
-          <div className="px-3 py-1.5 text-[12px] text-[#8A928C]">No match. Try the city name too.</div>
-        )}
-        {q.length > 0 && q.length < 3 && !homeMatches && (
-          <div className="px-3 py-1.5 text-[12px] text-[#8A928C]">Keep typing...</div>
-        )}
-        {results.map((r, i) => (
-          <button
-            key={`${r.lat},${r.lng},${i}`}
-            type="button"
-            onClick={() => pick(r)}
-            className="flex w-full flex-col items-start px-3 py-1.5 text-left hover:bg-[#FAF9F5]"
-          >
-            <span className="truncate text-[13px] font-medium text-[#14201B]">{r.label}</span>
-            <span className="truncate text-[11.5px] text-[#8A928C]">{r.address}</span>
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
