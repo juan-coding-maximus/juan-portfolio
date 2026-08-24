@@ -67,7 +67,7 @@ export default async function PlaybookIndex() {
             );
           })}
         </div>
-        {archive.reports.length > 0 && (
+        {archive.reports.length > 0 ? (
           <details className="mt-3">
             <summary className="cursor-pointer text-[11.5px] text-[#8A928C]">
               Archive ({archive.reports.length} earlier report{archive.reports.length === 1 ? "" : "s"})
@@ -100,6 +100,11 @@ export default async function PlaybookIndex() {
               })}
             </div>
           </details>
+        ) : (
+          <p className="mt-3 text-[11.5px] text-[#8A928C]">
+            Archive: empty so far, every report before 2026-08-23 was pruned by the old
+            delete-on-publish behavior. Starts filling in from the next daily/weekly run onward.
+          </p>
         )}
       </section>
 
