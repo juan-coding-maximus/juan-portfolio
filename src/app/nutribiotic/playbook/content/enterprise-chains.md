@@ -19,7 +19,10 @@ store in the chain at once. This needs a packet, not a visit, and one
 open question decides whether it's even Juan's to run (see "Before Track
 B" below).
 
-Last built: 2026-08-24, from `nb_activities` and live web research.
+Last built: 2026-08-24, from `nb_activities` and live web research. Updated
+same day with a West Hollywood corporate-door sweep (Sprouts, GNC, Ulta,
+Trader Joe's, Smart & Final, BevMo!/Gopuff, Best Buy), all logged as
+`meeting` activities on 2026-08-24.
 
 ---
 
@@ -112,20 +115,78 @@ plant-based yogurt brand.
 **Sources**: [Getting Into Whole Foods overview](https://femfounded.org/reference/getting-into-whole-foods/), [Whole Foods vendor requirements](https://blog.getopener.ai/whole-foods-vendor-requirements-shelf-space)
 
 ### Sprouts Farmers Market
-**Status**: `chain_excluded` since 2026-08-04, no outreach logged. Not
-previously on this list, added 8/23, this is the strongest-fit corporate
-door on the whole list.
+**Status**: West Hollywood (915 N La Brea) visited 8/24, staff confirmed
+in person this is a corporate/enterprise decision, no store-level path.
 **Tip**: Sprouts is the one chain here with an explicit, named **Vitamins
 and Body Care** department in its own submission portal, this is not a
 generic grocery pitch, submit directly into the category NutriBiotic
-already is.
-**Links**: [New Item Submission Process](https://about.sprouts.com/new-item-submission-process/) · [Vendor Policies](https://about.sprouts.com/vendor-policies-2/) · submission portal: submissions.sprouts.com
+already is. The field visit surfaced a sharper detail than the generic
+submission portal: Sprouts runs a **Full Reset Calendar**, published
+windows when they actually consider stock changes by category. Picking a
+specific product and timing the submission to the right reset window beats
+submitting blind.
+**Links**: [New Item Submission Process](https://about.sprouts.com/new-item-submission-process/) · [Vendor Policies](https://about.sprouts.com/vendor-policies-2/) · [Full Reset Calendar](https://about.sprouts.com/full-reset-calendar/) · submission portal: submissions.sprouts.com
 **Process**: select department (Vitamins/Body Care is a listed option),
 submit product info and images through the portal, prepare physical
 samples, if selected you get an email invite to Sprouts' Workday Financials
 supplier portal for onboarding. General questions: submissions@sprouts.com.
+**Next step**: pull the Full Reset Calendar and pick the Vitamins/Body Care
+window before submitting.
 **Success story**: TODO, no specific post-2021 named brand found in this
 research pass, worth a second search closer to submission time.
+
+### Trader Joe's
+**Status**: Los Angeles (3131 S Hoover) visited 8/24, no store-level path,
+directed straight to the corporate vendor form.
+**Tip**: no store-level contact or outcome logged beyond the referral, this
+is a pure Track B lead, corporate decides for every store at once.
+**Links**: [Potential Vendor Form](https://www.traderjoes.com/home/contact-us/potential-vendor-form)
+**Process**: submit through the Potential Vendor Form on the corporate
+site.
+**Next step**: submit the vendor form, or fold into the "Before Track B"
+distributor question above since Trader Joe's private-label-heavy model
+usually means going through their own supplier pipeline rather than UNFI/KeHE.
+**Success story**: TODO, none found in this pass.
+
+### Smart & Final
+**Status**: West Hollywood (1041 N Fuller) visited 8/24, talked to manager
+**Alex**: `no_decision_maker`.
+**Tip**: this specific location does not stock vitamins at all, Alex said
+it's theft risk given the neighborhood. He confirmed some other locations,
+specifically **Smart & Final Extra**, do carry vitamins, so this is a
+per-format question, not a per-store one. Corporate route is the same
+RangeMe funnel regardless.
+**Links**: [Smart & Final on RangeMe](https://www.rangeme.com/smartandfinal)
+**Process**: RangeMe product profile, standard category-buyer review.
+**Next step**: before submitting, confirm which SoCal locations are the
+Extra format (the vitamin-carrying one) so the pitch targets the right
+format, not this store.
+**Success story**: TODO, none found in this pass.
+
+### BevMo! (Gopuff)
+**Status**: West Hollywood (10984 Santa Monica Blvd) visited 8/24, talked
+to manager **Chris**: `no_decision_maker`.
+**Tip**: Chris said the corporate owner to submit through is **Gopuff**
+(BevMo has operated under Gopuff ownership since 2023), confirmed by the
+RangeMe link itself pointing to Gopuff's own vendor page, not a BevMo-branded
+one.
+**Links**: [Gopuff on RangeMe](https://www.rangeme.com/gopuff)
+**Process**: RangeMe product profile submitted to Gopuff, not BevMo
+directly.
+**Success story**: TODO, none found in this pass.
+
+### Best Buy
+**Status**: West Hollywood (1015 N La Brea) visited 8/24, no outcome
+logged beyond the referral link.
+**Tip**: category fit is a real open question here, a supplement/beauty
+brand into an electronics retailer is not an obvious pitch, worth
+confirming this is worth Track B effort at all before spending more time.
+Also flagging the link itself needs a second look: it resolves to Best
+Buy **Canada's** marketplace seller form, not a US-market page, TODO to
+find the correct US application before treating this as actionable.
+**Links**: [Marketplace Seller Application (CA)](https://www.bestbuy.ca/en-ca/about/marketplace-seller-application-form)
+**Process**: unverified, see tip above.
+**Success story**: TODO, none found in this pass.
 
 ### Sephora
 **Status**: Beverly Hills visited 8/19, staff confirmed no store-level
@@ -145,24 +206,34 @@ out of the 2023 Accelerate cohort.
 **Sources**: [2023 Accelerate cohort announcement](https://www.businesswire.com/news/home/20221206005483/en/Sephora-Announces-Participants-for-2023-Accelerate-Brand-Incubator-Program-With-Continued-Focus-on-BIPOC-Brand-Founders-and-New-Programming)
 
 ### Ulta Beauty
-**Status**: not yet in the OS, not visited.
-**Tip**: Ulta does not run a cold application form, brands are discovered
-through **RangeMe** or the **MUSE Accelerator**. MUSE (launched 2022) is
-built for emerging BIPOC beauty brands specifically, same eligibility
-caveat as Sephora Accelerate applies.
-**Links**: [Ulta Vendor Standards](https://www.ulta.com/ultavendorstandards/)
+**Status**: West Hollywood (7100 Santa Monica Blvd) visited 8/24, talked
+to **Kalia**: `no_decision_maker`, confirmed store-level staff cannot buy
+in, has to go through the website.
+**Tip**: Kalia pointed to a **merchandising** page, a different door than
+the RangeMe/MUSE path found in earlier research, keep both since neither
+is confirmed dead. She also confirmed something the earlier research
+didn't have: Ulta runs **separate buyers for vitamins vs. other
+categories like skin care**, pitch the two separately rather than as one
+beauty-and-wellness bundle.
+**Links**: [Ulta Vendor Standards](https://www.ulta.com/ultavendorstandards/) · [Merchandising / supplier contact](https://www.ulta.com/company/merchandising)
 **Process**: build a RangeMe profile, or apply to a MUSE cohort (10-week
-retail-readiness curriculum, ~$50k funding per brand).
+retail-readiness curriculum, ~$50k funding per brand); the merchandising
+page is a second entry point Kalia named directly, not yet cross-checked
+against RangeMe/MUSE.
 **Success story (2022-2023)**: MUSE moved Pound Cake, Octavia Morgan Los
 Angeles, Scarlet by RedDrop, and Ocoa into actual Ulta distribution.
 **Sources**: [How to become an Ulta supplier](https://www.supplierdiversity.com/blog/how-to-become-an-ulta-supplier/)
 
 ### GNC
-**Status**: `chain_excluded` since 2026-08-04, no outreach logged.
+**Status**: West Hollywood (7100 Santa Monica Blvd) visited 8/24: `declined`.
+Staff confirmed the vendor path is RangeMe-only, matching prior research,
+and named the exact bar: proof of sales, proof of marketing effort, and a
+genuinely innovative product for their catalogue.
 **Tip**: bring a sell-through story, not a pitch deck. GNC buyers are
 explicitly described as risk-averse and volume-driven, the ask that works
 is proof the product already sells somewhere (farmers markets, direct
-site, another retailer) plus something genuinely new about it.
+site, another retailer) plus something genuinely new about it. The 8/24
+visit confirms this from the store side, not just secondary research.
 **Links**: [GNC on RangeMe](https://www.rangeme.com/gnc)
 **Process**: RangeMe profile, or call corporate for the category buyer's
 name directly and connect on LinkedIn.
@@ -329,6 +400,21 @@ answer to start (a local pitch/buyer relationship, not a national vendor
 number). Nothing here gets submitted by anyone but Juan; per the
 department's sending rule, an application is a send, and sends are never
 automatic.
+
+The 8/24 West Hollywood sweep confirms the pattern holds everywhere it was
+tested: seven store-level visits, zero store-level yeses, every one routed
+to a corporate portal (mostly RangeMe). That's not a failure of the visit,
+it's the answer the doc predicted, Track A doesn't work on these doors.
+Two things surfaced that change the next move: **GNC declined at the
+store**, but named its actual bar (proof of sales, proof of marketing,
+something genuinely new), so the next step there is building that case
+before resubmitting, not repeating the visit. **Sprouts named a real
+process detail** (the Full Reset Calendar) that turns "submit blind" into
+"submit into the next Vitamins/Body Care window", worth timing the
+submission around. Best Buy and BevMo!/Gopuff are lower-confidence adds,
+worth a second look before spending real time: Best Buy's category fit is
+unconfirmed and its link resolves to the Canadian site, and BevMo routes
+through Gopuff corporate rather than BevMo directly.
 
 ---
 
