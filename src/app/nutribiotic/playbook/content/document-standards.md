@@ -6,6 +6,32 @@ comes next. Read this before drafting one, and check a draft against it
 before it ships. Raised while building the med spa body-care guide,
 2026-08-13, first direction set; add to this file as more comes in.
 
+## Audience: who is this document for?
+
+Two different audiences, two different documents. Decide which one before
+writing a word, it changes everything below it.
+
+- **Trade / wholesale documents** &mdash; order guides, the product guide,
+  back-of-bar pricing, category talking points Juan reads before a visit.
+  The reader is Juan himself, or a store/spa owner deciding whether to
+  stock the line. Item numbers, the wholesale/retail price pair, and the
+  &ldquo;Frame pricing to favor the reader&rdquo; section below all apply.
+- **Customer-facing documents** &mdash; shelf-talkers, highlight sheets,
+  anything meant to sit at a register or in a shopper's hand. The reader is
+  the end customer deciding whether to buy one bottle. No item numbers, no
+  wholesale price, no trade contact line. Lead with what the product does
+  for them, real customer reviews, and the two or three questions a shopper
+  actually asks (how does it work without the thing they expect, why is it
+  gentle, what skin is it for) answered in plain language pulled from the
+  real product material, never invented.
+
+Corrected 2026-08-25: a skin-care highlight document had been built with
+wholesale pricing, SKU item numbers, and Juan's trade contact line, the
+wrong audience for a piece meant to persuade a shopper. His own words:
+&ldquo;make all of these collateral documents for the clients, not for me.
+You need to get them to understand the product [and] want to buy. This is
+for clients.&rdquo;
+
 ## Cut prose, lead with facts
 
 The instinct is: state the fact, don't cushion it. A caveat, a disclaimer,
@@ -58,5 +84,7 @@ done, it's the kind of thing that passes a glance and fails a close look.
 
 ## Changelog
 
+- 2026-08-25 &middot; added the Audience section: trade/wholesale docs vs.
+  customer-facing docs are different documents with different rules.
 - 2026-08-13 &middot; started, from the first round of feedback on the med
   spa body-care guide.
