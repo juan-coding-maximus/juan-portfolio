@@ -73,3 +73,17 @@ export function defaultActiveDay(byDay: Record<string, unknown[] | undefined>, d
   if (days.includes(iso)) return iso;
   return days.find((d) => (byDay[d]?.length ?? 0) > 0) ?? days[0];
 }
+
+const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** "2026-08-25" -> { weekday: "Tue", short: "8/25" }. Parsed as parts and
+    anchored at UTC noon, same trick as weekdayIsoOf above: parsing the bare
+    date directly would read it as UTC midnight and roll the weekday back a
+    day anywhere west of Greenwich. Shared by DayTabs and the day-move picker
+    so a tab's label and a picker's label can never disagree about the same
+    date. */
+export function dayLabel(iso: string): { weekday: string; short: string } {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d, 12));
+  return { weekday: WEEKDAY_NAMES[dt.getUTCDay()], short: `${m}/${d}` };
+}

@@ -104,11 +104,12 @@ export function MapScreen({
     moveInRoute,
     moveToTop,
     reorderRoute,
-    postponeToNextDay,
+    moveStopToDay,
     clearRoute,
     calls,
     addCall,
     removeCall,
+    moveCallToDay,
   } = useRoute();
 
   /* An account entry that no longer resolves drops out here (see getRouteDraft);
@@ -436,6 +437,7 @@ export function MapScreen({
         onChangeEnd={editEnd}
         onMove={moveInRoute}
         onMoveToTop={moveToTop}
+        onReorder={reorderRoute}
         onRemove={removeFromRoute}
         onClear={clearRoute}
         onShowInMap={showInMap}
@@ -443,10 +445,11 @@ export function MapScreen({
         calls={calls}
         onAddCall={addCall}
         onRemoveCall={removeCall}
+        onMoveCallDay={moveCallToDay}
         days={days}
         activeDay={activeDay}
         onSelectDay={setActiveDay}
-        onPostpone={postponeToNextDay}
+        onMoveStopDay={moveStopToDay}
         onOptimize={handleOptimizeRoute}
         busy={routeBusy}
       />

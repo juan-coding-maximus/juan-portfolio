@@ -39,11 +39,14 @@
  *      Nothing is stored, so a time can never disagree with the list above it.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CallEntry, CustomStop, CustomStopKind, RouteEndpoint, RouteSchedulePrefs } from "../lib/dal";
+import { dayLabel } from "../lib/field-week";
 import { appleMapsUrl, CUSTOM_STOP_LABEL, fullAddress, Ico, prettyPhone, ReachLinks, TierChip } from "../lib/ui";
 import { AccountLink } from "../lib/modal";
 import { resolveStopAddress } from "../lib/stop-actions";
+import { CallSearchField } from "./CallSearchField";
+import { DayMoveMenu } from "./DayMoveMenu";
 import { routeDriveLegs, type DriveLeg } from "./drive-actions";
 import type { RouteStopView } from "./MapScreen";
 import { RouteEndpointField } from "./RouteEndpointField";
@@ -339,12 +342,20 @@ function AddCallForm({ onAdd }: { onAdd: (call: Omit<CallEntry, "id">) => void }
   return (
     <form onSubmit={submit} className="rounded-lg border border-[#E2DFD5] bg-white p-3.5">
       <div className="flex flex-col gap-2 sm:flex-row">
-        <input
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          placeholder="Who, e.g. Alex Conrad, Vasari Plaster"
+        {/* HUBSPOT SEARCH (2026-08-25): typing here searches the shared
+            portal for a contact or a company by name; picking a result fills
+            phone too (contact's own, else their company's, else -- for a
+            company result with none of its own -- a contact of theirs). See
+            CallSearchField and lib/hubspot-people-search.ts. Free typing
+            still works exactly as before; this only ever offers a shortcut. */}
+        <CallSearchField
+          label={label}
+          onChangeLabel={setLabel}
+          onPick={(r) => {
+            setLabel(r.label);
+            if (r.phone) setPhone(r.phone);
+          }}
           autoFocus
-          className="min-w-0 flex-[2] rounded-md border border-[#E2DFD5] bg-[#FCFBF7] px-3 py-2 text-[13.5px] outline-none placeholder:text-[#A9AFA9] focus:border-[#8A928C]"
         />
         <input
           value={phone}
@@ -383,7 +394,19 @@ function AddCallForm({ onAdd }: { onAdd: (call: Omit<CallEntry, "id">) => void }
   );
 }
 
-function CallsList({ calls, onRemove }: { calls: CallEntry[]; onRemove: (id: string) => void }) {
+function CallsList({
+  calls,
+  onRemove,
+  days,
+  active,
+  onMoveDay,
+}: {
+  calls: CallEntry[];
+  onRemove: (id: string) => void;
+  days: string[];
+  active: string;
+  onMoveDay: (id: string, day: string) => void;
+}) {
   if (calls.length === 0) return null;
   return (
     <ul className="divide-y divide-[#EEECE3] overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
@@ -404,6 +427,19 @@ function CallsList({ calls, onRemove }: { calls: CallEntry[]; onRemove: (id: str
             </div>
             {c.note && <p className="mt-0.5 text-[12.5px] leading-snug text-[#5B6560]">{c.note}</p>}
           </div>
+          {/* MOVE TO A DAY (2026-08-25): a call is Juan's own follow-up, same
+              as a stop, and he can plan one on the wrong tab just as easily.
+              Same picker the stop rows use, days.length > 1 guards the case
+              of a single-day horizon where there is nowhere else to move it. */}
+          {days.length > 1 && (
+            <DayMoveMenu
+              days={days}
+              active={active}
+              onPick={(day) => onMoveDay(c.id, day)}
+              label={`Move ${c.label} to a day`}
+              icon="chevrons-right"
+            />
+          )}
           <button
             type="button"
             onClick={() => onRemove(c.id)}
@@ -422,10 +458,16 @@ function CallsSection({
   calls,
   onAdd,
   onRemove,
+  days,
+  active,
+  onMoveDay,
 }: {
   calls: CallEntry[];
   onAdd: (call: Omit<CallEntry, "id">) => void;
   onRemove: (id: string) => void;
+  days: string[];
+  active: string;
+  onMoveDay: (id: string, day: string) => void;
 }) {
   return (
     <div className="mb-3">
@@ -438,7 +480,7 @@ function CallsSection({
         )}
       </div>
       <div className="flex flex-col gap-2">
-        <CallsList calls={calls} onRemove={onRemove} />
+        <CallsList calls={calls} onRemove={onRemove} days={days} active={active} onMoveDay={onMoveDay} />
         <AddCallForm onAdd={onAdd} />
       </div>
     </div>
@@ -606,17 +648,6 @@ function DayBar({
   );
 }
 
-// "2026-08-25" -> { weekday: "Tue", short: "8/25" }. Parsed as parts and
-// anchored at UTC noon, same trick as planningHorizonDates() in field-week.ts:
-// parsing the bare date directly would read it as UTC midnight and roll the
-// weekday back a day anywhere west of Greenwich.
-const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-function dayLabel(iso: string): { weekday: string; short: string } {
-  const [y, m, d] = iso.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d, 12));
-  return { weekday: WEEKDAY_NAMES[dt.getUTCDay()], short: `${m}/${d}` };
-}
-
 /**
  * The toggle at the top of Route: a rolling ten-weekday horizon, Monday
  * through Friday, always (2026-08-23, extended to a real rolling window
@@ -674,6 +705,7 @@ export function RoutePanel({
   onChangeEnd,
   onMove,
   onMoveToTop,
+  onReorder,
   onRemove,
   onClear,
   onShowInMap,
@@ -681,10 +713,11 @@ export function RoutePanel({
   calls,
   onAddCall,
   onRemoveCall,
+  onMoveCallDay,
   days,
   activeDay,
   onSelectDay,
-  onPostpone,
+  onMoveStopDay,
   onOptimize,
   busy,
 }: {
@@ -708,6 +741,10 @@ export function RoutePanel({
   onChangeEnd: (ep: RouteEndpoint | null) => void;
   onMove: (id: string, dir: -1 | 1) => void;
   onMoveToTop: (id: string) => void;
+  /** Reorder the whole day to an exact id order -- both Optimize route and
+      the drag handle below call this, the former with the router's answer,
+      the latter with wherever the pointer let go. */
+  onReorder: (idsInOrder: string[]) => void;
   onRemove: (id: string) => void;
   onClear: () => void;
   onShowInMap: (id: string) => void;
@@ -716,20 +753,78 @@ export function RoutePanel({
   calls: CallEntry[];
   onAddCall: (call: Omit<CallEntry, "id">) => void;
   onRemoveCall: (id: string) => void;
+  /** Move one call to any day on the horizon (2026-08-25). */
+  onMoveCallDay: (id: string, day: string) => void;
   /** The rolling ten-weekday horizon (Mon-Fri), the one Juan's on, and the switch. */
   days: string[];
   activeDay: string;
   onSelectDay: (day: string) => void;
-  /** Push one stop to the next day's tab. Disabled on the last tab. */
-  onPostpone: (id: string) => void;
+  /** Move one stop to any day on the horizon (2026-08-25): opens a day
+      picker rather than always pushing to the next tab. */
+  onMoveStopDay: (id: string, day: string) => void;
   /** Reorder the whole day for the least total driving (route-optimize.ts). */
   onOptimize: () => void;
   /** True while a smart-insert or an optimize is computing. */
   busy: boolean;
 }) {
-  const isLastDay = days.length === 0 || activeDay === days[days.length - 1];
   const [legs, setLegs] = useState<DriveLeg[] | null>(null);
   const [legState, setLegState] = useState<"loading" | "ok" | "unavailable">("loading");
+
+  // DRAG TO REORDER (2026-08-25), alongside the up/down chevrons, not instead
+  // of them -- the comment on the chevron button below still holds (one-
+  // handed in a parked car), this is for the times two hands and a longer
+  // list make a drag faster than eight taps of the single-step button.
+  //
+  // POINTER CAPTURE ON THE HANDLE, not a window listener: setPointerCapture
+  // keeps move/up events firing on the handle itself even once the finger has
+  // left it, which is exactly what a drag needs and is simpler than manually
+  // adding/removing window listeners on every drag start/end.
+  //
+  // NO LIVE REFLOW WHILE DRAGGING. The dragged row dims and an insertion line
+  // shows where it would land; the actual array only reorders once on drop,
+  // one onReorder call, same all-or-nothing contract Optimize route uses --
+  // never a silent partial reorder mid-drag.
+  const listRef = useRef<HTMLUListElement>(null);
+  const [drag, setDrag] = useState<{ id: string; dropIndex: number } | null>(null);
+
+  function dropIndexAt(clientY: number, excludeId: string): number {
+    const items = listRef.current
+      ? Array.from(listRef.current.querySelectorAll<HTMLLIElement>("li[data-stop-id]"))
+      : [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].dataset.stopId === excludeId) continue;
+      const rect = items[i].getBoundingClientRect();
+      if (clientY < rect.top + rect.height / 2) return i;
+    }
+    return items.length;
+  }
+
+  function handleGripDown(e: React.PointerEvent<HTMLButtonElement>, id: string, index: number) {
+    if (e.button !== 0 && e.pointerType === "mouse") return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setDrag({ id, dropIndex: index });
+  }
+
+  function handleGripMove(e: React.PointerEvent<HTMLButtonElement>) {
+    if (!drag) return;
+    e.preventDefault();
+    const next = dropIndexAt(e.clientY, drag.id);
+    if (next !== drag.dropIndex) setDrag({ ...drag, dropIndex: next });
+  }
+
+  function handleGripUp(e: React.PointerEvent<HTMLButtonElement>) {
+    if (!drag) return;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    const ids = stops.map((s) => s.id);
+    const from = ids.indexOf(drag.id);
+    const filtered = ids.filter((id) => id !== drag.id);
+    let insertAt = drag.dropIndex;
+    if (from !== -1 && from < drag.dropIndex) insertAt -= 1;
+    insertAt = Math.max(0, Math.min(filtered.length, insertAt));
+    filtered.splice(insertAt, 0, drag.id);
+    setDrag(null);
+    if (filtered.some((id, i) => id !== ids[i])) onReorder(filtered);
+  }
 
   /* Where the day actually starts/ends (0040): Juan's override if he picked
      one at either end, else the chain default for start / the waypoint for
@@ -810,7 +905,16 @@ export function RoutePanel({
     </div>
   );
 
-  const callsSection = <CallsSection calls={calls} onAdd={onAddCall} onRemove={onRemoveCall} />;
+  const callsSection = (
+    <CallsSection
+      calls={calls}
+      onAdd={onAddCall}
+      onRemove={onRemoveCall}
+      days={days}
+      active={activeDay}
+      onMoveDay={onMoveCallDay}
+    />
+  );
 
   const dayBar = (
     <DayBar
@@ -897,7 +1001,7 @@ export function RoutePanel({
             )}
           </div>
         )}
-        <ul className="divide-y divide-[#EEECE3]">
+        <ul ref={listRef} className="divide-y divide-[#EEECE3]">
           {stops.map((s, i) => {
             const prev = i > 0 ? stops[i - 1] : null;
             const a = s.type === "account" ? s.account : null;
@@ -909,8 +1013,23 @@ export function RoutePanel({
             // stop you cannot identify next to controls you do not need until
             // you have. Below sm the text gets the full width and the buttons
             // sit under it, right-aligned.
+            //
+            // THE INSERTION LINE (2026-08-25): while a drag is live, the row
+            // at drag.dropIndex gets a top border and the dragged row itself
+            // dims, rather than reflowing the whole list on every pointer
+            // move -- see the drag handlers above for why.
+            const dropBefore = drag && drag.dropIndex === i && drag.id !== s.id;
+            const dropAtEnd = drag && drag.dropIndex === stops.length && i === stops.length - 1;
             return (
-              <li key={s.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3">
+              <li
+                key={s.id}
+                data-stop-id={s.id}
+                className={`flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3 ${
+                  drag?.id === s.id ? "opacity-40" : ""
+                } ${dropBefore ? "border-t-2 border-[#2C6A46]" : ""} ${
+                  dropAtEnd ? "border-b-2 border-[#2C6A46]" : ""
+                }`}
+              >
                 <div className="flex min-w-0 flex-1 items-start gap-3">
                 {/* An amber square for a lunch or hotel stop, the same shape and
                     colour it gets on the map, so the list and the map agree at a
@@ -1052,6 +1171,25 @@ export function RoutePanel({
                 </div>
 
                 <div className="flex shrink-0 items-center justify-end gap-1">
+                  {/* DRAG HANDLE (2026-08-25), first in the row so it sits
+                      right against the stop's own text rather than among the
+                      tap targets: grab and drop anywhere in the list, no
+                      per-position tap count. Alongside the chevrons below,
+                      not instead of them -- see the drag-state comment above
+                      for why both stay. touchAction: none stops the page
+                      itself from scrolling while a finger is mid-drag. */}
+                  <button
+                    type="button"
+                    onPointerDown={(e) => handleGripDown(e, s.id, i)}
+                    onPointerMove={handleGripMove}
+                    onPointerUp={handleGripUp}
+                    onPointerCancel={() => setDrag(null)}
+                    aria-label={`Drag ${title} to reorder`}
+                    style={{ touchAction: "none" }}
+                    className="cursor-grab rounded-md border border-[#E2DFD5] bg-white px-2 py-2 text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] active:cursor-grabbing"
+                  >
+                    <Ico name="grip" size={13} />
+                  </button>
                   {/* MOVE TO TOP (2026-08-21): a stop found deep on the
                       ten-closest list otherwise costs one tap of the chevron
                       per position to become the day's first door. Same
@@ -1086,21 +1224,20 @@ export function RoutePanel({
                   >
                     <Ico name="chevron-down" size={13} />
                   </button>
-                  {/* POSTPONE (2026-08-23): push this stop to the next day's
-                      tab. Disabled on the last tab -- there is nowhere on this
-                      screen for it to land, so it stays put rather than
-                      wrapping to a day nobody's looking at. */}
-                  <button
-                    type="button"
-                    onClick={() => onPostpone(s.id)}
-                    disabled={isLastDay}
-                    aria-label={
-                      isLastDay ? `${title} is already on the last day` : `Push ${title} to the next day`
-                    }
-                    className="rounded-md border border-[#E2DFD5] bg-white px-2 py-2 text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] disabled:cursor-not-allowed disabled:opacity-30"
-                  >
-                    <Ico name="chevrons-right" size={13} />
-                  </button>
+                  {/* MOVE TO A DAY (2026-08-25): was a plain postpone-to-
+                      tomorrow button, now opens a picker over the whole
+                      horizon -- see DayMoveMenu. Hidden rather than disabled
+                      on a single-day horizon, since there is nowhere for it
+                      to open onto. */}
+                  {days.length > 1 && (
+                    <DayMoveMenu
+                      days={days}
+                      active={activeDay}
+                      onPick={(day) => onMoveStopDay(s.id, day)}
+                      label={`Move ${title} to a day`}
+                      icon="chevrons-right"
+                    />
+                  )}
                   <button
                     type="button"
                     onClick={() => onShowInMap(s.id)}

@@ -46,13 +46,19 @@ type RouteCtx = {
   moveInRoute: (id: string, dir: -1 | 1) => void;
   moveToTop: (id: string) => void;
   reorderRoute: (idsInOrder: string[]) => void;
-  postponeToNextDay: (id: string) => void;
+  /** Move one stop from the active day to any day on the horizon (2026-08-25,
+   *  generalizes the old "postpone to next day only" button into a day
+   *  picker). A no-op moving to the day it is already on. */
+  moveStopToDay: (id: string, day: string) => void;
   clearRoute: () => void;
   /** The active day's calls (0041): phone-only, no drive position, never
    *  reordered, never part of route_draft. See dal.ts's CallEntry. */
   calls: CallEntry[];
   addCall: (call: Omit<CallEntry, "id">) => void;
   removeCall: (id: string) => void;
+  /** Move one call to any day on the horizon (2026-08-25), same shape as
+   *  moveStopToDay but over the calls column. */
+  moveCallToDay: (id: string, day: string) => void;
 };
 
 const Ctx = createContext<RouteCtx | null>(null);
@@ -144,19 +150,18 @@ export function RouteProvider({
     commitDay(activeDay, next);
   }
 
-  // Push one stop to the next field-day tab, dropped onto the end of that
-  // day's list (2026-08-23). A no-op past the last tab -- there is nowhere on
-  // this screen to show it landing, so the button that calls this is disabled
-  // there rather than silently wrapping to a day nobody's looking at.
-  function postponeToNextDay(id: string) {
-    const dayIdx = days.indexOf(activeDay);
-    if (dayIdx < 0 || dayIdx >= days.length - 1) return;
+  // Move one stop to any day on the horizon (2026-08-25), dropped onto the
+  // end of that day's list. Generalizes the old "postpone to next day only"
+  // button, which is now a day picker rather than a single fixed step -- see
+  // DayMoveMenu. A no-op moving to the day it is already on.
+  function moveStopToDay(id: string, day: string) {
+    if (day === activeDay) return;
+    if (!days.includes(day)) return;
     const entry = routeDraft.find((e) => entryId(e) === id);
     if (!entry) return;
-    const nextDay = days[dayIdx + 1];
-    const nextDayList = draftByDay[nextDay] ?? [];
-    if (nextDayList.some((e) => entryId(e) === id)) {
-      // already on tomorrow's list too -- just drop it from today's
+    const targetList = draftByDay[day] ?? [];
+    if (targetList.some((e) => entryId(e) === id)) {
+      // already on the target day's list too -- just drop it from today's
       commitDay(activeDay, routeDraft.filter((e) => entryId(e) !== id));
       return;
     }
@@ -164,7 +169,7 @@ export function RouteProvider({
     const nextByDay = {
       ...draftByDay,
       [activeDay]: routeDraft.filter((e) => entryId(e) !== id),
-      [nextDay]: [...nextDayList, entry],
+      [day]: [...targetList, entry],
     };
     setDraftByDay(nextByDay);
     saveRouteDraft(nextByDay).catch(() => setDraftByDay(prev));
@@ -194,6 +199,29 @@ export function RouteProvider({
     commitCalls(activeDay, calls.filter((c) => c.id !== id));
   }
 
+  // Same shape as moveStopToDay, over callsByDay instead of draftByDay: a
+  // call has no drive position, so there is no "insert at the end in order"
+  // question, it just lands in the target day's list.
+  function moveCallToDay(id: string, day: string) {
+    if (day === activeDay) return;
+    if (!days.includes(day)) return;
+    const entry = calls.find((c) => c.id === id);
+    if (!entry) return;
+    const targetList = callsByDay[day] ?? [];
+    if (targetList.some((c) => c.id === id)) {
+      commitCalls(activeDay, calls.filter((c) => c.id !== id));
+      return;
+    }
+    const prev = callsByDay;
+    const nextByDay = {
+      ...callsByDay,
+      [activeDay]: calls.filter((c) => c.id !== id),
+      [day]: [...targetList, entry],
+    };
+    setCallsByDay(nextByDay);
+    saveRouteCalls(nextByDay).catch(() => setCallsByDay(prev));
+  }
+
   return (
     <Ctx.Provider
       value={{
@@ -208,11 +236,12 @@ export function RouteProvider({
         moveInRoute,
         moveToTop,
         reorderRoute,
-        postponeToNextDay,
+        moveStopToDay,
         clearRoute,
         calls,
         addCall,
         removeCall,
+        moveCallToDay,
       }}
     >
       {children}

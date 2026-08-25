@@ -73,6 +73,18 @@ const ICONS: Record<string, ReactNode> = {
   gauge: <><circle cx="8" cy="8.6" r="5.8" /><path d="M8 8.6 10.6 6M5.4 8.6h5.2" strokeLinecap="round" /></>,
   receipt: <><path d="M4 2.4h8v11.2l-1.4-1-1.4 1-1.2-1-1.2 1-1.4-1-1.4 1z" /><path d="M6 5.6h4M6 8h4M6 10.4h2.6" /></>,
   more: <><circle cx="4" cy="8" r="1.15" fill="currentColor" stroke="none" /><circle cx="8" cy="8" r="1.15" fill="currentColor" stroke="none" /><circle cx="12" cy="8" r="1.15" fill="currentColor" stroke="none" /></>,
+  // Drag handle (2026-08-25): a 2x3 dot grid, the standard "grab this" glyph,
+  // distinct from "more" (its 1x3 row) at a glance in the same small control row.
+  grip: (
+    <>
+      <circle cx="6" cy="4.5" r="1.05" fill="currentColor" stroke="none" />
+      <circle cx="10" cy="4.5" r="1.05" fill="currentColor" stroke="none" />
+      <circle cx="6" cy="8" r="1.05" fill="currentColor" stroke="none" />
+      <circle cx="10" cy="8" r="1.05" fill="currentColor" stroke="none" />
+      <circle cx="6" cy="11.5" r="1.05" fill="currentColor" stroke="none" />
+      <circle cx="10" cy="11.5" r="1.05" fill="currentColor" stroke="none" />
+    </>
+  ),
 };
 
 /**
