@@ -193,7 +193,7 @@ function Hero() {
           JUAN ARENAS
         </h1>
         <p className="mt-6 font-display italic text-[clamp(1rem,2.2vw,1.5rem)] text-[#C9A24B]">
-          Cold contact to closed deal.
+          Explain your science to the right audience. Get leads. Close deals.
         </p>
         <div className="mt-12 flex justify-center">
           <a href="#portfolio" className="text-[#F2EFE6]/40 hover:text-[#F2EFE6]/70 transition-colors" aria-label="Scroll down">
@@ -885,8 +885,8 @@ function Capabilities() {
     {
       num: "03",
       icon: "flask",
-      title: "Science-fluent selling",
-      desc: "I speak lab and clinic. I have spent two years selling things buyers had to be convinced they needed, to the most skeptical rooms there are.",
+      title: "Science-fluent messaging & content",
+      desc: "I turn dense science into messaging each buyer persona actually reads, clinician, investor, or patient, sharpened until it generates the leads you close.",
     },
     {
       num: "04",
@@ -910,7 +910,7 @@ function Capabilities() {
             How I help your team.
           </h2>
           <p className="font-display italic text-lg text-[#F2EFE6]/55 mb-8 md:mb-12">
-            The route from complex science to revenue, end to end.
+            The route from complex science, to the right message, to revenue.
           </p>
         </Reveal>
         {/* Olympic rings layout: 3 on top, 2 offset below (lg+). Mobile: 1-col, sm: 2-col */}
