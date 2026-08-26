@@ -309,11 +309,12 @@ function BrandStrip() {
   const bio:     BrandItem = { kind: "img", src: "/img/logos/biotech-connection.png",alt: "Biotech Connection LA",                    href: "https://bc-la.org",             rounded: true };
   const metaba:  BrandItem = { kind: "img", src: "/img/logos/metaba.png",            alt: "Metaba Health",                            href: "https://metabahealth.us",       rounded: true };
   const super_:  BrandItem = { kind: "img", src: "/img/logos/superbiome.png",        alt: "Milieu Skin Microbiome",                   href: "https://milieuskin.com",        rounded: true };
+  const nutri:   BrandItem = { kind: "img", src: "/img/logos/nutribiotic-white.png", alt: "NutriBiotic",                              href: "https://nutribiotic.com" };
 
   const all: BrandItem[] = [
     aura, metaba, bio, super_, brain, aura,
-    metaba, bio, brain, super_, tranq, metaba,
-    bio, super_, aura, tranq,
+    metaba, nutri, bio, brain, super_, tranq,
+    metaba, bio, nutri, super_, aura, tranq,
   ];
 
   function tooltip(href: string) {
@@ -590,6 +591,19 @@ function CaseArtifact({ art }: { art: string }) {
     return <CPBHVideo />;
   }
 
+  if (art === "nutribiotic-logo-tile") {
+    return (
+      <div className="aspect-[4/3] rounded-3xl border border-[#284A3C] bg-[#0e1813] flex items-center justify-center p-10">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/img/logos/nutribiotic-white.png"
+          alt="NutriBiotic"
+          className="w-full h-auto max-h-32 object-contain"
+        />
+      </div>
+    );
+  }
+
   // default placeholder
   return (
     <div className="aspect-video rounded-3xl border border-[#284A3C] bg-[#0e1813] flex items-center justify-center text-[#F2EFE6]/20 text-sm px-6 text-center">
@@ -640,6 +654,27 @@ function CaseStudies() {
     art: string; newsletters?: boolean; role?: string;
   }[] = [
     {
+      tag: "HIPAA COMPLIANT MARKETING",
+      role: "Revenue Ops & Marketing Lead",
+      title: "I joined a world‑class Alzheimer's center to get their science out of the journals and into the world, loud and clear.",
+      body: (
+        <ul className="space-y-3">
+          <CaseBullet>
+            Led the cross‑functional marketing engine of an Alzheimer&apos;s Lab &amp; Brain Health Clinic: content, email, social, and web, all HIPAA‑compliant and on‑brand.
+          </CaseBullet>
+          <CaseBullet>
+            <strong className="text-[#C9A24B] font-medium">2× newsletter and social reach in 8 months</strong>
+            , growing a pipeline of engaged patients and caregivers.
+          </CaseBullet>
+          <CaseBullet>
+            Launched and scaled a Spanish‑language newsletter, expanding the addressable LA market.
+          </CaseBullet>
+        </ul>
+      ),
+      art: "cpbh-video",
+      newsletters: true,
+    },
+    {
       tag: "BUSINESS DEVELOPMENT · OUTBOUND · CLOSING",
       role: "Business Developer",
       title: "I owned 200+ accounts as a business developer, cold contact to close.",
@@ -685,22 +720,23 @@ function CaseStudies() {
       art: "n8n-video",
     },
     {
-      tag: "COLD CALLING · NO BRAND · FIRST CLOSE",
+      tag: "0→1 GO-TO-MARKET · DIAGNOSTICS",
       role: "Founding Go-To-Market Operator",
-      title: "I cold-called dermatologists for a company that didn't exist yet, and closed the first clients.",
+      title: "I set the go-to-market plan for a 0→1 diagnostics startup, then closed the first clients myself.",
       body: (
         <ul className="space-y-3">
           <CaseBullet>
-            Called dermatologists and clinic decision-makers across Los Angeles with{" "}
-            <strong className="text-[#C9A24B] font-medium">zero brand recognition behind me</strong>
-            , booking the meetings that became standing relationships at several LA clinics.
+            Set the full commercial plan for a{" "}
+            <strong className="text-[#C9A24B] font-medium">0→1 longevity-metabolomics diagnostics startup</strong>
+            : AI-driven Meta Ads leads, custom conversion software, and route-planned visits into dermatology and longevity-clinic accounts.
           </CaseBullet>
           <CaseBullet>
-            Built the website before anyone asked, then the outbound pipeline into dermatology, concierge, and longevity clinics.
+            Cold-called dermatologists and clinic decision-makers across Los Angeles with zero brand recognition behind me, engaged{" "}
+            <strong className="text-[#C9A24B] font-medium">50+ high-intent leads</strong>
+            , and closed the first paying clients on a pilot program.
           </CaseBullet>
           <CaseBullet>
-            Warmed the first leads and{" "}
-            <strong className="text-[#C9A24B] font-medium">closed the first paying clients</strong>.
+            Wrote the sales playbook for further market development, and built the company&apos;s investor website and pitch deck.
           </CaseBullet>
         </ul>
       ),
@@ -737,25 +773,25 @@ function CaseStudies() {
       art: "aura-collage",
     },
     {
-      tag: "HIPAA COMPLIANT MARKETING",
-      role: "Revenue Ops & Marketing Lead",
-      title: "I joined a world‑class Alzheimer's center to get their science out of the journals and into the world, loud and clear.",
+      tag: "FIELD SALES · PLAYBOOK · TERRITORY",
+      role: "Field Sales Manager",
+      title: "I run the Southern California territory for a national supplement brand, cold accounts to signed shelf space.",
       body: (
         <ul className="space-y-3">
           <CaseBullet>
-            Led the cross‑functional marketing engine of an Alzheimer&apos;s Lab &amp; Brain Health Clinic: content, email, social, and web, all HIPAA‑compliant and on‑brand.
+            Manage enterprise account acquisition (Whole Foods, CVS, Sprouts) plus{" "}
+            <strong className="text-[#C9A24B] font-medium">200+ independent accounts</strong>
+            , writing the sales playbook the whole company, including 30+ outside salespeople, runs on.
           </CaseBullet>
           <CaseBullet>
-            <strong className="text-[#C9A24B] font-medium">2× newsletter and social reach in 8 months</strong>
-            , growing a pipeline of engaged patients and caregivers.
+            <strong className="text-[#C9A24B] font-medium">40-under-40</strong>: opened 40 new accounts in under 40 days, converting 10 to paying clients with custom sales collateral built to prove product validity and cut friction to buy.
           </CaseBullet>
           <CaseBullet>
-            Launched and scaled a Spanish‑language newsletter, expanding the addressable LA market.
+            Built optimized territory routes on custom AI agents running on top of the CRM, logging visits and setting next touchpoints; coached the Northern California rep onto the system, raising his daily visits from 6 to 9.
           </CaseBullet>
         </ul>
       ),
-      art: "cpbh-video",
-      newsletters: true,
+      art: "nutribiotic-logo-tile",
     },
   ];
 
@@ -769,7 +805,7 @@ function CaseStudies() {
         </Reveal>
         <div className="space-y-24 lg:space-y-32">
           {cases.map((c, i) => (
-            <div key={i} className={i === 2 ? "lg:!mt-56" : ""}>
+            <div key={i} className={i === 3 ? "lg:!mt-56" : ""}>
             <Reveal delay={100}>
               <article>
                 <div className="grid lg:grid-cols-2 gap-10 items-center">
