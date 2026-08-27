@@ -8,6 +8,7 @@
 
 import { PageHead, Card, Ico } from "../lib/ui";
 import {
+  getHomeEndpoint,
   getReportDraft,
   listPlaybookReports,
   listPlaybookReportArchive,
@@ -26,10 +27,11 @@ const REPORT_TITLE: Record<"daily" | "weekly", string> = {
 
 export default async function ReportsIndex() {
   const today = reportDateLA();
-  const [reports, archive, draft] = await Promise.all([
+  const [reports, archive, draft, home] = await Promise.all([
     listPlaybookReports(),
     listPlaybookReportArchive(),
     getReportDraft(today).catch(() => null),
+    getHomeEndpoint().catch(() => null),
   ]);
   const previewUrl = draft?.preview_path && !draft.dirty ? await signReportPreview(draft.preview_path) : null;
 
@@ -45,7 +47,7 @@ export default async function ReportsIndex() {
           pin could only be corrected by sending a follow-up. This is where he
           reads it first. Absent until a draft exists for today. */}
       {draft ? (
-        <ReportReview draft={draft} previewUrl={previewUrl} />
+        <ReportReview draft={draft} previewUrl={previewUrl} home={home} />
       ) : (
         <ReportReview
           draft={{
@@ -61,6 +63,7 @@ export default async function ReportsIndex() {
             updated_at: new Date().toISOString(),
           }}
           previewUrl={null}
+          home={home}
         />
       )}
 

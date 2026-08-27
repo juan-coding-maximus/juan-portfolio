@@ -6,6 +6,7 @@ import {
   requestReportRebuild,
   saveReportDraftPayload,
   setReportDraftStatus,
+  type RouteEndpoint,
   type ReportHqNote,
   type ReportPayload,
 } from "./dal";
@@ -25,7 +26,12 @@ import {
  *   - each stop's hidden / call-only / message-only classification, which is
  *     what decides map inclusion and mileage and is where the heuristics
  *     actually get it wrong;
- *   - miles, when the computed drive is wrong.
+ *   - where the day starts and ends (route_start_override/route_end_override),
+ *     when field_report.py's route_endpoints_for() got it wrong or nothing was
+ *     ever planned for the day -- the 2026-08-27 bug (a Sands of La Jolla
+ *     overnight reported as a round trip from Manhattan Beach because the
+ *     report never looked at the route plan);
+ *   - miles, when the computed drive is wrong even with the right start/end.
  * Everything else on the report is a HubSpot record. Correcting one of those
  * means correcting the CRM, which is a separate and separately-gated write.
  * Nothing here touches HubSpot.
@@ -49,6 +55,10 @@ export async function actionDecideReport(
 export type ReportEdits = {
   hqNotes: ReportHqNote[];
   miles: number | null;
+  /** null = clear the override (fall back to route_endpoints_for's default);
+   *  undefined = leave whatever override is already stored untouched. */
+  routeStart?: RouteEndpoint | null;
+  routeEnd?: RouteEndpoint | null;
   stops: Record<string, { hidden: boolean; call_only: boolean; message_only: boolean }>;
 };
 
@@ -86,6 +96,9 @@ export async function actionSaveReportEdits(dateISO: string, edits: ReportEdits)
   // field_report.py, which is where both branches are resolved.
   payload.miles_override =
     edits.miles === null || Number.isNaN(edits.miles) ? null : edits.miles;
+
+  if (edits.routeStart !== undefined) payload.route_start_override = edits.routeStart;
+  if (edits.routeEnd !== undefined) payload.route_end_override = edits.routeEnd;
 
   payload.stops = (draft.payload.stops ?? []).map((s) => {
     const e = edits.stops[String(s.n)];

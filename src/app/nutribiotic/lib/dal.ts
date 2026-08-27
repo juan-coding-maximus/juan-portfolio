@@ -1567,6 +1567,22 @@ export async function setShowPracticeAccounts(show: boolean): Promise<void> {
  */
 export type RouteEndpoint = { label: string; address: string; lat: number; lng: number };
 
+/**
+ * Juan's apartment (migration 0029's waypoint account), as a RouteEndpoint --
+ * the same quick-pick "Home" row RouteEndpointField shows on the Map screen,
+ * reused on the Reports review screen so correcting a report's start/end
+ * offers the same shortcut rather than making him retype the address.
+ */
+export async function getHomeEndpoint(): Promise<RouteEndpoint | null> {
+  const rows = await raw<{ name: string; street: string | null; city: string | null; state: string | null; postal: string | null; lat: number; lng: number }>(
+    "nb_accounts?select=name,street,city,state,postal,lat,lng&lifecycle=eq.waypoint&limit=1",
+  );
+  const w = rows[0];
+  if (!w) return null;
+  const address = [w.street, w.city, w.state, w.postal].filter(Boolean).join(", ") || w.name;
+  return { label: "Home", address, lat: w.lat, lng: w.lng };
+}
+
 export type RouteSchedulePrefs = {
   depart: string;          // "09:30", local, no zone: it is a wall clock
   dwellMinutes: number;
@@ -2902,7 +2918,23 @@ export type ReportHqNote = { category: string; text: string; source: string };
 export type ReportPayload = {
   date_label?: string;
   date_iso?: string;
+  no_return?: boolean;
+  /** field_report.py's computed figure (build_report) or last recompute
+   *  (apply_edits). Read-only from here -- write miles_override instead. */
   miles?: number | null;
+  /** A figure Juan typed by hand. Null means "recompute from start/stops/end",
+   *  which is what apply_edits does on every render once this is cleared. */
+  miles_override?: number | null;
+  /** field_report.py's resolved default for the day (route_endpoints_for):
+   *  the route plan's start/end, or home if nothing was planned. Read-only --
+   *  write route_start_override/route_end_override to correct it. */
+  route_start?: RouteEndpoint;
+  route_end?: RouteEndpoint;
+  /** Juan's correction, when the resolved default above is wrong -- the
+   *  2026-08-27 bug (a Sands of La Jolla overnight reported as a round trip
+   *  from Manhattan Beach). Null means "use route_start/route_end as-is". */
+  route_start_override?: RouteEndpoint | null;
+  route_end_override?: RouteEndpoint | null;
   hq_notes?: ReportHqNote[];
   summary?: Record<string, number | boolean | null>;
   stops?: Array<{

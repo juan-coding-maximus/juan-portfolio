@@ -2,8 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { ReportDraft, ReportHqNote } from "./dal";
+import type { ReportDraft, ReportHqNote, RouteEndpoint } from "./dal";
 import { actionDecideReport, actionRequestRebuild, actionSaveReportEdits } from "./report-actions";
+import { RouteEndpointField } from "../map/RouteEndpointField";
 import { Ico, SuccessNote } from "./ui";
 
 const HQ_CATEGORIES = [
@@ -36,7 +37,18 @@ type StopEdit = { hidden: boolean; call_only: boolean; message_only: boolean };
  * classification, and the mileage. Every other line on the report is a HubSpot
  * record and is corrected in HubSpot. Nothing on this screen writes to the CRM.
  */
-export function ReportReview({ draft, previewUrl }: { draft: ReportDraft; previewUrl: string | null }) {
+export function ReportReview({
+  draft,
+  previewUrl,
+  home,
+}: {
+  draft: ReportDraft;
+  previewUrl: string | null;
+  /** Juan's apartment, for the start/end pickers' "Home" quick-pick. Null if
+      the waypoint account is missing -- the pickers still work, just without
+      that shortcut, same as RouteEndpointField on the Map screen. */
+  home: RouteEndpoint | null;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState<string | null>(null);
@@ -48,6 +60,12 @@ export function ReportReview({ draft, previewUrl }: { draft: ReportDraft; previe
   const [miles, setMiles] = useState<string>(
     payload?.miles_override != null ? String(payload.miles_override) : "",
   );
+  // null = use the route plan's resolved default (payload.route_start/_end,
+  // set by field_report.py's route_endpoints_for -- not always home anymore,
+  // see 2026-08-27). A picked value is Juan overriding that default because
+  // it's wrong or nothing was ever planned.
+  const [routeStart, setRouteStart] = useState<RouteEndpoint | null>(payload?.route_start_override ?? null);
+  const [routeEnd, setRouteEnd] = useState<RouteEndpoint | null>(payload?.route_end_override ?? null);
   const [stopEdits, setStopEdits] = useState<Record<string, StopEdit>>(() =>
     Object.fromEntries(
       stops.map((s) => [
@@ -64,13 +82,19 @@ export function ReportReview({ draft, previewUrl }: { draft: ReportDraft; previe
   const sent = draft.status === "sent";
   const locked = sent || pending;
 
+  function currentEdits() {
+    return {
+      hqNotes,
+      miles: miles.trim() === "" ? null : Number(miles),
+      routeStart,
+      routeEnd,
+      stops: stopEdits,
+    };
+  }
+
   function save(then?: () => void) {
     startTransition(async () => {
-      await actionSaveReportEdits(draft.report_date, {
-        hqNotes,
-        miles: miles.trim() === "" ? null : Number(miles),
-        stops: stopEdits,
-      });
+      await actionSaveReportEdits(draft.report_date, currentEdits());
       setSaved("Saved. The preview is re-rendering.");
       then?.();
       router.refresh();
@@ -81,11 +105,7 @@ export function ReportReview({ draft, previewUrl }: { draft: ReportDraft; previe
     startTransition(async () => {
       // Save first, always: approving something he edited but did not save
       // would mail the version he was looking away from.
-      await actionSaveReportEdits(draft.report_date, {
-        hqNotes,
-        miles: miles.trim() === "" ? null : Number(miles),
-        stops: stopEdits,
-      });
+      await actionSaveReportEdits(draft.report_date, currentEdits());
       await actionDecideReport(draft.report_date, decision);
       setSaved(
         decision === "approved"
@@ -174,6 +194,44 @@ export function ReportReview({ draft, previewUrl }: { draft: ReportDraft; previe
                 The PDF is behind your edits. It re-renders within a few minutes.
               </span>
             )}
+          </div>
+
+          {/* START/END. field_report.py resolves these from the route plan
+              (route_start/route_end -- migration 0040, not always home
+              anymore since the 2026-08-27 fix: a day never assumes Manhattan
+              Beach when a hotel was actually planned). Overriding here is for
+              when that default is still wrong, or nothing was ever planned. */}
+          <div className="mb-5 grid gap-3 sm:grid-cols-2">
+            <div>
+              <div className="mb-1 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">Route starts</div>
+              {sent ? (
+                <span className="text-[13.5px] text-[#5B6560]">
+                  {(routeStart ?? payload.route_start ?? home)?.label ?? "—"}
+                </span>
+              ) : (
+                <RouteEndpointField
+                  value={routeStart}
+                  home={home}
+                  fallback={payload.route_start ?? home}
+                  onChange={setRouteStart}
+                />
+              )}
+            </div>
+            <div>
+              <div className="mb-1 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">Route ends</div>
+              {sent ? (
+                <span className="text-[13.5px] text-[#5B6560]">
+                  {(routeEnd ?? payload.route_end ?? home)?.label ?? "—"}
+                </span>
+              ) : (
+                <RouteEndpointField
+                  value={routeEnd}
+                  home={home}
+                  fallback={payload.route_end ?? home}
+                  onChange={setRouteEnd}
+                />
+              )}
+            </div>
           </div>
 
           {/* STOPS. The three toggles are exactly the ones that decide what the
