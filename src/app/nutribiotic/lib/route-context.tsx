@@ -116,12 +116,30 @@ export function RouteProvider({
   const [doneByDay, setDoneByDay] = useState<RouteDoneByDay>({});
   const [hydrated, setHydrated] = useState(false);
   const dayTouchedRef = useRef(false);
+  const hydratedRef = useRef(false);
 
+  /**
+   * HYDRATES EXACTLY ONCE, and that is deliberate.
+   *
+   * RefreshOnForeground fires router.refresh() on every return to the
+   * foreground, which re-renders the layout and hands down a NEW promise. If
+   * each one were allowed to overwrite state, an optimistic local edit
+   * (commitDay writes the list first and saves after) could be reverted by a
+   * refresh whose read raced ahead of its own save. Juan would watch a stop he
+   * just added disappear.
+   *
+   * Seeding once preserves exactly the semantics this provider had when it
+   * took a plain `initial` value through useState, which ignores later props
+   * by definition. The only thing that changed is WHEN the first seed lands:
+   * a beat after paint instead of blocking it.
+   */
   useEffect(() => {
+    if (hydratedRef.current) return;
     let live = true;
     initial
       .then((state) => {
-        if (!live) return;
+        if (!live || hydratedRef.current) return;
+        hydratedRef.current = true;
         setDraftByDay(state.draft);
         setCallsByDay(state.calls);
         setDoneByDay(state.done);
