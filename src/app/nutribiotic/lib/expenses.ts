@@ -341,6 +341,10 @@ export async function uploadMileagePhoto(
  */
 export async function fileTripFromLinks(input: {
   date: string; startOdo: string; endOdo: string; startLink: string; endLink: string;
+  /** Set when a side came from the widget's "Enter manually" bypass rather
+   *  than a photo, so the cell says so plainly instead of rendering an empty
+   *  link that would read as a missing/broken upload. */
+  startManual?: boolean; endManual?: boolean;
 }): Promise<{ sheetLink: string; miles: number }> {
   const startNum = Number(String(input.startOdo).replace(/,/g, ""));
   const endNum = Number(String(input.endOdo).replace(/,/g, ""));
@@ -357,8 +361,8 @@ export async function fileTripFromLinks(input: {
   // expense_log.py, a per-drive dollar figure read as more precision than the claim needs.
   const row = Math.max(await nextFreeRow(tree.sheetId, LOG_TAB, "H"), FIRST_DATA_ROW);
   await writeRange(tree.sheetId, `${LOG_TAB}!H${row}:M${row}`, [[
-    input.startOdo, hyperlink(input.startLink, "photo"),
-    input.endOdo, hyperlink(input.endLink, "photo"),
+    input.startOdo, input.startManual ? "no photo (manual)" : hyperlink(input.startLink, "photo"),
+    input.endOdo, input.endManual ? "no photo (manual)" : hyperlink(input.endLink, "photo"),
     `=IF(OR(H${row}="",J${row}=""),"",J${row}-H${row})`,
     "",
   ]]);

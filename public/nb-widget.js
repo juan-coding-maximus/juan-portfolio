@@ -198,12 +198,16 @@ function backLine(data) {
  * `scriptable:///run/<this script's own name>` rather than a hardcoded name:
  * Script.name() is whatever Juan actually named this script on his phone, so
  * the URL is correct regardless, and stays correct if he ever renames it.
+ *
+ * BYPASS (2026-08-27): the tap doesn't go straight to the camera any more --
+ * chooseMileageMethod() offers "Enter Manually" first, for the odometer that
+ * just won't photograph cleanly. See captureAndUploadMileage below.
  */
 function renderMileagePrompt(w, data, mode) {
   const label = mode === "start" ? "Record start mileage" : "Record end mileage";
   const sub =
     mode === "start"
-      ? "Tap to open the camera before today's route."
+      ? "Tap for the camera, or to enter it by hand."
       : "Every stop is done. Tap to close out the day.";
   w.addSpacer(4);
   txt(w, label, { size: 15, bold: true, lines: 2 });
@@ -496,17 +500,80 @@ async function fetchRoute() {
 }
 
 /**
+ * "Take Photo" or "Enter Manually" (Juan's bypass ask, 2026-08-27) -- asked
+ * BEFORE the camera ever opens, so a dead dashboard light, glare, or a hand
+ * that just doesn't have the photo isn't a dead end. Returns "photo",
+ * "manual", or null on Cancel.
+ */
+async function chooseMileageMethod(mode) {
+  const alert = new Alert();
+  alert.title = mode === "end" ? "Record end mileage" : "Record start mileage";
+  alert.message = "Can't get a clean photo of the odometer? Enter the reading by hand instead.";
+  alert.addAction("Take Photo");
+  alert.addAction("Enter Manually");
+  alert.addCancelAction("Cancel");
+  const idx = await alert.presentAlert();
+  return idx === 0 ? "photo" : idx === 1 ? "manual" : null;
+}
+
+/** The bypass's own prompt: one text field, digits only expected server-side
+ *  (same "no fabrication" rule as the photo path -- a bypass skips the
+ *  photo, never skips having a real reading). Returns the typed string, or
+ *  null on Cancel / an empty field. */
+async function promptManualOdo() {
+  const alert = new Alert();
+  alert.title = "Odometer reading";
+  alert.message = "Plain digits off the dash, e.g. 84213.4";
+  alert.addTextField("Odometer", "");
+  alert.addAction("Submit");
+  alert.addCancelAction("Cancel");
+  const idx = await alert.presentAlert();
+  if (idx !== 0) return null;
+  const value = alert.textFieldValue(0).trim();
+  return value === "" ? null : value;
+}
+
+/** POSTs a bypassed reading, no photo attached. Same endpoint, same response
+ *  shape as the photo path below -- the caller can't tell which one ran. */
+async function submitManualMileage(kind, day, reading) {
+  try {
+    const req = new Request(`${NB.base}/nutribiotic/api/widget/mileage`);
+    req.method = "POST";
+    req.headers = { Authorization: `Bearer ${NB.token}` };
+    req.addParameterToMultipart("kind", kind);
+    req.addParameterToMultipart("day", day);
+    req.addParameterToMultipart("bypass", "1");
+    req.addParameterToMultipart("manual_odo", reading);
+    const result = await req.loadJSON();
+    return { ok: Boolean(result && result.ok), result };
+  } catch (e) {
+    return { ok: false, error: String(e.message || e) };
+  }
+}
+
+/**
  * Open the camera, take one odometer photo, upload it (Juan, 2026-08-26).
+ * Offers the manual bypass first (chooseMileageMethod) -- see that function
+ * and submitManualMileage above.
  *
  * ONLY REACHABLE ON AN INTERACTIVE RUN. Photos.fromCamera() presents real UI;
  * there is no camera to show during a background timeline refresh, which is
  * exactly what config.runsInWidget distinguishes (see the bottom of this
- * file). A cancelled camera or a network failure both resolve to
- * `{ ok: false }` rather than throwing -- either way the caller should just
- * fall through and draw whatever the route actually is, never crash the
- * whole widget over a photo that didn't happen.
+ * file). A cancelled camera, a cancelled bypass, or a network failure all
+ * resolve to `{ ok: false }` rather than throwing -- either way the caller
+ * should just fall through and draw whatever the route actually is, never
+ * crash the whole widget over a photo (or a reading) that didn't happen.
  */
 async function captureAndUploadMileage(kind, day) {
+  const method = await chooseMileageMethod(kind);
+  if (!method) return { ok: false, cancelled: true };
+
+  if (method === "manual") {
+    const reading = await promptManualOdo();
+    if (!reading) return { ok: false, cancelled: true };
+    return submitManualMileage(kind, day, reading);
+  }
+
   let photo;
   try {
     photo = await Photos.fromCamera();
