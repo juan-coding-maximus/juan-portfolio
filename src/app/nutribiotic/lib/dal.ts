@@ -2096,6 +2096,48 @@ export async function setLastLocationAndAutoComplete(lat: number, lng: number): 
   return { autoDoneIds: newlyDone };
 }
 
+/**
+ * Juan's most recently recorded odometer digits (migration 0047). ONE ROW,
+ * not day-partitioned, same reasoning as last_location above: the odometer
+ * is a single running total, not a per-day fact. Written from every side
+ * api/widget/mileage records with a real number, photo or bypass, regardless
+ * of which day or which side it belonged to -- whatever came in last IS the
+ * current reading. Feeds the bypass's own auto-carry: a bypassed START uses
+ * this value instead of asking Juan to type or re-photograph a number the
+ * car hasn't actually changed (his ask 2026-08-27 -- he doesn't drive this
+ * car personally between trips, so last END really is next START).
+ */
+export type LastRouteOdo = { value: string; at: string };
+
+export async function getLastRouteOdo(): Promise<LastRouteOdo | null> {
+  const rows = await raw<{ last_route_odo: unknown }>("nb_ui_prefs?select=last_route_odo&id=eq.1");
+  const v = rows[0]?.last_route_odo as Partial<LastRouteOdo> | undefined;
+  if (!v || typeof v.value !== "string" || typeof v.at !== "string") return null;
+  return { value: v.value, at: v.at };
+}
+
+/** GATED HERE, NOT VIA mutate() -- same widened bearer as setRouteMileageDay
+ *  above: Juan's own odometer digits, nothing customer-facing. */
+export async function setLastRouteOdo(value: string): Promise<void> {
+  if (!(await hasWidgetToken()) && !(await hasAccess())) {
+    throw new Error("Unauthorized.");
+  }
+  if (!isConfigured()) throw new Error("Cannot write odometer: no data source configured.");
+  const res = await fetch(`${SB_URL}/rest/v1/nb_ui_prefs?id=eq.1`, {
+    method: "PATCH",
+    headers: {
+      apikey: SB_KEY,
+      Authorization: `Bearer ${SB_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify({ last_route_odo: { value, at: new Date().toISOString() }, updated_at: new Date().toISOString() }),
+  });
+  if (!res.ok) {
+    throw new Error(`Supabase nb_ui_prefs PATCH -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Route plans (phase 5 · nb_route_plans / nb_route_days / nb_route_stops)
 //

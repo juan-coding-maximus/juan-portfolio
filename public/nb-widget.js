@@ -200,14 +200,14 @@ function backLine(data) {
  * the URL is correct regardless, and stays correct if he ever renames it.
  *
  * BYPASS (2026-08-27): the tap doesn't go straight to the camera any more --
- * chooseMileageMethod() offers "Enter Manually" first, for the odometer that
- * just won't photograph cleanly. See captureAndUploadMileage below.
+ * chooseMileageMethod() offers Take Photo or Bypass first, for the odometer
+ * that just won't photograph cleanly. See captureAndUploadMileage below.
  */
 function renderMileagePrompt(w, data, mode) {
   const label = mode === "start" ? "Record start mileage" : "Record end mileage";
   const sub =
     mode === "start"
-      ? "Tap for the camera, or to enter it by hand."
+      ? "Tap for the camera, or to bypass."
       : "Every stop is done. Tap to close out the day.";
   w.addSpacer(4);
   txt(w, label, { size: 15, bold: true, lines: 2 });
@@ -500,42 +500,33 @@ async function fetchRoute() {
 }
 
 /**
- * "Take Photo" or "Enter Manually" (Juan's bypass ask, 2026-08-27) -- asked
- * BEFORE the camera ever opens, so a dead dashboard light, glare, or a hand
- * that just doesn't have the photo isn't a dead end. Returns "photo",
- * "manual", or null on Cancel.
+ * "Take Photo" or "Bypass" (Juan's ask, 2026-08-27) -- asked BEFORE the
+ * camera ever opens, so a dead dashboard light, glare, or a hand that just
+ * doesn't have the photo isn't a dead end. Two options, one tap, no
+ * follow-up prompt either way -- a bypassed START auto-carries the last
+ * odometer this route ever recorded (Juan doesn't drive this car personally
+ * between work trips, so last END really is next START; see the mileage
+ * route's own header), a bypassed END just records no reading. Returns
+ * "photo", "bypass", or null on Cancel.
  */
 async function chooseMileageMethod(mode) {
   const alert = new Alert();
   alert.title = mode === "end" ? "Record end mileage" : "Record start mileage";
-  alert.message = "Can't get a clean photo of the odometer? Enter the reading by hand instead.";
+  alert.message =
+    mode === "end"
+      ? "Bypass records no reading for this side."
+      : "Bypass carries forward the last odometer this route recorded.";
   alert.addAction("Take Photo");
-  alert.addAction("Enter Manually");
+  alert.addAction("Bypass");
   alert.addCancelAction("Cancel");
   const idx = await alert.presentAlert();
-  return idx === 0 ? "photo" : idx === 1 ? "manual" : null;
+  return idx === 0 ? "photo" : idx === 1 ? "bypass" : null;
 }
 
-/** The bypass's own prompt: one text field, digits only expected server-side
- *  (same "no fabrication" rule as the photo path -- a bypass skips the
- *  photo, never skips having a real reading). Returns the typed string, or
- *  null on Cancel / an empty field. */
-async function promptManualOdo() {
-  const alert = new Alert();
-  alert.title = "Odometer reading";
-  alert.message = "Plain digits off the dash, e.g. 84213.4";
-  alert.addTextField("Odometer", "");
-  alert.addAction("Submit");
-  alert.addCancelAction("Cancel");
-  const idx = await alert.presentAlert();
-  if (idx !== 0) return null;
-  const value = alert.textFieldValue(0).trim();
-  return value === "" ? null : value;
-}
-
-/** POSTs a bypassed reading, no photo attached. Same endpoint, same response
- *  shape as the photo path below -- the caller can't tell which one ran. */
-async function submitManualMileage(kind, day, reading) {
+/** POSTs a bypass, no photo and no typed reading. Same endpoint, same
+ *  response shape as the photo path below -- the caller can't tell which
+ *  one ran. */
+async function submitMileageBypass(kind, day) {
   try {
     const req = new Request(`${NB.base}/nutribiotic/api/widget/mileage`);
     req.method = "POST";
@@ -543,7 +534,6 @@ async function submitManualMileage(kind, day, reading) {
     req.addParameterToMultipart("kind", kind);
     req.addParameterToMultipart("day", day);
     req.addParameterToMultipart("bypass", "1");
-    req.addParameterToMultipart("manual_odo", reading);
     const result = await req.loadJSON();
     return { ok: Boolean(result && result.ok), result };
   } catch (e) {
@@ -553,26 +543,22 @@ async function submitManualMileage(kind, day, reading) {
 
 /**
  * Open the camera, take one odometer photo, upload it (Juan, 2026-08-26).
- * Offers the manual bypass first (chooseMileageMethod) -- see that function
- * and submitManualMileage above.
+ * Offers the bypass first (chooseMileageMethod) -- see that function and
+ * submitMileageBypass above.
  *
  * ONLY REACHABLE ON AN INTERACTIVE RUN. Photos.fromCamera() presents real UI;
  * there is no camera to show during a background timeline refresh, which is
  * exactly what config.runsInWidget distinguishes (see the bottom of this
- * file). A cancelled camera, a cancelled bypass, or a network failure all
+ * file). A cancelled camera, a cancelled prompt, or a network failure all
  * resolve to `{ ok: false }` rather than throwing -- either way the caller
  * should just fall through and draw whatever the route actually is, never
- * crash the whole widget over a photo (or a reading) that didn't happen.
+ * crash the whole widget over a photo that didn't happen.
  */
 async function captureAndUploadMileage(kind, day) {
   const method = await chooseMileageMethod(kind);
   if (!method) return { ok: false, cancelled: true };
 
-  if (method === "manual") {
-    const reading = await promptManualOdo();
-    if (!reading) return { ok: false, cancelled: true };
-    return submitManualMileage(kind, day, reading);
-  }
+  if (method === "bypass") return submitMileageBypass(kind, day);
 
   let photo;
   try {
