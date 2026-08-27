@@ -133,17 +133,21 @@ function actionRow(on, stop, { compact = false } = {}) {
 }
 
 /**
- * How old what you are reading is.
+ * How old what you are reading is, AND a way to ask for newer (Juan, 2026-08-26).
  *
- * iOS decides when a widget redraws, not the script, so the honest thing a
- * widget can do about staleness is show it rather than promise freshness it
- * does not control. Server time from the payload, not the phone's clock at
- * render: it answers "when was this route actually read", which is the question.
+ * iOS decides when a widget's FACE redraws, not the script -- refreshAfterDate
+ * below is a request, not a schedule, and nothing any app installs can force
+ * WidgetKit to repaint a tile already on the Home Screen sooner than its own
+ * budget allows. What actually IS instant: opening the route, which always
+ * fetches this same live endpoint. So the honest "update button" is this row
+ * itself, tappable, landing on the live page rather than a cached tile.
  */
 function stamp(w, data) {
   const at = new Date(data.generated_at);
   const t = at.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  txt(w, `as of ${t}`, { size: 9.5, color: FAINT });
+  const row = w.addStack();
+  row.url = `${NB.base}/nutribiotic/map`;
+  txt(row, `as of ${t} · tap to update`, { size: 9.5, color: FAINT });
 }
 
 function header(w, data, { compact = false } = {}) {
@@ -167,14 +171,27 @@ function divider(w) {
   d.addSpacer();
 }
 
+/** "back ~18:24", red and bold past the returnBy target. See the API route's
+ *  own comment for why this is a rough, no-traffic estimate rather than the
+ *  router-backed clock RoutePanel shows on /nutribiotic/map. */
+function backLine(data) {
+  if (!data.schedule) return null;
+  return { text: `back ~${data.schedule.finish_clock}`, over: data.schedule.over };
+}
+
 /* -------------------------------------------------------------------- small */
 /* One stop, big. The question a small widget answers is "where am I going
-   next", and any second stop on it makes the first one unreadable. */
+   next", and any second stop on it makes the first one unreadable.
+   THE FIRST STOP NOT MARKED DONE (0042, 2026-08-26), not literally stops[0]:
+   once he's crossed off #1 at the door, "next" means #2, and a widget that
+   keeps headlining a stop he already finished is answering last hour's
+   question. Falls back to stops[0] if every stop is done, so the widget
+   never renders blank on a day that's simply finished. */
 function renderSmall(w, data) {
   header(w, data, { compact: true });
   w.addSpacer(6);
 
-  const s = data.stops[0];
+  const s = data.stops.find((x) => !x.done) || data.stops[0];
   if (!s) return renderEmpty(w);
 
   const top = w.addStack();
@@ -191,7 +208,12 @@ function renderSmall(w, data) {
 
   w.addSpacer();
   if (s.type === "account") txt(w, moneyLine(s), { size: 10, color: FAINT, lines: 1 });
-  if (data.count > 1) txt(w, `then ${data.count - 1} more`, { size: 10, color: FAINT });
+  const back = backLine(data);
+  const tail = [data.count > 1 ? `then ${data.count - 1} more` : null, back ? back.text : null]
+    .filter(Boolean)
+    .join("  ·  ");
+  if (tail) txt(w, tail, { size: 10, color: back && back.over ? RED : FAINT, bold: Boolean(back && back.over) });
+  stamp(w, data);
   w.url = s.maps_url;
 }
 
@@ -202,7 +224,10 @@ function renderMedium(w, data) {
   if (data.count === 0) return renderEmpty(w);
   w.addSpacer(7);
 
-  const s = data.stops[0];
+  // The first stop NOT done is the hero (0042); everything from there on is
+  // the peek-ahead, same "next" logic as renderSmall.
+  const heroIdx = data.stops.findIndex((x) => !x.done);
+  const s = heroIdx >= 0 ? data.stops[heroIdx] : data.stops[0];
   const top = w.addStack();
   top.centerAlignContent();
   chip(top, s, 22);
@@ -226,11 +251,13 @@ function renderMedium(w, data) {
     txt(col, line, { size: 10, color: FAINT });
   }
   top.addSpacer();
+  const back = backLine(data);
+  if (back) txt(top, back.text, { size: 10, color: back.over ? RED : FAINT, bold: back.over });
 
   w.addSpacer(8);
   actionRow(w, s);
 
-  const rest = data.stops.slice(1, 3);
+  const rest = data.stops.slice(heroIdx >= 0 ? heroIdx + 1 : 1, (heroIdx >= 0 ? heroIdx + 1 : 1) + 2);
   if (rest.length) {
     w.addSpacer(8);
     divider(w);
@@ -240,7 +267,10 @@ function renderMedium(w, data) {
       row.centerAlignContent();
       chip(row, r, 15);
       row.addSpacer(6);
-      txt(row, r.name, { size: 11.5, color: MUTED });
+      // Done stops shown in the peek-ahead (a stop marked done out of order)
+      // read dimmer, same visual language as /nutribiotic/map's strikethrough.
+      const t = txt(row, r.name, { size: 11.5, color: MUTED });
+      if (r.done) t.textOpacity = 0.45;
       row.addSpacer();
       if (r.straight_line_miles_from_prev !== null)
         txt(row, `${r.straight_line_miles_from_prev} mi`, { size: 10, color: FAINT });
@@ -268,8 +298,23 @@ function renderLarge(w, data) {
      WidgetKit renders a static snapshot whose only interaction is a tap target,
      so there is no fifth stop hiding below the fold to reach for. Four is what
      the widget IS, and the footer says how many it is not showing and where the
-     rest live, rather than implying a gesture that does nothing. */
-  const shown = data.stops.slice(0, 4);
+     rest live, rather than implying a gesture that does nothing.
+
+     NOT-DONE FIRST (0042, 2026-08-26): a stop already crossed off has nothing
+     left to decide, so it no longer competes for one of the four slots -- same
+     "next" logic as the small/medium widgets. Falls back to the plain first
+     four (done included) once every stop IS done, so a finished day still
+     fills the tile instead of rendering mostly blank. */
+  const undone = data.stops.filter((s) => !s.done);
+  const shown = (undone.length > 0 ? undone : data.stops).slice(0, 4);
+  const back = backLine(data);
+  if (undone.length === 0 && data.count > 0) {
+    txt(w, "All stops done", { size: 11, color: GREEN, bold: true });
+    w.addSpacer(4);
+  } else if (back) {
+    txt(w, back.text, { size: 10.5, color: back.over ? RED : FAINT, bold: back.over });
+    w.addSpacer(4);
+  }
   shown.forEach((s, i) => {
     if (i > 0) {
       w.addSpacer(4);
@@ -285,7 +330,7 @@ function renderLarge(w, data) {
     col.layoutVertically();
     const nameRow = col.addStack();
     nameRow.centerAlignContent();
-    txt(nameRow, s.name, { size: 12.5, bold: true });
+    txt(nameRow, s.name, { size: 12.5, bold: true, opacity: s.done ? 0.45 : undefined });
     const tier = tierLabel(s);
     if (tier) {
       nameRow.addSpacer(5);
@@ -313,15 +358,18 @@ function renderLarge(w, data) {
 
   /* The rest of the day, as a tap rather than a scroll that cannot exist. Its
      own target, not just a line of text: the sentence "4 of 9" is only useful
-     next to the thing that shows you the other five. */
-  if (data.count > shown.length) {
+     next to the thing that shows you the other five. Counted off the same
+     pool `shown` was drawn from (not-done first), so this says how many are
+     actually still ahead, not how many rows exist total including done ones. */
+  const pool = undone.length > 0 ? undone : data.stops;
+  if (pool.length > shown.length) {
     w.addSpacer(7);
     divider(w);
     w.addSpacer(6);
     const more = w.addStack();
     more.centerAlignContent();
     more.url = `${NB.base}/nutribiotic/map`;
-    txt(more, `${data.count - shown.length} more stop${data.count - shown.length === 1 ? "" : "s"}`, {
+    txt(more, `${pool.length - shown.length} more stop${pool.length - shown.length === 1 ? "" : "s"}`, {
       size: 11,
       color: GREEN,
       bold: true,

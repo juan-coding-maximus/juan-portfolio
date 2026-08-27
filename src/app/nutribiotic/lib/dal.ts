@@ -727,6 +727,66 @@ export async function insertActivity(input: NewActivity): Promise<Activity> {
   return row;
 }
 
+/** Midnight today, America/Los_Angeles, as an ISO instant with the offset
+ *  that actually applies right now (PST or PDT) -- computed from Intl rather
+ *  than a hardcoded "-07:00" or "-08:00", so it stays correct across the
+ *  March/November transitions without a yearly edit. */
+function todayStartLA(): string {
+  const now = new Date();
+  const dateParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const get = (type: string) => dateParts.find((p) => p.type === type)?.value ?? "";
+  const offsetPart = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    timeZoneName: "shortOffset",
+  })
+    .formatToParts(now)
+    .find((p) => p.type === "timeZoneName")?.value;
+  const m = /GMT([+-]\d+)(?::?(\d+))?/.exec(offsetPart ?? "");
+  const offsetMin = m ? Number(m[1]) * 60 + (Number(m[1]) < 0 ? -1 : 1) * Number(m[2] ?? 0) : -480;
+  const sign = offsetMin <= 0 ? "-" : "+";
+  const abs = Math.abs(offsetMin);
+  const offset = `${sign}${String(Math.floor(abs / 60)).padStart(2, "0")}:${String(abs % 60).padStart(2, "0")}`;
+  return `${get("year")}-${get("month")}-${get("day")}T00:00:00${offset}`;
+}
+
+/**
+ * Where Juan physically was last, today (Juan's ask 2026-08-26): the account
+ * behind the most recent activity logged since midnight, if that account has
+ * a coordinate. Feeds new-account-actions.ts's Places search, on the theory a
+ * business just logged for the first time is usually a few doors down from
+ * wherever the rep already was, not somewhere else in the county.
+ *
+ * SAME DAY ONLY. A last touchpoint from yesterday says nothing about where
+ * today's drive is, so this returns null rather than reaching backward past
+ * midnight, and the caller falls back to the county-wide search it always had
+ * (HARD RULE 1: the blank stays blank, nothing here guesses at a location).
+ */
+export async function getLastVisitedLocationToday(): Promise<{ lat: number; lng: number; name: string } | null> {
+  await verifyReadAccess();
+  if (!isConfigured()) return null;
+  const recent = await query<{ account_id: string; at: string; origin?: Origin }>("nb_activities", {
+    select: "account_id,at",
+    at: `gte.${todayStartLA()}`,
+    order: "at.desc",
+    limit: 1,
+  });
+  const accountId = recent.data[0]?.account_id;
+  if (!accountId) return null;
+  const acc = await query<{ lat: number | null; lng: number | null; name: string; origin?: Origin }>("nb_accounts", {
+    select: "lat,lng,name",
+    id: `eq.${accountId}`,
+    limit: 1,
+  });
+  const a = acc.data[0];
+  if (!a || a.lat == null || a.lng == null) return null;
+  return { lat: a.lat, lng: a.lng, name: a.name };
+}
+
 export type NewContact = {
   account_id: string;
   first_name?: string | null;
@@ -1761,6 +1821,33 @@ export async function getRouteCallsByDay(): Promise<RouteCallsByDay> {
 
 export async function setRouteCalls(byDay: RouteCallsByDay): Promise<void> {
   await mutate("nb_ui_prefs", "PATCH", { route_calls: byDay, updated_at: new Date().toISOString() }, {
+    id: "eq.1",
+  });
+}
+
+/**
+ * Stops marked done on the hand-built route (migration 0042), day-partitioned
+ * like route_draft but a bare set of stop ids: a stop marked done stays ON
+ * route_draft, this only changes how it renders. See the migration header for
+ * why this is not folded into route_draft or route_calls.
+ */
+export type RouteDoneByDay = Record<string, string[]>;
+
+export async function getRouteDoneByDay(): Promise<RouteDoneByDay> {
+  const rows = await raw<{ route_done: unknown }>("nb_ui_prefs?select=route_done&id=eq.1");
+  const stored = rows[0]?.route_done;
+  if (!stored || typeof stored !== "object") return {};
+  const out: RouteDoneByDay = {};
+  for (const [day, entries] of Object.entries(stored as Record<string, unknown>)) {
+    if (!ISO_DATE_RE.test(day) || !Array.isArray(entries)) continue;
+    const ids = entries.filter((e): e is string => typeof e === "string" && e.length > 0);
+    if (ids.length > 0) out[day] = ids;
+  }
+  return out;
+}
+
+export async function setRouteDone(byDay: RouteDoneByDay): Promise<void> {
+  await mutate("nb_ui_prefs", "PATCH", { route_done: byDay, updated_at: new Date().toISOString() }, {
     id: "eq.1",
   });
 }

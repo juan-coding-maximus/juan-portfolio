@@ -30,9 +30,9 @@
  */
 
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
-import type { CallEntry, CustomStop, RouteCallsByDay, RouteDraftByDay, RouteDraftEntry } from "./dal";
+import type { CallEntry, CustomStop, RouteCallsByDay, RouteDoneByDay, RouteDraftByDay, RouteDraftEntry } from "./dal";
 import { defaultActiveDay, planningHorizonDates } from "./field-week";
-import { saveRouteCalls, saveRouteDraft } from "./prefs-actions";
+import { saveRouteCalls, saveRouteDone, saveRouteDraft } from "./prefs-actions";
 
 type RouteCtx = {
   routeDraft: RouteDraftEntry[];
@@ -59,6 +59,11 @@ type RouteCtx = {
   /** Move one call to any day on the horizon (2026-08-25), same shape as
    *  moveStopToDay but over the calls column. */
   moveCallToDay: (id: string, day: string) => void;
+  /** Stop ids marked done today (0042). A done stop stays IN routeDraft --
+   *  this is a separate overlay, never a filter, so the schedule/mileage
+   *  below never changes when Juan crosses a stop off. */
+  done: Set<string>;
+  toggleDone: (id: string) => void;
 };
 
 const Ctx = createContext<RouteCtx | null>(null);
@@ -70,19 +75,23 @@ function entryId(e: RouteDraftEntry): string {
 export function RouteProvider({
   initial,
   initialCalls,
+  initialDone,
   children,
 }: {
   initial: RouteDraftByDay;
   initialCalls?: RouteCallsByDay;
+  initialDone?: RouteDoneByDay;
   children: ReactNode;
 }) {
   const days = useMemo(() => planningHorizonDates(), []);
   const [draftByDay, setDraftByDay] = useState<RouteDraftByDay>(initial);
   const [activeDay, setActiveDay] = useState<string>(() => defaultActiveDay(initial, days));
   const [callsByDay, setCallsByDay] = useState<RouteCallsByDay>(initialCalls ?? {});
+  const [doneByDay, setDoneByDay] = useState<RouteDoneByDay>(initialDone ?? {});
 
   const routeDraft = useMemo(() => draftByDay[activeDay] ?? [], [draftByDay, activeDay]);
   const calls = useMemo(() => callsByDay[activeDay] ?? [], [callsByDay, activeDay]);
+  const done = useMemo(() => new Set(doneByDay[activeDay] ?? []), [doneByDay, activeDay]);
 
   // Optimistic, same as every other prefs write on this OS: the list moves
   // now and the row catches up, reverted if the write fails. Always the whole
@@ -114,6 +123,7 @@ export function RouteProvider({
 
   function removeFromRoute(id: string) {
     commitDay(activeDay, routeDraft.filter((e) => entryId(e) !== id));
+    if (done.has(id)) commitDone(activeDay, [...done].filter((d) => d !== id));
   }
 
   function moveInRoute(id: string, dir: -1 | 1) {
@@ -177,6 +187,7 @@ export function RouteProvider({
 
   function clearRoute() {
     commitDay(activeDay, []);
+    if (done.size > 0) commitDone(activeDay, []);
   }
 
   // Same optimistic-write shape as commitDay, over the calls column instead
@@ -222,6 +233,21 @@ export function RouteProvider({
     saveRouteCalls(nextByDay).catch(() => setCallsByDay(prev));
   }
 
+  // Same optimistic-write shape again, over the done set (0042). A toggle
+  // rather than separate mark/unmark actions -- Juan tapping the wrong stop by
+  // mistake should cost one more tap to undo, not a different control to find.
+  function commitDone(day: string, next: string[]) {
+    const prev = doneByDay;
+    const nextByDay = { ...doneByDay, [day]: next };
+    setDoneByDay(nextByDay);
+    saveRouteDone(nextByDay).catch(() => setDoneByDay(prev));
+  }
+
+  function toggleDone(id: string) {
+    const next = done.has(id) ? [...done].filter((d) => d !== id) : [...done, id];
+    commitDone(activeDay, next);
+  }
+
   return (
     <Ctx.Provider
       value={{
@@ -242,6 +268,8 @@ export function RouteProvider({
         addCall,
         removeCall,
         moveCallToDay,
+        done,
+        toggleDone,
       }}
     >
       {children}

@@ -34,7 +34,9 @@ import {
   defaultActiveDay,
   planningHorizonDates,
   getRouteCallsByDay,
+  getRouteDoneByDay,
   getRouteDraftByDay,
+  getRouteSchedulePrefs,
   listOwnerAccounts,
   type CustomStop,
   type MapAccount,
@@ -82,6 +84,9 @@ type Stop = {
   top_category_lifetime: string | null;
   /** Straight-line miles from the previous stop. Null on the first. */
   straight_line_miles_from_prev: number | null;
+  /** Crossed off on /nutribiotic/map (migration 0042). Stays a stop -- the
+   *  widget never drops a done stop, it just renders it done. */
+  done: boolean;
   /* THE THREE THINGS A STOP IS FOR (Juan, 2026-08-14): drive to it, call it,
      read it. Each is a whole URL rather than a piece the widget assembles,
      because a deep link built in two places is a deep link that breaks in one
@@ -97,10 +102,12 @@ export async function GET(request: Request) {
     return Response.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 
-  const [byDay, callsByDay, accounts] = await Promise.all([
+  const [byDay, callsByDay, doneByDay, accounts, prefs] = await Promise.all([
     getRouteDraftByDay(),
     getRouteCallsByDay(),
+    getRouteDoneByDay(),
     listOwnerAccounts(),
+    getRouteSchedulePrefs(),
   ]);
   const byId = new Map(accounts.data.map((a) => [a.id, a]));
 
@@ -108,6 +115,7 @@ export async function GET(request: Request) {
   const requested = new URL(request.url).searchParams.get("day");
   const day = requested && days.includes(requested) ? requested : defaultActiveDay(byDay, days);
   const draft = byDay[day] ?? [];
+  const doneIds = new Set(doneByDay[day] ?? []);
   /* Calls (0041) are a separate, day-partitioned column, never mixed into
      route_draft: same mirror-not-second-source rule as the stops above, just
      over the other column. */
@@ -143,6 +151,7 @@ export async function GET(request: Request) {
         top_category_12m: null,
         top_category_lifetime: null,
         straight_line_miles_from_prev: null,
+        done: doneIds.has(e.id),
         /* A custom stop's address IS its identity (it was resolved from Places
            when it was added and then frozen), so it deep-links by address too. */
         maps_url: appleMapsUrl(e),
@@ -173,6 +182,7 @@ export async function GET(request: Request) {
       top_category_12m: a.top_category_12m,
       top_category_lifetime: a.top_category_lifetime,
       straight_line_miles_from_prev: null,
+      done: doneIds.has(a.id),
       maps_url: appleMapsUrl({ address: fullAddress(a), lat: a.lat, lng: a.lng }),
       call_url: a.phone ? `tel:${a.phone.replace(/[^\d+]/g, "")}` : null,
       account_url: `${SITE}/nutribiotic/account/${a.id}`,
@@ -186,6 +196,59 @@ export async function GET(request: Request) {
     total += miles;
   }
 
+  /**
+   * A ROUGH FINISH-TIME ESTIMATE (Juan's ask 2026-08-26: know what time the
+   * route will be done, without opening the app). Same honesty split as
+   * everywhere else drive time appears in this OS: this endpoint deliberately
+   * makes no Directions call (see the file header), so this is NOT the router
+   * -backed clock RoutePanel shows on /nutribiotic/map. It is the same
+   * circuity/speed heuristic plan_week.py's drive() uses for its own
+   * corridor-free estimate (1.28x straight-line, 42mph freeway-length legs,
+   * 21mph surface-length legs), with no traffic multiplier applied -- porting
+   * traffic_corridors.json's time-of-day matching here would be more code
+   * claiming more precision than a glance widget should. Labelled `rough` in
+   * the payload for exactly that reason; the app's own clock is the one to
+   * trust for anything that decides whether a stop gets cut.
+   */
+  const home = accounts.data.find((a) => a.lifecycle === "waypoint");
+  let schedule: { depart: string; finish_clock: string; over: boolean; return_by: string | null; rough: true } | null = null;
+  if (home && stops.length > 0) {
+    const CIRCUITY = 1.28;
+    const FREEWAY_MPH = 42;
+    const SURFACE_MPH = 21;
+    const FREEWAY_MIN_MILES = 6;
+    const leg = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+      const miles = haversineMiles(a, b) * CIRCUITY;
+      const mph = miles >= FREEWAY_MIN_MILES ? FREEWAY_MPH : SURFACE_MPH;
+      return Math.max(4, (miles / mph) * 60);
+    };
+    const [dh, dm] = prefs.depart.split(":").map(Number);
+    let t = (Number.isFinite(dh) ? dh : 9) * 60 + (Number.isFinite(dm) ? dm : 30);
+    let pos: { lat: number; lng: number } = { lat: home.lat, lng: home.lng };
+    for (const s of stops) {
+      t += leg(pos, s);
+      const dwell = s.kind === "lunch" ? prefs.lunchMinutes : s.kind === "hotel" ? 0 : prefs.dwellMinutes;
+      t += dwell;
+      pos = s;
+    }
+    t += leg(pos, home);
+    const clock = (mins: number) => {
+      const wrapped = ((Math.round(mins) % 1440) + 1440) % 1440;
+      return `${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
+    };
+    const returnByMin = prefs.returnBy ? (() => {
+      const [rh, rm] = prefs.returnBy!.split(":").map(Number);
+      return rh * 60 + rm;
+    })() : null;
+    schedule = {
+      depart: prefs.depart,
+      finish_clock: clock(t),
+      over: returnByMin !== null && t > returnByMin,
+      return_by: prefs.returnBy,
+      rough: true,
+    };
+  }
+
   return Response.json(
     {
       ok: true,
@@ -195,6 +258,7 @@ export async function GET(request: Request) {
       count: stops.length,
       stops,
       calls,
+      schedule,
       total_straight_line_miles: stops.length > 1 ? Number(total.toFixed(1)) : null,
       maps_all_url:
         stops.length > 1

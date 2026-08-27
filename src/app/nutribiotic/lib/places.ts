@@ -119,8 +119,31 @@ const CALIFORNIA_BOUNDS = {
   high: { latitude: 42.1, longitude: -114.0 },
 };
 
-/** Top few candidates for a free-text query ("XCEL Wellness, Huntington Beach, CA"). */
-export async function searchPlaces(query: string, maxResults = 3): Promise<PlaceCandidate[]> {
+/**
+ * Radius for a proximity-biased search (Juan's ask 2026-08-26): a business
+ * he's naming for the first time today is usually a few doors down from
+ * wherever he already was, not somewhere else in the county. 15 miles is wide
+ * enough to cover a whole cluster/day of driving without being so wide it
+ * stops meaning anything.
+ */
+const NEAR_RADIUS_METERS = 24_140; // 15 miles
+
+/**
+ * Top few candidates for a free-text query ("XCEL Wellness, Huntington Beach, CA").
+ *
+ * `near`, when given, biases results toward that point (see dal.ts's
+ * getLastVisitedLocationToday) with Places' `locationBias`, a soft nudge, not
+ * a filter -- a real match named accurately still surfaces even if it's
+ * outside the circle. Places' request accepts locationBias OR
+ * locationRestriction, never both, so a caller with a bias point trades the
+ * hard California rectangle for the soft circle; a caller with none keeps the
+ * original county-wide restriction unchanged.
+ */
+export async function searchPlaces(
+  query: string,
+  maxResults = 3,
+  near?: { lat: number; lng: number },
+): Promise<PlaceCandidate[]> {
   const key = process.env.NB_PLACES_API_KEY ?? "";
   if (!key) throw new PlacesError("NB_PLACES_API_KEY is not configured on this deployment.");
 
@@ -136,7 +159,9 @@ export async function searchPlaces(query: string, maxResults = 3): Promise<Place
       maxResultCount: maxResults,
       languageCode: "en",
       regionCode: "US",
-      locationRestriction: { rectangle: CALIFORNIA_BOUNDS },
+      ...(near
+        ? { locationBias: { circle: { center: { latitude: near.lat, longitude: near.lng }, radius: NEAR_RADIUS_METERS } } }
+        : { locationRestriction: { rectangle: CALIFORNIA_BOUNDS } }),
     }),
     cache: "no-store",
   });

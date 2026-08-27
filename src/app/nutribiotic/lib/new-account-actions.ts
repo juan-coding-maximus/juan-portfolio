@@ -10,7 +10,7 @@
  */
 
 import { revalidatePath } from "next/cache";
-import { insertAccount, linkAccountHubspotCompany } from "./dal";
+import { getLastVisitedLocationToday, insertAccount, linkAccountHubspotCompany } from "./dal";
 import { createCompany, findPossibleDuplicates, type DuplicateCandidate } from "./hubspot-company";
 import { OWNER_ID } from "./hubspot";
 import { searchPlaces, type PlaceCandidate } from "./places";
@@ -18,11 +18,19 @@ import { resolveTouchpointToAccount } from "./touchpoint";
 
 export type BusinessSearchOutcome = { ok: true; candidates: PlaceCandidate[] } | { ok: false; error: string };
 
+/**
+ * A NEW STORE IS USUALLY NEAR THE LAST ONE (Juan, 2026-08-26). When today
+ * already has a logged stop with a known address, that address biases the
+ * Places search -- see places.ts's `near`. No same-day stop yet, or that
+ * stop's account has no coordinate: falls back to the county-wide search
+ * unchanged, same as before this existed.
+ */
 export async function searchNewBusiness(query: string): Promise<BusinessSearchOutcome> {
   const q = query.trim();
   if (!q) return { ok: false, error: "Type a business name to search." };
   try {
-    const candidates = await searchPlaces(q);
+    const last = await getLastVisitedLocationToday();
+    const candidates = await searchPlaces(q, 3, last ? { lat: last.lat, lng: last.lng } : undefined);
     if (candidates.length === 0) return { ok: false, error: `No Google Places result for "${q}".` };
     return { ok: true, candidates };
   } catch (e) {

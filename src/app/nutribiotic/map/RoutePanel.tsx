@@ -714,6 +714,8 @@ export function RoutePanel({
   onAddCall,
   onRemoveCall,
   onMoveCallDay,
+  done,
+  onToggleDone,
   days,
   activeDay,
   onSelectDay,
@@ -755,6 +757,9 @@ export function RoutePanel({
   onRemoveCall: (id: string) => void;
   /** Move one call to any day on the horizon (2026-08-25). */
   onMoveCallDay: (id: string, day: string) => void;
+  /** Stop ids marked done today (0042). Crossed off, never removed. */
+  done: Set<string>;
+  onToggleDone: (id: string) => void;
   /** The rolling ten-weekday horizon (Mon-Fri), the one Juan's on, and the switch. */
   days: string[];
   activeDay: string;
@@ -883,6 +888,25 @@ export function RoutePanel({
     [legs, stops, start, end, prefs],
   );
 
+  /**
+   * STAR CLIENTS AT RISK OF THE CUT (Juan's ask 2026-08-26): an account
+   * carrying Potential A on this screen (MapAccount.tier, nb_v_account_potential,
+   * the HQ A-G scale TierChip already renders here -- see dal.ts's MapAccount
+   * comment for why the map shows potential rather than the fit x engagement
+   * tier) whose scheduled arrival lands after the returnBy target. Never
+   * auto-moved or auto-postponed -- Juan's order stays his -- just named, so
+   * the account with the most upside is never the one quietly dropped when
+   * the day runs long. Computed off the same schedule the clock above shows.
+   */
+  const atRiskStars = useMemo(() => {
+    if (!schedule || !prefs.returnBy) return [];
+    const limit = minutesOfDay(prefs.returnBy);
+    return stops
+      .map((s, i) => ({ s, i }))
+      .filter(({ s, i }) => s.type === "account" && s.account.tier === "A" && schedule.rows[i].arrive > limit);
+  }, [schedule, stops, prefs.returnBy]);
+  const atRiskIds = useMemo(() => new Set(atRiskStars.map(({ s }) => s.id)), [atRiskStars]);
+
   const legBetween = (i: number): DriveLeg | null => {
     if (!legs || i < 1) return null;
     return legs.slice(start ? 1 : 0, legs.length - (end ? 1 : 0))[i - 1] ?? null;
@@ -983,6 +1007,21 @@ export function RoutePanel({
         )}
       </div>
 
+      {/* STAR CLIENTS AT RISK (2026-08-26): named, not hidden inside the row
+          math below -- if the day is going to run short, this is what Juan
+          should read before he starts cutting stops. */}
+      {atRiskStars.length > 0 && (
+        <div className="mb-2 flex items-start gap-2 rounded-md border border-[#E8C9C0] bg-[#FBF4F2] px-3 py-2.5 text-[12.5px] leading-relaxed text-[#8A3B2E]">
+          <Ico name="flag" size={13} />
+          <span>
+            {atRiskStars.length === 1 ? "A Potential-A stop" : `${atRiskStars.length} Potential-A stops`} would
+            land after your {prefs.returnBy} target if the day runs long:{" "}
+            {atRiskStars.map(({ s }) => (s.type === "account" ? s.account.name : "")).join(", ")}. If a cut
+            has to happen, protect these first, move them earlier or postpone a lower-tier stop instead.
+          </span>
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
         {/* The drive out. Not a stop, so it is a rule above the first one
             rather than a numbered row, but it is the reason stop 1 is not at
@@ -1007,6 +1046,8 @@ export function RoutePanel({
             const a = s.type === "account" ? s.account : null;
             const c = s.type === "custom" ? s.custom : null;
             const title = a ? a.name : c!.label;
+            const isDone = done.has(s.id);
+            const isAtRisk = atRiskIds.has(s.id);
             // CONTROLS DROP TO THEIR OWN ROW ON A PHONE. Five buttons beside
             // the text left the name as "DIRECTLY FR..." and the address as
             // "621 RUSHING C..." in Juan's 2026-08-05 screenshot, which is a
@@ -1025,7 +1066,7 @@ export function RoutePanel({
                 key={s.id}
                 data-stop-id={s.id}
                 className={`flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3 ${
-                  drag?.id === s.id ? "opacity-40" : ""
+                  drag?.id === s.id ? "opacity-40" : isDone ? "opacity-50" : ""
                 } ${dropBefore ? "border-t-2 border-[#2C6A46]" : ""} ${
                   dropAtEnd ? "border-b-2 border-[#2C6A46]" : ""
                 }`}
@@ -1033,14 +1074,16 @@ export function RoutePanel({
                 <div className="flex min-w-0 flex-1 items-start gap-3">
                 {/* An amber square for a lunch or hotel stop, the same shape and
                     colour it gets on the map, so the list and the map agree at a
-                    glance about which stops are not accounts. */}
+                    glance about which stops are not accounts. Done (0042) swaps
+                    the position number for a checkmark -- the fact that a stop
+                    is #4 stops mattering the moment it's crossed off. */}
                 <div className="flex shrink-0 flex-col items-center gap-1">
                   <span
                     className={`mt-0.5 flex h-6 w-6 items-center justify-center text-[11.5px] font-semibold tabular-nums text-[#F7F6F1] ${
                       c ? "rounded-[4px] bg-[#A0762C]" : "rounded-full bg-[#14201B]"
                     }`}
                   >
-                    {i + 1}
+                    {isDone ? <Ico name="check" size={12} /> : i + 1}
                   </span>
                   {/* When he is there, in the column he is already scanning for
                       "which stop is this". Absent, not zeroed, when the router
@@ -1056,7 +1099,9 @@ export function RoutePanel({
                   {c ? (
                     <>
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                        <span className="truncate text-[14px] font-medium leading-snug">{c.label}</span>
+                        <span className={`truncate text-[14px] font-medium leading-snug ${isDone ? "line-through" : ""}`}>
+                          {c.label}
+                        </span>
                         <span className="rounded bg-[#F6EEDD] px-1.5 py-0.5 text-[10.5px] font-medium uppercase tracking-wide text-[#7A5A1E]">
                           {CUSTOM_STOP_LABEL[c.kind]}
                         </span>
@@ -1075,11 +1120,20 @@ export function RoutePanel({
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     <AccountLink
                       id={a!.id}
-                      className="truncate text-[14px] font-medium leading-snug hover:underline"
+                      className={`truncate text-[14px] font-medium leading-snug hover:underline ${isDone ? "line-through" : ""}`}
                     >
                       {a!.name}
                     </AccountLink>
                     {a!.tier && <TierChip tier={a!.tier} scale="hq" />}
+                    {isAtRisk && (
+                      <span
+                        title={`Scheduled after your ${prefs.returnBy} target -- protect this one if the day gets cut`}
+                        className="inline-flex items-center gap-1 rounded bg-[#FBF4F2] px-1.5 py-0.5 text-[10.5px] font-medium text-[#8A3B2E]"
+                      >
+                        <Ico name="flag" size={10} />
+                        at risk
+                      </span>
+                    )}
                   </div>
                   <div className="mt-0.5 truncate text-[12.5px] text-[#5B6560]">
                     {a!.street}
@@ -1189,6 +1243,23 @@ export function RoutePanel({
                     className="cursor-grab rounded-md border border-[#E2DFD5] bg-white px-2 py-2 text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] active:cursor-grabbing"
                   >
                     <Ico name="grip" size={13} />
+                  </button>
+                  {/* DONE (0042, 2026-08-26): crosses the stop off without
+                      removing it, so the mileage/finish clock above still
+                      reflects the whole day, not just what's left. Toggle,
+                      not a one-way mark, so a mis-tap costs one more tap. */}
+                  <button
+                    type="button"
+                    onClick={() => onToggleDone(s.id)}
+                    aria-label={isDone ? `Mark ${title} not done` : `Mark ${title} done`}
+                    aria-pressed={isDone}
+                    className={`rounded-md border px-2 py-2 transition-colors ${
+                      isDone
+                        ? "border-[#2C6A46] bg-[#2C6A46] text-white hover:opacity-90"
+                        : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
+                    }`}
+                  >
+                    <Ico name="check" size={13} />
                   </button>
                   {/* MOVE TO TOP (2026-08-21): a stop found deep on the
                       ten-closest list otherwise costs one tap of the chevron

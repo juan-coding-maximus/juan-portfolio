@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import {
   sanitizeRouteEndpoint,
   setRouteCalls,
+  setRouteDone,
   setRouteDraft,
   setRouteEndByDay,
   setRouteSchedulePrefs,
@@ -11,6 +12,7 @@ import {
   setShowChainAccounts,
   setShowPracticeAccounts,
   type RouteCallsByDay,
+  type RouteDoneByDay,
   type RouteDraftByDay,
   type RouteEndpointsByDay,
   type RouteSchedulePrefs,
@@ -54,6 +56,16 @@ export async function saveRouteDraft(byDay: RouteDraftByDay): Promise<void> {
  */
 export async function saveRouteCalls(byDay: RouteCallsByDay): Promise<void> {
   await setRouteCalls(byDay);
+}
+
+/**
+ * Stops marked done (migration 0042), same optimistic contract as
+ * saveRouteDraft/saveRouteCalls: the tap already crossed the stop off on
+ * screen, this makes it durable and lets the widget pick it up. No
+ * revalidatePath, same reason as saveRouteDraft.
+ */
+export async function saveRouteDone(byDay: RouteDoneByDay): Promise<void> {
+  await setRouteDone(byDay);
 }
 
 /**
