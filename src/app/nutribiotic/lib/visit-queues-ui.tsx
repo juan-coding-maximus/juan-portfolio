@@ -3,9 +3,7 @@
 import { useEffect, useState } from "react";
 import type { CalendarProposal, EngagementActivity, Touchpoint } from "./dal";
 import { EngagementQueue } from "./engagement-ui";
-import { AccountMatchResolver } from "./new-account-ui";
 import { CalendarProposalRow } from "./touchpoint-ui";
-import type { ParsedTouchpoint } from "./touchpoint";
 
 type Payload = {
   ok: boolean;
@@ -16,7 +14,13 @@ type Payload = {
 };
 
 /**
- * The three queues, loaded AFTER the document has closed.
+ * The two queues, loaded AFTER the document has closed.
+ *
+ * "Needs a match" left this screen on 2026-08-27 at Juan's ask. It was the
+ * tallest thing on Visit and it is not doorway work: resolving which store a
+ * note belongs to means reading candidates and comparing addresses, which is a
+ * desk job. It lives on Clients now. Nothing about the filing changed, only
+ * where the unresolved ones are worked.
  *
  * See api/visit-queues/route.ts for why they are not part of the page render
  * any more: a streamed response stays open until its last Suspense boundary
@@ -71,39 +75,11 @@ export function VisitQueues() {
   }
   if (!data) return null;
 
-  const pending = data.pending ?? [];
   const unfiled = data.unfiled ?? [];
   const proposals = data.proposals ?? [];
-  const accountNames = data.accountNames ?? {};
 
   return (
     <>
-      {pending.length > 0 && (
-        <section className="mx-auto w-full max-w-[600px]">
-          <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8A928C]">
-            Needs a match
-          </h2>
-          <div className="flex flex-col gap-4">
-            {pending.map((tp) => {
-              const parsed = tp.parsed as ParsedTouchpoint | null;
-              const matchAccountId =
-                parsed?.account_confidence === "low" && parsed.account_id ? parsed.account_id : null;
-              return (
-                <div key={tp.id} className="rounded-xl border border-[#E2DFD5] bg-white p-4">
-                  <p className="line-clamp-3 text-[13px] leading-relaxed text-[#3D4A44]">{tp.raw_text}</p>
-                  <AccountMatchResolver
-                    touchpointId={tp.id}
-                    nameGuess={parsed?.business_name_guess ?? null}
-                    matchAccountId={matchAccountId}
-                    matchAccountName={matchAccountId ? (accountNames[matchAccountId] ?? null) : null}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
       <div className="mx-auto w-full max-w-[600px]">
         <EngagementQueue activities={unfiled} />
       </div>

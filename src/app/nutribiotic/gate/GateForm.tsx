@@ -16,10 +16,16 @@ import { useState } from "react";
  * with "//", which is what rules out the protocol-relative "//evil.com" form,
  * and the gate itself is excluded so a bounce cannot loop.
  */
+const HOME = "/nutribiotic/visit";
+
 function safeNext(search: string): string {
   const raw = new URLSearchParams(search).get("next");
-  if (!raw || !raw.startsWith("/nutribiotic/")) return "/nutribiotic";
-  if (raw.startsWith("/nutribiotic/gate")) return "/nutribiotic";
+  // Visit is the default landing, not /nutribiotic (Juan, 2026-08-27: "make
+  // sure that visit is the first page that gets opened anytime"). /nutribiotic
+  // only redirected here anyway, so this drops a hop on the one path where a
+  // hop costs the most: a cold unlock, on a phone, in a doorway.
+  if (!raw || !raw.startsWith("/nutribiotic/")) return HOME;
+  if (raw.startsWith("/nutribiotic/gate")) return HOME;
   return raw;
 }
 

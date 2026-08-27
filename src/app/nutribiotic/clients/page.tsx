@@ -30,6 +30,7 @@ import {
 } from "../lib/dal";
 import { AccountLink } from "../lib/modal";
 import { Card, Confidence, Empty, Ico, PageHead, TierChip } from "../lib/ui";
+import { UnmatchedTouchpoints } from "../lib/unmatched-ui";
 
 export const dynamic = "force-dynamic";
 
@@ -108,6 +109,12 @@ export default async function Clients({
             : "Your 273 accounts, sorted by OS tier (fit x engagement, A-D), then by how much we actually know. An account we know nothing about does not get to sit at the top of the list because its one measured input happened to be high. HubSpot's letter on the same company is HQ's potential grade, a different scale and a different question."
         }
       />
+
+      {/* Notes that never landed on an account. First thing on the screen when
+          there are any, absent when there are none. Moved here off Visit on
+          2026-08-27: matching a note to a store is desk work, not doorway
+          work. See lib/unmatched-ui.tsx. */}
+      <UnmatchedTouchpoints />
 
       {/* The territory, divided into the areas Juan actually drives. Each carries its
           own colour, and the same colour fills its frontier on the map, so the chip and
