@@ -48,7 +48,7 @@ import { resolveStopAddress } from "../lib/stop-actions";
 import { CallSearchField } from "./CallSearchField";
 import { DayMoveMenu } from "./DayMoveMenu";
 import { routeDriveLegs, type DriveLeg } from "./drive-actions";
-import { likelyDriveMinutes, LONG_LEG_MINUTES } from "./traffic";
+import { BAND_STYLE, driveBand, likelyDriveMinutes } from "./traffic";
 import type { RouteStopView } from "./MapScreen";
 import { RouteEndpointField } from "./RouteEndpointField";
 
@@ -1271,11 +1271,26 @@ export function RoutePanel({
                       does not have. */}
                   {prev &&
                     (legBetween(i) ? (
-                      <div className="mt-0.5 text-[12px] text-[#8A928C]">
-                        <span className="tabular-nums">{duration(legBetween(i)!.minutes)}</span>{" "}
-                        drive ·{" "}
-                        <span className="tabular-nums">{legBetween(i)!.miles.toFixed(1)} mi</span>{" "}
-                        from stop {i}
+                      <div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-[#8A928C]">
+                        {/* The same band the map draws this leg in (traffic.ts),
+                            so the two panes of the dashboard describe one day
+                            rather than two. A dot, not a word: the row already
+                            carries the exact minutes right beside it. */}
+                        <span
+                          aria-hidden
+                          title={BAND_STYLE[driveBand(legBetween(i)!.minutes)].title}
+                          className="inline-block h-2 w-2 shrink-0 rounded-full ring-1 ring-[#14201B]/40"
+                          style={{ backgroundColor: BAND_STYLE[driveBand(legBetween(i)!.minutes)].color }}
+                        />
+                        <span>
+                          <span className="tabular-nums">{duration(legBetween(i)!.minutes)}</span>{" "}
+                          drive ·{" "}
+                          <span className="tabular-nums">{legBetween(i)!.miles.toFixed(1)} mi</span>{" "}
+                          from stop {i}
+                          {driveBand(legBetween(i)!.minutes) === "walk" && (
+                            <span className="ml-1 font-medium text-[#2C6A46]">walkable</span>
+                          )}
+                        </span>
                       </div>
                     ) : (
                       <div className="mt-0.5 text-[12px] text-[#8A928C]">

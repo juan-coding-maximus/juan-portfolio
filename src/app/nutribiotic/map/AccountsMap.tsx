@@ -19,7 +19,7 @@ import { AccountLink } from "../lib/modal";
 import { appleMapsUrl, CUSTOM_STOP_LABEL, Ico, ReachLinks, realChannel } from "../lib/ui";
 import type { DriveLeg } from "./drive-actions";
 import type { FocusRequest, RouteStopView } from "./MapScreen";
-import { LONG_LEG_MINUTES } from "./traffic";
+import { BAND_STYLE, driveBand } from "./traffic";
 
 /**
  * A red disc with a house cut into it: the two ends of the driving day.
@@ -271,26 +271,38 @@ export function AccountsMap({
     }));
   }, [showRouteChain, routeStops.length, routeStart, routeEnd]);
 
-  const longLegs = useMemo(() => {
+  /**
+   * EVERY SEGMENT, BANDED BY WHAT IT COSTS (Juan, 2026-08-26).
+   *
+   * The chain used to be one uniform near-black line, which meant a
+   * five-minute hop between two stores on the same block and a fifty-minute
+   * run up the 405 were drawn identically. Those are opposite facts: the first
+   * says park once and do both on foot, the second says this might be two
+   * days. See traffic.ts's driveBand for the four bands and why these four.
+   *
+   * EMPTY UNTIL THE ROUTER ANSWERS, and that is the honesty rule this screen
+   * has always had: a band is a claim about drive time, so with no drive time
+   * there is no band. The fallback is the old single dark line, drawn
+   * unbanded, rather than bands guessed from straight-line distance.
+   */
+  const chainSegments = useMemo(() => {
     if (!routeLegs || chainPoints.length < 2) return [];
     if (routeLegs.length !== chainPoints.length - 1) return [];
-    const out: Array<{ key: string; path: google.maps.LatLngLiteral[]; mid: google.maps.LatLngLiteral; minutes: number }> = [];
-    for (let i = 0; i < routeLegs.length; i++) {
-      const leg = routeLegs[i];
-      if (leg.minutes < LONG_LEG_MINUTES) continue;
+    return routeLegs.map((leg, i) => {
       const a = chainPoints[i];
       const b = chainPoints[i + 1];
-      out.push({
+      const minutes = Math.round(leg.minutes);
+      return {
         key: `${i}:${a.lat},${a.lng}->${b.lat},${b.lng}`,
         path: [
           { lat: a.lat, lng: a.lng },
           { lat: b.lat, lng: b.lng },
-        ],
+        ] as google.maps.LatLngLiteral[],
         mid: { lat: (a.lat + b.lat) / 2, lng: (a.lng + b.lng) / 2 },
-        minutes: Math.round(leg.minutes),
-      });
-    }
-    return out;
+        minutes,
+        band: driveBand(minutes),
+      };
+    });
   }, [routeLegs, chainPoints]);
 
   function toggleLeadStatus(v: string) {
@@ -836,6 +848,24 @@ export function AccountsMap({
             <span className="tabular-nums opacity-70">{routeStops.length}</span>
           </button>
         )}
+        {/* THE KEY TO THE BANDS. Four colours mean nothing without it, and the
+            one that matters most, walkable, is the one nobody would guess. Only
+            rendered when there are bands on screen to explain: a legend for a
+            line that is not drawn is chrome. */}
+        {chainSegments.length > 0 && (
+          <span className="flex items-center gap-2.5 text-[11.5px] text-[#8A928C]">
+            {(["walk", "near", "far", "haul"] as const).map((band) => (
+              <span key={band} className="inline-flex items-center gap-1" title={BAND_STYLE[band].title}>
+                <span
+                  aria-hidden
+                  className="inline-block h-2 w-2 rounded-full ring-1 ring-[#14201B]/40"
+                  style={{ backgroundColor: BAND_STYLE[band].color }}
+                />
+                {band === "walk" ? "walk" : band === "near" ? "25m" : band === "far" ? "45m" : "45m+"}
+              </span>
+            ))}
+          </span>
+        )}
         <span className="ml-auto hidden text-[12px] text-[#8A928C] md:inline">
           {filtered.length} of {accounts.length}
         </span>
@@ -953,45 +983,106 @@ export function AccountsMap({
               rows measure. No routing engine here, so this is deliberately
               the honest straight-line hop, not a driving path -- see
               drive-actions.ts for the real one. */}
-          {/* THE LONG HAULS, under the chain and much wider (Juan, 2026-08-26).
-              Grey rather than the chain's near-black: this band is a weight, not
-              a second path, and it must read as "this segment is expensive"
-              at a glance without competing with the route itself. Drawn first
-              so the chain and its arrows sit on top of it. */}
-          {longLegs.map((l) => (
-            <PolylineF
-              key={`band:${l.key}`}
-              path={l.path}
-              options={{
-                strokeColor: "#9AA3A0",
-                strokeOpacity: 0.55,
-                strokeWeight: 11,
-                zIndex: 3,
-                clickable: false,
-              }}
-            />
-          ))}
+          {/* THE CASINGS. A dark stroke under each fluorescent one, drawn as a
+              separate pass so every casing sits below every colour and no
+              segment's casing can cut across its neighbour's fill. This is what
+              lets the greens and yellows stay genuinely fluorescent on a pale
+              basemap instead of being darkened into legibility. `haul` opts out
+              (casing 0): it is already the widest and quietest band. */}
+          {chainSegments
+            .filter((seg) => BAND_STYLE[seg.band].casing > 0)
+            .map((seg) => (
+              <PolylineF
+                key={`casing:${seg.key}`}
+                path={seg.path}
+                options={{
+                  strokeColor: "#14201B",
+                  strokeOpacity: 0.7,
+                  strokeWeight: BAND_STYLE[seg.band].casing,
+                  zIndex: 3,
+                  clickable: false,
+                }}
+              />
+            ))}
 
-          {/* One likely number per long leg, at its midpoint. Label-only
-              markers: no icon, so nothing new appears on the map, just the
-              minutes. Priced at the hour the leg is driven, see traffic.ts. */}
-          {longLegs.map((l) => (
-            <MarkerF
-              key={`label:${l.key}`}
-              position={l.mid}
-              clickable={false}
-              zIndex={6}
-              icon={{ path: google.maps.SymbolPath.CIRCLE, scale: 0, fillOpacity: 0, strokeOpacity: 0 }}
-              label={{
-                text: `${l.minutes} min`,
-                color: "#3D4A44",
-                fontSize: "12px",
-                fontWeight: "600",
-              }}
-            />
-          ))}
+          {/* THE BANDS THEMSELVES. Colour and weight both rank the same way, so
+              the day still reads correctly in a screenshot and to anyone who
+              cannot separate red from green. */}
+          {chainSegments.map((seg) => {
+            const style = BAND_STYLE[seg.band];
+            return (
+              <PolylineF
+                key={`band:${seg.key}`}
+                path={seg.path}
+                options={{
+                  strokeColor: style.color,
+                  strokeOpacity: seg.band === "haul" ? 0.55 : 1,
+                  strokeWeight: style.weight,
+                  zIndex: 4,
+                  clickable: false,
+                }}
+              />
+            );
+          })}
 
-          {chainPath.length > 1 && (
+          {/* DIRECTION, once per segment rather than repeating along it. The
+              old chain repeated an arrow every 110px, which on a banded line
+              would stipple a short walkable hop into dashes. `walk` skips it
+              outright: at that length the arrow would be the whole segment. */}
+          {chainSegments
+            .filter((seg) => seg.band !== "walk")
+            .map((seg) => (
+              <PolylineF
+                key={`arrow:${seg.key}`}
+                path={seg.path}
+                options={{
+                  strokeOpacity: 0,
+                  zIndex: 5,
+                  clickable: false,
+                  icons: [
+                    {
+                      icon: {
+                        path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                        scale: 3,
+                        strokeColor: "#14201B",
+                        fillColor: "#14201B",
+                        fillOpacity: 1,
+                      },
+                      offset: "50%",
+                    },
+                  ],
+                }}
+              />
+            ))}
+
+          {/* ONLY THE HAULS CARRY THEIR NUMBER (Juan, 2026-08-26). Putting a
+              minute count on all four bands would be a wall of digits over the
+              territory; the band already says what the leg costs. The 46+ leg
+              is the one where the exact figure changes the decision, so it is
+              the one that says it. Label-only markers: no icon is drawn, just
+              the text beside the middle of the line. */}
+          {chainSegments
+            .filter((seg) => BAND_STYLE[seg.band].label)
+            .map((seg) => (
+              <MarkerF
+                key={`label:${seg.key}`}
+                position={seg.mid}
+                clickable={false}
+                zIndex={6}
+                icon={{ path: google.maps.SymbolPath.CIRCLE, scale: 0, fillOpacity: 0, strokeOpacity: 0 }}
+                label={{
+                  text: `${seg.minutes} min`,
+                  color: "#3D4A44",
+                  fontSize: "12px",
+                  fontWeight: "600",
+                }}
+              />
+            ))}
+
+          {/* THE UNBANDED FALLBACK. Drawn only when the router gave us nothing,
+              so the route is still visible as a shape without any segment
+              claiming a drive time nobody measured. */}
+          {chainSegments.length === 0 && chainPath.length > 1 && (
             <PolylineF
               path={chainPath}
               options={{

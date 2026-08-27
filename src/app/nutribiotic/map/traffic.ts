@@ -77,9 +77,57 @@ export function likelyDriveMinutes(freeFlowMinutes: number, at: Date): number {
 }
 
 /**
- * The threshold at which a leg stops being a hop between neighbours and
- * becomes a transit decision (Juan, 2026-08-26). At 45 minutes a segment is
- * drawn heavy and grey on the map and carries its own minute count, because
- * that is the leg that decides whether a day is one cluster or two.
+ * WHAT A LEG COSTS, AS FOUR KINDS OF DECISION (Juan, 2026-08-26).
+ *
+ * A minute count is a number to read. A band is a thing to see. These four are
+ * the distinctions that actually change what he does with a pair of stops:
+ *
+ *   walk  <= 5 min   Park once and do both on foot. This is the band that
+ *                    changes a day, because it turns two stops into one stop,
+ *                    and it was completely invisible on a uniform line.
+ *   near  6-25 min   An ordinary hop inside a cluster.
+ *   far   26-45 min  Still one day, but it costs a real piece of it.
+ *   haul  46+ min    The leg that decides whether this is one day or two.
+ *                    The only band that carries its number on the map.
+ *
+ * Boundaries are inclusive on both ends as written, over the ROUNDED minute
+ * count, so a leg is in exactly one band and nothing lands between two.
  */
-export const LONG_LEG_MINUTES = 45;
+export type DriveBand = "walk" | "near" | "far" | "haul";
+
+export const WALKABLE_MINUTES = 5;
+export const HAUL_MINUTES = 46;
+
+export function driveBand(minutes: number): DriveBand {
+  const m = Math.round(minutes);
+  if (m <= WALKABLE_MINUTES) return "walk";
+  if (m <= 25) return "near";
+  if (m <= 45) return "far";
+  return "haul";
+}
+
+/**
+ * How each band is drawn.
+ *
+ * ON FLUORESCENT COLOURS OVER A PALE MAP. Juan asked for fluorescent green and
+ * yellow. Taken literally, on this basemap (#f3f1ea ground, white roads) a
+ * neon yellow line is very nearly invisible, which would defeat the whole
+ * point of banding. So each segment is drawn twice: a dark casing underneath,
+ * then the fluorescent colour on top. That is the same trick Google and Apple
+ * use to put traffic colours on a light basemap, and it is what lets the hues
+ * stay genuinely fluorescent instead of being muted down into legibility.
+ *
+ * Weight carries the same ranking as the colour, so the day reads correctly in
+ * a screenshot, at a glance, and to anyone who cannot separate red from green.
+ * `walk` is deliberately the finest line: a five-minute hop should look like
+ * almost nothing, because that is what it costs.
+ */
+export const BAND_STYLE: Record<
+  DriveBand,
+  { color: string; weight: number; casing: number; label: boolean; title: string }
+> = {
+  walk: { color: "#00F06A", weight: 2.5, casing: 4.5, label: false, title: "Walkable, 5 min or less" },
+  near: { color: "#FFE600", weight: 4, casing: 6.5, label: false, title: "6 to 25 min" },
+  far: { color: "#FF2D2D", weight: 5, casing: 7.5, label: false, title: "26 to 45 min" },
+  haul: { color: "#9AA3A0", weight: 11, casing: 0, label: true, title: "46 min or more" },
+};
