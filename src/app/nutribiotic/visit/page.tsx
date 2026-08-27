@@ -91,11 +91,35 @@ export default function VisitPage() {
  * uncommon case.
  */
 async function VisitQueues() {
-  const [proposals, unfiled, pending] = await Promise.all([
-    listCalendarProposals(),
-    listUnfiledActivities(),
-    listPendingAccountMatches(),
-  ]);
+  /**
+   * NEVER THROWS, AND THAT IS LOAD-BEARING.
+   *
+   * These reads used to happen BEFORE any HTML was flushed, so a Supabase
+   * failure produced a clean error page. Now the shell flushes first, which
+   * means an uncaught throw in here aborts a stream that is already in the
+   * browser: the reader gets a truncated document and "the page couldn't
+   * load", which is a far worse failure than the one it replaced, and it
+   * would take the capture box down with it.
+   *
+   * So a queue failure degrades to a queue-shaped message and nothing else.
+   * The box above it keeps working, because filing what just happened does
+   * not depend on any of this. There is a segment-level error.tsx as a second
+   * net, but nothing on this screen should ever need it.
+   */
+  let proposals, unfiled, pending;
+  try {
+    [proposals, unfiled, pending] = await Promise.all([
+      listCalendarProposals(),
+      listUnfiledActivities(),
+      listPendingAccountMatches(),
+    ]);
+  } catch {
+    return (
+      <div className="mx-auto w-full max-w-[600px] rounded-md border border-[#E5D9BF] bg-[#FBF6E9] px-3 py-2.5 text-[13px] text-[#8A6D2F]">
+        Couldn&rsquo;t load the follow-up queues just now. Logging a visit still works.
+      </div>
+    );
+  }
 
   // A recorded (spoken) visit that parks as needs_account resolves after
   // transcription, on nobody's screen, so it needs its own name lookup
@@ -105,7 +129,7 @@ async function VisitQueues() {
     .map((tp) => (tp.parsed as ParsedTouchpoint | null))
     .filter((p): p is ParsedTouchpoint => p != null && p.account_confidence === "low" && !!p.account_id)
     .map((p) => p.account_id as string);
-  const accountNames = await getAccountNames([...new Set(lowConfidenceIds)]);
+  const accountNames = await getAccountNames([...new Set(lowConfidenceIds)]).catch(() => ({}) as Record<string, string>);
 
   return (
     <>

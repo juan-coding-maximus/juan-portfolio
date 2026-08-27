@@ -46,6 +46,24 @@ export function WarmRoutes() {
 
     const warm = () => {
       if (cancelled) return;
+
+      /**
+       * NOT ON A BAD LINK, AND NOT ON HIS DATA IF HE SAID SO.
+       *
+       * Every route here is force-dynamic, so a prefetch is a full server
+       * render, and /map ships the whole territory. That is a fine trade on
+       * wifi and a bad one on a weak cell connection outside a store, which is
+       * exactly where this screen is used. `saveData` is the user asking not
+       * to spend data; 2g/slow-2g means the spend would not pay off anyway.
+       * The API is Chromium-only, so this is an opportunistic check: absent
+       * means proceed, never means block.
+       */
+      const conn = (navigator as unknown as {
+        connection?: { saveData?: boolean; effectiveType?: string };
+      }).connection;
+      if (conn?.saveData) return;
+      if (conn?.effectiveType && /(^|-)2g$/.test(conn.effectiveType)) return;
+
       for (const href of ROUTES) {
         try {
           router.prefetch(href);
