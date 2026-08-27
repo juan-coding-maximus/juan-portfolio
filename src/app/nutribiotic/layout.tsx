@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getRouteCallsByDay, getRouteDoneByDay, getRouteDraftByDay, isConfigured, workspaceMode } from "./lib/dal";
+import { getRouteStateByDay, isConfigured, workspaceMode } from "./lib/dal";
 import { LAUNCHERS } from "./lib/launchers";
 import { ModalProvider } from "./lib/modal";
 import { MobileNav } from "./lib/MobileNav";
@@ -123,12 +123,26 @@ export default async function NutribioticLayout({
     return <div className="min-h-screen bg-[#F7F6F1] text-[#14201B]">{children}</div>;
   }
 
-  const mode = await workspaceMode();
-  const synthetic = mode === "synthetic";
+  // STARTED, NOT AWAITED.
+  //
+  // This layout is on the critical path of every NutriBiotic screen, /visit
+  // included, and /visit is the one Juan opens standing in a doorway with
+  // someone waiting. It used to await workspaceMode() and THEN three separate
+  // reads of three columns of the SAME nb_ui_prefs row: four round trips deep
+  // in a chain that had to finish before the capture box existed in the DOM.
+  //
+  // The route read is now one query, and it is handed to RouteProvider as a
+  // promise rather than awaited here, so the shell paints without it. /visit
+  // never reads a route at all; the screens that do fill in a beat later. See
+  // RouteProvider for how an un-hydrated route is told apart from an empty one.
+  const routeStatePromise = isConfigured()
+    ? getRouteStateByDay()
+    : Promise.resolve({ draft: {}, calls: {}, done: {} });
+  // Swallowed here so an unhandled rejection can never take down the shell;
+  // RouteProvider attaches the real handler and reports through `hydrated`.
+  routeStatePromise.catch(() => {});
 
-  const [routeDraft, routeCalls, routeDone] = isConfigured()
-    ? await Promise.all([getRouteDraftByDay(), getRouteCallsByDay(), getRouteDoneByDay()])
-    : [{}, {}, {}];
+  const synthetic = (await workspaceMode()) === "synthetic";
   const nav = NAV;
 
   /* Review left the nav for good, 2026-08-02: the page stays reachable at
@@ -137,7 +151,7 @@ export default async function NutribioticLayout({
 
   return (
     <div className="min-h-screen bg-[#F7F6F1] text-[#14201B]">
-      <RouteProvider initial={routeDraft} initialCalls={routeCalls} initialDone={routeDone}>
+      <RouteProvider initial={routeStatePromise}>
       <ModalProvider>
       <RefreshOnForeground />
       <div className="min-h-screen bg-[#F7F6F1]">

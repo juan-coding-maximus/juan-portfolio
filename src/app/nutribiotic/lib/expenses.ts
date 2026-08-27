@@ -314,7 +314,34 @@ export type TripInput = {
   endPhoto: { bytes: ArrayBuffer; mimeType: string; filename: string };
 };
 
-export async function fileTrip(input: TripInput): Promise<{ sheetLink: string; miles: number }> {
+/**
+ * Upload one odometer photo into its date's period folder, tagged start/end,
+ * same naming convention fileTrip has always used. Split out of fileTrip
+ * 2026-08-26 for the widget's camera-gated mileage flow (see api/widget/
+ * mileage/route.ts): that flow captures a start photo hours before the end
+ * one exists, so the upload has to happen on its own, before there is a pair
+ * to file a row for. fileTrip below calls this too, unchanged externally.
+ */
+export async function uploadMileagePhoto(
+  date: string,
+  moment: "start" | "end",
+  photo: { bytes: ArrayBuffer; mimeType: string; filename: string },
+): Promise<{ driveFileId: string; photoLink: string }> {
+  const tree = await ensureTree(date);
+  const stamp = date.replace(/-/g, "");
+  const up = await uploadFile(photo.bytes, photo.mimeType, tree.periodFolderId, `${stamp}_trip-${moment}_${randomSuffix()}${extOf(photo.filename, photo.mimeType)}`);
+  return { driveFileId: up.id, photoLink: asOwnerLink(up.webViewLink) };
+}
+
+/**
+ * The H:M sheet row itself, given two ALREADY-UPLOADED photo links rather
+ * than raw bytes -- the other half of fileTrip's split. Both entry points
+ * (this one and fileTrip) end at the exact same row shape, so a trip filed
+ * from the widget and one filed from /expenses read identically on the sheet.
+ */
+export async function fileTripFromLinks(input: {
+  date: string; startOdo: string; endOdo: string; startLink: string; endLink: string;
+}): Promise<{ sheetLink: string; miles: number }> {
   const startNum = Number(String(input.startOdo).replace(/,/g, ""));
   const endNum = Number(String(input.endOdo).replace(/,/g, ""));
   if (!Number.isFinite(startNum) || !Number.isFinite(endNum)) {
@@ -325,25 +352,27 @@ export async function fileTrip(input: TripInput): Promise<{ sheetLink: string; m
   }
 
   const tree = await ensureTree(input.date);
-  const startStamp = input.date.replace(/-/g, "");
-  const endStamp = (input.endDate ?? input.date).replace(/-/g, "");
-  const startUp = await uploadFile(input.startPhoto.bytes, input.startPhoto.mimeType, tree.periodFolderId, `${startStamp}_trip-start_${randomSuffix()}${extOf(input.startPhoto.filename, input.startPhoto.mimeType)}`);
-  const endUp = await uploadFile(input.endPhoto.bytes, input.endPhoto.mimeType, tree.periodFolderId, `${endStamp}_trip-end_${randomSuffix()}${extOf(input.endPhoto.filename, input.endPhoto.mimeType)}`);
-  const startLink = asOwnerLink(startUp.webViewLink);
-  const endLink = asOwnerLink(endUp.webViewLink);
-
   // H:M, not G:L: G is the gap/DAY column between the two tables (2026-08-19). Mileage
   // Comp (M) stays blank per row, a totals-row-only figure since 2026-08-17, matching
   // expense_log.py, a per-drive dollar figure read as more precision than the claim needs.
   const row = Math.max(await nextFreeRow(tree.sheetId, LOG_TAB, "H"), FIRST_DATA_ROW);
   await writeRange(tree.sheetId, `${LOG_TAB}!H${row}:M${row}`, [[
-    input.startOdo, hyperlink(startLink, "photo"),
-    input.endOdo, hyperlink(endLink, "photo"),
+    input.startOdo, hyperlink(input.startLink, "photo"),
+    input.endOdo, hyperlink(input.endLink, "photo"),
     `=IF(OR(H${row}="",J${row}=""),"",J${row}-H${row})`,
     "",
   ]]);
 
   return { sheetLink: asOwnerLink(tree.sheetLink), miles: Math.round((endNum - startNum) * 10) / 10 };
+}
+
+export async function fileTrip(input: TripInput): Promise<{ sheetLink: string; miles: number }> {
+  const startUp = await uploadMileagePhoto(input.date, "start", input.startPhoto);
+  const endUp = await uploadMileagePhoto(input.endDate ?? input.date, "end", input.endPhoto);
+  return fileTripFromLinks({
+    date: input.date, startOdo: input.startOdo, endOdo: input.endOdo,
+    startLink: startUp.photoLink, endLink: endUp.photoLink,
+  });
 }
 
 function extOf(filename: string, mimeType: string): string {

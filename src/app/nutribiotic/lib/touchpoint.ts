@@ -42,24 +42,44 @@ import { Blocked, runEngagement } from "./hubspot-engagement";
  * unwinds the touchpoint itself, the activity just stays unfiled and drops
  * into the Visit tab's manual queue below for a retry.
  */
-export async function autoFileEngagement(
-  activityId: number,
-): Promise<{ hubspotFiled: boolean; hubspotNoteId: string | null; hubspotError: string | null }> {
+export async function autoFileEngagement(activityId: number): Promise<HubspotFilingReport> {
   try {
     const filed = await runEngagement(activityId, { write: true });
     return {
       hubspotFiled: filed.wrote || Boolean(filed.alreadyFiledId),
       hubspotNoteId: filed.noteId ?? filed.alreadyFiledId,
       hubspotError: null,
+      // Carried to the screen rather than only to the sync log. A link HubSpot
+      // made on its own and this run undid is exactly the kind of thing that
+      // previously surfaced days later in a field report.
+      hubspotLeaks: filed.leaks.length,
+      companyPhoneFilled: filed.companyPhone && "filled" in filed.companyPhone ? filed.companyPhone.filled : null,
+      companyPhoneConflict:
+        filed.companyPhone && "conflict" in filed.companyPhone ? filed.companyPhone.conflict.existing : null,
     };
   } catch (e) {
     return {
       hubspotFiled: false,
       hubspotNoteId: null,
       hubspotError: e instanceof Blocked ? e.message : e instanceof Error ? e.message : String(e),
+      hubspotLeaks: 0,
+      companyPhoneFilled: null,
+      companyPhoneConflict: null,
     };
   }
 }
+
+export type HubspotFilingReport = {
+  hubspotFiled: boolean;
+  hubspotNoteId: string | null;
+  hubspotError: string | null;
+  /** Count of unrequested company links detached during this filing. */
+  hubspotLeaks: number;
+  /** The number written onto the company record, when it had none. */
+  companyPhoneFilled: string | null;
+  /** The number already on the company, when it disagreed and was kept. */
+  companyPhoneConflict: string | null;
+};
 
 const client = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -206,6 +226,9 @@ export type RecordTouchpointResult =
       ok: true;
       touchpoint_id: string;
       accountName: string | null;
+      /** The account this landed on. Carried back so the capture surface can
+       * apply a grade Juan picked while typing, without a second lookup. */
+      accountId: string | null;
       needsAccount: false;
       summary: string;
       peopleAdded: number;
@@ -214,6 +237,9 @@ export type RecordTouchpointResult =
       hubspotFiled: boolean;
       hubspotNoteId: string | null;
       hubspotError: string | null;
+      hubspotLeaks: number;
+      companyPhoneFilled: string | null;
+      companyPhoneConflict: string | null;
     }
   | {
       ok: true;
@@ -239,7 +265,23 @@ export async function recordTouchpoint(
   rawText: string,
   accountIdHint?: string | null,
   occurredAt?: string | null,
-  opts: { autoFileHubspot?: boolean; kindOverride?: "meeting" | "call" | "email" } = {},
+  opts: {
+    autoFileHubspot?: boolean;
+    kindOverride?: "meeting" | "call" | "email";
+    /**
+     * Juan already knows this is not one of his 273. Skip account matching
+     * entirely and park straight into the create-a-business flow.
+     *
+     * This is an accuracy control, not a shortcut. The matcher's failure mode
+     * is confidently attaching a brand-new store to a similarly-named existing
+     * account (a chain's other branch, a same-name store one city over), and
+     * that fuses two stores' histories, which HARD RULE 3 exists to prevent
+     * and which nobody notices from the field. When the rep standing in the
+     * door says it's new, his word outranks a name-similarity guess, the same
+     * precedence accountIdHint and kindOverride already have.
+     */
+    forceNewAccount?: boolean;
+  } = {},
 ): Promise<RecordTouchpointResult> {
   const autoFileHubspot = opts.autoFileHubspot ?? true;
   const text = rawText.trim();
@@ -289,7 +331,11 @@ export async function recordTouchpoint(
   // Only a "high" confidence match auto-files to an existing account; "low" is the
   // model's own hedge that the name match may be wrong (e.g. a same-named store in a
   // different city) and must park as needs_account like "none" does, not silently file.
-  const accountId = accountIdHint || (parsed.account_confidence === "high" ? parsed.account_id : null);
+  // forceNewAccount outranks even a "high" match: the rep is looking at the
+  // storefront, the model is looking at a name.
+  const accountId = opts.forceNewAccount
+    ? null
+    : accountIdHint || (parsed.account_confidence === "high" ? parsed.account_id : null);
 
   if (!accountId) {
     const tp = await insertTouchpoint({
@@ -302,8 +348,14 @@ export async function recordTouchpoint(
     // A "low" guess still names a real candidate id; "none" never does (see
     // the extraction prompt above). Resolve it to a name now, once, rather
     // than making the client look it up.
+    // Suppressed under forceNewAccount: offering a one-tap "YES!" match to an
+    // existing account directly contradicts the rep having just declared this
+    // one new, and re-opens the wrong-attach path the flag exists to close.
+    // The safety net moves downstream and gets stronger there:
+    // createBusinessFromPlace runs findPossibleDuplicates against the WHOLE
+    // portal (not just Juan's book) and blocks on any hit.
     const matchAccount =
-      parsed.account_confidence === "low" && parsed.account_id
+      !opts.forceNewAccount && parsed.account_confidence === "low" && parsed.account_id
         ? accountsRes.data.find((a) => a.account_id === parsed.account_id)
         : null;
     return {
@@ -397,12 +449,20 @@ export async function recordTouchpoint(
 
   const hubspot = autoFileHubspot
     ? await autoFileEngagement(activity.id)
-    : { hubspotFiled: false, hubspotNoteId: null, hubspotError: null };
+    : ({
+        hubspotFiled: false,
+        hubspotNoteId: null,
+        hubspotError: null,
+        hubspotLeaks: 0,
+        companyPhoneFilled: null,
+        companyPhoneConflict: null,
+      } satisfies HubspotFilingReport);
 
   return {
     ok: true,
     touchpoint_id: tp.id,
     accountName: account?.name ?? null,
+    accountId: account?.account_id ?? null,
     needsAccount: false,
     summary: parsed.activity.detail,
     peopleAdded,
@@ -415,6 +475,7 @@ export async function recordTouchpoint(
 export type ResolveResult =
   | {
       ok: true;
+      accountId: string;
       accountName: string;
       summary: string;
       peopleAdded: number;
@@ -423,6 +484,9 @@ export type ResolveResult =
       hubspotFiled: boolean;
       hubspotNoteId: string | null;
       hubspotError: string | null;
+      hubspotLeaks: number;
+      companyPhoneFilled: string | null;
+      companyPhoneConflict: string | null;
     }
   | { ok: false; error: string };
 
@@ -512,5 +576,5 @@ export async function resolveTouchpointToAccount(
   const hubspot = await autoFileEngagement(activity.id);
 
   revalidatePath("/nutribiotic/visit");
-  return { ok: true, accountName, summary: parsed.activity.detail, peopleAdded, peopleUpdated, calendarProposals, ...hubspot };
+  return { ok: true, accountId, accountName, summary: parsed.activity.detail, peopleAdded, peopleUpdated, calendarProposals, ...hubspot };
 }

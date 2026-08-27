@@ -33,9 +33,7 @@
 import {
   defaultActiveDay,
   planningHorizonDates,
-  getRouteCallsByDay,
-  getRouteDoneByDay,
-  getRouteDraftByDay,
+  getRouteStateByDay,
   getRouteSchedulePrefs,
   listOwnerAccounts,
   type CustomStop,
@@ -102,13 +100,12 @@ export async function GET(request: Request) {
     return Response.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 
-  const [byDay, callsByDay, doneByDay, accounts, prefs] = await Promise.all([
-    getRouteDraftByDay(),
-    getRouteCallsByDay(),
-    getRouteDoneByDay(),
+  const [routeState, accounts, prefs] = await Promise.all([
+    getRouteStateByDay(),
     listOwnerAccounts(),
     getRouteSchedulePrefs(),
   ]);
+  const { draft: byDay, calls: callsByDay, done: doneByDay } = routeState;
   const byId = new Map(accounts.data.map((a) => [a.id, a]));
 
   const days = planningHorizonDates();

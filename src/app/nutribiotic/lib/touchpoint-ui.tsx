@@ -1,11 +1,56 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { setPotentialJuan } from "./account-actions";
 import { decideCalendarProposal } from "./calendar-actions";
+import type { Tier } from "./dal";
 import { AccountMatchResolver } from "./new-account-ui";
 import { recordTouchpoint, type RecordTouchpointResult } from "./touchpoint";
 import { Ico, SuccessNote } from "./ui";
+
+/**
+ * A-E, not the full A-G the account card offers.
+ *
+ * The seven HubSpot options are A very big / B big / C medium / D small /
+ * E very small / F no at all / G personal use through wholesale line. A-E is
+ * the size judgment a rep actually forms standing in a store. F and G are
+ * administrative dispositions, not sizes, and mis-tapping one from the field
+ * would overwrite HQ's grade with a classification Juan did not mean. They stay
+ * available on the account card, where there is room to read what they mean.
+ */
+const VISIT_GRADES: Tier[] = ["A", "B", "C", "D", "E"];
+
+const GRADE_TITLE: Record<string, string> = {
+  A: "A · very big",
+  B: "B · big",
+  C: "C · medium",
+  D: "D · small",
+  E: "E · very small",
+};
+
+/** Survives a gate redirect, an iOS eviction, or a version-skew reload. The
+ * key is per-surface, so a draft typed in ClientOS is the one ClientOS
+ * restores. Text only: never a customer's name keyed to an account id. */
+const DRAFT_KEY = "nb.touchpoint.draft.v1";
+
+function readDraft(): string {
+  try {
+    return window.localStorage.getItem(DRAFT_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function writeDraft(value: string): void {
+  try {
+    if (value.trim()) window.localStorage.setItem(DRAFT_KEY, value);
+    else window.localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    /* Private mode, or storage disabled. The draft is a safety net, never a
+     * dependency: capture must keep working without it. */
+  }
+}
 
 function mtMimeType(): string {
   if (typeof MediaRecorder === "undefined") return "";
@@ -54,7 +99,13 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
   // then drop back to a blank capture on its own. needsAccount/error stay in
   // `result` since those need Juan to read and act, not a timed dismiss.
   const [success, setSuccess] = useState<FiledTouchpoint | null>(null);
+  // The size read he formed at the door, applied to whatever account the note
+  // lands on. Held here rather than written immediately because the account is
+  // not known until the note is filed.
+  const [grade, setGrade] = useState<Tier | null>(null);
+  const [newCompany, setNewCompany] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const restoredRef = useRef(false);
 
   const [voice, setVoice] = useState<"idle" | "recording" | "uploading" | "uploaded" | "error">("idle");
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -78,22 +129,64 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
     return () => clearTimeout(t);
   }, [voice]);
 
-  function autosize(el: HTMLTextAreaElement) {
+  const autosize = useCallback((el: HTMLTextAreaElement) => {
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 420)}px`;
-  }
+  }, []);
+
+  /**
+   * Restore a draft, then put the caret in the box.
+   *
+   * The focus call is deliberately NOT an `autoFocus` attribute. iOS Safari,
+   * standalone web apps included, ignores focus that does not originate in a
+   * user-gesture task, so on a cold launch the caret lands but the keyboard
+   * does not rise. Focusing here at least means the first tap anywhere in the
+   * card types rather than aims, and on every warm navigation (the common
+   * case, since /nutribiotic and both tiles all land here) it does raise the
+   * keyboard. `preventScroll` keeps the card from jumping under a thumb that
+   * is already moving toward it.
+   */
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    const saved = readDraft();
+    if (saved) {
+      setText(saved);
+      requestAnimationFrame(() => textareaRef.current && autosize(textareaRef.current));
+    }
+    textareaRef.current?.focus({ preventScroll: true });
+  }, [autosize]);
 
   function submit() {
     const value = text;
     if (!value.trim() || pending) return;
     startTransition(async () => {
-      const res = await recordTouchpoint(value, accountIdHint, null, { kindOverride: kind });
+      const res = await recordTouchpoint(value, accountIdHint, null, {
+        kindOverride: kind,
+        forceNewAccount: newCompany,
+      });
       if (res.ok && !res.needsAccount) {
+        // The grade goes on only once the note has landed and named its
+        // account, so a failed file never leaves a grade on the wrong record.
+        // Not awaited: it reaches HubSpot on the sync worker's own 60-second
+        // cycle either way, and making the rep wait for it would undo the
+        // point of this screen.
+        if (grade && res.accountId) void setPotentialJuan(res.accountId, grade);
         setText("");
+        writeDraft("");
         setKind("meeting");
-        requestAnimationFrame(() => textareaRef.current && autosize(textareaRef.current));
+        setGrade(null);
+        setNewCompany(false);
+        requestAnimationFrame(() => {
+          if (textareaRef.current) {
+            autosize(textareaRef.current);
+            textareaRef.current.focus({ preventScroll: true });
+          }
+        });
         setSuccess(res);
       } else {
+        // Parked or failed: the text stays in the box AND in storage. This is
+        // the case where the rep still has work to do on this note.
         setResult(res);
       }
     });
@@ -189,6 +282,28 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
                         `${success.peopleAdded || success.peopleUpdated ? " · " : ""}${success.calendarProposals} follow-up${success.calendarProposals === 1 ? "" : "s"} waiting below`}
                     </div>
                   )}
+                  {success.companyPhoneFilled && (
+                    <div className="mt-1.5 text-[12px] text-[#8A928C]">
+                      Company phone set to {success.companyPhoneFilled}
+                    </div>
+                  )}
+                  {success.companyPhoneConflict && (
+                    <div className="mt-1.5 flex items-start gap-1.5 text-[12px] text-[#8A6D2F]">
+                      <Ico name="alert" size={11} />
+                      <span>
+                        Company already lists {success.companyPhoneConflict}. Kept it; the new number is on the contact.
+                      </span>
+                    </div>
+                  )}
+                  {success.hubspotLeaks > 0 && (
+                    <div className="mt-1.5 flex items-start gap-1.5 text-[12px] text-[#8A6D2F]">
+                      <Ico name="alert" size={11} />
+                      <span>
+                        HubSpot linked this to {success.hubspotLeaks} other{" "}
+                        {success.hubspotLeaks === 1 ? "company" : "companies"} on its own. Unlinked.
+                      </span>
+                    </div>
+                  )}
                   <div className="mt-1.5 text-[11px] uppercase tracking-[0.1em] text-[#A9AFA9]">Tap for the next one</div>
                 </>
               }
@@ -218,10 +333,14 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
                 value={text}
                 onChange={(e) => {
                   setText(e.target.value);
+                  writeDraft(e.target.value);
                   autosize(e.target);
                 }}
                 placeholder="What just happened?"
                 rows={5}
+                autoCapitalize="sentences"
+                autoCorrect="on"
+                spellCheck
                 className="min-h-[132px] w-full resize-none border-none bg-transparent p-0 pr-14 text-[16px] leading-relaxed text-[#14201B] placeholder:text-[#A9AFA9] focus:outline-none"
               />
 
@@ -246,6 +365,60 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
                 )}
               </button>
             </div>
+
+            {/* Potential and New company sit BELOW the textarea on purpose.
+                Above it they would push the one thing this screen exists for
+                further from the thumb, and they are both decisions the rep
+                makes about the note he has already written. */}
+            <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-2 border-t border-[#EDEBE3] pt-3">
+              <span className="text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">Potential</span>
+              <div className="flex gap-1">
+                {VISIT_GRADES.map((t) => {
+                  const active = grade === t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      aria-pressed={active}
+                      title={GRADE_TITLE[t]}
+                      onClick={() => setGrade(active ? null : t)}
+                      className={`h-8 w-8 rounded-md text-[13px] font-semibold transition-colors ${
+                        active
+                          ? "bg-[#14201B] text-[#F7F6F1]"
+                          : "bg-[#ECEAE1] text-[#3D4A44] hover:bg-[#E2DFD5]"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                aria-pressed={newCompany}
+                onClick={() => setNewCompany((v) => !v)}
+                title="Skip matching against your accounts and create this business from Google Places"
+                className={`ml-auto flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12.5px] font-medium transition-colors ${
+                  newCompany
+                    ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
+                    : "border-[#E2DFD5] bg-transparent text-[#5B6560] hover:bg-[#FAF9F5]"
+                }`}
+              >
+                <Ico name={newCompany ? "check" : "plus"} size={13} />
+                New company
+              </button>
+            </div>
+
+            {newCompany && (
+              <p className="mt-2 text-[11.5px] leading-relaxed text-[#8A6D2F]">
+                Won&rsquo;t be matched to an existing account. You&rsquo;ll pick it from Google Places after logging.
+              </p>
+            )}
+            {grade && (
+              <p className="mt-2 text-[11.5px] leading-relaxed text-[#8A928C]">
+                {GRADE_TITLE[grade]}, saved to the account this lands on and synced to HubSpot within a minute.
+              </p>
+            )}
 
             <div className="mt-3 flex items-center justify-between gap-3">
               <span className="min-h-[1em] text-[12px] leading-relaxed text-[#8A6D2F]">
@@ -281,6 +454,19 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
           nameGuess={result.businessNameGuess}
           matchAccountId={result.matchAccountId}
           matchAccountName={result.matchAccountName}
+          pendingGrade={grade}
+          onResolved={() => {
+            // `result` deliberately stays: the resolver replaces itself with
+            // its own success note, and clearing it here would erase the
+            // confirmation the rep is reading. Only the inputs reset, so the
+            // card above is a blank slate for the next stop.
+            setText("");
+            writeDraft("");
+            setKind("meeting");
+            setGrade(null);
+            setNewCompany(false);
+            requestAnimationFrame(() => textareaRef.current && autosize(textareaRef.current));
+          }}
         />
       )}
     </div>

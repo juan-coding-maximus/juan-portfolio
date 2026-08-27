@@ -48,8 +48,8 @@ import {
   type Contact,
   type EngagementActivity,
 } from "./dal";
-import { assertJuansBook, OWNER_ID, request } from "./hubspot";
-import { ensureCompanyDomainForEmail } from "./hubspot-company";
+import { assertJuansBook, deleteAssociation, OWNER_ID, readAssociations, request } from "./hubspot";
+import { ensureCompanyDomainForEmail, ensureCompanyPhone } from "./hubspot-company";
 
 export class Blocked extends Error {}
 
@@ -379,6 +379,48 @@ async function findContactByPhone(phone: string | null | undefined): Promise<str
   return null;
 }
 
+/**
+ * Read back an object's live company associations and detach any that were
+ * never asked for. Ported from hubspot_notes.py:246-276, which had this guard
+ * while this path did not, so the same leak was closed on the Mac and open on
+ * the phone.
+ *
+ * HubSpot can silently attach a record to a second company on its own.
+ * Confirmed 2026-08-17 (a contact on a chain domain auto-linked to the other
+ * rep's parent record), again 2026-08-19/20 (a contact whose email domain did
+ * not match its own company spawned and got linked to a blank duplicate), and
+ * again 2026-08-20 (twice in one day). Every time, the leak sat undiscovered
+ * until a field report exposed it days later.
+ *
+ * This runs right after the write that can cause it and detaches on sight
+ * (2026-08-21, Juan's standing order: close this class of leak without a human
+ * loop each time). This is NOT the merge HARD RULE 3 gates: nothing here fuses
+ * two records' order histories, it only removes a link HubSpot added on its own
+ * that neither write path ever asked for. `expectedCompanyId` is always the one
+ * this code explicitly requested, so anything else is by definition
+ * unrequested. Every delete lands in nb_hubspot_sync_log's 90-day retention, so
+ * a bad detach is auditable and reversible.
+ *
+ * Best-effort by design: a read or detach failure is reported, never allowed to
+ * unwind an engagement that already filed correctly.
+ */
+async function checkAssociationLeak(
+  objectType: string,
+  objectId: string,
+  expectedCompanyId: string,
+): Promise<string[]> {
+  try {
+    const assoc = await readAssociations(objectType, "companies", [objectId]);
+    const extra = (assoc[objectId] ?? []).filter((cid) => cid !== expectedCompanyId);
+    for (const cid of extra) {
+      await deleteAssociation(objectType, objectId, "companies", cid);
+    }
+    return extra;
+  } catch {
+    return [];
+  }
+}
+
 /** Best-effort search for an engagement already carrying this activity's
  * marker: catches the POST-succeeded-stamp-failed window. Advisory only. */
 async function alreadyFiled(activityId: number, otype: EngagementType): Promise<string | null> {
@@ -418,6 +460,22 @@ async function alreadyFiled(activityId: number, otype: EngagementType): Promise<
 // the main flow
 // ---------------------------------------------------------------------------
 
+/** One unrequested company link HubSpot made on its own, and undid. */
+export type AssociationLeak = {
+  /** "contact", "note", "call", "meeting", "email". */
+  object: string;
+  objectId: string;
+  /** The company ids detached. Never includes the intended company. */
+  detached: string[];
+};
+
+/** What became of the door-collected phone number on the COMPANY record.
+ * null when no number was offered or nothing was written. */
+export type CompanyPhoneReport =
+  | { filled: string }
+  | { conflict: { existing: string; offered: string } }
+  | null;
+
 export type EngagementResult = {
   status: "ok";
   activityId: number;
@@ -429,6 +487,10 @@ export type EngagementResult = {
   matchedNames: string[];
   unmatchedPeople: ParsedPerson[];
   contactErrors: string[];
+  /** Non-empty means HubSpot mislinked something and this run corrected it.
+   * Surfaced, never swallowed: a silent auto-detach is as opaque as the leak. */
+  leaks: AssociationLeak[];
+  companyPhone: CompanyPhoneReport;
   alreadyFiledId: string | null;
   wrote: boolean;
   noteId: string | null;
@@ -488,6 +550,8 @@ export async function runEngagement(activityId: number, opts: { write: boolean }
       matchedNames: [],
       unmatchedPeople: [],
       contactErrors: [],
+      leaks: [],
+      companyPhone: null,
       alreadyFiledId: activity.hubspot_engagement_id,
       wrote: false,
       noteId: activity.hubspot_engagement_id,
@@ -516,6 +580,8 @@ export async function runEngagement(activityId: number, opts: { write: boolean }
   // found by phone anywhere in the portal, or created, associated to this
   // company. The search always runs; only the create POST is gated on write.
   const contactErrors: string[] = [];
+  const leaks: AssociationLeak[] = [];
+  let companyPhone: CompanyPhoneReport = null;
   for (const m of matched) {
     if (!m.person || m.contact.hubspot_contact_id) continue;
     const phone = m.person.phone ?? null;
@@ -556,7 +622,23 @@ export async function runEngagement(activityId: number, opts: { write: boolean }
       }
       if (cid) {
         m.contact.hubspot_contact_id = cid;
-        if (created) await linkContactHubspotId(m.contact.id, cid);
+        if (created) {
+          await linkContactHubspotId(m.contact.id, cid);
+          // The write that can leak. A contact whose email domain belongs to a
+          // chain's corporate parent gets auto-linked there too, and that
+          // parent is often the other rep's record. Detach on sight.
+          const stray = await checkAssociationLeak("contacts", cid, companyId);
+          if (stray.length) leaks.push({ object: "contact", objectId: cid, detached: stray });
+        }
+        // The number he was just handed at the door, onto the company record
+        // too, so the next person to read it does not call the dead ERP line.
+        // Blank-fill only; a disagreement is reported, never resolved here.
+        if (opts.write) {
+          const phoneOutcome = await ensureCompanyPhone(companyId, phone);
+          if (phoneOutcome.status === "filled") companyPhone = { filled: phoneOutcome.phone };
+          else if (phoneOutcome.status === "conflict")
+            companyPhone = { conflict: { existing: phoneOutcome.existing, offered: phoneOutcome.offered } };
+        }
       }
     } catch (e) {
       // Enrichment, not a gate: a contact-creation failure must never block
@@ -584,6 +666,8 @@ export async function runEngagement(activityId: number, opts: { write: boolean }
       matchedNames,
       unmatchedPeople: unmatched,
       contactErrors,
+      leaks,
+      companyPhone,
       alreadyFiledId: null,
       wrote: false,
       noteId: null,
@@ -613,6 +697,12 @@ export async function runEngagement(activityId: number, opts: { write: boolean }
     });
     if (!res.id) throw new Blocked(`HubSpot accepted the ${otype.toLowerCase()} but returned no id; refusing to stamp.`);
     noteId = res.id;
+
+    // The second write that can leak: a visit filed against a chain store has
+    // been auto-linked to the chain's parent twice (2026-08-20). Only checked
+    // on a fresh create; a `dup` was already checked when it was written.
+    const stray = await checkAssociationLeak(ENGAGEMENT_OBJECT[otype], noteId, companyId);
+    if (stray.length) leaks.push({ object: otype.toLowerCase(), objectId: noteId, detached: stray });
   }
 
   await stampActivityEngagementId(activityId, noteId);
@@ -628,6 +718,8 @@ export async function runEngagement(activityId: number, opts: { write: boolean }
     matchedNames,
     unmatchedPeople: unmatched,
     contactErrors,
+    leaks,
+    companyPhone,
     alreadyFiledId: null,
     wrote: !dup,
     noteId,

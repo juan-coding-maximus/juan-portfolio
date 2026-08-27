@@ -95,7 +95,7 @@ export class ScopeError extends Error {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type RequestOpts = {
-  method: "GET" | "POST" | "PATCH";
+  method: "GET" | "POST" | "PATCH" | "DELETE";
   path: string;
   body?: unknown;
   qs?: Record<string, string | number>;
@@ -265,6 +265,63 @@ export async function assertJuansBook(companyIds: string[]): Promise<ScopeVerdic
     else dropped.push({ id, owner });
   }
   return { allowed, dropped };
+}
+
+/**
+ * from_id -> [to_id], for one association direction. Mirrors hubspot.py:294-311.
+ *
+ * HubSpot returns association ids only, never nested properties, so reading an
+ * object's companies is inherently a two-step: this, then a batchRead of the
+ * ids that came back. The path ends in `/read`, so `request` classifies it as a
+ * pull and it works without the write flag armed.
+ */
+export async function readAssociations(
+  fromType: string,
+  toType: string,
+  ids: string[],
+): Promise<Record<string, string[]>> {
+  const edges: Record<string, string[]> = {};
+  for (let i = 0; i < ids.length; i += BATCH_MAX) {
+    const chunk = ids.slice(i, i + BATCH_MAX);
+    const res = await request<{
+      results?: Array<{ from?: { id?: string }; to?: Array<{ toObjectId?: string | number }> }>;
+    }>({
+      method: "POST",
+      path: `/crm/v4/associations/${fromType}/${toType}/batch/read`,
+      body: { inputs: chunk.map((id) => ({ id })) },
+      entity: fromType,
+      operation: "assoc_read",
+    });
+    for (const r of res.results ?? []) {
+      const src = String(r.from?.id ?? "");
+      if (src) edges[src] = (r.to ?? []).map((t) => String(t.toObjectId));
+    }
+  }
+  return edges;
+}
+
+/**
+ * Remove every association label between one object and one other object.
+ * Mirrors hubspot.py:323-331.
+ *
+ * ONLY for undoing a link HubSpot added on its own that neither write path ever
+ * asked for (see checkAssociationLeak in hubspot-engagement.ts). Never for
+ * detaching a link this code created on purpose. This is a push, so the write
+ * flag gates it like every other mutation, and the call itself lands in
+ * nb_hubspot_sync_log's 90-day retention.
+ */
+export async function deleteAssociation(
+  fromType: string,
+  fromId: string,
+  toType: string,
+  toId: string,
+): Promise<void> {
+  await request({
+    method: "DELETE",
+    path: `/crm/v4/objects/${fromType}/${fromId}/associations/${toType}/${toId}`,
+    entity: fromType,
+    operation: "assoc_delete",
+  });
 }
 
 /**

@@ -1680,8 +1680,10 @@ export { planningHorizonDates, defaultActiveDay };
 
 export async function getRouteDraftByDay(): Promise<RouteDraftByDay> {
   const rows = await raw<{ route_draft: unknown }>("nb_ui_prefs?select=route_draft&id=eq.1");
-  const stored = rows[0]?.route_draft;
+  return parseRouteDraft(rows[0]?.route_draft);
+}
 
+function parseRouteDraft(stored: unknown): RouteDraftByDay {
   if (Array.isArray(stored)) {
     const stops = stored.map(asDraftEntry).filter((e): e is RouteDraftEntry => e !== null);
     return stops.length > 0 ? { [nextWeekday(3)]: stops } : {};
@@ -1808,7 +1810,10 @@ function asCallEntry(x: unknown): CallEntry | null {
 
 export async function getRouteCallsByDay(): Promise<RouteCallsByDay> {
   const rows = await raw<{ route_calls: unknown }>("nb_ui_prefs?select=route_calls&id=eq.1");
-  const stored = rows[0]?.route_calls;
+  return parseRouteCalls(rows[0]?.route_calls);
+}
+
+function parseRouteCalls(stored: unknown): RouteCallsByDay {
   if (!stored || typeof stored !== "object") return {};
   const out: RouteCallsByDay = {};
   for (const [day, entries] of Object.entries(stored as Record<string, unknown>)) {
@@ -1835,7 +1840,10 @@ export type RouteDoneByDay = Record<string, string[]>;
 
 export async function getRouteDoneByDay(): Promise<RouteDoneByDay> {
   const rows = await raw<{ route_done: unknown }>("nb_ui_prefs?select=route_done&id=eq.1");
-  const stored = rows[0]?.route_done;
+  return parseRouteDone(rows[0]?.route_done);
+}
+
+function parseRouteDone(stored: unknown): RouteDoneByDay {
   if (!stored || typeof stored !== "object") return {};
   const out: RouteDoneByDay = {};
   for (const [day, entries] of Object.entries(stored as Record<string, unknown>)) {
@@ -1844,6 +1852,34 @@ export async function getRouteDoneByDay(): Promise<RouteDoneByDay> {
     if (ids.length > 0) out[day] = ids;
   }
   return out;
+}
+
+export type RouteState = {
+  draft: RouteDraftByDay;
+  calls: RouteCallsByDay;
+  done: RouteDoneByDay;
+};
+
+/**
+ * All three route jsonb columns in ONE request.
+ *
+ * They live on the same single `nb_ui_prefs` row (id=1), so reading them
+ * separately was three round trips to fetch three cells of one record. That
+ * cost sat on the critical path of EVERY NutriBiotic screen, because the
+ * layout seeds RouteProvider for all of them, including /visit, which never
+ * reads a route. The three single-column getters stay for callers that want
+ * exactly one; nothing that loads a page should use them.
+ */
+export async function getRouteStateByDay(): Promise<RouteState> {
+  const rows = await raw<{ route_draft: unknown; route_calls: unknown; route_done: unknown }>(
+    "nb_ui_prefs?select=route_draft,route_calls,route_done&id=eq.1",
+  );
+  const row = rows[0];
+  return {
+    draft: parseRouteDraft(row?.route_draft),
+    calls: parseRouteCalls(row?.route_calls),
+    done: parseRouteDone(row?.route_done),
+  };
 }
 
 export async function setRouteDone(byDay: RouteDoneByDay): Promise<void> {

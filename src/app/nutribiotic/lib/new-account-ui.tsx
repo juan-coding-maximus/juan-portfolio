@@ -21,6 +21,8 @@
  */
 
 import { useEffect, useState, useTransition } from "react";
+import { setPotentialJuan } from "./account-actions";
+import type { Tier } from "./dal";
 import {
   createBusinessFromPlace,
   searchNewBusiness,
@@ -67,11 +69,17 @@ export function AccountMatchResolver({
   nameGuess,
   matchAccountId,
   matchAccountName,
+  pendingGrade = null,
+  onResolved,
 }: {
   touchpointId: string;
   nameGuess: string | null;
   matchAccountId: string | null;
   matchAccountName: string | null;
+  /** A potential letter the rep picked on the capture card before the account
+   * was known. Applied the moment one exists, whether by match or by create. */
+  pendingGrade?: Tier | null;
+  onResolved?: () => void;
 }) {
   const [matchResult, setMatchResult] = useState<ResolveResult | null>(null);
   const [matching, startMatching] = useTransition();
@@ -95,17 +103,30 @@ export function AccountMatchResolver({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nameGuess]);
 
+  /** The grade the rep picked at the door, now that there is an account to put
+   * it on. Fire-and-forget, same as the capture card: the sync worker carries
+   * it to HubSpot on its own cycle, and a grade that failed to save must never
+   * roll back a visit that filed. */
+  function applyPendingGrade(accountId: string) {
+    if (pendingGrade) void setPotentialJuan(accountId, pendingGrade);
+    onResolved?.();
+  }
+
   function confirmMatch() {
     if (!matchAccountId || !matchAccountName || matching) return;
     startMatching(async () => {
-      setMatchResult(await resolveTouchpointToAccount(touchpointId, matchAccountId, matchAccountName));
+      const res = await resolveTouchpointToAccount(touchpointId, matchAccountId, matchAccountName);
+      setMatchResult(res);
+      if (res.ok) applyPendingGrade(res.accountId);
     });
   }
 
   function pick(place: PlaceCandidate, force = false) {
     setCreatingId(place.placeId);
     startCreate(async () => {
-      setCreated(await createBusinessFromPlace(touchpointId, place, { force }));
+      const res = await createBusinessFromPlace(touchpointId, place, { force });
+      setCreated(res);
+      if (res.ok) applyPendingGrade(res.accountId);
     });
   }
 

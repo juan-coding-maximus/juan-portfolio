@@ -29,8 +29,16 @@
  * stop can always be postponed one more tab over.
  */
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
-import type { CallEntry, CustomStop, RouteCallsByDay, RouteDoneByDay, RouteDraftByDay, RouteDraftEntry } from "./dal";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type {
+  CallEntry,
+  CustomStop,
+  RouteCallsByDay,
+  RouteDoneByDay,
+  RouteDraftByDay,
+  RouteDraftEntry,
+  RouteState,
+} from "./dal";
 import { defaultActiveDay, planningHorizonDates } from "./field-week";
 import { saveRouteCalls, saveRouteDone, saveRouteDraft } from "./prefs-actions";
 
@@ -40,6 +48,9 @@ type RouteCtx = {
   days: string[];
   activeDay: string;
   setActiveDay: (day: string) => void;
+  /** True once the server read has landed. Distinguishes "no stops" from
+   *  "not loaded yet", which look identical and mean opposite things. */
+  hydrated: boolean;
   addToRoute: (id: string, atIndex?: number) => void;
   addCustomStop: (stop: Omit<CustomStop, "id">, atIndex?: number) => void;
   removeFromRoute: (id: string) => void;
@@ -72,22 +83,59 @@ function entryId(e: RouteDraftEntry): string {
   return typeof e === "string" ? e : e.id;
 }
 
+/**
+ * The route state, handed over as a PROMISE the layout never awaits.
+ *
+ * This provider sits above every NutriBiotic screen, because "Add to route"
+ * has to work from an account modal opened anywhere. The cost of that reach
+ * used to be that the layout blocked on reading nb_ui_prefs before ANY page
+ * could render, /visit included, and /visit is the screen Juan opens standing
+ * in a doorway with a customer waiting. It never reads a route.
+ *
+ * So the read is started on the server and consumed here: the shell paints
+ * immediately, and the route fills in a beat later on the one or two screens
+ * that show it. Nothing renders a wrong route in the meantime, it renders an
+ * empty one, and `hydrated` says which of the two it is so a caller can tell
+ * "no stops yet" from "not loaded yet".
+ *
+ * activeDay is seeded once, when the data actually lands, and only if the user
+ * has not already picked a day. Overriding a deliberate tap because a fetch
+ * resolved late is worse than defaulting a beat later.
+ */
 export function RouteProvider({
   initial,
-  initialCalls,
-  initialDone,
   children,
 }: {
-  initial: RouteDraftByDay;
-  initialCalls?: RouteCallsByDay;
-  initialDone?: RouteDoneByDay;
+  initial: Promise<RouteState>;
   children: ReactNode;
 }) {
   const days = useMemo(() => planningHorizonDates(), []);
-  const [draftByDay, setDraftByDay] = useState<RouteDraftByDay>(initial);
-  const [activeDay, setActiveDay] = useState<string>(() => defaultActiveDay(initial, days));
-  const [callsByDay, setCallsByDay] = useState<RouteCallsByDay>(initialCalls ?? {});
-  const [doneByDay, setDoneByDay] = useState<RouteDoneByDay>(initialDone ?? {});
+  const [draftByDay, setDraftByDay] = useState<RouteDraftByDay>({});
+  const [activeDay, setActiveDay] = useState<string>(() => defaultActiveDay({}, days));
+  const [callsByDay, setCallsByDay] = useState<RouteCallsByDay>({});
+  const [doneByDay, setDoneByDay] = useState<RouteDoneByDay>({});
+  const [hydrated, setHydrated] = useState(false);
+  const dayTouchedRef = useRef(false);
+
+  useEffect(() => {
+    let live = true;
+    initial
+      .then((state) => {
+        if (!live) return;
+        setDraftByDay(state.draft);
+        setCallsByDay(state.calls);
+        setDoneByDay(state.done);
+        if (!dayTouchedRef.current) setActiveDay(defaultActiveDay(state.draft, days));
+        setHydrated(true);
+      })
+      .catch(() => {
+        // A failed read leaves an empty route and says so via `hydrated`
+        // staying false. It never invents stops and never blocks the screen.
+      });
+    return () => {
+      live = false;
+    };
+  }, [initial, days]);
 
   const routeDraft = useMemo(() => draftByDay[activeDay] ?? [], [draftByDay, activeDay]);
   const calls = useMemo(() => callsByDay[activeDay] ?? [], [callsByDay, activeDay]);
@@ -255,7 +303,11 @@ export function RouteProvider({
         inRoute,
         days,
         activeDay,
-        setActiveDay,
+        setActiveDay: (day: string) => {
+          dayTouchedRef.current = true;
+          setActiveDay(day);
+        },
+        hydrated,
         addToRoute,
         addCustomStop,
         removeFromRoute,

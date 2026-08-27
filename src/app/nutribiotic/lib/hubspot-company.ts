@@ -121,3 +121,68 @@ export async function ensureCompanyDomainForEmail(companyId: string, email: stri
     operation: "upsert",
   });
 }
+
+/** Last 10 digits, the comparison NANP numbers actually survive: the same
+ * number reaches this OS as (760) 555-0134, 760-555-0134 and +17605550134. */
+function phoneDigits(s: string | null | undefined): string {
+  return (s ?? "").replace(/\D/g, "").slice(-10);
+}
+
+export type CompanyPhoneOutcome =
+  | { status: "filled"; phone: string }
+  | { status: "same" }
+  /** The company has a DIFFERENT working number. Kept, never overwritten. */
+  | { status: "conflict"; existing: string; offered: string }
+  | { status: "skipped" };
+
+/**
+ * Blank-fill a company's `phone` from the number a contact just gave at the
+ * door. Returns what it decided so the caller can show it rather than guess.
+ *
+ * WHY THIS EXISTS. A number collected in person is often the only working line
+ * for a store whose ERP row carries a disconnected billing number, and until
+ * now that number lived on the contact alone. A rep re-reading the company a
+ * month later saw the dead number and called it.
+ *
+ * WHY BLANK-FILL AND NOT OVERWRITE. hubspot_fields.json declares
+ * `companies.phone` as `owner: "hubspot"`, `push: "fill"` — HQ owns that cell,
+ * and the 7 live disagreements found on 2026-08-02 all traced to the same ERP
+ * import on both sides. Writing over it here would make this path contradict
+ * the one declaration of field direction the department has, and would do it
+ * from the phone, where nobody would see it happen. So: fill when empty, and
+ * when both sides have a number and they differ, keep HQ's and report the
+ * conflict. That is AGENTS.md HARD RULE 4 (nothing is deleted to make room)
+ * applied to a cell HQ owns; the contact keeps its own number either way, so no
+ * information is lost by declining to overwrite.
+ *
+ * Best-effort: this is enrichment hanging off a visit, never a gate on filing
+ * it. Every failure returns "skipped" rather than throwing.
+ */
+export async function ensureCompanyPhone(
+  companyId: string,
+  phone: string | null | undefined,
+): Promise<CompanyPhoneOutcome> {
+  const offered = (phone ?? "").trim();
+  if (!offered || phoneDigits(offered).length < 10) return { status: "skipped" };
+
+  try {
+    const live = await batchRead("companies", [companyId], ["phone"]);
+    const existing = (live[0]?.properties?.phone ?? "").trim();
+
+    if (existing) {
+      if (phoneDigits(existing) === phoneDigits(offered)) return { status: "same" };
+      return { status: "conflict", existing, offered };
+    }
+
+    await request({
+      method: "PATCH",
+      path: `/crm/v3/objects/companies/${companyId}`,
+      body: { properties: { phone: offered } },
+      entity: "companies",
+      operation: "upsert",
+    });
+    return { status: "filled", phone: offered };
+  } catch {
+    return { status: "skipped" };
+  }
+}
