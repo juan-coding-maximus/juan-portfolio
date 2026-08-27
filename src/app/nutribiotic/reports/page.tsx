@@ -7,9 +7,17 @@
  */
 
 import { PageHead, Card, Ico } from "../lib/ui";
-import { listPlaybookReports, listPlaybookReportArchive } from "../lib/dal";
+import {
+  getReportDraft,
+  listPlaybookReports,
+  listPlaybookReportArchive,
+  reportDateLA,
+  signReportPreview,
+} from "../lib/dal";
+import { ReportReview } from "../lib/report-review-ui";
 
 export const metadata = { title: "Reports · NutriBiotic OS" };
+export const dynamic = "force-dynamic";
 
 const REPORT_TITLE: Record<"daily" | "weekly", string> = {
   daily: "Daily Field Report",
@@ -17,14 +25,44 @@ const REPORT_TITLE: Record<"daily" | "weekly", string> = {
 };
 
 export default async function ReportsIndex() {
-  const [reports, archive] = await Promise.all([listPlaybookReports(), listPlaybookReportArchive()]);
+  const today = reportDateLA();
+  const [reports, archive, draft] = await Promise.all([
+    listPlaybookReports(),
+    listPlaybookReportArchive(),
+    getReportDraft(today).catch(() => null),
+  ]);
+  const previewUrl = draft?.preview_path && !draft.dirty ? await signReportPreview(draft.preview_path) : null;
 
   return (
     <>
       <PageHead
         title="Reports"
-        sub="The latest daily and weekly field-report PDFs, published straight from the field-report scripts, never edited by hand."
+        sub="Tonight's report before it goes out, then the latest daily and weekly PDFs and every prior one."
       />
+
+      {/* THE REVIEW GATE (migrations 0045/0046). Until 2026-08-27 the 22:00 cron
+          mailed the PDF unread to Juan and to juan@nutribiotic.com, and a wrong
+          pin could only be corrected by sending a follow-up. This is where he
+          reads it first. Absent until a draft exists for today. */}
+      {draft ? (
+        <ReportReview draft={draft} previewUrl={previewUrl} />
+      ) : (
+        <ReportReview
+          draft={{
+            report_date: today,
+            kind: "daily",
+            payload: null,
+            status: "pending",
+            dirty: false,
+            rebuild_requested: false,
+            preview_path: null,
+            sent_at: null,
+            send_error: null,
+            updated_at: new Date().toISOString(),
+          }}
+          previewUrl={null}
+        />
+      )}
 
       <section className="mb-7">
         <div className="grid gap-3.5 md:grid-cols-2">

@@ -155,6 +155,10 @@ async function mutate<T>(
   method: "POST" | "PATCH",
   body: unknown,
   opts: QueryOpts = {},
+  /** Overrides the default return=representation. The one caller that needs
+   *  this is the report-draft upsert, which asks PostgREST to merge on the
+   *  primary key rather than fail on a row that already exists. */
+  prefer = "return=representation",
 ): Promise<T[]> {
   await verifySession();
 
@@ -173,7 +177,7 @@ async function mutate<T>(
       apikey: SB_KEY,
       Authorization: `Bearer ${SB_KEY}`,
       "Content-Type": "application/json",
-      Prefer: "return=representation",
+      Prefer: prefer,
     },
     body: JSON.stringify(body),
   });
@@ -1917,12 +1921,17 @@ export async function setRouteDone(byDay: RouteDoneByDay): Promise<void> {
  * widget's read-only NB_WIDGET_TOKEN is allowed to write.
  */
 export type RouteMileageSide = {
-  /** Digits Claude read off the odometer photo, or null if it wasn't legible.
-   *  Never a guess -- see api/widget/mileage/route.ts's readOdometer. */
+  /** Digits Claude read off the odometer photo, or the digits Juan typed
+   *  himself when he bypassed the camera (see `manual`). Never a guess --
+   *  see api/widget/mileage/route.ts's readOdometer. */
   odo: string | null;
   driveFileId: string;
   photoLink: string;
   capturedAt: string;
+  /** True when this reading came from the widget's "Enter manually" bypass
+   *  rather than a photo -- no odometer photo exists for this side, and the
+   *  filed trip row says so in plain text instead of a blank/broken link. */
+  manual?: boolean;
 };
 export type RouteMileageDay = {
   start?: RouteMileageSide;
@@ -2831,4 +2840,132 @@ export async function listOwnerContactPhones(ownerName = "Juan Arenas Martin"): 
   return raw<OutreachContact>(
     `nb_contacts?select=id,account_id,first_name,last_name,title,phone&account_id=in.(${ids})&phone=not.is.null`,
   );
+}
+
+// ---------------------------------------------------------------------------
+// The report review gate (migrations 0045/0046)
+//
+// The app RECORDS decisions here; bridges/nutribiotic/field_report.py --serve
+// does every render and the send, because Vercel can run neither Playwright
+// nor /usr/bin/python3. Same split as nb_import_rows and nb_calendar_proposals.
+// ---------------------------------------------------------------------------
+
+/** One HQ note on the report. Free text: model-drafted, human-editable, with
+ *  no upstream record for it to contradict. */
+export type ReportHqNote = { category: string; text: string; source: string };
+
+/** Only the slice of build_report()'s dict the review screen reads or writes.
+ *  The payload carries far more; everything not named here is passed through
+ *  untouched, because it belongs to HubSpot and is corrected there. */
+export type ReportPayload = {
+  date_label?: string;
+  date_iso?: string;
+  miles?: number | null;
+  hq_notes?: ReportHqNote[];
+  summary?: Record<string, number | boolean | null>;
+  stops?: Array<{
+    n?: number;
+    name?: string;
+    city?: string | null;
+    lat?: number | null;
+    lng?: number | null;
+    is_call_only?: boolean;
+    is_message_only?: boolean;
+    hidden?: boolean;
+    events?: unknown[];
+  }>;
+  [k: string]: unknown;
+};
+
+export type ReportDraft = {
+  report_date: string;
+  kind: "daily" | "weekly";
+  payload: ReportPayload | null;
+  status: "pending" | "approved" | "sent" | "held";
+  dirty: boolean;
+  rebuild_requested: boolean;
+  preview_path: string | null;
+  sent_at: string | null;
+  send_error: string | null;
+  updated_at: string;
+};
+
+/** Today in Los Angeles, which is the day the report is about. Never the
+ *  server's date: Vercel runs UTC, and after 17:00 LA those disagree. */
+export function reportDateLA(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+export async function getReportDraft(dateISO: string): Promise<ReportDraft | null> {
+  // raw() rather than query(): query()'s row type is constrained to carry an
+  // `origin`, which is the synthetic-data marker on customer tables. This
+  // table has no such column and never will, so claiming one to satisfy a
+  // signature would be a lie in the type.
+  const rows = await raw<ReportDraft>(
+    `nb_report_drafts?select=*&report_date=eq.${encodeURIComponent(dateISO)}&limit=1`,
+  );
+  return rows[0] ?? null;
+}
+
+/** Ask the Mac for a fresh build. Creates the row if today has none yet, which
+ *  is the normal case: the day has just ended and nothing has run. */
+export async function requestReportRebuild(dateISO: string): Promise<void> {
+  await mutate(
+    "nb_report_drafts",
+    "POST",
+    { report_date: dateISO, kind: "daily", rebuild_requested: true, status: "pending" },
+    {},
+    "resolution=merge-duplicates,return=minimal",
+  );
+}
+
+/** Save his edits. `dirty` is what tells the Mac the preview PDF is now behind
+ *  the payload, so the screen can say so instead of showing a stale map. */
+export async function saveReportDraftPayload(dateISO: string, payload: ReportPayload): Promise<void> {
+  await mutate(
+    "nb_report_drafts",
+    "PATCH",
+    { payload, dirty: true, updated_at: new Date().toISOString() },
+    { report_date: `eq.${dateISO}` },
+    "return=minimal",
+  );
+}
+
+export async function setReportDraftStatus(
+  dateISO: string,
+  status: "pending" | "approved" | "held",
+): Promise<void> {
+  await mutate(
+    "nb_report_drafts",
+    "PATCH",
+    { status, decided_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { report_date: `eq.${dateISO}` },
+    "return=minimal",
+  );
+}
+
+/** A short-lived link to the preview PDF, so the review is done against the
+ *  real artifact, map and all, rather than a second rendering of the data. */
+export async function signReportPreview(name: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `${SB_URL}/storage/v1/object/sign/${REPORTS_BUCKET}/${encodeURIComponent(name)}`,
+      {
+        method: "POST",
+        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ expiresIn: 900 }),
+        cache: "no-store",
+      },
+    );
+    if (!res.ok) return null;
+    const { signedURL } = (await res.json()) as { signedURL: string };
+    return `${SB_URL}/storage/v1${signedURL}`;
+  } catch {
+    return null;
+  }
 }
