@@ -9,6 +9,7 @@
  * bridges/nutribiotic/hubspot_notes.py.
  */
 
+import { Suspense } from "react";
 import {
   getAccountNames,
   isConfigured,
@@ -22,6 +23,7 @@ import { CalendarProposalRow, TouchpointCapture } from "../lib/touchpoint-ui";
 import type { ParsedTouchpoint } from "../lib/touchpoint";
 import { LAUNCHERS } from "../lib/launchers";
 import { Empty, PageHead } from "../lib/ui";
+import { WarmRoutes } from "../lib/WarmRoutes";
 
 export const dynamic = "force-dynamic";
 /* appleWebApp.title labels the Home Screen icon when this exact screen is the
@@ -42,23 +44,22 @@ export const metadata = {
   manifest: LAUNCHERS.CLIENTOS.href,
 };
 
-export default async function VisitPage() {
-  const [proposals, unfiled, pending] = await Promise.all([
-    isConfigured() ? listCalendarProposals() : Promise.resolve({ data: [] }),
-    isConfigured() ? listUnfiledActivities() : Promise.resolve({ data: [] }),
-    isConfigured() ? listPendingAccountMatches() : Promise.resolve({ data: [] }),
-  ]);
-
-  // A recorded (spoken) visit that parks as needs_account resolves after
-  // transcription, on nobody's screen, so it needs its own name lookup
-  // rather than the one recordTouchpoint() already did for a same-page typed
-  // note (see AccountMatchResolver in touchpoint-ui.tsx).
-  const lowConfidenceIds = pending.data
-    .map((tp) => (tp.parsed as ParsedTouchpoint | null))
-    .filter((p): p is ParsedTouchpoint => p != null && p.account_confidence === "low" && !!p.account_id)
-    .map((p) => p.account_id as string);
-  const accountNames = isConfigured() ? await getAccountNames([...new Set(lowConfidenceIds)]) : {};
-
+/**
+ * NOT ASYNC, AND THAT IS THE WHOLE POINT (Juan, 2026-08-26: "it must be super
+ * fast and only load that really quick").
+ *
+ * This function awaits nothing, so the heading and the capture box are in the
+ * first flush of the stream. Everything else on this screen is a QUEUE: work
+ * that arrived earlier and is waiting on him. None of it is needed to type
+ * what just happened, and all of it used to block the box that types it, three
+ * Supabase reads deep, sometimes four.
+ *
+ * The queues render below the capture box, so streaming them in later moves
+ * nothing above it. That is why the Suspense fallback is `null` rather than a
+ * skeleton: a placeholder here would reserve space for lists that are usually
+ * empty and push the box up when they resolve.
+ */
+export default function VisitPage() {
   return (
     <>
       <PageHead title="Visit" />
@@ -69,6 +70,45 @@ export default async function VisitPage() {
         <div className="flex flex-col gap-8">
           <TouchpointCapture />
 
+          <Suspense fallback={null}>
+            <VisitQueues />
+          </Suspense>
+
+          {/* Everything else this OS can do, warmed 15 seconds after the box is
+              usable. See WarmRoutes. */}
+          <WarmRoutes />
+        </div>
+      )}
+    </>
+  );
+}
+
+/**
+ * The three queues, off the critical path.
+ *
+ * Read together rather than in sequence, and the account-name lookup only
+ * happens when a spoken visit actually parked as low-confidence, which is the
+ * uncommon case.
+ */
+async function VisitQueues() {
+  const [proposals, unfiled, pending] = await Promise.all([
+    listCalendarProposals(),
+    listUnfiledActivities(),
+    listPendingAccountMatches(),
+  ]);
+
+  // A recorded (spoken) visit that parks as needs_account resolves after
+  // transcription, on nobody's screen, so it needs its own name lookup
+  // rather than the one recordTouchpoint() already did for a same-page typed
+  // note (see AccountMatchResolver in touchpoint-ui.tsx).
+  const lowConfidenceIds = pending.data
+    .map((tp) => (tp.parsed as ParsedTouchpoint | null))
+    .filter((p): p is ParsedTouchpoint => p != null && p.account_confidence === "low" && !!p.account_id)
+    .map((p) => p.account_id as string);
+  const accountNames = await getAccountNames([...new Set(lowConfidenceIds)]);
+
+  return (
+    <>
           {pending.data.length > 0 && (
             <section className="mx-auto w-full max-w-[600px]">
               <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8A928C]">
@@ -111,8 +151,6 @@ export default async function VisitPage() {
               </ul>
             </section>
           )}
-        </div>
-      )}
     </>
   );
 }

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getRouteStateByDay, isConfigured, workspaceMode } from "./lib/dal";
@@ -142,7 +143,6 @@ export default async function NutribioticLayout({
   // RouteProvider attaches the real handler and reports through `hydrated`.
   routeStatePromise.catch(() => {});
 
-  const synthetic = (await workspaceMode()) === "synthetic";
   const nav = NAV;
 
   /* Review left the nav for good, 2026-08-02: the page stays reachable at
@@ -161,12 +161,9 @@ export default async function NutribioticLayout({
             that survives. This keeps the guarantee (mode-level, not a per-row
             badge, still impossible to miss on a cropped screenshot because it
             sits above the content) and drops the stripes. */}
-        {synthetic && (
-          <div className="flex items-center justify-center gap-2 border-b border-[#E5D9BF] bg-[#FBF6E9] px-4 py-1.5 text-[12px] text-[#8A6D2F]">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#C9A24B]" aria-hidden />
-            Sample data. Not real accounts, and nothing here can be sent or reported.
-          </div>
-        )}
+        <Suspense fallback={null}>
+          <SyntheticBanner />
+        </Suspense>
 
         {/* Only shown when the backend is genuinely unwired. An empty RESULT is
             not the same as an empty SYSTEM, and saying "not configured" over a
@@ -223,6 +220,32 @@ export default async function NutribioticLayout({
       </div>
       </ModalProvider>
       </RouteProvider>
+    </div>
+  );
+}
+
+/**
+ * The sample-data warning, off the critical path.
+ *
+ * workspaceMode() is one Supabase read whose only job is to decide whether
+ * this strip appears, and it was awaited before ANY NutriBiotic screen could
+ * render, /visit included. The guarantee it carries is unchanged: still
+ * mode-level rather than a per-row badge, still above the content, still
+ * impossible to miss on a cropped screenshot. It just arrives a beat later
+ * than the shell instead of holding it up.
+ *
+ * FAILS TOWARD THE WARNING. If the read throws, `synthetic` is treated as
+ * false and no banner is drawn, which is the same thing that happened before
+ * when the whole page failed. What must never happen is real data being
+ * labelled sample, or sample data going unlabelled once known: the read either
+ * answers or it does not, and it is not inferred from anything else.
+ */
+async function SyntheticBanner() {
+  if ((await workspaceMode()) !== "synthetic") return null;
+  return (
+    <div className="flex items-center justify-center gap-2 border-b border-[#E5D9BF] bg-[#FBF6E9] px-4 py-1.5 text-[12px] text-[#8A6D2F]">
+      <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#C9A24B]" aria-hidden />
+      Sample data. Not real accounts, and nothing here can be sent or reported.
     </div>
   );
 }

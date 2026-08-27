@@ -99,7 +99,12 @@ export const trustedDeviceId = cache(async (): Promise<string | null> => {
   }
   if (rows.length === 0) return null;
 
-  await touch(rows[0].id, rows[0].last_seen_at);
+  // NOT AWAITED. This is a cosmetic timestamp for the devices list, and it sat
+  // on the critical path of every page load that authenticated by device
+  // rather than by session: a blocking PATCH between the tap on ClientOS and
+  // the capture box existing. Fired and forgotten, with its own catch so an
+  // unhandled rejection can never take down the request that started it.
+  void touch(rows[0].id, rows[0].last_seen_at).catch(() => {});
   return rows[0].id;
 });
 
