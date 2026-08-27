@@ -1911,6 +1911,80 @@ export async function setRouteDone(byDay: RouteDoneByDay): Promise<void> {
   });
 }
 
+/**
+ * Camera-gated start/end mileage state per route day (migration 0043). See
+ * that migration's header for the shape and why this is the one column the
+ * widget's read-only NB_WIDGET_TOKEN is allowed to write.
+ */
+export type RouteMileageSide = {
+  /** Digits Claude read off the odometer photo, or null if it wasn't legible.
+   *  Never a guess -- see api/widget/mileage/route.ts's readOdometer. */
+  odo: string | null;
+  driveFileId: string;
+  photoLink: string;
+  capturedAt: string;
+};
+export type RouteMileageDay = {
+  start?: RouteMileageSide;
+  end?: RouteMileageSide;
+  filedSheetLink?: string;
+  fileError?: string;
+};
+export type RouteMileageByDay = Record<string, RouteMileageDay>;
+
+export async function getRouteMileageByDay(): Promise<RouteMileageByDay> {
+  const rows = await raw<{ route_mileage: unknown }>("nb_ui_prefs?select=route_mileage&id=eq.1");
+  const stored = rows[0]?.route_mileage;
+  if (!stored || typeof stored !== "object") return {};
+  const out: RouteMileageByDay = {};
+  for (const [day, v] of Object.entries(stored as Record<string, unknown>)) {
+    if (ISO_DATE_RE.test(day) && v && typeof v === "object") out[day] = v as RouteMileageDay;
+  }
+  return out;
+}
+
+/**
+ * Merge one day's patch into route_mileage and write the whole column back
+ * (read-modify-write, same shape as every other day-partitioned column here).
+ *
+ * GATED HERE, NOT VIA mutate(). mutate() calls verifySession(), which the
+ * widget's bearer deliberately cannot pass (see session.ts's split between
+ * hasWidgetToken and a real session) -- that boundary is exactly what keeps a
+ * copy of NB_WIDGET_TOKEN sitting in a phone script from being able to touch
+ * HubSpot, a customer record, or anything else mutate() guards. This function
+ * is the ONE deliberate, narrow exception: Juan's own odometer photo, nothing
+ * customer-facing, nothing that leaves the building. A key set to `undefined`
+ * in `patch` is dropped from the day's object (JSON.stringify omits it),
+ * which is how a filed day resets back to {} -- waiting for the next start.
+ */
+export async function setRouteMileageDay(day: string, patch: Partial<RouteMileageDay>): Promise<RouteMileageByDay> {
+  if (!(await hasWidgetToken()) && !(await hasAccess())) {
+    throw new Error("Unauthorized.");
+  }
+  if (!isConfigured()) throw new Error("Cannot write mileage: no data source configured.");
+  const current = await getRouteMileageByDay();
+  const merged = { ...current[day], ...patch };
+  const hasAnyKey = Object.values(merged).some((v) => v !== undefined);
+  const next = { ...current };
+  if (hasAnyKey) next[day] = merged;
+  else delete next[day];
+
+  const res = await fetch(`${SB_URL}/rest/v1/nb_ui_prefs?id=eq.1`, {
+    method: "PATCH",
+    headers: {
+      apikey: SB_KEY,
+      Authorization: `Bearer ${SB_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify({ route_mileage: next, updated_at: new Date().toISOString() }),
+  });
+  if (!res.ok) {
+    throw new Error(`Supabase nb_ui_prefs PATCH -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  }
+  return next;
+}
+
 // ---------------------------------------------------------------------------
 // Route plans (phase 5 · nb_route_plans / nb_route_days / nb_route_stops)
 //

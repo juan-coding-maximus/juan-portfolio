@@ -367,6 +367,12 @@ export async function fileTripFromLinks(input: {
 }
 
 export async function fileTrip(input: TripInput): Promise<{ sheetLink: string; miles: number }> {
+  // Fail fast on a bad reading, same as before this was split: no reason to
+  // spend two Drive uploads on a request that's about to be rejected anyway.
+  if (!Number.isFinite(Number(String(input.startOdo).replace(/,/g, "")))
+    || !Number.isFinite(Number(String(input.endOdo).replace(/,/g, "")))) {
+    throw new Error("Odometer readings must be plain digits (a decimal is fine). An unreadable photo is a blank, never a guess.");
+  }
   const startUp = await uploadMileagePhoto(input.date, "start", input.startPhoto);
   const endUp = await uploadMileagePhoto(input.endDate ?? input.date, "end", input.endPhoto);
   return fileTripFromLinks({

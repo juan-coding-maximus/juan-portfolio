@@ -179,6 +179,50 @@ function backLine(data) {
   return { text: `back ~${data.schedule.finish_clock}`, over: data.schedule.over };
 }
 
+/**
+ * CAMERA-GATED MILEAGE (Juan, 2026-08-26): before the route is visible for
+ * the day, and again once every account stop is crossed off, the widget's
+ * whole face becomes this prompt instead of the route -- tapping it is what
+ * launches the camera (see the interactive-run block at the bottom of this
+ * file; a background timeline refresh can never open a camera, only a tap
+ * that opens the real app can).
+ *
+ * `scriptable:///run/<this script's own name>` rather than a hardcoded name:
+ * Script.name() is whatever Juan actually named this script on his phone, so
+ * the URL is correct regardless, and stays correct if he ever renames it.
+ */
+function renderMileagePrompt(w, data, mode) {
+  const label = mode === "start" ? "Record start mileage" : "Record end mileage";
+  const sub =
+    mode === "start"
+      ? "Tap to open the camera before today's route."
+      : "Every stop is done. Tap to close out the day.";
+  w.addSpacer(4);
+  txt(w, label, { size: 15, bold: true, lines: 2 });
+  w.addSpacer(4);
+  txt(w, sub, { size: 11, color: MUTED, lines: 3 });
+  w.addSpacer();
+  stamp(w, data);
+  w.url = `scriptable:///run/${encodeURIComponent(Script.name())}`;
+}
+
+/** Bottom-right, own tap target: ends the day even if not every stop got
+ *  marked done. Only drawn during in_progress/ended -- not_started and
+ *  ready_to_end already replace the whole face with renderMileagePrompt. */
+function endRouteButton(w) {
+  const row = w.addStack();
+  row.addSpacer();
+  const b = row.addStack();
+  b.url = `scriptable:///run/${encodeURIComponent(Script.name())}?end=1`;
+  b.centerAlignContent();
+  b.setPadding(5, 10, 5, 10);
+  b.cornerRadius = 7;
+  b.backgroundColor = Color.dynamic(new Color("#F3EDE7"), new Color("#2A211B"));
+  const t = b.addText("End route");
+  t.font = Font.semiboldSystemFont(10.5);
+  t.textColor = AMBER;
+}
+
 /* -------------------------------------------------------------------- small */
 /* One stop, big. The question a small widget answers is "where am I going
    next", and any second stop on it makes the first one unreadable.
@@ -190,6 +234,9 @@ function backLine(data) {
 function renderSmall(w, data) {
   header(w, data, { compact: true });
   w.addSpacer(6);
+
+  if (data.day_state === "not_started") return renderMileagePrompt(w, data, "start");
+  if (data.day_state === "ready_to_end") return renderMileagePrompt(w, data, "end");
 
   const s = data.stops.find((x) => !x.done) || data.stops[0];
   if (!s) return renderEmpty(w);
@@ -221,6 +268,8 @@ function renderSmall(w, data) {
 /* The next stop with its facts, then the two after it as a peek ahead. */
 function renderMedium(w, data) {
   header(w, data);
+  if (data.day_state === "not_started") return renderMileagePrompt(w, data, "start");
+  if (data.day_state === "ready_to_end") return renderMileagePrompt(w, data, "end");
   if (data.count === 0) return renderEmpty(w);
   w.addSpacer(7);
 
@@ -278,6 +327,10 @@ function renderMedium(w, data) {
       w.addSpacer(4);
     }
   }
+  if (data.day_state === "in_progress" || data.day_state === "ended") {
+    w.addSpacer(6);
+    endRouteButton(w);
+  }
   w.addSpacer();
   stamp(w, data);
   w.url = `${NB.base}/nutribiotic/map`;
@@ -291,6 +344,8 @@ function renderMedium(w, data) {
    third one. */
 function renderLarge(w, data) {
   header(w, data);
+  if (data.day_state === "not_started") return renderMileagePrompt(w, data, "start");
+  if (data.day_state === "ready_to_end") return renderMileagePrompt(w, data, "end");
   if (data.count === 0) return renderEmpty(w);
   w.addSpacer(6);
 
@@ -378,6 +433,10 @@ function renderLarge(w, data) {
     txt(more, "open the route", { size: 11, color: FAINT });
     more.addSpacer();
   }
+  if (data.day_state === "in_progress" || data.day_state === "ended") {
+    w.addSpacer(6);
+    endRouteButton(w);
+  }
   w.addSpacer();
   stamp(w, data);
   w.url = `${NB.base}/nutribiotic/map`;
@@ -428,6 +487,38 @@ async function fetchRoute() {
   return data;
 }
 
+/**
+ * Open the camera, take one odometer photo, upload it (Juan, 2026-08-26).
+ *
+ * ONLY REACHABLE ON AN INTERACTIVE RUN. Photos.fromCamera() presents real UI;
+ * there is no camera to show during a background timeline refresh, which is
+ * exactly what config.runsInWidget distinguishes (see the bottom of this
+ * file). A cancelled camera or a network failure both resolve to
+ * `{ ok: false }` rather than throwing -- either way the caller should just
+ * fall through and draw whatever the route actually is, never crash the
+ * whole widget over a photo that didn't happen.
+ */
+async function captureAndUploadMileage(kind, day) {
+  let photo;
+  try {
+    photo = await Photos.fromCamera();
+  } catch {
+    return { ok: false, cancelled: true };
+  }
+  try {
+    const req = new Request(`${NB.base}/nutribiotic/api/widget/mileage`);
+    req.method = "POST";
+    req.headers = { Authorization: `Bearer ${NB.token}` };
+    req.addImageToMultipart(photo, "photo", `${kind}.jpg`);
+    req.addParameterToMultipart("kind", kind);
+    req.addParameterToMultipart("day", day);
+    const result = await req.loadJSON();
+    return { ok: Boolean(result && result.ok), result };
+  } catch (e) {
+    return { ok: false, error: String(e.message || e) };
+  }
+}
+
 const family = config.widgetFamily || "medium";
 const accessory = family.startsWith("accessory");
 
@@ -450,7 +541,26 @@ if (!accessory) {
 widget.refreshAfterDate = new Date(Date.now() + 2 * 60 * 1000);
 
 try {
-  const data = await fetchRoute();
+  let data = await fetchRoute();
+
+  /* CAMERA-GATED MILEAGE (Juan, 2026-08-26), interactive runs only -- see
+   * config.runsInWidget below. Tapping the mileage prompt (renderMileagePrompt)
+   * or the End-route button (endRouteButton) both open THIS SAME script via
+   * scriptable:///run, the latter with ?end=1; either one launches the full
+   * Scriptable app rather than redrawing the Home Screen tile, which is the
+   * only way this app can ever show camera UI. A cancelled photo or a failed
+   * upload leaves `data` exactly as first fetched, so the widget still draws
+   * something real rather than a blank screen. */
+  if (!config.runsInWidget) {
+    const endRequested = Boolean(args.queryParameters && args.queryParameters.end === "1");
+    const wantsStart = data.day_state === "not_started";
+    const wantsEnd = endRequested || data.day_state === "ready_to_end";
+    if (wantsStart || wantsEnd) {
+      const outcome = await captureAndUploadMileage(wantsEnd ? "end" : "start", data.day);
+      if (outcome.ok) data = await fetchRoute();
+    }
+  }
+
   if (accessory) renderAccessory(widget, data);
   else if (family === "small") renderSmall(widget, data);
   else if (family === "large" || family === "extraLarge") renderLarge(widget, data);

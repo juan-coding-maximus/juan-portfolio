@@ -33,6 +33,7 @@
 import {
   defaultActiveDay,
   planningHorizonDates,
+  getRouteMileageByDay,
   getRouteStateByDay,
   getRouteSchedulePrefs,
   listOwnerAccounts,
@@ -41,12 +42,28 @@ import {
 } from "../../lib/dal";
 import { hasAccess } from "../../lib/devices";
 import { hasWidgetToken } from "../../lib/session";
+import { likelyDriveMinutes } from "../../map/traffic";
 import { appleMapsUrl, fullAddress, HUBSPOT_COMPANY_URL } from "../../lib/ui";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const SITE = "https://juanarenas.bio";
+
+/** Wall-clock minutes since midnight, America/Los_Angeles, right now. Used to
+ *  anchor the finish-time estimate to the actual moment the widget is being
+ *  read, not to this morning's planned depart time (Juan's ask 2026-08-26). */
+function nowMinutesLA(): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+  const h = Number(parts.find((p) => p.type === "hour")?.value ?? "0") % 24;
+  const m = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+  return h * 60 + m;
+}
 
 function haversineMiles(
   a: { lat: number; lng: number },
@@ -100,10 +117,11 @@ export async function GET(request: Request) {
     return Response.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 
-  const [routeState, accounts, prefs] = await Promise.all([
+  const [routeState, accounts, prefs, mileageByDay] = await Promise.all([
     getRouteStateByDay(),
     listOwnerAccounts(),
     getRouteSchedulePrefs(),
+    getRouteMileageByDay(),
   ]);
   const { draft: byDay, calls: callsByDay, done: doneByDay } = routeState;
   const byId = new Map(accounts.data.map((a) => [a.id, a]));
@@ -194,41 +212,82 @@ export async function GET(request: Request) {
   }
 
   /**
-   * A ROUGH FINISH-TIME ESTIMATE (Juan's ask 2026-08-26: know what time the
-   * route will be done, without opening the app). Same honesty split as
+   * A ROUGH, LIVE FINISH-TIME ESTIMATE (Juan's ask 2026-08-26: know what time
+   * the route will be done, "right now, live"). Same honesty split as
    * everywhere else drive time appears in this OS: this endpoint deliberately
-   * makes no Directions call (see the file header), so this is NOT the router
-   * -backed clock RoutePanel shows on /nutribiotic/map. It is the same
-   * circuity/speed heuristic plan_week.py's drive() uses for its own
-   * corridor-free estimate (1.28x straight-line, 42mph freeway-length legs,
-   * 21mph surface-length legs), with no traffic multiplier applied -- porting
-   * traffic_corridors.json's time-of-day matching here would be more code
-   * claiming more precision than a glance widget should. Labelled `rough` in
-   * the payload for exactly that reason; the app's own clock is the one to
-   * trust for anything that decides whether a stop gets cut.
+   * makes no Directions call (see the file header), so the FREE-FLOW minutes
+   * per leg is still this endpoint's own circuity/speed guess (1.28x
+   * straight-line, 42mph freeway-length legs, 21mph surface-length legs),
+   * not the router-backed number RoutePanel shows on /nutribiotic/map. The
+   * TIME-OF-DAY MULTIPLIER over that guess, though, is map/traffic.ts's real
+   * curve (see below), the same one RoutePanel prices every leg with, so the
+   * two screens never quote a different "back by" for the same day. Labelled
+   * `rough` in the payload for the free-flow half of that honesty split; the
+   * app's own clock is still the one to trust for anything that decides
+   * whether a stop gets cut.
+   *
+   * LIVE, NOT THIS MORNING'S PLAN: once the day has visibly started (a stop
+   * marked done, or a start odometer photo on file), the estimate anchors to
+   * the ACTUAL current clock and drives from the LAST DONE STOP forward,
+   * never from home at prefs.depart -- a route re-read at 2pm should say "3
+   * more stops from here, back by X", not repeat the same 9:30-anchored
+   * number it said at breakfast. Before the day starts, it still projects
+   * from whichever is later, the planned depart or right now (a look-ahead
+   * before leaving reads odd anchored to a depart time already in the past).
+   *
+   * ONE TRAFFIC SHAPE, NOT TWO (agency-3c, 2026-08-26): the free-flow number
+   * per leg is still this endpoint's own straight-line/circuity guess -- no
+   * Directions call, same reason as always -- but the multiplier over it is
+   * map/traffic.ts's real time-of-day curve, the same one RoutePanel prices
+   * every leg with. Two screens quoting two different "back by" times for
+   * the same day is the actual failure mode this guards against, not
+   * precision for its own sake.
    */
+  const dayMileage = mileageByDay[day] ?? {};
   const home = accounts.data.find((a) => a.lifecycle === "waypoint");
-  let schedule: { depart: string; finish_clock: string; over: boolean; return_by: string | null; rough: true } | null = null;
+  let schedule: { depart: string; finish_clock: string; over: boolean; return_by: string | null; live: boolean; rough: true } | null = null;
   if (home && stops.length > 0) {
     const CIRCUITY = 1.28;
     const FREEWAY_MPH = 42;
     const SURFACE_MPH = 21;
     const FREEWAY_MIN_MILES = 6;
-    const leg = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+    // Server runtime is UTC (Vercel), same trick lib/expenses.ts's parseDate
+    // uses: build the synthetic instant from `day`'s own Y/M/D via UTC
+    // fields, so trafficFactorAt's plain .getHours()/.getDay() read LA wall-
+    // clock time regardless of the machine's real timezone.
+    const [dy, dm2, dd] = day.split("-").map(Number);
+    const dateAtMinutes = (mins: number): Date => {
+      const wrapped = ((Math.round(mins) % 1440) + 1440) % 1440;
+      return new Date(Date.UTC(dy, dm2 - 1, dd, Math.floor(wrapped / 60), wrapped % 60));
+    };
+    const leg = (a: { lat: number; lng: number }, b: { lat: number; lng: number }, departAtMinutes: number) => {
       const miles = haversineMiles(a, b) * CIRCUITY;
       const mph = miles >= FREEWAY_MIN_MILES ? FREEWAY_MPH : SURFACE_MPH;
-      return Math.max(4, (miles / mph) * 60);
+      const freeFlow = (miles / mph) * 60;
+      return Math.max(4, likelyDriveMinutes(freeFlow, dateAtMinutes(departAtMinutes)));
     };
     const [dh, dm] = prefs.depart.split(":").map(Number);
-    let t = (Number.isFinite(dh) ? dh : 9) * 60 + (Number.isFinite(dm) ? dm : 30);
-    let pos: { lat: number; lng: number } = { lat: home.lat, lng: home.lng };
-    for (const s of stops) {
-      t += leg(pos, s);
+    const departMin = (Number.isFinite(dh) ? dh : 9) * 60 + (Number.isFinite(dm) ? dm : 30);
+    const nowMin = nowMinutesLA();
+
+    let lastDoneIdx = -1;
+    stops.forEach((s, i) => {
+      if (s.done) lastDoneIdx = i;
+    });
+    const remaining = stops.slice(lastDoneIdx + 1);
+    const startPos: { lat: number; lng: number } =
+      lastDoneIdx >= 0 ? { lat: stops[lastDoneIdx].lat, lng: stops[lastDoneIdx].lng } : { lat: home.lat, lng: home.lng };
+    const dayStarted = lastDoneIdx >= 0 || Boolean(dayMileage.start);
+
+    let t = dayStarted ? nowMin : Math.max(departMin, nowMin);
+    let pos = startPos;
+    for (const s of remaining) {
+      t += leg(pos, s, t);
       const dwell = s.kind === "lunch" ? prefs.lunchMinutes : s.kind === "hotel" ? 0 : prefs.dwellMinutes;
       t += dwell;
       pos = s;
     }
-    t += leg(pos, home);
+    t += leg(pos, home, t);
     const clock = (mins: number) => {
       const wrapped = ((Math.round(mins) % 1440) + 1440) % 1440;
       return `${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
@@ -242,9 +301,30 @@ export async function GET(request: Request) {
       finish_clock: clock(t),
       over: returnByMin !== null && t > returnByMin,
       return_by: prefs.returnBy,
+      live: dayStarted,
       rough: true,
     };
   }
+
+  /**
+   * CAMERA-GATED START/END MILEAGE (migration 0043, Juan's ask 2026-08-26):
+   * not_started means the widget shows "record start mileage" instead of the
+   * route; ready_to_end means every account stop today is crossed off, so
+   * the widget prompts for the end photo on its own rather than waiting for
+   * the manual End-route tap; ended is the brief moment right after an end
+   * photo lands but before the pair has finished filing (see the mileage
+   * route -- a successful file resets the day back to not_started, Juan's
+   * own ask, so a second trip the same day starts clean).
+   */
+  const accountStops = stops.filter((s) => s.type === "account");
+  const allAccountStopsDone = accountStops.length > 0 && accountStops.every((s) => s.done);
+  const day_state: "not_started" | "in_progress" | "ready_to_end" | "ended" = !dayMileage.start
+    ? "not_started"
+    : dayMileage.end
+      ? "ended"
+      : allAccountStopsDone
+        ? "ready_to_end"
+        : "in_progress";
 
   return Response.json(
     {
@@ -256,6 +336,8 @@ export async function GET(request: Request) {
       stops,
       calls,
       schedule,
+      day_state,
+      mileage_error: dayMileage.fileError ?? null,
       total_straight_line_miles: stops.length > 1 ? Number(total.toFixed(1)) : null,
       maps_all_url:
         stops.length > 1
