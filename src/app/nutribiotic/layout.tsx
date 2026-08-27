@@ -1,13 +1,13 @@
-import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getRouteStateByDay, isConfigured, workspaceMode } from "./lib/dal";
+import { isConfigured } from "./lib/dal";
 import { LAUNCHERS } from "./lib/launchers";
 import { ModalProvider } from "./lib/modal";
 import { MobileNav } from "./lib/MobileNav";
 import { MoreMenu } from "./lib/MoreMenu";
 import { RefreshOnForeground } from "./lib/RefreshOnForeground";
 import { RouteProvider } from "./lib/route-context";
+import { SyntheticBanner } from "./lib/SyntheticBanner";
 import { hasAccess } from "./lib/devices";
 import { Ico } from "./lib/ui";
 
@@ -124,25 +124,32 @@ export default async function NutribioticLayout({
     return <div className="min-h-screen bg-[#F7F6F1] text-[#14201B]">{children}</div>;
   }
 
-  // STARTED, NOT AWAITED.
-  //
-  // This layout is on the critical path of every NutriBiotic screen, /visit
-  // included, and /visit is the one Juan opens standing in a doorway with
-  // someone waiting. It used to await workspaceMode() and THEN three separate
-  // reads of three columns of the SAME nb_ui_prefs row: four round trips deep
-  // in a chain that had to finish before the capture box existed in the DOM.
-  //
-  // The route read is now one query, and it is handed to RouteProvider as a
-  // promise rather than awaited here, so the shell paints without it. /visit
-  // never reads a route at all; the screens that do fill in a beat later. See
-  // RouteProvider for how an un-hydrated route is told apart from an empty one.
-  const routeStatePromise = isConfigured()
-    ? getRouteStateByDay()
-    : Promise.resolve({ draft: {}, calls: {}, done: {} });
-  // Swallowed here so an unhandled rejection can never take down the shell;
-  // RouteProvider attaches the real handler and reports through `hydrated`.
-  routeStatePromise.catch(() => {});
-
+  /**
+   * THE LAYOUT CARRIES NO DATA AT ALL (2026-08-27).
+   *
+   * It authenticates, and it renders chrome. Nothing else.
+   *
+   * This sits above every NutriBiotic screen, so anything it reads is paid for
+   * by /visit, the screen Juan opens standing in a doorway, which uses none of
+   * it. Two rounds of fixes here were not enough, because both kept the
+   * response OPEN:
+   *
+   *   awaited reads          blocked the shell outright (slow)
+   *   an un-awaited promise  still held the RSC stream until it resolved, and
+   *   a Suspense boundary    likewise, because a streamed document is not
+   *                          finished until its last boundary is
+   *
+   * An open stream is the failure mode that actually bit: on 2026-08-27 at
+   * 09:26 the phone's connection saturated mid-flight and iOS abandoned the
+   * navigation with "This page couldn't load", while every request in the
+   * server log read 200.
+   *
+   * So the two readers went to their own endpoints and fetch after the
+   * document has closed: RouteProvider to api/route-state, and the
+   * sample-data banner to api/workspace-mode. The only thing left awaited here
+   * is the gate above, which is HMAC-only on the common path and must be
+   * settled before any markup is written regardless.
+   */
   const nav = NAV;
 
   /* Review left the nav for good, 2026-08-02: the page stays reachable at
@@ -151,7 +158,7 @@ export default async function NutribioticLayout({
 
   return (
     <div className="min-h-screen bg-[#F7F6F1] text-[#14201B]">
-      <RouteProvider initial={routeStatePromise}>
+      <RouteProvider>
       <ModalProvider>
       <RefreshOnForeground />
       <div className="min-h-screen bg-[#F7F6F1]">
@@ -161,9 +168,7 @@ export default async function NutribioticLayout({
             that survives. This keeps the guarantee (mode-level, not a per-row
             badge, still impossible to miss on a cropped screenshot because it
             sits above the content) and drops the stripes. */}
-        <Suspense fallback={null}>
-          <SyntheticBanner />
-        </Suspense>
+        <SyntheticBanner />
 
         {/* Only shown when the backend is genuinely unwired. An empty RESULT is
             not the same as an empty SYSTEM, and saying "not configured" over a
@@ -196,6 +201,7 @@ export default async function NutribioticLayout({
             <nav className="flex flex-col gap-0.5">
               {nav.map((n) => (
                 <Link
+                  prefetch={false}
                   key={n.href}
                   href={n.href}
                   className="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[14px] text-[#3D4A44] transition-colors hover:bg-[#ECEAE1] hover:text-[#14201B]"
@@ -220,32 +226,6 @@ export default async function NutribioticLayout({
       </div>
       </ModalProvider>
       </RouteProvider>
-    </div>
-  );
-}
-
-/**
- * The sample-data warning, off the critical path.
- *
- * workspaceMode() is one Supabase read whose only job is to decide whether
- * this strip appears, and it was awaited before ANY NutriBiotic screen could
- * render, /visit included. The guarantee it carries is unchanged: still
- * mode-level rather than a per-row badge, still above the content, still
- * impossible to miss on a cropped screenshot. It just arrives a beat later
- * than the shell instead of holding it up.
- *
- * FAILS TOWARD THE WARNING. If the read throws, `synthetic` is treated as
- * false and no banner is drawn, which is the same thing that happened before
- * when the whole page failed. What must never happen is real data being
- * labelled sample, or sample data going unlabelled once known: the read either
- * answers or it does not, and it is not inferred from anything else.
- */
-async function SyntheticBanner() {
-  if ((await workspaceMode()) !== "synthetic") return null;
-  return (
-    <div className="flex items-center justify-center gap-2 border-b border-[#E5D9BF] bg-[#FBF6E9] px-4 py-1.5 text-[12px] text-[#8A6D2F]">
-      <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#C9A24B]" aria-hidden />
-      Sample data. Not real accounts, and nothing here can be sent or reported.
     </div>
   );
 }

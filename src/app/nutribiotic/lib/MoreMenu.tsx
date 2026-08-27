@@ -59,6 +59,7 @@ export function MoreMenu({
           <div className="absolute left-0 top-full z-50 mt-1 w-[190px] rounded-md border border-[#E2DFD5] bg-white py-1.5 shadow-[0_8px_24px_rgba(20,32,27,0.12)]">
             {items.map((n) => (
               <Link
+                prefetch={false}
                 key={n.href}
                 href={n.href}
                 className={`flex items-center gap-2.5 px-3 py-2 text-[14px] transition-colors hover:bg-[#ECEAE1] hover:text-[#14201B] ${
@@ -81,6 +82,7 @@ export function MoreMenu({
         <div className="absolute bottom-full right-0 z-50 mb-2 w-[200px] rounded-md border border-[#E2DFD5] bg-white py-1.5 shadow-[0_8px_24px_rgba(20,32,27,0.16)]">
           {items.map((n) => (
             <Link
+              prefetch={false}
               key={n.href}
               href={n.href}
               className={`flex items-center gap-2.5 px-3.5 py-3 text-[14.5px] transition-colors ${

@@ -47,6 +47,7 @@ export function MobileNav({
           const active = pathname === n.href || pathname.startsWith(`${n.href}/`);
           return (
             <Link
+              prefetch={false}
               key={n.href}
               href={n.href}
               aria-current={active ? "page" : undefined}

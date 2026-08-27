@@ -102,13 +102,7 @@ function entryId(e: RouteDraftEntry): string {
  * has not already picked a day. Overriding a deliberate tap because a fetch
  * resolved late is worse than defaulting a beat later.
  */
-export function RouteProvider({
-  initial,
-  children,
-}: {
-  initial: Promise<RouteState>;
-  children: ReactNode;
-}) {
+export function RouteProvider({ children }: { children: ReactNode }) {
   const days = useMemo(() => planningHorizonDates(), []);
   const [draftByDay, setDraftByDay] = useState<RouteDraftByDay>({});
   const [activeDay, setActiveDay] = useState<string>(() => defaultActiveDay({}, days));
@@ -119,26 +113,30 @@ export function RouteProvider({
   const hydratedRef = useRef(false);
 
   /**
-   * HYDRATES EXACTLY ONCE, and that is deliberate.
+   * FETCHES ITSELF, AND HYDRATES EXACTLY ONCE.
    *
-   * RefreshOnForeground fires router.refresh() on every return to the
-   * foreground, which re-renders the layout and hands down a NEW promise. If
-   * each one were allowed to overwrite state, an optimistic local edit
-   * (commitDay writes the list first and saves after) could be reverted by a
-   * refresh whose read raced ahead of its own save. Juan would watch a stop he
-   * just added disappear.
+   * This used to arrive as a prop. As an awaited value it blocked every screen
+   * on data most of them never use; as an un-awaited promise it still held the
+   * RSC stream open until nb_ui_prefs answered, because that is what handing a
+   * promise across the server/client boundary does. An open stream on a
+   * saturated phone connection is what iOS reports as "This page couldn't
+   * load". See api/route-state/route.ts.
    *
-   * Seeding once preserves exactly the semantics this provider had when it
-   * took a plain `initial` value through useState, which ignores later props
-   * by definition. The only thing that changed is WHEN the first seed lands:
-   * a beat after paint instead of blocking it.
+   * ONCE is deliberate. RefreshOnForeground fires router.refresh() on every
+   * return to the foreground; re-reading here would let a response that raced
+   * ahead of its own save revert an optimistic local edit (commitDay writes the
+   * list first and saves after), and Juan would watch a stop he just added
+   * disappear on switching back from Maps.
    */
   useEffect(() => {
     if (hydratedRef.current) return;
-    let live = true;
-    initial
-      .then((state) => {
-        if (!live || hydratedRef.current) return;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 20_000);
+
+    fetch("/nutribiotic/api/route-state", { signal: ctrl.signal, cache: "no-store" })
+      .then((r) => (r.ok && !r.redirected ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((state: RouteState & { ok: boolean }) => {
+        if (hydratedRef.current || !state.ok) return;
         hydratedRef.current = true;
         setDraftByDay(state.draft);
         setCallsByDay(state.calls);
@@ -147,13 +145,16 @@ export function RouteProvider({
         setHydrated(true);
       })
       .catch(() => {
-        // A failed read leaves an empty route and says so via `hydrated`
-        // staying false. It never invents stops and never blocks the screen.
-      });
+        // An unreachable route leaves an empty one, and `hydrated` staying
+        // false is how a caller tells that apart from "no stops today".
+      })
+      .finally(() => clearTimeout(timer));
+
     return () => {
-      live = false;
+      clearTimeout(timer);
+      ctrl.abort();
     };
-  }, [initial, days]);
+  }, [days]);
 
   const routeDraft = useMemo(() => draftByDay[activeDay] ?? [], [draftByDay, activeDay]);
   const calls = useMemo(() => callsByDay[activeDay] ?? [], [callsByDay, activeDay]);
