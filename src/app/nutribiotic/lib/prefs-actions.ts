@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import {
   sanitizeRouteEndpoint,
+  setLastLocationAndAutoComplete,
   setRouteCalls,
   setRouteDone,
   setRouteDraft,
@@ -66,6 +67,24 @@ export async function saveRouteCalls(byDay: RouteCallsByDay): Promise<void> {
  */
 export async function saveRouteDone(byDay: RouteDoneByDay): Promise<void> {
   await setRouteDone(byDay);
+}
+
+/**
+ * MapScreen's own half of the last-known-location write (migration 0044,
+ * Juan's ask 2026-08-27): the SAME geolocation fix requestLoc() already asks
+ * for every time /nutribiotic/map opens, now also saved so the widget can
+ * price its finish-time estimate off Juan's real position instead of a
+ * last-done-stop proxy. Fire-and-forget from the caller's side, same as
+ * every other optimistic write here -- the map already has its fix and
+ * doesn't need to wait on this to keep working.
+ *
+ * Also runs the <0.1mi auto-done check (setLastLocationAndAutoComplete),
+ * so a stop can cross itself off from the map screen exactly the same way
+ * the widget's "tap to update" does. Returns the ids it marked done so
+ * MapScreen can reflect them without waiting for a reload.
+ */
+export async function reportLiveLocation(lat: number, lng: number): Promise<{ autoDoneIds: string[] }> {
+  return setLastLocationAndAutoComplete(lat, lng);
 }
 
 /**

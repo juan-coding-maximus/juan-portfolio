@@ -1951,9 +1951,10 @@ export async function getRouteMileageByDay(): Promise<RouteMileageByDay> {
  * widget's bearer deliberately cannot pass (see session.ts's split between
  * hasWidgetToken and a real session) -- that boundary is exactly what keeps a
  * copy of NB_WIDGET_TOKEN sitting in a phone script from being able to touch
- * HubSpot, a customer record, or anything else mutate() guards. This function
- * is the ONE deliberate, narrow exception: Juan's own odometer photo, nothing
- * customer-facing, nothing that leaves the building. A key set to `undefined`
+ * HubSpot, a customer record, or anything else mutate() guards. This is one
+ * of a small, deliberate set of exceptions (see also setLastLocationAndAutoComplete
+ * below) -- Juan's own odometer photo, nothing customer-facing, nothing that
+ * leaves the building. A key set to `undefined`
  * in `patch` is dropped from the day's object (JSON.stringify omits it),
  * which is how a filed day resets back to {} -- waiting for the next start.
  */
@@ -1983,6 +1984,107 @@ export async function setRouteMileageDay(day: string, patch: Partial<RouteMileag
     throw new Error(`Supabase nb_ui_prefs PATCH -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
   }
   return next;
+}
+
+/**
+ * Juan's last known position (migration 0044). ONE ROW, not day-partitioned
+ * (see that migration's header): a location is a single point that goes
+ * stale the moment he stops moving, not a per-day fact. Callers MUST check
+ * `at` themselves -- this getter returns whatever is stored with no
+ * freshness opinion of its own, same as every other raw read in this file.
+ */
+export type LastLocation = { lat: number; lng: number; at: string };
+
+export async function getLastLocation(): Promise<LastLocation | null> {
+  const rows = await raw<{ last_location: unknown }>("nb_ui_prefs?select=last_location&id=eq.1");
+  const v = rows[0]?.last_location as Partial<LastLocation> | undefined;
+  if (!v || typeof v.lat !== "number" || typeof v.lng !== "number" || typeof v.at !== "string") return null;
+  return { lat: v.lat, lng: v.lng, at: v.at };
+}
+
+function haversineMilesForLocation(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const R = 3958.8;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const la1 = (a.lat * Math.PI) / 180;
+  const la2 = (b.lat * Math.PI) / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+/** Close enough to call it "there" (Juan, 2026-08-27): a tenth of a mile is
+ *  a parking lot, not a neighbourhood -- wide enough to cover where he
+ *  actually parks relative to a storefront's own pin, narrow enough that
+ *  driving past on a nearby street doesn't fire it. */
+const AUTO_DONE_RADIUS_MILES = 0.1;
+
+/**
+ * THE ONE WRITE PATH for "where is Juan right now" (migration 0044). Saves
+ * the fix, then checks it against today's not-done ACCOUNT stops (never a
+ * lunch/hotel/other custom stop -- there's nothing to "visit" there) and
+ * marks anything within AUTO_DONE_RADIUS_MILES done, same column and same
+ * toggle-able state a manual tap on /nutribiotic/map produces.
+ *
+ * Called from exactly two places, by design: MapScreen.tsx's existing
+ * geolocation request (via reportLiveLocation, prefs-actions.ts) and the
+ * widget's "tap to update" button (via api/location/route.ts). Nothing else
+ * calls this and nothing polls it -- see the migration header.
+ *
+ * GATED HERE, NOT VIA mutate() -- same reasoning and same widened bearer as
+ * setRouteMileageDay above: Juan's own coordinate, nothing customer-facing.
+ *
+ * A false-positive auto-done (driving past within a tenth of a mile without
+ * actually stopping) costs one tap to undo, the same as any other done mark
+ * -- a cheaper mistake than making Juan tap "done" standing at a door he's
+ * already at.
+ */
+export async function setLastLocationAndAutoComplete(lat: number, lng: number): Promise<{ autoDoneIds: string[] }> {
+  if (!(await hasWidgetToken()) && !(await hasAccess())) {
+    throw new Error("Unauthorized.");
+  }
+  if (!isConfigured()) throw new Error("Cannot write location: no data source configured.");
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    throw new Error("lat/lng must be finite numbers.");
+  }
+
+  const [routeState, accounts] = await Promise.all([getRouteStateByDay(), listOwnerAccounts()]);
+  const days = planningHorizonDates();
+  const day = defaultActiveDay(routeState.draft, days);
+  const draft = routeState.draft[day] ?? [];
+  const doneIds = new Set(routeState.done[day] ?? []);
+  const byId = new Map(accounts.data.map((a) => [a.id, a]));
+
+  const newlyDone: string[] = [];
+  for (const entry of draft) {
+    if (typeof entry !== "string") continue; // account stops only
+    if (doneIds.has(entry)) continue;
+    const a = byId.get(entry);
+    if (!a) continue;
+    if (haversineMilesForLocation({ lat, lng }, { lat: a.lat, lng: a.lng }) < AUTO_DONE_RADIUS_MILES) {
+      newlyDone.push(entry);
+    }
+  }
+
+  const at = new Date().toISOString();
+  const body: Record<string, unknown> = { last_location: { lat, lng, at }, updated_at: at };
+  if (newlyDone.length > 0) {
+    body.route_done = { ...routeState.done, [day]: [...doneIds, ...newlyDone] };
+  }
+
+  const res = await fetch(`${SB_URL}/rest/v1/nb_ui_prefs?id=eq.1`, {
+    method: "PATCH",
+    headers: {
+      apikey: SB_KEY,
+      Authorization: `Bearer ${SB_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new Error(`Supabase nb_ui_prefs PATCH -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  }
+  return { autoDoneIds: newlyDone };
 }
 
 // ---------------------------------------------------------------------------

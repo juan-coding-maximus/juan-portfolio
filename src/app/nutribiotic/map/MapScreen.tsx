@@ -21,6 +21,7 @@ import type {
 } from "../lib/dal";
 import { fullAddress } from "../lib/ui";
 import {
+  reportLiveLocation,
   saveRouteEndByDay,
   saveRouteSchedulePrefs,
   saveRouteStartByDay,
@@ -406,6 +407,28 @@ export function MapScreen({
   useEffect(() => {
     requestLoc();
   }, [requestLoc]);
+
+  /* THE ONLY PLACE THIS APP REPORTS A LIVE LOCATION (Juan's ask 2026-08-27):
+   * riding on the geolocation fix requestLoc() already asks for, never a
+   * separate poll. Runs on `loc` rather than inside requestLoc's own success
+   * callback so it always closes over the CURRENT done/toggleDone from this
+   * render, not whichever ones existed when requestLoc was first memoized.
+   * Feeds the widget's live finish-time estimate (last_location, migration
+   * 0044) and marks a stop done the instant Juan is within 0.1mi of it,
+   * same tolerance for a rare false positive as the widget's own version:
+   * one tap to undo. */
+  useEffect(() => {
+    if (!loc) return;
+    reportLiveLocation(loc.lat, loc.lng)
+      .then((res) => {
+        for (const id of res.autoDoneIds) toggleDone(id);
+      })
+      .catch(() => {
+        // A location report is a nice-to-have, not a dependency: the map
+        // already has its fix and keeps working regardless.
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loc]);
 
   return (
     /**

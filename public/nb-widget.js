@@ -133,20 +133,28 @@ function actionRow(on, stop, { compact = false } = {}) {
 }
 
 /**
- * How old what you are reading is, AND a way to ask for newer (Juan, 2026-08-26).
+ * How old what you are reading is, AND a way to ask for newer (Juan,
+ * 2026-08-26; now also a location report, 2026-08-27).
  *
  * iOS decides when a widget's FACE redraws, not the script -- refreshAfterDate
  * below is a request, not a schedule, and nothing any app installs can force
  * WidgetKit to repaint a tile already on the Home Screen sooner than its own
- * budget allows. What actually IS instant: opening the route, which always
+ * budget allows. What actually IS instant: an interactive run, which always
  * fetches this same live endpoint. So the honest "update button" is this row
- * itself, tappable, landing on the live page rather than a cached tile.
+ * itself, tappable -- and since 2026-08-27 that tap runs the script
+ * interactively (scriptable:///run, same mechanism as the mileage camera and
+ * the End-route button) rather than just opening Safari, which means it can
+ * also ask Scriptable's Location API for a real fix and report it (see the
+ * interactive-run block at the bottom of this file). That fix is what lets
+ * the finish-time estimate price itself off where Juan actually is instead
+ * of a last-done-stop guess, and it's the ONLY way this widget ever asks for
+ * a location -- never a background poll.
  */
 function stamp(w, data) {
   const at = new Date(data.generated_at);
   const t = at.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
   const row = w.addStack();
-  row.url = `${NB.base}/nutribiotic/map`;
+  row.url = `scriptable:///run/${encodeURIComponent(Script.name())}?refresh=1`;
   txt(row, `as of ${t} · tap to update`, { size: 9.5, color: FAINT });
 }
 
@@ -519,6 +527,42 @@ async function captureAndUploadMileage(kind, day) {
   }
 }
 
+/**
+ * Ask Scriptable for one live GPS fix and report it (Juan, 2026-08-27).
+ *
+ * Fired ONLY by the "tap to update" row (stamp()), never automatically and
+ * never on a background refresh -- config.runsInWidget rules that out the
+ * same way it rules out the camera above. This and /nutribiotic/map's own
+ * geolocation request (MapScreen.tsx) are the only two places this whole
+ * app ever asks for a location; nothing polls, nothing tracks in the
+ * background. Ten metres of accuracy is plenty for pricing a drive leg and
+ * for the <0.1mi auto-done check, so this never asks for `setAccuracyToBest`,
+ * which would just spend more battery/time for no real gain here.
+ *
+ * Silent on failure or a denied permission: a missing fix just means the
+ * finish-time estimate falls back to its last-done-stop guess, same as
+ * before this existed, not a broken widget.
+ */
+async function captureAndReportLocation() {
+  let loc;
+  try {
+    Location.setAccuracyToTenMeters();
+    loc = await Location.current();
+  } catch {
+    return { ok: false };
+  }
+  try {
+    const req = new Request(`${NB.base}/nutribiotic/api/location`);
+    req.method = "POST";
+    req.headers = { Authorization: `Bearer ${NB.token}`, "Content-Type": "application/json" };
+    req.body = JSON.stringify({ lat: loc.latitude, lng: loc.longitude });
+    const result = await req.loadJSON();
+    return { ok: Boolean(result && result.ok), result };
+  } catch (e) {
+    return { ok: false, error: String(e.message || e) };
+  }
+}
+
 const family = config.widgetFamily || "medium";
 const accessory = family.startsWith("accessory");
 
@@ -553,10 +597,16 @@ try {
    * something real rather than a blank screen. */
   if (!config.runsInWidget) {
     const endRequested = Boolean(args.queryParameters && args.queryParameters.end === "1");
+    const refreshRequested = Boolean(args.queryParameters && args.queryParameters.refresh === "1");
     const wantsStart = data.day_state === "not_started";
     const wantsEnd = endRequested || data.day_state === "ready_to_end";
     if (wantsStart || wantsEnd) {
       const outcome = await captureAndUploadMileage(wantsEnd ? "end" : "start", data.day);
+      if (outcome.ok) data = await fetchRoute();
+    } else if (refreshRequested) {
+      // "tap to update" (stamp()): a live GPS fix, reported so the
+      // finish-time estimate prices itself off where Juan actually is.
+      const outcome = await captureAndReportLocation();
       if (outcome.ok) data = await fetchRoute();
     }
   }

@@ -33,6 +33,7 @@
 import {
   defaultActiveDay,
   planningHorizonDates,
+  getLastLocation,
   getRouteMileageByDay,
   getRouteStateByDay,
   getRouteSchedulePrefs,
@@ -117,11 +118,12 @@ export async function GET(request: Request) {
     return Response.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 
-  const [routeState, accounts, prefs, mileageByDay] = await Promise.all([
+  const [routeState, accounts, prefs, mileageByDay, lastLocation] = await Promise.all([
     getRouteStateByDay(),
     listOwnerAccounts(),
     getRouteSchedulePrefs(),
     getRouteMileageByDay(),
+    getLastLocation(),
   ]);
   const { draft: byDay, calls: callsByDay, done: doneByDay } = routeState;
   const byId = new Map(accounts.data.map((a) => [a.id, a]));
@@ -274,10 +276,33 @@ export async function GET(request: Request) {
     stops.forEach((s, i) => {
       if (s.done) lastDoneIdx = i;
     });
-    const remaining = stops.slice(lastDoneIdx + 1);
-    const startPos: { lat: number; lng: number } =
-      lastDoneIdx >= 0 ? { lat: stops[lastDoneIdx].lat, lng: stops[lastDoneIdx].lng } : { lat: home.lat, lng: home.lng };
-    const dayStarted = lastDoneIdx >= 0 || Boolean(dayMileage.start);
+    // Skipped, not sliced: a live fix can put Juan ahead of or beside where
+    // his last done stop sits in the list, so "remaining" is every not-done
+    // stop in order, independent of which one supplies the starting point.
+    const remaining = stops.filter((s) => !s.done);
+
+    /**
+     * WHERE HE ACTUALLY IS (migration 0044, Juan's ask 2026-08-27). A fresh
+     * last_location -- reported only from /nutribiotic/map's own geolocation
+     * request or the widget's "tap to update" button, see dal.ts's
+     * setLastLocationAndAutoComplete -- outranks the last-done-stop proxy
+     * 0043 shipped with. LOCATION_FRESH_MINUTES bounds how old a fix this
+     * endpoint will still trust: a fix from the kitchen table this morning
+     * has no business pricing an afternoon leg, so a stale one is discarded
+     * exactly like a missing one, falling back to the same proxy as before.
+     */
+    const LOCATION_FRESH_MINUTES = 90;
+    const freshLocation =
+      lastLocation && Date.now() - new Date(lastLocation.at).getTime() < LOCATION_FRESH_MINUTES * 60_000
+        ? lastLocation
+        : null;
+
+    const startPos: { lat: number; lng: number } = freshLocation
+      ? { lat: freshLocation.lat, lng: freshLocation.lng }
+      : lastDoneIdx >= 0
+        ? { lat: stops[lastDoneIdx].lat, lng: stops[lastDoneIdx].lng }
+        : { lat: home.lat, lng: home.lng };
+    const dayStarted = Boolean(freshLocation) || lastDoneIdx >= 0 || Boolean(dayMileage.start);
 
     let t = dayStarted ? nowMin : Math.max(departMin, nowMin);
     let pos = startPos;
