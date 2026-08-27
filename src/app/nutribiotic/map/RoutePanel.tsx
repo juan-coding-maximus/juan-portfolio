@@ -48,6 +48,7 @@ import { resolveStopAddress } from "../lib/stop-actions";
 import { CallSearchField } from "./CallSearchField";
 import { DayMoveMenu } from "./DayMoveMenu";
 import { routeDriveLegs, type DriveLeg } from "./drive-actions";
+import { likelyDriveMinutes, LONG_LEG_MINUTES } from "./traffic";
 import type { RouteStopView } from "./MapScreen";
 import { RouteEndpointField } from "./RouteEndpointField";
 
@@ -131,24 +132,69 @@ function buildSchedule(
   hasStart: boolean,
   hasEnd: boolean,
   prefs: RouteSchedulePrefs,
-): { rows: ScheduleRow[]; finish: number; toFirst: DriveLeg | null; end: DriveLeg | null } {
-  const toFirst = hasStart ? legs[0] ?? null : null;
-  const endLeg = hasEnd ? legs[legs.length - 1] ?? null : null;
+  dayISO: string,
+): {
+  rows: ScheduleRow[];
+  finish: number;
+  toFirst: DriveLeg | null;
+  end: DriveLeg | null;
+  /** Every leg repriced at the hour it is actually driven, same indexing as
+   *  the `legs` that came in. This is what the panel AND the map both read, so
+   *  a segment can never say 52 minutes in one place and 38 in the other. */
+  priced: DriveLeg[];
+} {
+  /**
+   * PRICED FORWARD, ONE PASS.
+   *
+   * A leg's cost depends on when it departs, and when it departs depends on
+   * every leg before it, so the clock has to be walked rather than summed. The
+   * old version multiplied every leg by a flat 1.35 regardless of hour, which
+   * under-counted the 17:00 leg home and over-counted the 07:30 leg out, and
+   * on a ten-stop day those errors compounded into the one number Juan
+   * actually plans around. See traffic.ts.
+   */
+  const price = (leg: DriveLeg | undefined, atMinutes: number): DriveLeg | null => {
+    if (!leg) return null;
+    const at = new Date(`${dayISO}T00:00:00`);
+    at.setMinutes(at.getMinutes() + atMinutes);
+    return { ...leg, minutes: likelyDriveMinutes(leg.freeFlowMinutes, at) };
+  };
+
+  const priced: DriveLeg[] = new Array(legs.length);
+  const depart = minutesOfDay(prefs.depart);
+
+  const toFirst = hasStart ? price(legs[0], depart) : null;
+  if (hasStart && toFirst) priced[0] = toFirst;
+
   /* Between consecutive stops: drop the leading/trailing legs that belong to
      the start/end rather than to a stop-to-stop hop. */
-  const between = legs.slice(hasStart ? 1 : 0, legs.length - (hasEnd ? 1 : 0));
+  const betweenOffset = hasStart ? 1 : 0;
+  const between = legs.slice(betweenOffset, legs.length - (hasEnd ? 1 : 0));
 
   const rows: ScheduleRow[] = [];
-  let t = minutesOfDay(prefs.depart) + (toFirst?.minutes ?? 0);
+  let t = depart + (toFirst?.minutes ?? 0);
   stops.forEach((s, i) => {
-    if (i > 0) t += between[i - 1]?.minutes ?? 0;
+    if (i > 0) {
+      // Departing the previous stop is when this hop is actually driven.
+      const hop = price(between[i - 1], t);
+      if (hop) priced[betweenOffset + i - 1] = hop;
+      t += hop?.minutes ?? 0;
+    }
     const kind = s.type === "custom" ? s.custom.kind : null;
     const stay =
       kind === "lunch" ? prefs.lunchMinutes : kind === "hotel" ? 0 : prefs.dwellMinutes;
     rows.push({ arrive: t, leave: t + stay, stay });
     t += stay;
   });
-  return { rows, finish: t + (endLeg?.minutes ?? 0), toFirst, end: endLeg };
+
+  const endLeg = hasEnd ? price(legs[legs.length - 1], t) : null;
+  if (hasEnd && endLeg) priced[legs.length - 1] = endLeg;
+
+  // Any leg the walk never reached (a stop with no coordinates upstream) keeps
+  // its flat-factor value rather than becoming undefined. Never a blank.
+  for (let i = 0; i < legs.length; i++) if (!priced[i]) priced[i] = legs[i];
+
+  return { rows, finish: t + (endLeg?.minutes ?? 0), toFirst, end: endLeg, priced };
 }
 
 /**
@@ -722,6 +768,7 @@ export function RoutePanel({
   onMoveStopDay,
   onOptimize,
   busy,
+  onLegsChange,
 }: {
   stops: RouteStopView[];
   /** Juan's apartment, the waypoint account (0029), the ultimate default for
@@ -769,6 +816,11 @@ export function RoutePanel({
   onMoveStopDay: (id: string, day: string) => void;
   /** Reorder the whole day for the least total driving (route-optimize.ts). */
   onOptimize: () => void;
+  /** Publishes the legs this panel is DISPLAYING, already priced at the hour
+   *  each one is driven, so the map can draw the same day the list describes.
+   *  The panel owns this computation because it owns the schedule; a second
+   *  copy in MapScreen is a second answer waiting to disagree. */
+  onLegsChange?: (legs: DriveLeg[] | null) => void;
   /** True while a smart-insert or an optimize is computing. */
   busy: boolean;
 }) {
@@ -884,8 +936,8 @@ export function RoutePanel({
   }, [pathKey]);
 
   const schedule = useMemo(
-    () => (legs ? buildSchedule(stops, legs, start !== null, end !== null, prefs) : null),
-    [legs, stops, start, end, prefs],
+    () => (legs ? buildSchedule(stops, legs, start !== null, end !== null, prefs, activeDay) : null),
+    [legs, stops, start, end, prefs, activeDay],
   );
 
   /**
@@ -907,13 +959,23 @@ export function RoutePanel({
   }, [schedule, stops, prefs.returnBy]);
   const atRiskIds = useMemo(() => new Set(atRiskStars.map(({ s }) => s.id)), [atRiskStars]);
 
+  // The priced legs, not the raw ones: what the row shows must be the number
+  // the finish clock was actually computed from.
+  const shownLegs = schedule?.priced ?? legs;
+
+  useEffect(() => {
+    onLegsChange?.(shownLegs);
+    // shownLegs is derived from legs+schedule; onLegsChange is a stable setter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shownLegs]);
+
   const legBetween = (i: number): DriveLeg | null => {
-    if (!legs || i < 1) return null;
-    return legs.slice(start ? 1 : 0, legs.length - (end ? 1 : 0))[i - 1] ?? null;
+    if (!shownLegs || i < 1) return null;
+    return shownLegs.slice(start ? 1 : 0, shownLegs.length - (end ? 1 : 0))[i - 1] ?? null;
   };
 
-  const driveMinutes = legs ? legs.reduce((s, l) => s + l.minutes, 0) : null;
-  const driveMiles = legs ? legs.reduce((s, l) => s + l.miles, 0) : null;
+  const driveMinutes = shownLegs ? shownLegs.reduce((s, l) => s + l.minutes, 0) : null;
+  const driveMiles = shownLegs ? shownLegs.reduce((s, l) => s + l.miles, 0) : null;
   const endLabel = end?.label ?? "Home";
 
   const header = (

@@ -14,9 +14,35 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GoogleMap, MarkerF, InfoWindowF, PolygonF, PolylineF, useLoadScript } from "@react-google-maps/api";
 import type { CustomStop, MapAccount, TerritoryArea, Tier } from "../lib/dal";
+import { listAreaBoundaries } from "../lib/area-actions";
 import { AccountLink } from "../lib/modal";
 import { appleMapsUrl, CUSTOM_STOP_LABEL, Ico, ReachLinks, realChannel } from "../lib/ui";
+import type { DriveLeg } from "./drive-actions";
 import type { FocusRequest, RouteStopView } from "./MapScreen";
+import { LONG_LEG_MINUTES } from "./traffic";
+
+/**
+ * A red disc with a house cut into it: the two ends of the driving day.
+ *
+ * Inlined as a data URI rather than served from /public because the map draws
+ * it the instant the route resolves, and a marker that pops in a beat late on
+ * a screen Juan is scanning reads as a marker that was not there. It is also
+ * the only asset on this map that is not drawn by the Maps API itself, so
+ * having it carry no network dependency keeps the map's cold paint intact.
+ *
+ * White ring around the disc so it stays separable from a red area polygon or
+ * a cluster of pins underneath it.
+ */
+const HOME_PIN_SVG =
+  "data:image/svg+xml;charset=UTF-8," +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30" width="30" height="30">' +
+      '<circle cx="15" cy="15" r="13" fill="#B23B3B" stroke="#FFFFFF" stroke-width="2.5"/>' +
+      '<path d="M15 8.6 L21.4 14.2 L21.4 21.2 L17.6 21.2 L17.6 16.8 L12.4 16.8 L12.4 21.2 L8.6 21.2 L8.6 14.2 Z" ' +
+      'fill="#FFFFFF"/>' +
+      "</svg>",
+  );
+
 
 const CONTAINER_STYLE = { width: "100%", height: "100%" };
 
@@ -107,6 +133,7 @@ export function AccountsMap({
   customStops,
   routeStops,
   routeStart,
+  routeLegs,
   routeEnd,
 }: {
   accounts: MapAccount[];
@@ -126,8 +153,13 @@ export function AccountsMap({
   /** Where the day starts/ends (0040): the waypoint by default, or whatever
       Juan picked in RoutePanel's start/end fields. Drawn as the chain's two
       ends when the route-line toggle is on; independent of each other. */
-  routeStart: { lat: number; lng: number } | null;
-  routeEnd: { lat: number; lng: number } | null;
+  routeStart: { lat: number; lng: number; label?: string } | null;
+  routeEnd: { lat: number; lng: number; label?: string } | null;
+  /** The route's legs, ALREADY PRICED at the hour each is driven, published by
+      RoutePanel (see its onLegsChange). Same order and length as the chain's
+      segments. Null while the router is in flight or unreachable, in which
+      case no segment is labelled at all rather than labelled from a guess. */
+  routeLegs: DriveLeg[] | null;
 }) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const { isLoaded, loadError } = useLoadScript({ googleMapsApiKey: apiKey ?? "" });
@@ -164,7 +196,12 @@ export function AccountsMap({
      Straight lines on purpose, same honesty rule as the old ten-closest list:
      this map has no router, so a real driving path belongs to RoutePanel's
      drive-actions.ts leg times, not to a line here pretending to be one. */
-  const [showRouteChain, setShowRouteChain] = useState(false);
+  /* ON BY DEFAULT since 2026-08-26 (Juan: "routes are by default connected").
+     The reason it started off no longer holds: this used to be a bare
+     straight-line guess, and a guess drawn like a road is worse than no line.
+     It now carries real per-leg drive time from the same computation the list
+     beside it shows (see routeLegs), so the honest thing is to show it. */
+  const [showRouteChain, setShowRouteChain] = useState(true);
 
   const routeNumberById = useMemo(() => {
     const m = new Map<string, number>();
@@ -172,15 +209,89 @@ export function AccountsMap({
     return m;
   }, [routeStops]);
 
-  const chainPath = useMemo(() => {
+  /* Every point the day touches, in order, start and end included. This is the
+     SAME sequence RoutePanel hands to the router, which is what lets leg i of
+     routeLegs line up with segment i here without either side re-deriving it. */
+  const chainPoints = useMemo(() => {
     if (!showRouteChain || routeStops.length === 0) return [];
-    const pts = [
+    return [
       ...(routeStart ? [routeStart] : []),
       ...routeStops,
       ...(routeEnd ? [routeEnd] : []),
     ];
-    return pts.map((p) => ({ lat: p.lat, lng: p.lng }));
   }, [showRouteChain, routeStops, routeStart, routeEnd]);
+
+  const chainPath = useMemo(
+    () => chainPoints.map((p) => ({ lat: p.lat, lng: p.lng })),
+    [chainPoints],
+  );
+
+  /**
+   * THE LONG HAULS, drawn apart from the rest (Juan, 2026-08-26).
+   *
+   * A 45-minute-plus leg is not a hop between two neighbours, it is the
+   * decision that splits a day into two clusters, and on a thin uniform line
+   * it looked exactly like the six-minute leg next to it. These get a wide
+   * grey band under the chain and carry their own minute count at the
+   * midpoint, priced at the hour the leg is actually driven (traffic.ts) --
+   * one likely number, not a spread.
+   *
+   * Empty until routeLegs lands. A segment is never labelled from
+   * straight-line distance: an invented drive time on a map is the exact
+   * failure the panel's honesty rules exist to prevent.
+   */
+  /* Start and end, deduplicated. A day that leaves home and returns home is one
+     place, and stacking two identical markers on it just makes a heavier dot. */
+  const endMarkers = useMemo(() => {
+    if (!showRouteChain || routeStops.length === 0) return [];
+    const ends = [
+      { p: routeStart, role: "Start" },
+      { p: routeEnd, role: "End" },
+    ].filter((e): e is { p: { lat: number; lng: number; label?: string }; role: string } => e.p !== null);
+
+    // Group by rounded position, then name each group by the roles that landed
+    // on it: one place that is both ends reads "Start and end", not two marks.
+    const byPlace = new Map<string, { lat: number; lng: number; roles: string[]; label: string }>();
+    for (const { p, role } of ends) {
+      const k = `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`;
+      const found = byPlace.get(k);
+      byPlace.set(k, {
+        lat: p.lat,
+        lng: p.lng,
+        roles: [...(found?.roles ?? []), role],
+        label: found?.label ?? p.label ?? "Home",
+      });
+    }
+
+    return [...byPlace.entries()].map(([k, v]) => ({
+      key: `end:${k}`,
+      lat: v.lat,
+      lng: v.lng,
+      title: `${v.roles.length > 1 ? "Start and end" : v.roles[0]} · ${v.label}`,
+    }));
+  }, [showRouteChain, routeStops.length, routeStart, routeEnd]);
+
+  const longLegs = useMemo(() => {
+    if (!routeLegs || chainPoints.length < 2) return [];
+    if (routeLegs.length !== chainPoints.length - 1) return [];
+    const out: Array<{ key: string; path: google.maps.LatLngLiteral[]; mid: google.maps.LatLngLiteral; minutes: number }> = [];
+    for (let i = 0; i < routeLegs.length; i++) {
+      const leg = routeLegs[i];
+      if (leg.minutes < LONG_LEG_MINUTES) continue;
+      const a = chainPoints[i];
+      const b = chainPoints[i + 1];
+      out.push({
+        key: `${i}:${a.lat},${a.lng}->${b.lat},${b.lng}`,
+        path: [
+          { lat: a.lat, lng: a.lng },
+          { lat: b.lat, lng: b.lng },
+        ],
+        mid: { lat: (a.lat + b.lat) / 2, lng: (a.lng + b.lng) / 2 },
+        minutes: Math.round(leg.minutes),
+      });
+    }
+    return out;
+  }, [routeLegs, chainPoints]);
 
   function toggleLeadStatus(v: string) {
     setSelected(null);
@@ -203,10 +314,43 @@ export function AccountsMap({
 
      clickable is off. A polygon covering half the state would otherwise swallow every
      click meant for a marker sitting on top of it. */
-  const shownAreas = useMemo(
-    () => areas.filter((a) => a.boundary && (activeAreas.size === 0 || activeAreas.has(a.id))),
-    [areas, activeAreas],
-  );
+  /**
+   * THE FRONTIER POLYGONS, FETCHED ON DEMAND (2026-08-26).
+   *
+   * listAreas() stopped selecting `boundary`: unsimplified MultiPolygons for
+   * 14 areas were the heaviest thing in this screen's payload, re-serialized on
+   * every load of a force-dynamic page, to draw an outline Juan said is not
+   * important and changes as the territory moves. They now load the first time
+   * he actually picks an area, once per page view, and the chips work with or
+   * without them.
+   *
+   * A failure here draws no frontier and nothing else: the chips still filter
+   * pins, which is what the chips are for.
+   */
+  const [boundaries, setBoundaries] = useState<Map<string, TerritoryArea["boundary"]> | null>(null);
+  const boundaryAsked = useRef(false);
+
+  useEffect(() => {
+    if (activeAreas.size === 0 || boundaryAsked.current) return;
+    boundaryAsked.current = true;
+    let live = true;
+    listAreaBoundaries()
+      .then((rows) => {
+        if (live) setBoundaries(new Map(rows.map((r) => [r.id, r.boundary])));
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [activeAreas.size]);
+
+  const shownAreas = useMemo(() => {
+    if (activeAreas.size === 0 || !boundaries) return [];
+    return areas
+      .filter((a) => activeAreas.has(a.id))
+      .map((a) => ({ ...a, boundary: a.boundary ?? boundaries.get(a.id) ?? null }))
+      .filter((a) => a.boundary);
+  }, [areas, activeAreas, boundaries]);
 
   /* What every badge below counts FROM. Chains and practices are excluded
      here whenever their toggle is off (the resting state), same predicate as
@@ -376,6 +520,44 @@ export function AccountsMap({
     userCentredRef.current = true;
   }, [userLoc, mapReady, fitKey]);
 
+  /**
+   * REFIT WHEN THE PANE CHANGES SHAPE (2026-08-26, with the two-pane layout).
+   *
+   * fitBounds solves for the container's aspect ratio at the moment it runs.
+   * Going from a full-width map to a half-width one, or back, changes that
+   * ratio without changing `filtered`, so the guard above holds and the camera
+   * keeps a framing computed for a box that no longer exists: pins fall off
+   * the sides at the very moment the map became a dashboard pane.
+   *
+   * Only re-frames if the user has not taken the camera somewhere themselves,
+   * which the existing guards already track. A resize is a layout event, not
+   * an instruction to abandon where he panned to.
+   */
+  const containerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    let last = el.clientWidth;
+    let t: ReturnType<typeof setTimeout> | null = null;
+    const ro = new ResizeObserver(() => {
+      const w = el.clientWidth;
+      // Ignore the sub-pixel churn a scrollbar or a font swap causes.
+      if (Math.abs(w - last) < 40) return;
+      last = w;
+      if (userCentredRef.current) return;
+      if (t) clearTimeout(t);
+      t = setTimeout(() => {
+        fittedRef.current = "";
+        fitToPins();
+      }, 120);
+    });
+    ro.observe(el);
+    return () => {
+      if (t) clearTimeout(t);
+      ro.disconnect();
+    };
+  }, [fitToPins]);
+
   /* SHOW IN MAP, driven by the ten-closest list. A fresh `focus` object arrives
      on every click (even a repeat click on the same account), so this effect
      always re-fires. Fits the camera to the two points that matter, Juan and
@@ -447,7 +629,7 @@ export function AccountsMap({
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div ref={containerRef} className="flex h-full flex-col">
       {/* THE FILTERS COLLAPSE ON A PHONE, and this is a bug fix rather than a
           preference. These three chip rows are 14 areas + 7 grades + up to 6
           lead statuses, and on a phone they wrap to roughly a full viewport:
@@ -771,6 +953,44 @@ export function AccountsMap({
               rows measure. No routing engine here, so this is deliberately
               the honest straight-line hop, not a driving path -- see
               drive-actions.ts for the real one. */}
+          {/* THE LONG HAULS, under the chain and much wider (Juan, 2026-08-26).
+              Grey rather than the chain's near-black: this band is a weight, not
+              a second path, and it must read as "this segment is expensive"
+              at a glance without competing with the route itself. Drawn first
+              so the chain and its arrows sit on top of it. */}
+          {longLegs.map((l) => (
+            <PolylineF
+              key={`band:${l.key}`}
+              path={l.path}
+              options={{
+                strokeColor: "#9AA3A0",
+                strokeOpacity: 0.55,
+                strokeWeight: 11,
+                zIndex: 3,
+                clickable: false,
+              }}
+            />
+          ))}
+
+          {/* One likely number per long leg, at its midpoint. Label-only
+              markers: no icon, so nothing new appears on the map, just the
+              minutes. Priced at the hour the leg is driven, see traffic.ts. */}
+          {longLegs.map((l) => (
+            <MarkerF
+              key={`label:${l.key}`}
+              position={l.mid}
+              clickable={false}
+              zIndex={6}
+              icon={{ path: google.maps.SymbolPath.CIRCLE, scale: 0, fillOpacity: 0, strokeOpacity: 0 }}
+              label={{
+                text: `${l.minutes} min`,
+                color: "#3D4A44",
+                fontSize: "12px",
+                fontWeight: "600",
+              }}
+            />
+          ))}
+
           {chainPath.length > 1 && (
             <PolylineF
               path={chainPath}
@@ -796,6 +1016,39 @@ export function AccountsMap({
               }}
             />
           )}
+
+          {/* THE TWO ENDS OF THE DAY (Juan, 2026-08-26: "two red home in circle
+              icons on the map, one for start one for end").
+
+              Every other marker on this map is a place he might sell something.
+              These two are the only ones that are not: they are where the day
+              opens and where it closes, and until now they were invisible
+              unless the start happened to be the waypoint account, which drew
+              as an ordinary grey circle indistinguishable from a store.
+
+              Red and circular, above every pin and both route lines, because
+              the question they answer ("does this day actually get me back") is
+              read at a glance across the whole map, not by clicking. Start and
+              end are the same mark on purpose: which is which is legible from
+              where the chain's arrows point, and two different glyphs for one
+              concept is a legend to memorize. When both ends are the same
+              address, only one renders, because there is only one place. */}
+          {showRouteChain &&
+            routeStops.length > 0 &&
+            endMarkers.map((m) => (
+              <MarkerF
+                key={m.key}
+                position={{ lat: m.lat, lng: m.lng }}
+                title={m.title}
+                clickable={false}
+                zIndex={9}
+                icon={{
+                  url: HOME_PIN_SVG,
+                  scaledSize: new google.maps.Size(30, 30),
+                  anchor: new google.maps.Point(15, 15),
+                }}
+              />
+            ))}
 
           {/* ROUTE STOPS THAT ARE NOT ACCOUNTS: lunch, the hotel, a warehouse.
               Drawn as a square, never a circle, because every circle on this

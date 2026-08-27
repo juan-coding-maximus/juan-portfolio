@@ -1328,7 +1328,10 @@ export type TerritoryArea = {
   needs_review: boolean;
   brief: string | null;
   account_count: number;
-  boundary: { type: "MultiPolygon"; coordinates: number[][][][] } | null;
+  /** Optional because listAreas() no longer selects it: the frontier polygons
+   *  are fetched on demand by listAreaBoundaries() only when one is about to be
+   *  drawn. Undefined means "not loaded", null means "this area has none". */
+  boundary?: { type: "MultiPolygon"; coordinates: number[][][][] } | null;
 };
 
 /**
@@ -1347,11 +1350,31 @@ export type TerritoryArea = {
  * are no gaps. Two hand-maintained copies of one fact would drift, and the first
  * symptom is a rep driving to a store the map says is in a day he is not working.
  */
+/**
+ * WITHOUT THE BOUNDARIES (2026-08-26, Juan: the area chips "aren't all that
+ * important and they will change as it goes, so if it is a lot to load there's
+ * no need to default load them").
+ *
+ * `select=*` pulled every area's `boundary`, an unsimplified GeoJSON
+ * MultiPolygon. assign_areas.py keeps them unsimplified on purpose (per-area
+ * simplification opens slivers between neighbours), so that column is by far
+ * the heaviest thing on the map's payload, it is serialized into the RSC
+ * stream on every load, and the map is force-dynamic so nothing caches it.
+ *
+ * Everything the chips need (label, colour, count, review flag) is in the
+ * columns below and costs almost nothing. The polygons load only if Juan
+ * actually turns a frontier on, via listAreaBoundaries.
+ */
 export async function listAreas(): Promise<TerritoryArea[]> {
-  const rows = await raw<TerritoryArea>(
-    "nb_territory_areas?select=*&order=display_order.asc",
+  return raw<TerritoryArea>(
+    "nb_territory_areas?select=id,label,color,display_order,named_by_human,needs_review,brief,account_count" +
+      "&order=display_order.asc",
   );
-  return rows;
+}
+
+/** The frontier polygons, fetched only when one is about to be drawn. */
+export async function listAreaBoundaries(): Promise<Array<Pick<TerritoryArea, "id" | "boundary">>> {
+  return raw<Pick<TerritoryArea, "id" | "boundary">>("nb_territory_areas?select=id,boundary");
 }
 
 /**

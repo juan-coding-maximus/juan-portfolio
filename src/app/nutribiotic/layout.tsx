@@ -178,7 +178,14 @@ export default async function NutribioticLayout({
           </div>
         )}
 
-        <div className="mx-auto flex min-h-screen max-w-[1400px] gap-0">
+        {/* 1700, up from 1400 (2026-08-26): the map screen is a two-pane
+            dashboard now, map beside route, and at 1400 minus the 210px
+            sidebar each pane got ~550px, which is narrower than a phone in
+            landscape. Every other screen caps its own content well below this
+            (Visit at 600, the tables at their natural width), so widening the
+            shell costs them nothing and gives the one screen that needs the
+            pixels a MacBook's worth of them. */}
+        <div className="mx-auto flex min-h-screen max-w-[1700px] gap-0">
           <aside className="hidden w-[210px] shrink-0 border-r border-[#E2DFD5] px-5 py-7 md:block">
             <div className="mb-8">
               <div className="font-[family-name:var(--font-fraunces)] text-[19px] leading-none font-semibold tracking-tight">

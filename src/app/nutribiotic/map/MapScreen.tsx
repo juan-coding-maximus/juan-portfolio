@@ -29,7 +29,7 @@ import {
 } from "../lib/prefs-actions";
 import { useRoute } from "../lib/route-context";
 import { AccountsMap } from "./AccountsMap";
-import { routeDriveMatrix } from "./drive-actions";
+import { routeDriveMatrix, type DriveLeg } from "./drive-actions";
 import { NearestClients } from "./NearestClients";
 import { cheapestGap, haversineMatrix, optimizedStopOrder, type Matrix } from "./route-optimize";
 import { RoutePanel } from "./RoutePanel";
@@ -249,6 +249,12 @@ export function MapScreen({
      worse answer, not a stalled button. */
   const [routeBusy, setRouteBusy] = useState(false);
 
+  /* The legs RoutePanel is displaying, published upward so AccountsMap can
+     draw the SAME day the list describes. One computation, two readers: the
+     alternative is a second OSRM call and a second traffic pass whose answer
+     is free to disagree with the one on screen beside it. */
+  const [routeLegs, setRouteLegs] = useState<DriveLeg[] | null>(null);
+
   async function costMatrix(points: { lat: number; lng: number }[]): Promise<Matrix> {
     const live = await routeDriveMatrix(points).catch(() => null);
     return live ?? haversineMatrix(points);
@@ -327,7 +333,15 @@ export function MapScreen({
   function showInMap(id: string) {
     focusN.current += 1;
     setFocus({ id, n: focusN.current });
-    mapBoxRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Only worth scrolling when the map is somewhere else on the page. In the
+    // two-pane layout it is already beside the list that was just tapped, and
+    // yanking the page to the top would move the row out from under the
+    // cursor for no gain.
+    const box = mapBoxRef.current;
+    if (!box) return;
+    const r = box.getBoundingClientRect();
+    const alreadyVisible = r.top >= 0 && r.bottom <= window.innerHeight;
+    if (!alreadyVisible) box.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   // Ask for the fix. Callable again from the list's retry button, because the
@@ -394,7 +408,25 @@ export function MapScreen({
   }, [requestLoc]);
 
   return (
-    <>
+    /**
+     * TWO PANES ON A MAC, ONE COLUMN ON A PHONE (Juan, 2026-08-26).
+     *
+     * The map and the route are read against each other constantly: a pin is
+     * only interesting because of where it falls in the day, and a stop's
+     * position is only judgeable against the map. Stacked, one of them was
+     * always off screen while he reasoned about the other, and the answer was
+     * a scroll every few seconds. Side by side they carry the same weight,
+     * which is what they actually have.
+     *
+     * The split is xl-and-up on purpose: it needs both panes to clear a phone's
+     * landscape width before it beats stacking. Below that this is exactly the
+     * screen it was, because on a phone a half-width map is not a map.
+     *
+     * The left pane is sticky and viewport-tall; the right scrolls on its own.
+     * The ten-closest joins the right column rather than sitting under the
+     * grid: left is where things are, right is every list.
+     */
+    <div className="xl:grid xl:grid-cols-2 xl:items-start xl:gap-5">
       {/* THE FILTER ROWS LIVE INSIDE THIS BOX, so its height is not the map's
           height: the area and tier rows take ~128px off the top. At a 420px
           floor that left the map 292px tall, and fitBounds correctly solved for
@@ -404,7 +436,7 @@ export function MapScreen({
           smaller floor there paired with the ten-closest list right below. */}
       <div
         ref={mapBoxRef}
-        className="h-[calc(100vh-240px)] min-h-[520px] overflow-hidden rounded-lg border border-[#E2DFD5] md:min-h-[640px]"
+        className="h-[calc(100vh-240px)] min-h-[520px] overflow-hidden rounded-lg border border-[#E2DFD5] md:min-h-[640px] xl:sticky xl:top-7 xl:h-[calc(100vh-56px)]"
       >
         <AccountsMap
           accounts={accounts}
@@ -421,12 +453,14 @@ export function MapScreen({
           routeStops={routeStops}
           routeStart={routeStart}
           routeEnd={routeEnd}
+          routeLegs={routeLegs}
         />
       </div>
 
-      {/* Route sits between the map and the ten-closest, where Juan asked for
-          it: the map is where stops come from and the ten-closest is where the
-          next one comes from, so the thing being assembled belongs between. */}
+      {/* Stacked below the map on a phone, beside it on a Mac. The wrapper is
+          the right column; it carries its own flow so RoutePanel keeps
+          returning a fragment and nothing inside it had to change. */}
+      <div className="mt-8 flex flex-col gap-8 xl:mt-0">
       <RoutePanel
         stops={routeStops}
         home={home}
@@ -456,6 +490,7 @@ export function MapScreen({
         onMoveStopDay={moveStopToDay}
         onOptimize={handleOptimizeRoute}
         busy={routeBusy}
+        onLegsChange={setRouteLegs}
       />
 
       <NearestClients
@@ -467,6 +502,7 @@ export function MapScreen({
         showChains={showChains}
         showPractices={showPractices}
       />
-    </>
+      </div>
+    </div>
   );
 }

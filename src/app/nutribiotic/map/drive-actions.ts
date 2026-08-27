@@ -39,7 +39,17 @@ const TRAFFIC_FACTOR = 1.35;
    A field day is six to ten stops; twenty-five is a ceiling, not a target. */
 const MAX_STOPS = 25;
 
-export type DriveLeg = { minutes: number; miles: number };
+export type DriveLeg = {
+  /** Free-flow minutes scaled by the flat factor. Kept so a caller with no
+   *  schedule in hand still gets a usable number. */
+  minutes: number;
+  /** OSRM's raw free-flow minutes, unscaled. This is the road fact. A caller
+   *  that knows WHEN the leg departs prices it with traffic.ts instead, which
+   *  is the whole reason this is exposed separately: the server knows the
+   *  road, the client knows the clock. */
+  freeFlowMinutes: number;
+  miles: number;
+};
 
 export async function routeDriveLegs(
   points: { lat: number; lng: number }[],
@@ -77,6 +87,7 @@ export async function routeDriveLegs(
     if (typeof l.duration !== "number" || typeof l.distance !== "number") return null;
     out.push({
       minutes: (l.duration * TRAFFIC_FACTOR) / 60,
+      freeFlowMinutes: l.duration / 60,
       miles: l.distance / 1609.344,
     });
   }
