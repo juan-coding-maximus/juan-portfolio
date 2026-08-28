@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ReportDraft, ReportHqNote, RouteEndpoint } from "./dal";
-import { actionDecideReport, actionRequestRebuild, actionSaveReportEdits } from "./report-actions";
+import { actionDecideReport, actionRenderPreview, actionRequestRebuild, actionSaveReportEdits } from "./report-actions";
 import { RouteEndpointField } from "../map/RouteEndpointField";
 import { Ico, SuccessNote } from "./ui";
 
@@ -40,10 +40,19 @@ type StopEdit = { hidden: boolean; call_only: boolean; message_only: boolean };
 export function ReportReview({
   draft,
   previewUrl,
+  archivedUrl,
   home,
 }: {
   draft: ReportDraft;
   previewUrl: string | null;
+  /** The actual daily-{date}.pdf from the Reports archive, when one exists
+   *  (2026-08-28, "I need to be able to see what was sent... refer to from
+   *  the archives, you do have this information already"). This is the real
+   *  artifact for a sent day -- draft-{date}.pdf (previewUrl) is only the
+   *  pre-send preview and often doesn't exist any more once a day is sent
+   *  (see 2026-08-27's correction, which cleared it). Once sent, archivedUrl
+   *  is what's shown; previewUrl only matters while still pending. */
+  archivedUrl: string | null;
   /** Juan's apartment, for the start/end pickers' "Home" quick-pick. Null if
       the waypoint account is missing -- the pickers still work, just without
       that shortcut, same as RouteEndpointField on the Map screen. */
@@ -52,6 +61,7 @@ export function ReportReview({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState<string | null>(null);
+  const shownUrl = draft.status === "sent" && archivedUrl ? archivedUrl : previewUrl;
 
   const payload = draft.payload;
   const stops = payload?.stops ?? [];
@@ -172,49 +182,80 @@ export function ReportReview({
       )}
 
       {!payload ? (
-        <div className="text-[13.5px] text-[#5B6560]">
-          <p className="mb-3">Nothing built for {draft.report_date} yet.</p>
-          <button
-            onClick={() => startTransition(async () => {
-              await actionRequestRebuild(draft.report_date);
-              router.refresh();
-            })}
-            disabled={pending}
-            className="rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
-          >
-            {pending ? "Asking…" : "Build this day's report"}
-          </button>
-        </div>
-      ) : (
-        <>
-          <div className="mb-5 flex flex-wrap items-center gap-2">
-            {previewUrl ? (
-              <a
-                href={previewUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90"
-              >
-                <Ico name="external" size={13} />
-                Open the draft PDF
-              </a>
-            ) : (
-              <span className="text-[12.5px] text-[#8A928C]">Preview not rendered yet.</span>
-            )}
+        archivedUrl ? (
+          <div>
+            <p className="mb-3 text-[13.5px] text-[#5B6560]">
+              No draft on file for {draft.report_date}, but a report was sent that day.
+            </p>
+            <a
+              href={archivedUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mb-5 inline-flex items-center gap-1.5 rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90"
+            >
+              <Ico name="external" size={13} />
+              Open the sent PDF
+            </a>
+            <div className="overflow-hidden rounded-lg border border-[#E2DFD5]">
+              <iframe src={archivedUrl} title={`Sent report, ${draft.report_date}`} className="h-[70vh] w-full" />
+            </div>
+          </div>
+        ) : (
+          <div className="text-[13.5px] text-[#5B6560]">
+            <p className="mb-3">Nothing built or sent for {draft.report_date} yet.</p>
             <button
               onClick={() => startTransition(async () => {
                 await actionRequestRebuild(draft.report_date);
                 router.refresh();
               })}
-              disabled={locked}
-              title="Re-query HubSpot and rebuild from scratch. Discards the edits below."
-              className="rounded-md border border-[#E2DFD5] px-3 py-2 text-[12.5px] text-[#5B6560] transition-colors hover:bg-[#FAF9F5] disabled:opacity-40"
+              disabled={pending}
+              className="rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
             >
-              Rebuild from today&rsquo;s data
+              {pending ? "Asking…" : "Build this day's report"}
             </button>
+          </div>
+        )
+      ) : (
+        <>
+          <div className="mb-5 flex flex-wrap items-center gap-2">
+            {shownUrl ? (
+              <a
+                href={shownUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90"
+              >
+                <Ico name="external" size={13} />
+                {shownUrl === archivedUrl ? "Open the sent PDF" : "Open the draft PDF"}
+              </a>
+            ) : (
+              <button
+                onClick={() => startTransition(async () => {
+                  await actionRenderPreview(draft.report_date, "daily");
+                  router.refresh();
+                })}
+                disabled={pending}
+                className="inline-flex items-center gap-1.5 rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
+              >
+                {pending ? "Rendering…" : "Render preview"}
+              </button>
+            )}
+            {!sent && (
+              <button
+                onClick={() => startTransition(async () => {
+                  await actionRequestRebuild(draft.report_date);
+                  router.refresh();
+                })}
+                disabled={locked}
+                title="Re-query HubSpot and rebuild from scratch. Discards the edits below."
+                className="rounded-md border border-[#E2DFD5] px-3 py-2 text-[12.5px] text-[#5B6560] transition-colors hover:bg-[#FAF9F5] disabled:opacity-40"
+              >
+                Rebuild from today&rsquo;s data
+              </button>
+            )}
             {draft.dirty && (
               <span className="text-[12px] text-[#8A6D2F]">
-                The PDF is behind your edits. It re-renders within a few minutes.
+                The PDF is behind{sent ? "" : " your edits"}. It re-renders within a few minutes.
               </span>
             )}
           </div>
@@ -224,12 +265,13 @@ export function ReportReview({
               plus a link that leaves the page. This is the same artifact the
               "Open" link above points to (render_pdf(render_html(payload)) on
               the Mac) -- one rendering, shown two ways, never a second one
-              that could disagree with what actually mails. */}
-          {previewUrl && !draft.dirty && (
+              that could disagree with what actually mails. Once sent, this is
+              archivedUrl (the real daily-{date}.pdf), not the pre-send draft. */}
+          {shownUrl && !draft.dirty && (
             <div className="mb-5 overflow-hidden rounded-lg border border-[#E2DFD5]">
               <iframe
-                src={previewUrl}
-                title={`Draft report, ${draft.report_date}`}
+                src={shownUrl}
+                title={`Report, ${draft.report_date}`}
                 className="h-[70vh] w-full"
               />
             </div>
@@ -549,13 +591,24 @@ type WeeklyTotals = {
  * closes the actual gap, which was that the weekly rollup mailed itself to
  * the employer every Friday with nobody having looked at it first.
  */
-export function WeeklyReportReview({ draft, previewUrl }: { draft: ReportDraft; previewUrl: string | null }) {
+export function WeeklyReportReview({
+  draft,
+  previewUrl,
+  archivedUrl,
+}: {
+  draft: ReportDraft;
+  previewUrl: string | null;
+  /** The real weekly-{start}_to_{end}.pdf, once sent -- same reasoning as
+   *  ReportReview's archivedUrl. */
+  archivedUrl: string | null;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState<string | null>(null);
 
   const payload = draft.payload;
   if (!payload) return null;
+  const shownUrl = draft.status === "sent" && archivedUrl ? archivedUrl : previewUrl;
 
   const sent = draft.status === "sent";
   const locked = sent || pending;
@@ -616,24 +669,33 @@ export function WeeklyReportReview({ draft, previewUrl }: { draft: ReportDraft; 
       </div>
 
       <div className="mb-5 flex flex-wrap items-center gap-2">
-        {previewUrl ? (
+        {shownUrl ? (
           <a
-            href={previewUrl}
+            href={shownUrl}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1.5 rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90"
           >
             <Ico name="external" size={13} />
-            Open the draft PDF
+            {shownUrl === archivedUrl ? "Open the sent PDF" : "Open the draft PDF"}
           </a>
         ) : (
-          <span className="text-[12.5px] text-[#8A928C]">Preview not rendered yet.</span>
+          <button
+            onClick={() => startTransition(async () => {
+              await actionRenderPreview(draft.report_date, "weekly");
+              router.refresh();
+            })}
+            disabled={pending}
+            className="inline-flex items-center gap-1.5 rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
+          >
+            {pending ? "Rendering…" : "Render preview"}
+          </button>
         )}
       </div>
 
-      {previewUrl && !draft.dirty && (
+      {shownUrl && !draft.dirty && (
         <div className="mb-5 overflow-hidden rounded-lg border border-[#E2DFD5]">
-          <iframe src={previewUrl} title={`Weekly draft, ${rangeLabel}`} className="h-[70vh] w-full" />
+          <iframe src={shownUrl} title={`Weekly report, ${rangeLabel}`} className="h-[70vh] w-full" />
         </div>
       )}
 

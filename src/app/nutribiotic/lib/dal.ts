@@ -3077,6 +3077,24 @@ export async function requestReportRebuild(dateISO: string): Promise<void> {
   );
 }
 
+/** Render (or re-render) the preview PDF from whatever payload is already
+ *  stored -- no HubSpot pull, no status change (2026-08-28). requestReportRebuild
+ *  forces status back to "pending", which is wrong for a sent day: it isn't up
+ *  for re-review, Juan just wants to SEE it. Setting `dirty` is all
+ *  field_report.py's --serve poller needs to pick this row up and render it,
+ *  regardless of status -- see serve_drafts()'s dirty query, which was never
+ *  status-filtered. Row must already exist (a sent/held/pending row does);
+ *  a PATCH on a date with no row at all is a no-op. */
+export async function requestPreviewRender(dateISO: string, kind: "daily" | "weekly" = "daily"): Promise<void> {
+  await mutate(
+    "nb_report_drafts",
+    "PATCH",
+    { dirty: true, updated_at: new Date().toISOString() },
+    { report_date: `eq.${dateISO}`, kind: `eq.${kind}` },
+    "return=minimal",
+  );
+}
+
 /** Save his edits. `dirty` is what tells the Mac the preview PDF is now behind
  *  the payload, so the screen can say so instead of showing a stale map.
  *  `edited: true` is the other effect (migration 0049): this is the one path

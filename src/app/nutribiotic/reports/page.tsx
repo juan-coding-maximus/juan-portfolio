@@ -59,14 +59,23 @@ export default async function ReportsIndex({
   // in -- null on a Fri/Sat/Sun pick, since no such week contains it.
   const weekWindow = weekWindowFor(selectedDate);
 
-  const [reports, archive, draft, home, allTime, weeklyDraft] = await Promise.all([
-    listPlaybookReports(),
-    listPlaybookReportArchive(),
-    getReportDraft(selectedDate, "daily").catch(() => null),
-    getHomeEndpoint().catch(() => null),
-    getAllTimeMetrics(),
-    weekWindow ? getReportDraft(weekWindow.end, "weekly").catch(() => null) : Promise.resolve(null),
-  ]);
+  const [reports, archive, draft, home, allTime, weeklyDraft, archivedDailyUrl, archivedWeeklyUrl] =
+    await Promise.all([
+      listPlaybookReports(),
+      listPlaybookReportArchive(),
+      getReportDraft(selectedDate, "daily").catch(() => null),
+      getHomeEndpoint().catch(() => null),
+      getAllTimeMetrics(),
+      weekWindow ? getReportDraft(weekWindow.end, "weekly").catch(() => null) : Promise.resolve(null),
+      // The real, already-sent artifact for this day/week (2026-08-28, Juan:
+      // "I need to be able to see what was sent, which you should refer to
+      // from the archives, you do have this information already"). Exact
+      // filenames field_report.py/weekly_report.py publish on send --
+      // signReportPreview signs-if-exists, null otherwise, no separate
+      // listing call needed.
+      signReportPreview(`daily-${selectedDate}.pdf`).catch(() => null),
+      weekWindow ? signReportPreview(`weekly-${weekWindow.start}_to_${weekWindow.end}.pdf`).catch(() => null) : Promise.resolve(null),
+    ]);
   const previewUrl = draft?.preview_path && !draft.dirty ? await signReportPreview(draft.preview_path) : null;
   const weeklyPreviewUrl =
     weeklyDraft?.preview_path && !weeklyDraft.dirty ? await signReportPreview(weeklyDraft.preview_path) : null;
@@ -112,10 +121,24 @@ export default async function ReportsIndex({
           to today, not only today. */}
       <DateNav date={selectedDate} today={today} />
 
+      {/* key={selectedDate}: without it, switching dates reuses the same
+          ReportReview instance and every useState in it (stop order, hq
+          notes, route overrides, miles) stays frozen at whatever the
+          PREVIOUS date's payload produced -- caught 2026-08-28 by Juan
+          picking Aug 27 and seeing "Stops - 17 of 17" (a fresh prop) next to
+          "No stops on this day" (stale state). The key forces a clean
+          remount per date, same fix as keying a list item by its id. */}
       {draft ? (
-        <ReportReview draft={draft} previewUrl={previewUrl} home={home} />
+        <ReportReview
+          key={selectedDate}
+          draft={draft}
+          previewUrl={previewUrl}
+          archivedUrl={archivedDailyUrl}
+          home={home}
+        />
       ) : (
         <ReportReview
+          key={selectedDate}
           draft={{
             report_date: selectedDate,
             kind: "daily",
@@ -130,6 +153,7 @@ export default async function ReportsIndex({
             updated_at: new Date().toISOString(),
           }}
           previewUrl={null}
+          archivedUrl={archivedDailyUrl}
           home={home}
         />
       )}
@@ -146,10 +170,41 @@ export default async function ReportsIndex({
           ever staged one for this window -- no build button, staging one is
           what a daily rebuild in-window (or the Friday cron) is for. */}
       {weeklyDraft && weeklyDraft.payload ? (
-        <WeeklyReportReview draft={weeklyDraft} previewUrl={weeklyPreviewUrl} />
+        <WeeklyReportReview
+          key={weekWindow?.end}
+          draft={weeklyDraft}
+          previewUrl={weeklyPreviewUrl}
+          archivedUrl={archivedWeeklyUrl}
+        />
+      ) : archivedWeeklyUrl && weekWindow ? (
+        // No draft row at all (a week from before the review gate existed),
+        // but the real sent PDF is still in the archive -- same "refer to
+        // the archives" fix as the daily side above.
+        <section className="mb-8 rounded-xl border border-[#E2DFD5] bg-white p-5">
+          <h2 className="mb-3 font-[family-name:var(--font-fraunces)] text-[19px] font-semibold tracking-tight">
+            Week of {weekWindow.start} – {weekWindow.end}
+          </h2>
+          <p className="mb-3 text-[13.5px] text-[#5B6560]">No draft on file, but a report was sent that week.</p>
+          <a
+            href={archivedWeeklyUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mb-5 inline-flex items-center gap-1.5 rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90"
+          >
+            <Ico name="external" size={13} />
+            Open the sent PDF
+          </a>
+          <div className="overflow-hidden rounded-lg border border-[#E2DFD5]">
+            <iframe
+              src={archivedWeeklyUrl}
+              title={`Sent weekly report, ${weekWindow.start} to ${weekWindow.end}`}
+              className="h-[70vh] w-full"
+            />
+          </div>
+        </section>
       ) : weekWindow ? (
         <p className="mb-8 text-[12.5px] text-[#8A928C]">
-          No weekly report staged yet for {weekWindow.start} – {weekWindow.end}. It appears here once a
+          No weekly report staged or sent for {weekWindow.start} – {weekWindow.end}. It appears here once a
           day in that week is rebuilt, or at the Friday 10:00 cron.
         </p>
       ) : null}

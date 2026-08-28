@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import {
   getReportDraft,
+  requestPreviewRender,
   requestReportRebuild,
   saveReportDraftPayload,
   setReportDraftStatus,
@@ -41,6 +42,13 @@ const PATH = "/nutribiotic/reports";
 
 export async function actionRequestRebuild(dateISO: string): Promise<void> {
   await requestReportRebuild(dateISO);
+  revalidatePath(PATH);
+}
+
+/** Render-only, no HubSpot pull, no status change -- for a sent (or any)
+ *  day that has no preview PDF on hand yet. See requestPreviewRender. */
+export async function actionRenderPreview(dateISO: string, kind: "daily" | "weekly" = "daily"): Promise<void> {
+  await requestPreviewRender(dateISO, kind);
   revalidatePath(PATH);
 }
 
