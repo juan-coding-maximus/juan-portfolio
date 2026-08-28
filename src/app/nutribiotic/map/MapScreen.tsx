@@ -31,12 +31,10 @@ import {
 import { useRoute } from "../lib/route-context";
 import { AccountsMap } from "./AccountsMap";
 import { routeDriveMatrix, type DriveLeg } from "./drive-actions";
-import { NearestClients } from "./NearestClients";
 import { cheapestGap, haversineMatrix, optimizedStopOrder, type Matrix } from "./route-optimize";
 import { RoutePanel } from "./RoutePanel";
 
 export type UserLoc = { lat: number; lng: number };
-export type LocStatus = "pending" | "ok" | "denied" | "timeout" | "unavailable";
 export type FocusRequest = { id: string; n: number };
 
 /**
@@ -65,7 +63,6 @@ export function MapScreen({
   endpointsByDay: { start: RouteEndpointsByDay; end: RouteEndpointsByDay };
 }) {
   const [loc, setLoc] = useState<UserLoc | null>(null);
-  const [locStatus, setLocStatus] = useState<LocStatus>("pending");
   const [focus, setFocus] = useState<FocusRequest | null>(null);
   const focusN = useRef(0);
   const mapBoxRef = useRef<HTMLDivElement>(null);
@@ -366,22 +363,17 @@ export function MapScreen({
   //    answer, which is the other half of why this timed out. A city-block fix
   //    is all a "who is near me" ranking can honestly use anyway.
   const requestLoc = useCallback(() => {
-    if (!("geolocation" in navigator)) {
-      setLocStatus("unavailable");
-      return;
-    }
-    setLocStatus("pending");
+    if (!("geolocation" in navigator)) return;
 
     const ask = (answerPending: boolean) =>
       navigator.geolocation.getCurrentPosition(
         (p) => {
           setLoc({ lat: p.coords.latitude, lng: p.coords.longitude });
-          setLocStatus("ok");
         },
-        (e) => {
-          if (e.code === e.PERMISSION_DENIED) setLocStatus("denied");
-          else if (e.code === e.TIMEOUT) setLocStatus("timeout");
-          else setLocStatus("unavailable");
+        () => {
+          // A denied/timed-out fix degrades honestly: the map falls back to
+          // fitting the territory instead of centring on a location it doesn't
+          // have. Nothing else on this screen depends on knowing why.
         },
         {
           enableHighAccuracy: false,
@@ -514,16 +506,6 @@ export function MapScreen({
         onOptimize={handleOptimizeRoute}
         busy={routeBusy}
         onLegsChange={setRouteLegs}
-      />
-
-      <NearestClients
-        accounts={accounts}
-        userLoc={loc}
-        status={locStatus}
-        onRetryLoc={requestLoc}
-        onShowInMap={showInMap}
-        showChains={showChains}
-        showPractices={showPractices}
       />
       </div>
     </div>

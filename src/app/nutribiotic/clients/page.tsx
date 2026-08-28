@@ -31,6 +31,7 @@ import {
 import { AccountLink } from "../lib/modal";
 import { Card, Confidence, Empty, Ico, PageHead, TierChip } from "../lib/ui";
 import { UnmatchedTouchpoints } from "../lib/unmatched-ui";
+import { VisitQueues } from "../lib/visit-queues-ui";
 
 export const dynamic = "force-dynamic";
 
@@ -115,6 +116,13 @@ export default async function Clients({
           2026-08-27: matching a note to a store is desk work, not doorway
           work. See lib/unmatched-ui.tsx. */}
       <UnmatchedTouchpoints />
+
+      {/* The ready-to-file HubSpot queue and the calendar follow-ups to confirm,
+          moved here off Visit on 2026-08-28 for the same reason as the block
+          above: reviewing a correction note or approving a proposed follow-up
+          is desk work, not something Juan should be scrolling past standing in
+          a doorway. Visit stays the capture box and nothing else. */}
+      <VisitQueues />
 
       {/* The territory, divided into the areas Juan actually drives. Each carries its
           own colour, and the same colour fills its frontier on the map, so the chip and

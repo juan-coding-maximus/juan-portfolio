@@ -163,6 +163,20 @@ export function AccountMatchResolver({
   }
 
   if (created?.ok) {
+    // Everything a brand-new company left this flow carrying, stated plainly:
+    // this create path is the one documented exception that sets lead status
+    // and owner at birth (see hubspot-company.ts), and pendingGrade is Juan's
+    // own OS-side potential read from the capture card, applied the moment
+    // the account existed to receive it (see applyPendingGrade above).
+    const facts = [
+      "lead status set to New to open",
+      "owner set to you",
+      pendingGrade && `potential set to ${pendingGrade}`,
+      created.peopleAdded > 0 &&
+        `${created.peopleAdded} contact${created.peopleAdded === 1 ? "" : "s"} added`,
+      created.peopleUpdated > 0 && `${created.peopleUpdated} contact${created.peopleUpdated === 1 ? "" : "s"} updated`,
+    ].filter((f): f is string => Boolean(f));
+
     return (
       <div className="mt-3">
         <SuccessNote
@@ -172,15 +186,14 @@ export function AccountMatchResolver({
           hubspotId={created.hubspotNoteId}
           hubspotError={created.hubspotError}
           meta={
-            (created.peopleAdded > 0 || created.peopleUpdated > 0 || created.calendarProposals > 0) && (
-              <div className="mt-1.5 text-[12px] text-[#8A928C]">
-                {created.peopleAdded > 0 && `${created.peopleAdded} contact${created.peopleAdded === 1 ? "" : "s"} added`}
-                {created.peopleAdded > 0 && created.peopleUpdated > 0 && ", "}
-                {created.peopleUpdated > 0 && `${created.peopleUpdated} updated`}
-                {created.calendarProposals > 0 &&
-                  `${created.peopleAdded || created.peopleUpdated ? " · " : ""}${created.calendarProposals} follow-up waiting below`}
-              </div>
-            )
+            <>
+              <div className="mt-1.5 text-[12px] text-[#8A928C]">{facts.join(", ")}</div>
+              {created.calendarProposals > 0 && (
+                <div className="mt-1.5 text-[12px] text-[#8A928C]">
+                  {created.calendarProposals} follow-up{created.calendarProposals === 1 ? "" : "s"} waiting below
+                </div>
+              )}
+            </>
           }
         />
       </div>
@@ -189,10 +202,6 @@ export function AccountMatchResolver({
 
   return (
     <div className="mt-3 flex flex-col gap-3 rounded-md border border-[#E2DFD5] bg-[#FAF9F5] p-3">
-      <div className="text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
-        Couldn&apos;t confidently match an account.
-      </div>
-
       {matchAccountId && matchAccountName && (
         <div>
           <div className="mb-1.5 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">Client Match:</div>

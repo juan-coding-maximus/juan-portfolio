@@ -229,15 +229,13 @@ const KINDS: { value: CustomStopKind; hint: string }[] = [
 
 function AddStopForm({ onAdd }: { onAdd: (stop: Omit<CustomStop, "id">) => void }) {
   const [open, setOpen] = useState(false);
-  const [kind, setKind] = useState<CustomStopKind>("lunch");
+  const [kind, setKind] = useState<CustomStopKind>("stop");
   const [query, setQuery] = useState("");
-  const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function reset() {
     setQuery("");
-    setName("");
     setError(null);
   }
 
@@ -254,9 +252,7 @@ function AddStopForm({ onAdd }: { onAdd: (stop: Omit<CustomStop, "id">) => void 
     }
     onAdd({
       kind,
-      // Juan's own name for it wins over Google's, which is often the street
-      // number when what was typed was an address.
-      label: name.trim() || res.place.label,
+      label: res.place.label,
       address: res.place.address,
       lat: res.place.lat,
       lng: res.place.lng,
@@ -302,19 +298,13 @@ function AddStopForm({ onAdd }: { onAdd: (stop: Omit<CustomStop, "id">) => void 
         ))}
       </div>
 
-      <div className="mt-2.5 flex flex-col gap-2 sm:flex-row">
+      <div className="mt-2.5">
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={hint}
           autoFocus
-          className="min-w-0 flex-[2] rounded-md border border-[#E2DFD5] bg-[#FCFBF7] px-3 py-2 text-[13.5px] outline-none placeholder:text-[#A9AFA9] focus:border-[#8A928C]"
-        />
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Call it something (optional)"
-          className="min-w-0 flex-1 rounded-md border border-[#E2DFD5] bg-[#FCFBF7] px-3 py-2 text-[13.5px] outline-none placeholder:text-[#A9AFA9] focus:border-[#8A928C]"
+          className="w-full min-w-0 rounded-md border border-[#E2DFD5] bg-[#FCFBF7] px-3 py-2 text-[13.5px] outline-none placeholder:text-[#A9AFA9] focus:border-[#8A928C]"
         />
       </div>
 

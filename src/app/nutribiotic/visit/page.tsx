@@ -13,7 +13,6 @@ import { TouchpointCapture } from "../lib/touchpoint-ui";
 import { LAUNCHERS } from "../lib/launchers";
 import { isConfigured } from "../lib/dal";
 import { Empty, PageHead } from "../lib/ui";
-import { VisitQueues } from "../lib/visit-queues-ui";
 import { WarmRoutes } from "../lib/WarmRoutes";
 
 export const dynamic = "force-dynamic";
@@ -59,8 +58,12 @@ export const metadata = {
  * fail, or hold a connection open, which means there is nothing left here for
  * a bad connection to break.
  *
- * The queues fetch themselves (lib/visit-queues-ui.tsx). The rest of the OS
- * warms 15 seconds later (lib/WarmRoutes.tsx). Neither can touch the box.
+ * THE BOX AND NOTHING ELSE (Juan, 2026-08-28). The ready-to-file queue and the
+ * calendar follow-ups that used to sit below the box (lib/visit-queues-ui.tsx)
+ * moved to Clients: reviewing a correction note or approving a follow-up is
+ * desk work, and it was the reason this screen was never as fast or as quiet
+ * as the doorway needs it to be. The rest of the OS still warms 15 seconds
+ * later (lib/WarmRoutes.tsx), invisibly; it renders nothing.
  */
 export default function VisitPage() {
   return (
@@ -72,7 +75,6 @@ export default function VisitPage() {
       ) : (
         <div className="flex flex-col gap-8">
           <TouchpointCapture />
-          <VisitQueues />
           <WarmRoutes />
         </div>
       )}

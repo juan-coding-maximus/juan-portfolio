@@ -409,17 +409,6 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
               </button>
             </div>
 
-            {newCompany && (
-              <p className="mt-2 text-[11.5px] leading-relaxed text-[#8A6D2F]">
-                Won&rsquo;t be matched to an existing account. You&rsquo;ll pick it from Google Places after logging.
-              </p>
-            )}
-            {grade && (
-              <p className="mt-2 text-[11.5px] leading-relaxed text-[#8A928C]">
-                {GRADE_TITLE[grade]}, saved to the account this lands on and synced to HubSpot within a minute.
-              </p>
-            )}
-
             <div className="mt-3 flex items-center justify-between gap-3">
               <span className="min-h-[1em] text-[12px] leading-relaxed text-[#8A6D2F]">
                 {voice === "uploaded" ? "Recording sent, transcribing." : voiceError}
@@ -436,15 +425,9 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
         )}
       </div>
 
-      {result && (
-        <div
-          className={`mt-3 rounded-md border px-3 py-2.5 text-[13px] leading-relaxed ${
-            result.ok
-              ? "border-[#E2DFD5] bg-[#FAF9F5] text-[#3D4A44]"
-              : "border-[#E5D9BF] bg-[#FBF6E9] text-[#8A6D2F]"
-          }`}
-        >
-          {result.ok ? <>Logged, couldn&apos;t confidently match an account.</> : result.error}
+      {result && !result.ok && (
+        <div className="mt-3 rounded-md border border-[#E5D9BF] bg-[#FBF6E9] px-3 py-2.5 text-[13px] leading-relaxed text-[#8A6D2F]">
+          {result.error}
         </div>
       )}
 

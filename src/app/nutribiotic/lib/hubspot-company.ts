@@ -61,9 +61,22 @@ export type NewCompany = {
 
 /** Only name/city/state/phone/website, and only the ones that are actually
  * non-empty, same as hubspot_create_company.py's build_properties(). Owner
- * is always Juan's: this path only ever runs when he is the one filing. */
+ * is always Juan's: this path only ever runs when he is the one filing.
+ *
+ * hs_lead_status IS SET HERE, at birth, to NEW ("New to open"). The property
+ * is pull-only everywhere else in this boundary (owner:hubspot in
+ * hubspot_fields.json, never pushed by the sync worker), but CREATE is the
+ * one documented exception hubspot_create_company.py already carved out:
+ * there is no HQ judgment to overwrite because there is no record yet
+ * (see that script's --lead-status, same reasoning). Every brand-new
+ * company from the field starts life unworked, which is exactly what
+ * "New to open" means. */
 export async function createCompany(input: NewCompany): Promise<string> {
-  const properties: Record<string, string> = { hubspot_owner_id: OWNER_ID, name: input.name };
+  const properties: Record<string, string> = {
+    hubspot_owner_id: OWNER_ID,
+    name: input.name,
+    hs_lead_status: "NEW",
+  };
   if (input.city) properties.city = input.city;
   if (input.state) properties.state = input.state;
   if (input.phone) properties.phone = input.phone;

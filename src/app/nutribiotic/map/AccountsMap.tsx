@@ -96,7 +96,6 @@ const LEAD_STATUS_LABEL: Record<string, string> = {
   NEW: "New to open",
   Discarded: "Discarded",
   "To reactivate": "To reactivate",
-  Closed: "Closed",
 };
 
 // Sentinel for "HubSpot has no status on this company". A real filter choice,
@@ -373,7 +372,15 @@ export function AccountsMap({
      status: those chips ask "how many of X", so X's own count must stay
      whole for every OTHER chip to still make sense picked alongside it. */
   const visibleAccounts = useMemo(
-    () => accounts.filter((a) => (showChains || !a.chain_excluded) && (showPractices || !a.practice_excluded)),
+    () =>
+      accounts.filter(
+        (a) =>
+          (showChains || !a.chain_excluded) &&
+          (showPractices || !a.practice_excluded) &&
+          // Closed is a HQ lead-status bucket, not a place Juan drives: it never
+          // belongs on a field map, filterable or not (Juan, 2026-08-28).
+          a.lead_status !== "Closed",
+      ),
     [accounts, showChains, showPractices],
   );
 
@@ -642,20 +649,15 @@ export function AccountsMap({
 
   return (
     <div ref={containerRef} className="flex h-full flex-col">
-      {/* THE FILTERS COLLAPSE ON A PHONE, and this is a bug fix rather than a
-          preference. These three chip rows are 14 areas + 7 grades + up to 6
-          lead statuses, and on a phone they wrap to roughly a full viewport:
-          Juan sent a screenshot on 2026-08-05 where the map itself had been
-          squeezed to about 130px, a strip of Nevada under a wall of buttons.
-          The map is the page; the filters are how you narrow it, which is a
-          thing you do occasionally and the map is a thing you read constantly.
-
-          Open on md and up, where the rows fit in two lines and there is
-          nothing to gain by hiding them. The summary line stays visible at
-          both sizes so "112 of 253" and any active narrowing are never hidden
-          behind a tap: a filtered map that looks unfiltered is how you conclude
-          a territory is empty. */}
-      <div className="flex items-center justify-between gap-2 border-b border-[#E2DFD5] bg-white px-3 py-2 md:hidden">
+      {/* THE FILTERS COLLAPSE BY DEFAULT (Juan, 2026-08-28), at every width.
+          These three chip rows are 14 areas + 7 grades + up to 5 lead
+          statuses: a wall of buttons nobody needs on screen just to read the
+          map. Filtering is a thing you do occasionally; the map is a thing
+          you read constantly. The summary line stays visible whether the
+          rows are open or not, so "112 of 253" and any active narrowing are
+          never hidden behind a tap: a filtered map that looks unfiltered is
+          how you conclude a territory is empty. */}
+      <div className="flex items-center justify-between gap-2 border-b border-[#E2DFD5] bg-white px-3 py-2">
         <button
           type="button"
           onClick={() => setFiltersOpen((v) => !v)}
@@ -675,7 +677,7 @@ export function AccountsMap({
         </span>
       </div>
 
-      <div className={`${filtersOpen ? "contents" : "hidden"} md:contents`}>
+      <div className={filtersOpen ? "contents" : "hidden"}>
       {/* Area filter. Each chip carries its area's colour, and that same colour fills
           the area's frontier on the map, so the control and the region it controls are
           visibly one thing. */}
@@ -866,9 +868,6 @@ export function AccountsMap({
             ))}
           </span>
         )}
-        <span className="ml-auto hidden text-[12px] text-[#8A928C] md:inline">
-          {filtered.length} of {accounts.length}
-        </span>
       </div>
 
       {/* LEAD STATUS, Juan's ask 2026-08-05, chips rather than the dropdown it
