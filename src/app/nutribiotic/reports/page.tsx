@@ -10,14 +10,14 @@ import { PageHead, Card, Ico } from "../lib/ui";
 import {
   getAllTimeMetrics,
   getHomeEndpoint,
-  getLatestWeeklyDraft,
   getReportDraft,
   listPlaybookReports,
   listPlaybookReportArchive,
   reportDateLA,
   signReportPreview,
+  weekWindowFor,
 } from "../lib/dal";
-import { ReportReview, WeeklyReportReview } from "../lib/report-review-ui";
+import { DateNav, ReportReview, WeeklyReportReview } from "../lib/report-review-ui";
 
 export const metadata = { title: "Reports · NutriBiotic OS" };
 export const dynamic = "force-dynamic";
@@ -40,15 +40,32 @@ const METRIC_TILES: Array<{ key: NumericMetricKey; label: string; fmt?: (n: numb
   { key: "accountsClosed", label: "Accounts confirmed closed" },
 ];
 
-export default async function ReportsIndex() {
+export default async function ReportsIndex({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string }>;
+}) {
   const today = reportDateLA();
+  // Which day to review (2026-08-28, Juan's ask): a date picker spanning
+  // every day up to today, defaulting to today when nothing's picked. A
+  // malformed value falls back to today rather than sending a bad date into
+  // Supabase/HubSpot queries.
+  const sp = await searchParams;
+  const selectedDate = sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) && sp.date <= today ? sp.date : today;
+
+  // "Weekly is derived from daily so should auto update" (2026-08-28,
+  // Juan's follow-up): no separate weekly picker. Whichever day is selected,
+  // the weekly section below always shows the Mon-Thu week that day falls
+  // in -- null on a Fri/Sat/Sun pick, since no such week contains it.
+  const weekWindow = weekWindowFor(selectedDate);
+
   const [reports, archive, draft, home, allTime, weeklyDraft] = await Promise.all([
     listPlaybookReports(),
     listPlaybookReportArchive(),
-    getReportDraft(today, "daily").catch(() => null),
+    getReportDraft(selectedDate, "daily").catch(() => null),
     getHomeEndpoint().catch(() => null),
     getAllTimeMetrics(),
-    getLatestWeeklyDraft().catch(() => null),
+    weekWindow ? getReportDraft(weekWindow.end, "weekly").catch(() => null) : Promise.resolve(null),
   ]);
   const previewUrl = draft?.preview_path && !draft.dirty ? await signReportPreview(draft.preview_path) : null;
   const weeklyPreviewUrl =
@@ -91,13 +108,16 @@ export default async function ReportsIndex() {
       {/* THE REVIEW GATE (migrations 0045/0046). Until 2026-08-27 the 22:00 cron
           mailed the PDF unread to Juan and to juan@nutribiotic.com, and a wrong
           pin could only be corrected by sending a follow-up. This is where he
-          reads it first. Absent until a draft exists for today. */}
+          reads it first. DateNav (2026-08-28) is what lets this be any day up
+          to today, not only today. */}
+      <DateNav date={selectedDate} today={today} />
+
       {draft ? (
         <ReportReview draft={draft} previewUrl={previewUrl} home={home} />
       ) : (
         <ReportReview
           draft={{
-            report_date: today,
+            report_date: selectedDate,
             kind: "daily",
             payload: null,
             status: "pending",
@@ -116,14 +136,23 @@ export default async function ReportsIndex() {
 
       {/* WEEKLY REVIEW GATE (2026-08-28). Same story as the daily gate above,
           one week later: the Friday rollup used to --send straight to
-          juan@nutribiotic.com with nobody having looked at it. Absent
-          entirely until com.agency.nutribiotic-weekly-summary has staged one
-          (Fridays 10:00) -- no placeholder/build button, since there's no
-          single "this week" to resolve client-side the way "today" resolves
-          for the daily row. */}
-      {weeklyDraft && weeklyDraft.payload && (
+          juan@nutribiotic.com with nobody having looked at it. Tracks
+          whichever day is selected above -- no separate picker ("weekly is
+          derived from daily", his follow-up) -- and field_report.py's
+          build_draft() cascades a rebuild here whenever a day inside this
+          window is rebuilt, so it's never stale relative to a daily edit.
+          Absent on a Fri/Sat/Sun pick (no Mon-Thu week contains it) or
+          before com.agency.nutribiotic-weekly-summary/a daily rebuild has
+          ever staged one for this window -- no build button, staging one is
+          what a daily rebuild in-window (or the Friday cron) is for. */}
+      {weeklyDraft && weeklyDraft.payload ? (
         <WeeklyReportReview draft={weeklyDraft} previewUrl={weeklyPreviewUrl} />
-      )}
+      ) : weekWindow ? (
+        <p className="mb-8 text-[12.5px] text-[#8A928C]">
+          No weekly report staged yet for {weekWindow.start} – {weekWindow.end}. It appears here once a
+          day in that week is rebuilt, or at the Friday 10:00 cron.
+        </p>
+      ) : null}
 
       <section className="mb-7">
         <div className="grid gap-3.5 md:grid-cols-2">

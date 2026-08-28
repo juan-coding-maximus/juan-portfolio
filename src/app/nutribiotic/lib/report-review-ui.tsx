@@ -173,7 +173,7 @@ export function ReportReview({
 
       {!payload ? (
         <div className="text-[13.5px] text-[#5B6560]">
-          <p className="mb-3">Nothing built for today yet.</p>
+          <p className="mb-3">Nothing built for {draft.report_date} yet.</p>
           <button
             onClick={() => startTransition(async () => {
               await actionRequestRebuild(draft.report_date);
@@ -182,7 +182,7 @@ export function ReportReview({
             disabled={pending}
             className="rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
           >
-            {pending ? "Asking…" : "Build today's report"}
+            {pending ? "Asking…" : "Build this day's report"}
           </button>
         </div>
       ) : (
@@ -674,5 +674,43 @@ export function WeeklyReportReview({ draft, previewUrl }: { draft: ReportDraft; 
         whatever HubSpot says by then. Hold is how you stop that.
       </p>
     </section>
+  );
+}
+
+/**
+ * Which day to review (2026-08-28, Juan's ask). Spans every day up to today
+ * -- there's no min, a very old date just shows "nothing built yet" same as
+ * any date with no draft. Picking a date pushes ?date=YYYY-MM-DD, which
+ * page.tsx reads for both the daily section AND the week that date falls in
+ * ("weekly is derived from daily", his follow-up): the two are always the
+ * same click, never two separate pickers to keep in sync by hand.
+ */
+export function DateNav({ date, today }: { date: string; today: string }) {
+  const router = useRouter();
+  return (
+    <div className="mb-5 flex items-center gap-2">
+      <label htmlFor="report-date" className="text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
+        Reviewing
+      </label>
+      <input
+        id="report-date"
+        type="date"
+        value={date}
+        max={today}
+        onChange={(e) => {
+          if (!e.target.value) return;
+          router.push(`/nutribiotic/reports?date=${e.target.value}`);
+        }}
+        className="rounded-md border border-[#E2DFD5] bg-white px-2.5 py-1.5 text-[13.5px] tabular-nums focus:border-[#14201B] focus:outline-none"
+      />
+      {date !== today && (
+        <a
+          href="/nutribiotic/reports"
+          className="text-[12px] text-[#2C6A46] underline decoration-[#2C6A46]/40 underline-offset-2 hover:decoration-[#2C6A46]"
+        >
+          Back to today
+        </a>
+      )}
+    </div>
   );
 }

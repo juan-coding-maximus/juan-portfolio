@@ -3031,6 +3031,25 @@ export function reportDateLA(): string {
   }).format(new Date());
 }
 
+/** The Mon-Thu week a date falls in, keyed by its Thursday (end_date) --
+ *  matches weekly_report.py's own build_week_draft() key and
+ *  field_report.py's build_draft()-side cascade (2026-08-28: "weekly is
+ *  derived from daily so should auto update"). Plain calendar math on a
+ *  YYYY-MM-DD string, no timezone in play. Null for a Fri/Sat/Sun date --
+ *  Juan doesn't work the field then, so no Mon-Thu week contains it. */
+export function weekWindowFor(dateISO: string): { start: string; end: string } | null {
+  const d = new Date(`${dateISO}T00:00:00`);
+  const jsDay = d.getDay(); // Sun=0 .. Sat=6
+  const day = jsDay === 0 ? 6 : jsDay - 1; // Monday=0 .. Sunday=6
+  if (day > 3) return null;
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - day);
+  const thursday = new Date(monday);
+  thursday.setDate(monday.getDate() + 3);
+  const fmt = (x: Date) => x.toISOString().slice(0, 10);
+  return { start: fmt(monday), end: fmt(thursday) };
+}
+
 /** `kind` matters since migration 0050: nb_report_drafts's primary key is
  *  (report_date, kind), so a single date can hold a daily row and a weekly
  *  row (the week ending that day) at once. Defaults to "daily", the only
@@ -3044,25 +3063,6 @@ export async function getReportDraft(dateISO: string, kind: "daily" | "weekly" =
     `nb_report_drafts?select=*&report_date=eq.${encodeURIComponent(dateISO)}&kind=eq.${kind}&limit=1`,
   );
   return rows[0] ?? null;
-}
-
-/** The most recently staged weekly draft (2026-08-28). Keyed by its own
- *  end_date (the week's Thursday), same as any daily row's own date -- safe
- *  since 0050's composite key -- rather than computed client-side and
- *  duplicated: "most recent" is always right whether today is that Thursday,
- *  the Friday it actually gets staged, or the following Monday he finally
- *  opens Reports. */
-export async function getLatestWeeklyDraft(): Promise<ReportDraft | null> {
-  await verifySession();
-  if (!isConfigured()) return null;
-  try {
-    const rows = await raw<ReportDraft>(
-      "nb_report_drafts?select=*&kind=eq.weekly&order=report_date.desc&limit=1",
-    );
-    return rows[0] ?? null;
-  } catch {
-    return null;
-  }
 }
 
 /** Ask the Mac for a fresh build. Creates the row if today has none yet, which
