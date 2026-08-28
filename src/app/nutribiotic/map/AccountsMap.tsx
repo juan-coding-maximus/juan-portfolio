@@ -926,6 +926,11 @@ export function AccountsMap({
             zoomControl: true,
             streetViewControl: false,
             fullscreenControl: true,
+            // Trims the "Keyboard shortcuts" link out of the attribution bar.
+            // The Google logo and the "Map data © Google / Terms / Report a
+            // map error" line stay: Maps Platform's terms require them, and
+            // hiding them (CSS or otherwise) risks the API key itself.
+            keyboardShortcuts: false,
           }}
         >
           {shownAreas.map((a) => (
