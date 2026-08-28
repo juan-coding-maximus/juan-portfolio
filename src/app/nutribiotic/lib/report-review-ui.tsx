@@ -55,6 +55,7 @@ export function ReportReview({
 
   const payload = draft.payload;
   const stops = payload?.stops ?? [];
+  const followUps = payload?.follow_ups ?? [];
 
   const [hqNotes, setHqNotes] = useState<ReportHqNote[]>(payload?.hq_notes ?? []);
   const [miles, setMiles] = useState<string>(
@@ -196,6 +197,22 @@ export function ReportReview({
             )}
           </div>
 
+          {/* THE DRAFT, INLINE. Juan, 2026-08-28: he wants to see the report
+              itself on this screen while confirming it, not just an edit form
+              plus a link that leaves the page. This is the same artifact the
+              "Open" link above points to (render_pdf(render_html(payload)) on
+              the Mac) -- one rendering, shown two ways, never a second one
+              that could disagree with what actually mails. */}
+          {previewUrl && !draft.dirty && (
+            <div className="mb-5 overflow-hidden rounded-lg border border-[#E2DFD5]">
+              <iframe
+                src={previewUrl}
+                title={`Draft report, ${draft.report_date}`}
+                className="h-[70vh] w-full"
+              />
+            </div>
+          )}
+
           {/* START/END. field_report.py resolves these from the route plan
               (route_start/route_end -- migration 0040, not always home
               anymore since the 2026-08-27 fix: a day never assumes Manhattan
@@ -284,6 +301,37 @@ export function ReportReview({
               </ul>
             )}
           </div>
+
+          {/* FOLLOW-UPS. Companies with an open HubSpot Task and no visit this
+              window (assemble_stops() in field_report.py) -- accounts that need
+              more work, not stops that happened. Read-only: the task itself is
+              corrected in HubSpot, not here, this is just where Juan confirms
+              nothing due got missed before the day goes out. */}
+          {followUps.length > 0 && (
+            <div className="mb-5">
+              <div className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
+                Needs follow-up · {followUps.length}
+              </div>
+              <ul className="divide-y divide-[#EDEBE3] overflow-hidden rounded-lg border border-[#E2DFD5]">
+                {followUps.map((f, i) => (
+                  <li key={f.hubspot_id ?? i} className="px-3 py-2.5">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <span className="text-[13.5px] font-medium">
+                        {f.name}
+                        {f.city && <span className="font-normal text-[#8A928C]"> · {f.city}</span>}
+                      </span>
+                      {f.due && (
+                        <span className="shrink-0 text-[11.5px] text-[#8A6D2F]">
+                          due {new Date(f.due).toLocaleDateString("en-US")}
+                        </span>
+                      )}
+                    </div>
+                    {f.body && <p className="mt-1 text-[12.5px] leading-relaxed text-[#5B6560]">{f.body}</p>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* MILEAGE. Blank means recompute from whatever stops are still
               visible, which is what has to happen after hiding one. */}

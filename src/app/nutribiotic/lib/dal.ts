@@ -2948,6 +2948,17 @@ export type ReportPayload = {
     hidden?: boolean;
     events?: unknown[];
   }>;
+  /** Companies with an open HubSpot Task and no visit this window --
+   *  field_report.py's assemble_stops() pulls these out rather than fake a
+   *  driven leg for a task that's merely due, not happened. Read-only here:
+   *  the task itself is corrected in HubSpot, not on this screen. */
+  follow_ups?: Array<{
+    hubspot_id?: string;
+    name?: string;
+    city?: string | null;
+    due?: string | null;
+    body?: string | null;
+  }>;
   [k: string]: unknown;
 };
 
@@ -2958,11 +2969,56 @@ export type ReportDraft = {
   status: "pending" | "approved" | "sent" | "held";
   dirty: boolean;
   rebuild_requested: boolean;
+  /** True once Juan has saved an edit through this screen (migration 0049).
+   *  False on a row nobody has opened -- that's what tells run_deadline() a
+   *  pre-deadline refresh from HubSpot is safe, nothing of his to lose. */
+  edited: boolean;
   preview_path: string | null;
   sent_at: string | null;
   send_error: string | null;
   updated_at: string;
 };
+
+/** All-time dashboard, /nutribiotic/reports (migration 0048). One row per
+ *  metric, SUM(value) already done by nb_v_report_metrics_alltime -- this is
+ *  the whole query. field_report.py's build_report() writes the underlying
+ *  rows every time it builds a day, so this is never a separate rollup to
+ *  keep in sync by hand. */
+export type AllTimeMetrics = {
+  visits: number;
+  touchpoints: number;
+  miles: number;
+  daysWorked: number;
+  newAccounts: number;
+  accountsClosed: number;
+  throughDate: string | null;
+};
+
+export async function getAllTimeMetrics(): Promise<AllTimeMetrics | null> {
+  await verifySession();
+  if (!isConfigured()) return null;
+  try {
+    const rows = await raw<{ metric: string; total: number; through_date: string | null }>(
+      "nb_v_report_metrics_alltime?select=metric,total,through_date",
+    );
+    const byMetric = Object.fromEntries(rows.map((r) => [r.metric, Number(r.total)]));
+    const throughDate = rows.reduce<string | null>(
+      (max, r) => (r.through_date && (!max || r.through_date > max) ? r.through_date : max),
+      null,
+    );
+    return {
+      visits: byMetric.visits ?? 0,
+      touchpoints: byMetric.touchpoints ?? 0,
+      miles: byMetric.miles ?? 0,
+      daysWorked: byMetric.day_worked ?? 0,
+      newAccounts: byMetric.new_accounts ?? 0,
+      accountsClosed: byMetric.accounts_closed ?? 0,
+      throughDate,
+    };
+  } catch {
+    return null;
+  }
+}
 
 /** Today in Los Angeles, which is the day the report is about. Never the
  *  server's date: Vercel runs UTC, and after 17:00 LA those disagree. */
@@ -2999,12 +3055,16 @@ export async function requestReportRebuild(dateISO: string): Promise<void> {
 }
 
 /** Save his edits. `dirty` is what tells the Mac the preview PDF is now behind
- *  the payload, so the screen can say so instead of showing a stale map. */
+ *  the payload, so the screen can say so instead of showing a stale map.
+ *  `edited: true` is the other effect (migration 0049): this is the one path
+ *  that merges his overlay into the payload, so it's the one signal that
+ *  tells the 22:00 deadline a pre-send HubSpot refresh would now throw away
+ *  something of his rather than just staleness. */
 export async function saveReportDraftPayload(dateISO: string, payload: ReportPayload): Promise<void> {
   await mutate(
     "nb_report_drafts",
     "PATCH",
-    { payload, dirty: true, updated_at: new Date().toISOString() },
+    { payload, dirty: true, edited: true, updated_at: new Date().toISOString() },
     { report_date: `eq.${dateISO}` },
     "return=minimal",
   );
