@@ -143,6 +143,7 @@ const EXTRACT_TOOL = {
               "visit", "call", "text", "email_out", "email_in", "linkedin",
               "newsletter", "meeting", "note", "order", "sample_drop", "staff_training",
             ],
+            description: "An in-person stop at a store or office, walked in or dropped by, is 'visit', even when the rep talks to or 'meets with' someone while there. Use 'meeting' only when the text itself frames it as a scheduled, formal meeting or appointment, not just a conversation that happened in person. This is what titles the HubSpot record ('Visit' vs 'Meeting'), and almost everything a rep dictates from the field is a visit.",
           },
           direction: { type: "string", enum: ["outbound", "inbound", "internal"] },
           outcome: {
