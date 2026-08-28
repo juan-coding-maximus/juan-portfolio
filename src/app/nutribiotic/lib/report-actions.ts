@@ -47,8 +47,9 @@ export async function actionRequestRebuild(dateISO: string): Promise<void> {
 export async function actionDecideReport(
   dateISO: string,
   decision: "approved" | "held" | "pending",
+  kind: "daily" | "weekly" = "daily",
 ): Promise<void> {
-  await setReportDraftStatus(dateISO, decision);
+  await setReportDraftStatus(dateISO, decision, kind);
   revalidatePath(PATH);
 }
 
@@ -60,6 +61,13 @@ export type ReportEdits = {
   routeStart?: RouteEndpoint | null;
   routeEnd?: RouteEndpoint | null;
   stops: Record<string, { hidden: boolean; call_only: boolean; message_only: boolean }>;
+  /** Display order, as stop `n` values, in the order Juan arranged them
+   *  (2026-08-28, "move things around"). field_report.py's apply_edits()
+   *  renumbers and draws the route/mileage straight off array order, so
+   *  reordering here -- once, on save -- is the whole feature; nothing on
+   *  the Mac side needed to change. Undefined/empty leaves the existing
+   *  (HubSpot-chronological) order alone. */
+  order?: number[];
 };
 
 /**
@@ -105,6 +113,14 @@ export async function actionSaveReportEdits(dateISO: string, edits: ReportEdits)
     if (!e) return s;
     return { ...s, hidden: e.hidden, is_call_only: e.call_only, is_message_only: e.message_only };
   });
+
+  if (edits.order && edits.order.length > 0) {
+    const byN = new Map(payload.stops.map((s) => [s.n, s]));
+    const ordered = edits.order.map((n) => byN.get(n)).filter((s): s is NonNullable<typeof s> => Boolean(s));
+    const placed = new Set(ordered.map((s) => s.n));
+    const rest = payload.stops.filter((s) => !placed.has(s.n)); // any stop `order` didn't name, appended, never dropped
+    payload.stops = [...ordered, ...rest];
+  }
 
   await saveReportDraftPayload(dateISO, payload);
   revalidatePath(PATH);

@@ -10,13 +10,14 @@ import { PageHead, Card, Ico } from "../lib/ui";
 import {
   getAllTimeMetrics,
   getHomeEndpoint,
+  getLatestWeeklyDraft,
   getReportDraft,
   listPlaybookReports,
   listPlaybookReportArchive,
   reportDateLA,
   signReportPreview,
 } from "../lib/dal";
-import { ReportReview } from "../lib/report-review-ui";
+import { ReportReview, WeeklyReportReview } from "../lib/report-review-ui";
 
 export const metadata = { title: "Reports · NutriBiotic OS" };
 export const dynamic = "force-dynamic";
@@ -41,14 +42,17 @@ const METRIC_TILES: Array<{ key: NumericMetricKey; label: string; fmt?: (n: numb
 
 export default async function ReportsIndex() {
   const today = reportDateLA();
-  const [reports, archive, draft, home, allTime] = await Promise.all([
+  const [reports, archive, draft, home, allTime, weeklyDraft] = await Promise.all([
     listPlaybookReports(),
     listPlaybookReportArchive(),
-    getReportDraft(today).catch(() => null),
+    getReportDraft(today, "daily").catch(() => null),
     getHomeEndpoint().catch(() => null),
     getAllTimeMetrics(),
+    getLatestWeeklyDraft().catch(() => null),
   ]);
   const previewUrl = draft?.preview_path && !draft.dirty ? await signReportPreview(draft.preview_path) : null;
+  const weeklyPreviewUrl =
+    weeklyDraft?.preview_path && !weeklyDraft.dirty ? await signReportPreview(weeklyDraft.preview_path) : null;
 
   return (
     <>
@@ -108,6 +112,17 @@ export default async function ReportsIndex() {
           previewUrl={null}
           home={home}
         />
+      )}
+
+      {/* WEEKLY REVIEW GATE (2026-08-28). Same story as the daily gate above,
+          one week later: the Friday rollup used to --send straight to
+          juan@nutribiotic.com with nobody having looked at it. Absent
+          entirely until com.agency.nutribiotic-weekly-summary has staged one
+          (Fridays 10:00) -- no placeholder/build button, since there's no
+          single "this week" to resolve client-side the way "today" resolves
+          for the daily row. */}
+      {weeklyDraft && weeklyDraft.payload && (
+        <WeeklyReportReview draft={weeklyDraft} previewUrl={weeklyPreviewUrl} />
       )}
 
       <section className="mb-7">

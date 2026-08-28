@@ -57,6 +57,27 @@ export function ReportReview({
   const stops = payload?.stops ?? [];
   const followUps = payload?.follow_ups ?? [];
 
+  // Display order, as the stop `n` values in the order Juan arranged them.
+  // Starts as the payload's own order (HubSpot chronological, what
+  // build_report() gave it). Move buttons only reorder this local array --
+  // the actual reordering of payload.stops happens server-side in
+  // actionSaveReportEdits, once, on save, same read-modify-write discipline
+  // as every other edit here.
+  const [order, setOrder] = useState<number[]>(() => stops.map((s) => s.n ?? 0));
+  const orderedStops = order
+    .map((n) => stops.find((s) => s.n === n))
+    .filter((s): s is NonNullable<typeof s> => Boolean(s));
+  function moveStop(n: number, dir: -1 | 1) {
+    setOrder((prev) => {
+      const i = prev.indexOf(n);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  }
+
   const [hqNotes, setHqNotes] = useState<ReportHqNote[]>(payload?.hq_notes ?? []);
   const [miles, setMiles] = useState<string>(
     payload?.miles_override != null ? String(payload.miles_override) : "",
@@ -90,6 +111,7 @@ export function ReportReview({
       routeStart,
       routeEnd,
       stops: stopEdits,
+      order,
     };
   }
 
@@ -107,7 +129,7 @@ export function ReportReview({
       // Save first, always: approving something he edited but did not save
       // would mail the version he was looking away from.
       await actionSaveReportEdits(draft.report_date, currentEdits());
-      await actionDecideReport(draft.report_date, decision);
+      await actionDecideReport(draft.report_date, decision, "daily");
       setSaved(
         decision === "approved"
           ? "Approved. It goes out on the next pass, within a few minutes."
@@ -253,17 +275,22 @@ export function ReportReview({
 
           {/* STOPS. The three toggles are exactly the ones that decide what the
               map draws and what the mileage counts, which is where the keyword
-              heuristics are wrong most often. */}
+              heuristics are wrong most often. The move buttons only change
+              display/mileage order (2026-08-28 ask, "move things around") --
+              same up/down convention as the route plan's own reorder controls
+              on /nutribiotic/map, not drag-and-drop, which doesn't hold up on
+              a phone. */}
           <div className="mb-5">
             <div className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
               Stops · {stops.filter((s) => !stopEdits[String(s.n)]?.hidden).length} of {stops.length}
             </div>
-            {stops.length === 0 ? (
+            {orderedStops.length === 0 ? (
               <p className="text-[13px] text-[#8A928C]">No stops on this day.</p>
             ) : (
               <ul className="divide-y divide-[#EDEBE3] overflow-hidden rounded-lg border border-[#E2DFD5]">
-                {stops.map((s) => {
+                {orderedStops.map((s, i) => {
                   const key = String(s.n);
+                  const n = s.n ?? 0;
                   const e = stopEdits[key] ?? { hidden: false, call_only: false, message_only: false };
                   const set = (patch: Partial<StopEdit>) =>
                     setStopEdits((prev) => ({ ...prev, [key]: { ...e, ...patch } }));
@@ -272,7 +299,27 @@ export function ReportReview({
                       key={key}
                       className={`flex flex-wrap items-center gap-2 px-3 py-2.5 ${e.hidden ? "opacity-45" : ""}`}
                     >
-                      <span className="w-5 shrink-0 text-[12px] tabular-nums text-[#8A928C]">{s.n}</span>
+                      <div className="flex shrink-0 gap-1">
+                        <button
+                          type="button"
+                          onClick={() => moveStop(n, -1)}
+                          disabled={locked || i === 0}
+                          aria-label={`Move ${s.name} earlier`}
+                          className="rounded-md border border-[#E2DFD5] bg-white p-1 text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] disabled:cursor-not-allowed disabled:opacity-30"
+                        >
+                          <Ico name="chevron-up" size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveStop(n, 1)}
+                          disabled={locked || i === orderedStops.length - 1}
+                          aria-label={`Move ${s.name} later`}
+                          className="rounded-md border border-[#E2DFD5] bg-white p-1 text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] disabled:cursor-not-allowed disabled:opacity-30"
+                        >
+                          <Ico name="chevron-down" size={12} />
+                        </button>
+                      </div>
+                      <span className="w-5 shrink-0 text-[12px] tabular-nums text-[#8A928C]">{i + 1}</span>
                       <span className="min-w-0 flex-1 truncate text-[13.5px]">
                         {s.name}
                         {s.city && <span className="text-[#8A928C]"> · {s.city}</span>}
@@ -481,5 +528,151 @@ function Toggle({
     >
       {children}
     </button>
+  );
+}
+
+type WeeklyTotals = {
+  touchpoints?: number;
+  visits?: number;
+  calls?: number;
+  miles?: number;
+  new_accounts?: number;
+  accounts_closed?: number;
+};
+
+/**
+ * This week's report (2026-08-28). The weekly companion to ReportReview
+ * above, and deliberately a lighter one: weekly_report.py's payload has no
+ * per-stop overlay to edit yet (see the "review gate" note at the top of
+ * weekly_report.py) -- there's no single route to override, and mileage is
+ * odometer-read, not geometry. View it, approve it, or hold it; that alone
+ * closes the actual gap, which was that the weekly rollup mailed itself to
+ * the employer every Friday with nobody having looked at it first.
+ */
+export function WeeklyReportReview({ draft, previewUrl }: { draft: ReportDraft; previewUrl: string | null }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [saved, setSaved] = useState<string | null>(null);
+
+  const payload = draft.payload;
+  if (!payload) return null;
+
+  const sent = draft.status === "sent";
+  const locked = sent || pending;
+  const totals = (payload.totals as WeeklyTotals | undefined) ?? {};
+  const rangeLabel = (payload.range_label as string | undefined) ?? draft.report_date;
+
+  function decide(decision: "approved" | "held" | "pending") {
+    startTransition(async () => {
+      await actionDecideReport(draft.report_date, decision, "weekly");
+      setSaved(
+        decision === "approved"
+          ? "Approved. It goes out on the next pass, within a few minutes."
+          : decision === "held"
+            ? "Held. Nothing goes out at Friday's deadline unless you release it."
+            : "Back to pending.",
+      );
+      router.refresh();
+    });
+  }
+
+  const statusLine = sent
+    ? `Sent ${draft.sent_at ? new Date(draft.sent_at).toLocaleString("en-US") : ""}`
+    : draft.status === "approved"
+      ? "Approved, sending on the next pass"
+      : draft.status === "held"
+        ? "Held. Nothing goes out at Friday's deadline."
+        : draft.dirty
+          ? "Preview is rendering…"
+          : "Waiting on you";
+
+  return (
+    <section className="mb-8 rounded-xl border border-[#E2DFD5] bg-white p-5">
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-[family-name:var(--font-fraunces)] text-[19px] font-semibold tracking-tight">
+          This week&rsquo;s report · {rangeLabel}
+        </h2>
+        <span className={`text-[12.5px] ${draft.status === "held" ? "text-[#8A6D2F]" : "text-[#8A928C]"}`}>
+          {statusLine}
+        </span>
+      </div>
+
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {([
+          ["touchpoints", "Touchpoints"],
+          ["visits", "Visits"],
+          ["calls", "Calls"],
+          ["miles", "Miles"],
+          ["new_accounts", "New accounts"],
+          ["accounts_closed", "Closed"],
+        ] as const).map(([key, label]) => (
+          <div key={key} className="rounded-lg border border-[#E2DFD5] p-3 text-center">
+            <div className="font-[family-name:var(--font-fraunces)] text-[18px] font-semibold tabular-nums leading-none">
+              {totals[key] ?? "—"}
+            </div>
+            <div className="mt-1 text-[10.5px] leading-snug text-[#5B6560]">{label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mb-5 flex flex-wrap items-center gap-2">
+        {previewUrl ? (
+          <a
+            href={previewUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90"
+          >
+            <Ico name="external" size={13} />
+            Open the draft PDF
+          </a>
+        ) : (
+          <span className="text-[12.5px] text-[#8A928C]">Preview not rendered yet.</span>
+        )}
+      </div>
+
+      {previewUrl && !draft.dirty && (
+        <div className="mb-5 overflow-hidden rounded-lg border border-[#E2DFD5]">
+          <iframe src={previewUrl} title={`Weekly draft, ${rangeLabel}`} className="h-[70vh] w-full" />
+        </div>
+      )}
+
+      {saved && <div className="mb-4"><SuccessNote title={saved} /></div>}
+
+      {!sent && (
+        <div className="flex flex-wrap gap-2 border-t border-[#EDEBE3] pt-4">
+          <button
+            onClick={() => decide("approved")}
+            disabled={locked}
+            className="rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
+          >
+            {pending ? "Working…" : "Approve and send"}
+          </button>
+          {draft.status === "held" ? (
+            <button
+              onClick={() => decide("pending")}
+              disabled={locked}
+              className="rounded-md border border-[#E2DFD5] px-4 py-2 text-[13px] text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] disabled:opacity-40"
+            >
+              Release the hold
+            </button>
+          ) : (
+            <button
+              onClick={() => decide("held")}
+              disabled={locked}
+              title="Nothing goes out at Friday's deadline."
+              className="rounded-md border border-[#E5D9BF] bg-[#FBF6E9] px-4 py-2 text-[13px] text-[#8A6D2F] transition-colors hover:opacity-90 disabled:opacity-40"
+            >
+              Hold this week
+            </button>
+          )}
+        </div>
+      )}
+
+      <p className="mt-4 text-[11.5px] leading-relaxed text-[#8A928C]">
+        Approving sends within a few minutes. If you never get to it, it still goes out Friday evening with
+        whatever HubSpot says by then. Hold is how you stop that.
+      </p>
+    </section>
   );
 }

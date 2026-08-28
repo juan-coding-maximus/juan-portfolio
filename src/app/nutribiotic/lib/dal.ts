@@ -3031,15 +3031,38 @@ export function reportDateLA(): string {
   }).format(new Date());
 }
 
-export async function getReportDraft(dateISO: string): Promise<ReportDraft | null> {
+/** `kind` matters since migration 0050: nb_report_drafts's primary key is
+ *  (report_date, kind), so a single date can hold a daily row and a weekly
+ *  row (the week ending that day) at once. Defaults to "daily", the only
+ *  kind this ever meant before weekly drafts existed. */
+export async function getReportDraft(dateISO: string, kind: "daily" | "weekly" = "daily"): Promise<ReportDraft | null> {
   // raw() rather than query(): query()'s row type is constrained to carry an
   // `origin`, which is the synthetic-data marker on customer tables. This
   // table has no such column and never will, so claiming one to satisfy a
   // signature would be a lie in the type.
   const rows = await raw<ReportDraft>(
-    `nb_report_drafts?select=*&report_date=eq.${encodeURIComponent(dateISO)}&limit=1`,
+    `nb_report_drafts?select=*&report_date=eq.${encodeURIComponent(dateISO)}&kind=eq.${kind}&limit=1`,
   );
   return rows[0] ?? null;
+}
+
+/** The most recently staged weekly draft (2026-08-28). Keyed by its own
+ *  end_date (the week's Thursday), same as any daily row's own date -- safe
+ *  since 0050's composite key -- rather than computed client-side and
+ *  duplicated: "most recent" is always right whether today is that Thursday,
+ *  the Friday it actually gets staged, or the following Monday he finally
+ *  opens Reports. */
+export async function getLatestWeeklyDraft(): Promise<ReportDraft | null> {
+  await verifySession();
+  if (!isConfigured()) return null;
+  try {
+    const rows = await raw<ReportDraft>(
+      "nb_report_drafts?select=*&kind=eq.weekly&order=report_date.desc&limit=1",
+    );
+    return rows[0] ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** Ask the Mac for a fresh build. Creates the row if today has none yet, which
@@ -3065,20 +3088,24 @@ export async function saveReportDraftPayload(dateISO: string, payload: ReportPay
     "nb_report_drafts",
     "PATCH",
     { payload, dirty: true, edited: true, updated_at: new Date().toISOString() },
-    { report_date: `eq.${dateISO}` },
+    { report_date: `eq.${dateISO}`, kind: "eq.daily" }, // only the daily row has editable overlay fields yet
     "return=minimal",
   );
 }
 
+/** `kind` matters since migration 0050 -- without it, approving/holding a
+ *  weekly draft would PATCH a same-date daily row too (and vice versa),
+ *  since report_date alone no longer picks one row. */
 export async function setReportDraftStatus(
   dateISO: string,
   status: "pending" | "approved" | "held",
+  kind: "daily" | "weekly" = "daily",
 ): Promise<void> {
   await mutate(
     "nb_report_drafts",
     "PATCH",
     { status, decided_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-    { report_date: `eq.${dateISO}` },
+    { report_date: `eq.${dateISO}`, kind: `eq.${kind}` },
     "return=minimal",
   );
 }
