@@ -35,7 +35,7 @@ import {
   type AccountFactsReport,
 } from "./dal";
 import { Blocked, runEngagement } from "./hubspot-engagement";
-import { pushBusinessHours } from "./hubspot-company";
+import { formatBusinessHours, pushBusinessHours, pushCompanyEmail, pushCompanyPhone } from "./hubspot-company";
 
 /**
  * File the just-logged activity straight into HubSpot, no click. One
@@ -425,21 +425,52 @@ export async function recordTouchpoint(
   });
 
   // A fact stated about the business itself (hours, general phone/email)
-  // blank-fills nb_accounts regardless of whether this call also files to
+  // updates nb_accounts regardless of whether this call also files to
   // HubSpot; the OS record is the source of truth either way. Never blocks
   // the visit itself on failure, same "enrichment, not a gate" treatment as
   // the contact loop below.
   let accountFacts: AccountFactsReport | null = null;
   try {
     accountFacts = await applyAccountFacts(accountId, parsed.account_facts);
-    // Hours have no field-level sync to HubSpot (AGENTS.md HARD RULE 14), so
-    // a fresh OS blank-fill is the only trigger that reaches the portal at
-    // all. Gated the same as the note itself: skip entirely for a door that
-    // asked not to touch HubSpot yet (the clientos CLI's dry-then-write step).
-    if (accountFacts.business_hours?.status === "filled" && autoFileHubspot) {
-      const acc = await getAccount(accountId);
-      const companyId = acc.data[0]?.hubspot_company_id;
-      if (companyId) await pushBusinessHours(companyId, parsed.account_facts.business_hours!);
+
+    // A disagreement is never silently dropped, 2026-08-29: the old value
+    // rides along as a plain line in the note filed for THIS visit (where a
+    // human actually reads it) rather than an opaque JSON column nobody
+    // opens. Mutating hubspot_summary before insertTouchpoint below means
+    // both filing doors (the TS auto-file path and the clientos CLI, which
+    // reads the same stored `parsed` back out of Supabase) pick it up for
+    // free, no second place to keep this in sync.
+    const oldVersionLines: string[] = [];
+    if (accountFacts.business_hours?.status === "updated") {
+      oldVersionLines.push(`Old version (business hours): ${formatBusinessHours(accountFacts.business_hours.old).replace(/\n/g, ", ")}`);
+    }
+    if (accountFacts.phone?.status === "updated") {
+      oldVersionLines.push(`Old version (phone): ${accountFacts.phone.old}`);
+    }
+    if (accountFacts.email?.status === "updated") {
+      oldVersionLines.push(`Old version (email): ${accountFacts.email.old}`);
+    }
+    if (oldVersionLines.length > 0) {
+      parsed.activity.hubspot_summary = `${parsed.activity.hubspot_summary}\n\n${oldVersionLines.join("\n")}`;
+    }
+
+    // Hours have no field-level sync to HubSpot at all (AGENTS.md HARD RULE
+    // 14); phone is owner:hubspot/push:fill, which would silently revert a
+    // fresh number back on the next pull if HubSpot isn't told directly too.
+    // Gated the same as the note itself: skip entirely for a door that asked
+    // not to touch HubSpot yet (the clientos CLI's own dry-then-write step
+    // handles this instead, see hubspot_notes.py's push_business_hours).
+    if (autoFileHubspot) {
+      const hoursChanged = accountFacts.business_hours?.status === "filled" || accountFacts.business_hours?.status === "updated";
+      if (hoursChanged || accountFacts.phone || accountFacts.email) {
+        const acc = await getAccount(accountId);
+        const companyId = acc.data[0]?.hubspot_company_id;
+        if (companyId) {
+          if (hoursChanged) await pushBusinessHours(companyId, parsed.account_facts.business_hours!);
+          if (accountFacts.phone) await pushCompanyPhone(companyId, accountFacts.phone.value);
+          if (accountFacts.email) await pushCompanyEmail(companyId, accountFacts.email.value);
+        }
+      }
     }
   } catch {
     accountFacts = null;

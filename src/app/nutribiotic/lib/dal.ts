@@ -391,18 +391,25 @@ export async function setAccountPotentialJuan(id: string, grade: Tier | null): P
 }
 
 export type AccountFactsReport = {
-  business_hours: { status: "filled" } | { status: "conflict"; existing: Record<string, string[][]> } | null;
-  phone: { status: "filled"; value: string } | { status: "conflict"; existing: string } | null;
-  email: { status: "filled"; value: string } | { status: "conflict"; existing: string } | null;
+  business_hours: { status: "filled" } | { status: "updated"; old: Record<string, string[][]> } | null;
+  phone: { status: "filled"; value: string } | { status: "updated"; old: string; value: string } | null;
+  email: { status: "filled"; value: string } | { status: "updated"; old: string; value: string } | null;
 };
 
 /**
- * Blank-fill nb_accounts.business_hours/phone/email from what was stated
- * about the BUSINESS during a visit (AGENTS.md HARD RULE 14). Re-reads the
- * live row first, same as every other write in this file, a concurrent
- * enrichment pass may have filled the cell in the minutes since this
- * touchpoint started. Never overwrites an existing value; a disagreement is
- * reported, not resolved, same shape as ensureCompanyPhone's report.
+ * Fill (or, on a disagreement, replace) nb_accounts.business_hours/phone/
+ * email from what was stated about the BUSINESS during a visit (AGENTS.md
+ * HARD RULE 14). Re-reads the live row first, same as every other write in
+ * this file, a concurrent enrichment pass may have filled the cell in the
+ * minutes since this touchpoint started.
+ *
+ * OVERWRITES on a disagreement, 2026-08-29, Juan's explicit call: a fact
+ * heard standing in the store outranks whatever's on file (an ERP import or
+ * a stale Places read), the same "fresh finding outranks the legacy value"
+ * logic AGENTS.md HARD RULE 4 already applies to enrichment. The old value
+ * is never discarded, only demoted: the caller (recordTouchpoint) appends an
+ * "Old version" line to the note filed for this visit, so the correction is
+ * visible where a human actually reads it, not buried in a JSON column.
  */
 export async function applyAccountFacts(
   accountId: string,
@@ -422,8 +429,9 @@ export async function applyAccountFacts(
     if (!row.business_hours) {
       patch.business_hours = facts.business_hours;
       report.business_hours = { status: "filled" };
-    } else {
-      report.business_hours = { status: "conflict", existing: row.business_hours };
+    } else if (JSON.stringify(row.business_hours) !== JSON.stringify(facts.business_hours)) {
+      patch.business_hours = facts.business_hours;
+      report.business_hours = { status: "updated", old: row.business_hours };
     }
   }
   if (facts.phone) {
@@ -431,7 +439,8 @@ export async function applyAccountFacts(
       patch.phone = facts.phone;
       report.phone = { status: "filled", value: facts.phone };
     } else if (row.phone !== facts.phone) {
-      report.phone = { status: "conflict", existing: row.phone };
+      patch.phone = facts.phone;
+      report.phone = { status: "updated", old: row.phone, value: facts.phone };
     }
   }
   if (facts.email) {
@@ -439,7 +448,8 @@ export async function applyAccountFacts(
       patch.email = facts.email;
       report.email = { status: "filled", value: facts.email };
     } else if (row.email !== facts.email) {
-      report.email = { status: "conflict", existing: row.email };
+      patch.email = facts.email;
+      report.email = { status: "updated", old: row.email, value: facts.email };
     }
   }
 
@@ -707,6 +717,11 @@ export type Draft = {
    * subject line. `urgency_reason` carries the evidence. */
   urgency: number | null;
   urgency_reason: string | null;
+  /** What the account actually asked for ("email me", "WhatsApp me"), only
+   * when a touchpoint says so explicitly. Null means no preference is on
+   * record — falls back to `channel` on screen, never assumed. See
+   * migration 0051. */
+  preferred_channel: "email" | "whatsapp" | "imessage" | null;
   origin: Origin;
 };
 

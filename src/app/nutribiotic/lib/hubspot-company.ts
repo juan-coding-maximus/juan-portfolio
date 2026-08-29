@@ -200,6 +200,53 @@ export async function ensureCompanyPhone(
   }
 }
 
+/**
+ * Force-write a company's `phone`/`nb_ordering_email`, no blank-fill check.
+ * Only for a NEW disagreement freshly heard in the store (recordTouchpoint's
+ * account_facts, 2026-08-29): a value stated standing in the door outranks
+ * whatever's on file, the same call Juan made for business hours. `phone`
+ * is otherwise `owner:hubspot`/`push:fill` in hubspot_fields.json (HubSpot
+ * wins, OS only fills blanks) specifically to protect it from an unverified
+ * guess; that reasoning does not apply to something Juan just heard in
+ * person, so this bypasses it on purpose, for this one call only, not a
+ * change to the field's normal ownership. Without also writing HubSpot
+ * directly, the next pull cycle would silently revert the OS side back to
+ * HubSpot's stale number.
+ */
+export async function pushCompanyPhone(companyId: string, phone: string): Promise<"filled" | "skipped"> {
+  try {
+    await request({
+      method: "PATCH",
+      path: `/crm/v3/objects/companies/${companyId}`,
+      body: { properties: { phone } },
+      entity: "companies",
+      operation: "upsert",
+    });
+    return "filled";
+  } catch {
+    return "skipped";
+  }
+}
+
+/** Same as pushCompanyPhone, for `nb_ordering_email`. This one's normal
+ * ownership (`owner: "os"`, `push: "own"`) already means the 60-second sync
+ * would carry an overwrite on its own; this just does it immediately rather
+ * than waiting on that cycle. */
+export async function pushCompanyEmail(companyId: string, email: string): Promise<"filled" | "skipped"> {
+  try {
+    await request({
+      method: "PATCH",
+      path: `/crm/v3/objects/companies/${companyId}`,
+      body: { properties: { nb_ordering_email: email } },
+      entity: "companies",
+      operation: "upsert",
+    });
+    return "filled";
+  } catch {
+    return "skipped";
+  }
+}
+
 const DAY_LABEL: Record<string, string> = {
   mon: "Mon", tue: "Tue", wed: "Wed", thu: "Thu", fri: "Fri", sat: "Sat", sun: "Sun",
 };
