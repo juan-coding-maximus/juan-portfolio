@@ -199,3 +199,46 @@ export async function ensureCompanyPhone(
     return { status: "skipped" };
   }
 }
+
+const DAY_LABEL: Record<string, string> = {
+  mon: "Mon", tue: "Tue", wed: "Wed", thu: "Thu", fri: "Fri", sat: "Sat", sun: "Sun",
+};
+const DAY_ORDER = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+
+/** Same rendering `nb_business_hours` gets everywhere else (the manual pass, 2026-08-28). */
+export function formatBusinessHours(hours: Record<string, string[][]>): string {
+  return DAY_ORDER.map((d) => {
+    const windows = hours[d] ?? [];
+    if (windows.length === 0) return `${DAY_LABEL[d]} closed`;
+    return `${DAY_LABEL[d]} ${windows.map(([s, e]) => `${s}-${e}`).join(" & ")}`;
+  }).join("\n");
+}
+
+/**
+ * Push newly-stated hours onto the company's `nb_business_hours` property.
+ * No auto-sync path exists for this field yet (AGENTS.md HARD RULE 14), so
+ * unlike phone/email this is the only way it reaches HubSpot at all. Only
+ * called right after `nb_accounts.business_hours` was itself a blank-fill
+ * (recordTouchpoint), so it should be unset on the HubSpot side too in the
+ * ordinary case, but this does not re-read the live property first the way
+ * ensureCompanyPhone does, a value set by hand directly in HubSpot with no
+ * matching OS row would get overwritten. Acceptable for now given how rarely
+ * this property gets touched by hand; revisit if that changes.
+ */
+export async function pushBusinessHours(
+  companyId: string,
+  hours: Record<string, string[][]>,
+): Promise<"filled" | "skipped"> {
+  try {
+    await request({
+      method: "PATCH",
+      path: `/crm/v3/objects/companies/${companyId}`,
+      body: { properties: { nb_business_hours: formatBusinessHours(hours) } },
+      entity: "companies",
+      operation: "upsert",
+    });
+    return "filled";
+  } catch {
+    return "skipped";
+  }
+}

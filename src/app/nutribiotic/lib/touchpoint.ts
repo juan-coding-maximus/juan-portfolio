@@ -21,7 +21,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { revalidatePath } from "next/cache";
 import {
+  applyAccountFacts,
   finalizeTouchpointAccount,
+  getAccount,
   getTouchpointById,
   insertActivity,
   insertCalendarProposal,
@@ -30,8 +32,10 @@ import {
   listAccounts,
   listContacts,
   patchContact,
+  type AccountFactsReport,
 } from "./dal";
 import { Blocked, runEngagement } from "./hubspot-engagement";
+import { pushBusinessHours } from "./hubspot-company";
 
 /**
  * File the just-logged activity straight into HubSpot, no click. One
@@ -117,6 +121,20 @@ export type ParsedTouchpoint = {
   };
   people: ParsedPerson[];
   calendar_actions: ParsedCalendarAction[];
+  account_facts: ParsedAccountFacts;
+};
+
+/**
+ * Facts about the BUSINESS itself, stated during the visit, distinct from a
+ * person's own phone/email in `people[]`. Blank-fills nb_accounts (HARD RULE
+ * 14): a structured fact belongs in its own HubSpot property AND the note
+ * text, not one or the other, and hours specifically never carry two live
+ * conflicting answers (resolve to the more conservative reading).
+ */
+type ParsedAccountFacts = {
+  business_hours: Record<string, string[][]> | null;
+  phone: string | null;
+  email: string | null;
 };
 
 const EXTRACT_TOOL = {
@@ -198,8 +216,27 @@ const EXTRACT_TOOL = {
           required: ["kind", "title"],
         },
       },
+      account_facts: {
+        type: "object",
+        description: "Facts about the BUSINESS itself, only when explicitly stated about the store/office as a whole, never inferred from a person's own contact info in people[]. Null fields are the common case, most visits state none of this.",
+        properties: {
+          business_hours: {
+            type: ["object", "null"],
+            description: "The business's stated hours, as a 7-key object (mon/tue/wed/thu/fri/sat/sun), each value an array of [\"HH:MM\",\"HH:MM\"] 24-hour windows (empty array for a closed day, e.g. a lunch break means two windows in one day). Only include a day the text actually covers; if the note states weekday hours but says nothing about the weekend, still return all 7 keys, empty array for the days not mentioned, rather than guessing they're closed. Null entirely if no hours were stated at all.",
+          },
+          phone: {
+            type: ["string", "null"],
+            description: "The business's own general/store phone number, only if stated as the store's number, not a specific person's direct line (that belongs in people[].phone).",
+          },
+          email: {
+            type: ["string", "null"],
+            description: "The business's own general/ordering email, only if stated as the store's address (e.g. 'their email is orders@...'), not a specific person's email (that belongs in people[].email).",
+          },
+        },
+        required: ["business_hours", "phone", "email"],
+      },
     },
-    required: ["account_confidence", "business_name_guess", "activity", "people", "calendar_actions"],
+    required: ["account_confidence", "business_name_guess", "activity", "people", "calendar_actions", "account_facts"],
   },
 };
 
@@ -219,7 +256,8 @@ RULES, all absolute:
 - activity.hubspot_summary is what reaches the shared CRM another rep or HQ reads. It must match activity.detail's first-person voice and completeness: never third person, never "the rep," never "visited" with no subject, and never drop a fact, however small (an aside about where someone is from, what they said about themselves, etc). You may tighten redundant phrasing, but do not summarize facts away. Still never invent a name, number, date, or fact not in the text.
 - Only include a person in "people" if the note actually names them or clearly describes a specific individual (a title alone like "the manager" with no name is still worth including with first_name/last_name null, if a real detail like an email or a stated preference is attached to them).
 - Only include a calendar_action if the note describes something that should go on a calendar (a scheduled meeting, an explicit follow-up date, a planned return visit). Do not invent a follow-up that was not mentioned.
-- when_iso must be a real resolved timestamp if a specific day/time was stated; if only vague ("follow up soon") leave it null and say so in notes.`;
+- when_iso must be a real resolved timestamp if a specific day/time was stated; if only vague ("follow up soon") leave it null and say so in notes.
+- account_facts is for a fact about the BUSINESS as a whole, not a person: hours, a general store phone, a general ordering email. Only fill a field when the text states it about the store/office itself ("their hours are...", "the store's number is..."); a person's own phone or email belongs in people[], never here. Most visits state none of this, null is the normal answer.`;
 }
 
 export type RecordTouchpointResult =
@@ -241,6 +279,7 @@ export type RecordTouchpointResult =
       hubspotLeaks: number;
       companyPhoneFilled: string | null;
       companyPhoneConflict: string | null;
+      accountFacts: AccountFactsReport | null;
     }
   | {
       ok: true;
@@ -385,6 +424,27 @@ export async function recordTouchpoint(
     ...(occurredAt ? { at: occurredAt } : {}),
   });
 
+  // A fact stated about the business itself (hours, general phone/email)
+  // blank-fills nb_accounts regardless of whether this call also files to
+  // HubSpot; the OS record is the source of truth either way. Never blocks
+  // the visit itself on failure, same "enrichment, not a gate" treatment as
+  // the contact loop below.
+  let accountFacts: AccountFactsReport | null = null;
+  try {
+    accountFacts = await applyAccountFacts(accountId, parsed.account_facts);
+    // Hours have no field-level sync to HubSpot (AGENTS.md HARD RULE 14), so
+    // a fresh OS blank-fill is the only trigger that reaches the portal at
+    // all. Gated the same as the note itself: skip entirely for a door that
+    // asked not to touch HubSpot yet (the clientos CLI's dry-then-write step).
+    if (accountFacts.business_hours?.status === "filled" && autoFileHubspot) {
+      const acc = await getAccount(accountId);
+      const companyId = acc.data[0]?.hubspot_company_id;
+      if (companyId) await pushBusinessHours(companyId, parsed.account_facts.business_hours!);
+    }
+  } catch {
+    accountFacts = null;
+  }
+
   const existing = await listContacts(accountId);
   let peopleAdded = 0;
   let peopleUpdated = 0;
@@ -470,6 +530,7 @@ export async function recordTouchpoint(
     peopleUpdated,
     calendarProposals,
     ...hubspot,
+    accountFacts,
   };
 }
 

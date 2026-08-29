@@ -390,6 +390,65 @@ export async function setAccountPotentialJuan(id: string, grade: Tier | null): P
   return rows[0] ?? null;
 }
 
+export type AccountFactsReport = {
+  business_hours: { status: "filled" } | { status: "conflict"; existing: Record<string, string[][]> } | null;
+  phone: { status: "filled"; value: string } | { status: "conflict"; existing: string } | null;
+  email: { status: "filled"; value: string } | { status: "conflict"; existing: string } | null;
+};
+
+/**
+ * Blank-fill nb_accounts.business_hours/phone/email from what was stated
+ * about the BUSINESS during a visit (AGENTS.md HARD RULE 14). Re-reads the
+ * live row first, same as every other write in this file, a concurrent
+ * enrichment pass may have filled the cell in the minutes since this
+ * touchpoint started. Never overwrites an existing value; a disagreement is
+ * reported, not resolved, same shape as ensureCompanyPhone's report.
+ */
+export async function applyAccountFacts(
+  accountId: string,
+  facts: { business_hours: Record<string, string[][]> | null; phone: string | null; email: string | null },
+): Promise<AccountFactsReport> {
+  const report: AccountFactsReport = { business_hours: null, phone: null, email: null };
+  const hasAnyHours = facts.business_hours && Object.values(facts.business_hours).some((w) => w.length > 0);
+  if (!hasAnyHours && !facts.phone && !facts.email) return report;
+
+  const current = await getAccount(accountId);
+  const row = current.data[0];
+  if (!row) return report;
+
+  const patch: Record<string, unknown> = {};
+
+  if (hasAnyHours) {
+    if (!row.business_hours) {
+      patch.business_hours = facts.business_hours;
+      report.business_hours = { status: "filled" };
+    } else {
+      report.business_hours = { status: "conflict", existing: row.business_hours };
+    }
+  }
+  if (facts.phone) {
+    if (!row.phone) {
+      patch.phone = facts.phone;
+      report.phone = { status: "filled", value: facts.phone };
+    } else if (row.phone !== facts.phone) {
+      report.phone = { status: "conflict", existing: row.phone };
+    }
+  }
+  if (facts.email) {
+    if (!row.email) {
+      patch.email = facts.email;
+      report.email = { status: "filled", value: facts.email };
+    } else if (row.email !== facts.email) {
+      report.email = { status: "conflict", existing: row.email };
+    }
+  }
+
+  if (Object.keys(patch).length > 0) {
+    await mutate<Account>("nb_accounts", "PATCH", patch, { id: `eq.${accountId}` });
+  }
+  return report;
+}
+
 export type NewAccount = {
   name: string;
   channel?: string;
