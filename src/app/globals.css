@@ -23,6 +23,16 @@
 html {
   scroll-behavior: smooth;
   overflow-x: hidden;
+  /* overflow-y explicit on purpose: naming only overflow-x here would pair
+     overflow-y to 'auto' per the CSS overflow spec, turning html/body into
+     their own scroll containers even though the page never overflows them.
+     That silently breaks every `position: sticky` on the site, because
+     sticky computes against the NEAREST scroll container, and a container
+     that never itself scrolls (the real scroll happens one level up, on the
+     viewport) never sticks. Found 2026-08-30: the NutriBiotic route map was
+     supposed to stay pinned while the route list scrolled past it and
+     instead scrolled away with the page. */
+  overflow-y: visible;
 }
 
 body {
@@ -32,6 +42,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  overflow-y: visible;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
