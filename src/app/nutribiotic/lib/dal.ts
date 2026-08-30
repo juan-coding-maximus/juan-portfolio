@@ -1822,6 +1822,26 @@ export async function setRouteDraft(byDay: RouteDraftByDay): Promise<void> {
   });
 }
 
+/** Add one account to an upcoming day's hand-built route, from a report stop
+ *  (2026-08-29, Juan: "instead of button Message, add a button of add the
+ *  client to an upcoming route on /map and i can decide the date"). A report
+ *  stop only carries the HubSpot company id; the draft keys on nb_accounts.id
+ *  (see RouteDraftEntry above), so this resolves one from the other first.
+ *  Silently a no-op if the account is already on that day's draft -- the
+ *  route panel itself treats a double-add as nothing to do, same here. */
+export async function addAccountToRouteDraft(hubspotCompanyId: string, date: string): Promise<void> {
+  const rows = await raw<{ id: string }>(
+    `nb_accounts?select=id&hubspot_company_id=eq.${encodeURIComponent(hubspotCompanyId)}&limit=1`,
+  );
+  const accountId = rows[0]?.id;
+  if (!accountId) throw new Error(`No local account found for HubSpot company ${hubspotCompanyId}`);
+
+  const byDay = await getRouteDraftByDay();
+  const day = byDay[date] ?? [];
+  if (day.some((e) => e === accountId)) return; // already on that day
+  await setRouteDraft({ ...byDay, [date]: [...day, accountId] });
+}
+
 /**
  * Route start/end (0040), DAY-PARTITIONED alongside route_draft (2026-08-23):
  * one entry per field day, keyed the same as RouteDraftByDay, present only for
@@ -2873,13 +2893,13 @@ export async function listPlaybookReportArchive(): Promise<PlaybookReportArchive
 const MARKETING_BUCKET = "nb-marketing";
 
 export type MarketingFile = {
-  folder: "marketing" | "field";
+  folder: "marketing" | "field" | "fact_cards";
   name: string;
   label: string;
   url: string;
 };
 
-async function listMarketingFolder(folder: "marketing" | "field"): Promise<MarketingFile[]> {
+async function listMarketingFolder(folder: "marketing" | "field" | "fact_cards"): Promise<MarketingFile[]> {
   const listRes = await fetch(`${SB_URL}/storage/v1/object/list/${MARKETING_BUCKET}`, {
     method: "POST",
     headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" },
@@ -2939,11 +2959,12 @@ export async function listMarketingFiles(): Promise<MarketingFile[]> {
   await verifySession();
   if (!isConfigured()) return [];
   try {
-    const [marketing, field] = await Promise.all([
+    const [marketing, field, factCards] = await Promise.all([
       listMarketingFolder("marketing"),
       listMarketingFolder("field"),
+      listMarketingFolder("fact_cards"),
     ]);
-    return [...marketing, ...field];
+    return [...marketing, ...field, ...factCards];
   } catch {
     return [];
   }
@@ -3021,6 +3042,9 @@ export type ReportPayload = {
     is_message_only?: boolean;
     hidden?: boolean;
     events?: unknown[];
+    /** HubSpot company id -- the join key for "add to an upcoming route",
+     *  which resolves it to nb_accounts.id (addAccountToRouteDraft). */
+    hubspot_id?: string;
   }>;
   /** Companies with an open HubSpot Task and no visit this window --
    *  field_report.py's assemble_stops() pulls these out rather than fake a

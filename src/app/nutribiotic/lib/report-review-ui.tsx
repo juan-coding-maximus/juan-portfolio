@@ -3,8 +3,15 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ReportDraft, ReportHqNote, RouteEndpoint } from "./dal";
-import { actionDecideReport, actionRenderPreview, actionRequestRebuild, actionSaveReportEdits } from "./report-actions";
+import {
+  actionAddToRoute,
+  actionDecideReport,
+  actionRenderPreview,
+  actionRequestRebuild,
+  actionSaveReportEdits,
+} from "./report-actions";
 import { RouteEndpointField } from "../map/RouteEndpointField";
+import { planningHorizonDates } from "./field-week";
 import { Ico, SuccessNote } from "./ui";
 
 const HQ_CATEGORIES = [
@@ -369,17 +376,17 @@ export function ReportReview({
                           <span className="ml-1.5 text-[11.5px] text-[#8A6D2F]">no coordinates, off the map</span>
                         )}
                       </span>
-                      <div className="flex shrink-0 gap-1.5">
+                      <div className="flex shrink-0 items-center gap-1.5">
                         <Toggle on={e.call_only} onClick={() => set({ call_only: !e.call_only })} disabled={locked}>
                           Call only
                         </Toggle>
-                        <Toggle
-                          on={e.message_only}
-                          onClick={() => set({ message_only: !e.message_only })}
-                          disabled={locked}
-                        >
-                          Message
-                        </Toggle>
+                        {s.hubspot_id && (
+                          <AddToRouteControl
+                            hubspotId={s.hubspot_id}
+                            name={s.name ?? "this account"}
+                            onAdded={(label) => setSaved(`Added ${s.name} to ${label}'s route.`)}
+                          />
+                        )}
                         <Toggle on={e.hidden} onClick={() => set({ hidden: !e.hidden })} disabled={locked} danger>
                           Hide
                         </Toggle>
@@ -570,6 +577,66 @@ function Toggle({
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * Add this stop to an upcoming route day (2026-08-29, replaces the "Message"
+ * toggle: "add a button of add the client to an upcoming route on /map and i
+ * can decide the date"). Writes straight to the route_draft /map itself
+ * edits (see actionAddToRoute) -- open Map on the picked date and the
+ * account is already sitting there, same shape as adding it by hand there.
+ */
+function AddToRouteControl({
+  hubspotId,
+  name,
+  onAdded,
+}: {
+  hubspotId: string;
+  name: string;
+  onAdded: (dayLabel: string) => void;
+}) {
+  const horizon = planningHorizonDates(10);
+  const [date, setDate] = useState(horizon[0]);
+  const [pending, startTransition] = useTransition();
+
+  function add() {
+    startTransition(async () => {
+      await actionAddToRoute(hubspotId, date);
+      const label = new Date(`${date}T00:00:00`).toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      });
+      onAdded(label);
+    });
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <select
+        value={date}
+        onChange={(ev) => setDate(ev.target.value)}
+        disabled={pending}
+        aria-label={`Route day for ${name}`}
+        className="rounded-md border border-[#E2DFD5] bg-white px-1.5 py-1 text-[11.5px] text-[#5B6560] focus:border-[#14201B] focus:outline-none disabled:opacity-50"
+      >
+        {horizon.map((d) => (
+          <option key={d} value={d}>
+            {new Date(`${d}T00:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        onClick={add}
+        disabled={pending}
+        title={`Add ${name} to this day's route on /map`}
+        className="rounded-md border border-[#E2DFD5] bg-white px-2 py-1 text-[11.5px] font-medium text-[#5B6560] transition-colors hover:bg-[#FAF9F5] disabled:opacity-40"
+      >
+        {pending ? "Adding…" : "Add to route"}
+      </button>
+    </div>
   );
 }
 

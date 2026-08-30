@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  addAccountToRouteDraft,
   getReportDraft,
   requestPreviewRender,
   requestReportRebuild,
@@ -50,6 +51,18 @@ export async function actionRequestRebuild(dateISO: string): Promise<void> {
 export async function actionRenderPreview(dateISO: string, kind: "daily" | "weekly" = "daily"): Promise<void> {
   await requestPreviewRender(dateISO, kind);
   revalidatePath(PATH);
+}
+
+/** Add a report stop to an upcoming day's route (2026-08-29, replaces the
+ *  "Message" toggle: "add a button of add the client to an upcoming route on
+ *  /map and i can decide the date"). Writes straight to the same
+ *  route_draft the /map screen edits -- open Map on that date and the
+ *  account is already there. Revalidates /map too since this is the one
+ *  action here that changes what that screen shows. */
+export async function actionAddToRoute(hubspotCompanyId: string, date: string): Promise<void> {
+  await addAccountToRouteDraft(hubspotCompanyId, date);
+  revalidatePath(PATH);
+  revalidatePath("/nutribiotic/map");
 }
 
 export async function actionDecideReport(
