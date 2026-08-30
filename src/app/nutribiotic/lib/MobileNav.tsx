@@ -37,7 +37,7 @@ export function MobileNav({
   return (
     <nav
       aria-label="The OS mobile nav"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-[#E2DFD5] bg-white pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-[#E2DFD5] bg-white pb-[env(safe-area-inset-bottom)] 2xl:hidden"
     >
       <div
         className="grid"

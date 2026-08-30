@@ -424,7 +424,8 @@ export function MapScreen({
 
   return (
     /**
-     * TWO PANES ON A MAC, ONE COLUMN ON A PHONE (Juan, 2026-08-26).
+     * TWO PANES FROM TABLET UP, ONE COLUMN ON A PHONE (Juan, 2026-08-26;
+     * breakpoint moved 2026-08-30).
      *
      * The map and the route are read against each other constantly: a pin is
      * only interesting because of where it falls in the day, and a stop's
@@ -433,15 +434,25 @@ export function MapScreen({
      * a scroll every few seconds. Side by side they carry the same weight,
      * which is what they actually have.
      *
-     * The split is xl-and-up on purpose: it needs both panes to clear a phone's
-     * landscape width before it beats stacking. Below that this is exactly the
-     * screen it was, because on a phone a half-width map is not a map.
+     * The split triggers at md, the SAME breakpoint the sidebar disappears at
+     * (layout.tsx's aside/MobileNav moved from md to 2xl on 2026-08-30 for
+     * exactly this reason): two panes need width, and the sidebar was the
+     * biggest single thing standing between them and it. Below md this is
+     * exactly the screen it was, because on a phone a half-width map is not a
+     * map. From md to 2xl there is no sidebar competing for room, only the
+     * bottom tab bar; from 2xl up the sidebar returns and both panes keep
+     * growing inside it. The columns are NOT an even split -- grid-cols-2
+     * would hand the route panel the same width as the map, and the route's
+     * own content (a stop's action-button row, RoutePanel.tsx) needs less of
+     * it than the map does to stay legible. 3fr:2fr (~60/40) gives the map
+     * the larger share throughout, so it reads as "the map, with a route
+     * beside it" at every width instead of two equal boxes.
      *
      * The left pane is sticky and viewport-tall; the right scrolls on its own.
      * The ten-closest joins the right column rather than sitting under the
      * grid: left is where things are, right is every list.
      */
-    <div className="xl:grid xl:grid-cols-2 xl:items-start xl:gap-5">
+    <div className="md:grid md:grid-cols-[3fr_2fr] md:items-start md:gap-4 lg:gap-5">
       {/* THE FILTER ROWS LIVE INSIDE THIS BOX, so its height is not the map's
           height: the area and tier rows take ~128px off the top. At a 420px
           floor that left the map 292px tall, and fitBounds correctly solved for
@@ -451,7 +462,7 @@ export function MapScreen({
           smaller floor there paired with the ten-closest list right below. */}
       <div
         ref={mapBoxRef}
-        className="h-[calc(100vh-240px)] min-h-[520px] overflow-hidden rounded-lg border border-[#E2DFD5] md:min-h-[640px] xl:sticky xl:top-7 xl:h-[calc(100vh-56px)]"
+        className="h-[calc(100vh-240px)] min-h-[420px] overflow-hidden rounded-lg border border-[#E2DFD5] md:min-h-[380px] md:sticky md:top-7 md:h-[calc(100vh-56px)]"
       >
         <AccountsMap
           accounts={accounts}
@@ -472,10 +483,18 @@ export function MapScreen({
         />
       </div>
 
-      {/* Stacked below the map on a phone, beside it on a Mac. The wrapper is
-          the right column; it carries its own flow so RoutePanel keeps
-          returning a fragment and nothing inside it had to change. */}
-      <div className="mt-8 flex flex-col gap-8 xl:mt-0">
+      {/* Stacked below the map on a phone, beside it from md up. min-w-0 is
+          load-bearing (2026-08-30): a grid item's default min-width is its
+          content's, not the track's, so without this RoutePanel's own
+          content (a stop's fixed-width action-button row, notably) could
+          refuse to shrink below its intrinsic width and force the grid
+          track wider than its 2fr share -- which, with globals.css clipping
+          horizontal overflow instead of scrolling it, made the whole column
+          silently vanish off the right edge at exactly the widths this
+          split exists to serve. The wrapper is the right column; it carries
+          its own flow so RoutePanel keeps returning a fragment and nothing
+          inside it had to change. */}
+      <div className="mt-8 flex min-w-0 flex-col gap-8 md:mt-0">
       <RoutePanel
         stops={routeStops}
         home={home}

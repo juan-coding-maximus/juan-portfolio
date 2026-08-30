@@ -188,7 +188,17 @@ export default async function NutribioticLayout({
             shell costs them nothing and gives the one screen that needs the
             pixels a MacBook's worth of them. */}
         <div className="mx-auto flex min-h-screen max-w-[1700px] gap-0">
-          <aside className="hidden w-[210px] shrink-0 border-r border-[#E2DFD5] px-5 py-7 md:block">
+          {/* 2xl not md (2026-08-30): between md and 2xl the sidebar was the
+              thing standing between the Map screen's two panes and the room
+              they need -- at, say, 1300px it cost map+route 210px each side
+              of a border, exactly the range where the route panel's fixed-
+              width action-button row had nowhere left to go but off the
+              edge (see globals.css's overflow-x note: it clipped instead of
+              scrolling). Sidebar chrome only earns its keep once there is
+              width to spare beyond what the dashboard itself needs; below
+              2xl the bottom tab bar carries the same nav for less width. See
+              MapScreen's matching md breakpoint for the other half of this. */}
+          <aside className="hidden w-[210px] shrink-0 border-r border-[#E2DFD5] px-5 py-7 2xl:block">
             <div className="mb-8">
               <div className="font-[family-name:var(--font-fraunces)] text-[19px] leading-none font-semibold tracking-tight">
                 NutriBiotic
@@ -215,13 +225,14 @@ export default async function NutribioticLayout({
 
           </aside>
 
-          {/* pb clears The OS mobile nav below md; the bar is fixed, so without
-              this the last row of every screen hides behind it. */}
-          <main className="min-w-0 flex-1 px-5 py-7 pb-24 md:px-9 md:pb-7">{children}</main>
+          {/* pb clears The OS mobile nav below 2xl (matches the aside/MobileNav
+              breakpoint above); the bar is fixed, so without this the last
+              row of every screen hides behind it. */}
+          <main className="min-w-0 flex-1 px-5 py-7 pb-24 md:px-9 2xl:pb-7">{children}</main>
         </div>
 
         {/* The OS mobile nav: the same items as the sidebar, same gating rules,
-            rendered as a bottom tab bar below md where the sidebar disappears. */}
+            rendered as a bottom tab bar below 2xl where the sidebar disappears. */}
         <MobileNav items={nav} moreItems={MORE_NAV} />
       </div>
       </ModalProvider>

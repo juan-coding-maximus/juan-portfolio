@@ -1117,7 +1117,13 @@ export function RoutePanel({
               <li
                 key={s.id}
                 data-stop-id={s.id}
-                className={`flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3 ${
+                // flex-wrap (2026-08-30): the button cluster below (drag,
+                // done, top, up, down, day-move, locate, GO, remove) is
+                // shrink-0 -- it never gets narrower -- so on a route column
+                // too skinny to hold both it and the stop's own text on one
+                // line, it now drops to its own line under the text instead
+                // of forcing the row past the column's width.
+                className={`flex flex-col flex-wrap gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3 ${
                   drag?.id === s.id ? "opacity-40" : isDone ? "opacity-50" : ""
                 } ${dropBefore ? "border-t-2 border-[#2C6A46]" : ""} ${
                   dropAtEnd ? "border-b-2 border-[#2C6A46]" : ""
