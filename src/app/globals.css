@@ -22,17 +22,22 @@
 
 html {
   scroll-behavior: smooth;
-  overflow-x: hidden;
-  /* overflow-y explicit on purpose: naming only overflow-x here would pair
-     overflow-y to 'auto' per the CSS overflow spec, turning html/body into
-     their own scroll containers even though the page never overflows them.
-     That silently breaks every `position: sticky` on the site, because
-     sticky computes against the NEAREST scroll container, and a container
-     that never itself scrolls (the real scroll happens one level up, on the
-     viewport) never sticks. Found 2026-08-30: the NutriBiotic route map was
-     supposed to stay pinned while the route list scrolled past it and
-     instead scrolled away with the page. */
-  overflow-y: visible;
+  /* NO overflow-x here (reverted 2026-08-30; added 2026-08-14 in 113bbd2 to
+     close a phone-sidebar clipping gap that body's own overflow-x:hidden
+     already covered). The CSS overflow spec pairs a non-'visible' axis with
+     an 'auto' on the other axis of THE SAME element -- overflow-x:hidden
+     always forces overflow-y to 'auto', there's no way to set overflow-x
+     alone without doing that (confirmed: an explicit overflow-y:visible
+     alongside it just gets computed back to 'auto', it does not stick).
+     'auto' makes the element a scroll container for position:sticky's
+     purposes even though it never itself scrolls. With BOTH html and body
+     carrying that, a sticky descendant binds to the nearer one (body),
+     which never scrolls (the real scroll happens on html), so it can never
+     stick. Left on body alone, this doesn't happen: html's own overflow
+     stays the untouched default 'visible', so the browser propagates
+     body's overflow-x:hidden up to the viewport itself instead of nesting
+     a second, non-scrolling container in between -- the same thing this
+     rule already did from May 2026 to Aug 14 without breaking sticky. */
 }
 
 body {
@@ -42,7 +47,6 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
-  overflow-y: visible;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
