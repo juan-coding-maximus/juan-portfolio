@@ -31,6 +31,7 @@ import {
   insertTouchpoint,
   listAccounts,
   listContacts,
+  markRouteStopDoneForAccountToday,
   patchContact,
   type AccountFactsReport,
 } from "./dal";
@@ -88,6 +89,37 @@ export type HubspotFilingReport = {
 const client = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   : null;
+
+/**
+ * Kinds that mean Juan was physically at the account, as opposed to kinds
+ * that only prove contact (call/text/email_out/email_in/linkedin/newsletter)
+ * or don't belong to a single stop at all (order, note). Deliberately
+ * excludes "meeting": AGENTS.md HARD RULE 12 already establishes that kind is
+ * reserved for something the text itself frames as scheduled/formal, not
+ * "in person" -- REMOTE_MEETING_SIGNALS (field_report.py) exists precisely
+ * because a Meeting object is sometimes a video call, and marking a route
+ * stop serviced off a remote meeting would be a false auto-done exactly like
+ * the one that keyword fix was built to stop.
+ */
+const IN_PERSON_ENGAGEMENT_KINDS = new Set(["visit", "sample_drop", "staff_training"]);
+
+/**
+ * The second auto-done trigger (Juan's ask 2026-08-31): a filed HubSpot
+ * engagement for an account on today's route is stronger evidence he serviced
+ * that stop than any location fix, and it fires the instant the note is
+ * filed rather than waiting on a location report to happen to land nearby.
+ * Never blocks or reports failure to the caller -- this is a side-effect of a
+ * successful filing, not a condition of one (same "never fails the visit
+ * itself" treatment as accountFacts below).
+ */
+async function maybeMarkStopServiced(accountId: string, kind: string, hubspotFiled: boolean): Promise<void> {
+  if (!hubspotFiled || !IN_PERSON_ENGAGEMENT_KINDS.has(kind)) return;
+  try {
+    await markRouteStopDoneForAccountToday(accountId);
+  } catch {
+    // A route side-effect never fails a HubSpot filing that already succeeded.
+  }
+}
 
 type ParsedPerson = {
   first_name: string | null;
@@ -550,6 +582,8 @@ export async function recordTouchpoint(
         companyPhoneConflict: null,
       } satisfies HubspotFilingReport);
 
+  await maybeMarkStopServiced(accountId, parsed.activity.kind, hubspot.hubspotFiled);
+
   return {
     ok: true,
     touchpoint_id: tp.id,
@@ -667,6 +701,8 @@ export async function resolveTouchpointToAccount(
   }
 
   const hubspot = await autoFileEngagement(activity.id);
+
+  await maybeMarkStopServiced(accountId, parsed.activity.kind, hubspot.hubspotFiled);
 
   revalidatePath("/nutribiotic/visit");
   return { ok: true, accountId, accountName, summary: parsed.activity.detail, peopleAdded, peopleUpdated, calendarProposals, ...hubspot };
