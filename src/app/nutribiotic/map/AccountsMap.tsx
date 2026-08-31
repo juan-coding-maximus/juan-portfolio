@@ -507,37 +507,81 @@ export function AccountsMap({
   const fitKey = useMemo(() => filtered.map((a) => a.id).join(","), [filtered]);
   const fittedRef = useRef("");
 
+  /* THE DAY'S ROUTE OUTRANKS THE TERRITORY (Juan, 2026-08-31): with a route
+     built for the active day, "zoomed for the territory" is the wrong
+     default -- he is looking at today's five stops, not all 331 accounts
+     scattered from Fresno to the border. `routeStops` already comes in
+     scoped to whichever day tab is active (route-context.tsx keys the draft
+     by day), so switching days naturally changes this key and re-frames.
+     Falls back to the territory fit below whenever the active day has no
+     stops yet, which is every day before Juan builds one. */
+  const routeFitKey = useMemo(
+    () =>
+      [
+        ...(routeStart ? [`s:${routeStart.lat},${routeStart.lng}`] : []),
+        ...routeStops.map((s) => `${s.id}:${s.lat},${s.lng}`),
+        ...(routeEnd ? [`e:${routeEnd.lat},${routeEnd.lng}`] : []),
+      ].join("|"),
+    [routeStops, routeStart, routeEnd],
+  );
+
   const fitToPins = useCallback(() => {
     const map = mapRef.current;
-    if (!map || filtered.length === 0 || fittedRef.current === fitKey) return;
+    if (!map) return;
+
+    if (routeStops.length > 0) {
+      const key = `route:${routeFitKey}`;
+      if (fittedRef.current === key) return;
+      const bounds = new google.maps.LatLngBounds();
+      for (const s of routeStops) bounds.extend({ lat: s.lat, lng: s.lng });
+      if (routeStart) bounds.extend({ lat: routeStart.lat, lng: routeStart.lng });
+      if (routeEnd) bounds.extend({ lat: routeEnd.lat, lng: routeEnd.lng });
+      // Wider padding than the territory fit (64 vs 48): a handful of stops
+      // pinned right against the pane's edge is harder to read than a
+      // 300-pin territory losing the same margin.
+      map.fitBounds(bounds, 64);
+      fittedRef.current = key;
+      return;
+    }
+
+    if (filtered.length === 0 || fittedRef.current === fitKey) return;
     const bounds = new google.maps.LatLngBounds();
     for (const a of filtered) bounds.extend({ lat: a.lat, lng: a.lng });
     map.fitBounds(bounds, 48);
     fittedRef.current = fitKey;
-  }, [filtered, fitKey]);
+  }, [filtered, fitKey, routeStops, routeFitKey, routeStart, routeEnd]);
 
-  // A new filter means the previous fit no longer describes what is on screen, so the
-  // guard is cleared and the next idle re-frames.
+  // A new filter, or a change to the active day's route, means the previous
+  // fit no longer describes what is on screen, so the guard is cleared and
+  // the next idle re-frames.
   useEffect(() => {
     fittedRef.current = "";
     fitToPins();
-  }, [fitKey, mapReady, fitToPins]);
+  }, [fitKey, routeFitKey, mapReady, fitToPins]);
 
   /* OPEN ON JUAN, kinda zoomed in. The fix arrives async (1-3s on a phone), so
      this cannot be an initial-center option: by then the territory fit has run.
      When the position lands, the camera moves to it once, at street-cluster
      zoom, and the fit signature is stamped so the next idle does not yank the
      viewport back to the whole territory. Touching a filter afterwards is an
-     explicit ask to see those pins, and re-fits as before. */
+     explicit ask to see those pins, and re-fits as before.
+
+     Skipped when the active day already has a route (2026-08-31): the route
+     fit above already gave the camera a purposeful frame around today's
+     stops, and "recenter on wherever Juan is standing right now, zoomed to a
+     generic street level" is a worse view of that than the one it would
+     replace. His GPS fix landing async is exactly the failure mode this
+     guards against -- without it, a route fit that ran first could get
+     silently overwritten a second later when the position arrives. */
   const userCentredRef = useRef(false);
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !userLoc || !mapReady || userCentredRef.current) return;
+    if (!map || !userLoc || !mapReady || userCentredRef.current || routeStops.length > 0) return;
     map.setCenter(userLoc);
     map.setZoom(12);
     fittedRef.current = fitKey;
     userCentredRef.current = true;
-  }, [userLoc, mapReady, fitKey]);
+  }, [userLoc, mapReady, fitKey, routeStops.length]);
 
   /**
    * REFIT WHEN THE PANE CHANGES SHAPE (2026-08-26, with the two-pane layout).
