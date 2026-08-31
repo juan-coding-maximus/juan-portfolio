@@ -1153,7 +1153,14 @@ export function RoutePanel({
                   )}
                 </div>
 
-                <div className="min-w-0 flex-1">
+                {/* min-w-[10rem] not min-w-0 (2026-08-31): min-w-0 let this
+                    shrink all the way to nothing instead of ever wrapping the
+                    button cluster onto its own line -- flex-wrap only kicks
+                    in once a child truly can't shrink any further, and a
+                    flex-1 item with no floor can always "fit" by crushing the
+                    stop's name down to a couple of letters. 160px is enough
+                    for a truncated name to still read as a name. */}
+                <div className="min-w-[10rem] flex-1">
                   {c ? (
                     <>
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
