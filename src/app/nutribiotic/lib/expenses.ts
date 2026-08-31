@@ -64,6 +64,14 @@ const MILEAGE_RATE = 0.76;
 
 export type PeriodBounds = { start: Date; end: Date };
 
+// 2026-08-31, Juan's call: pay periods run Monday through the following Sunday (a fixed
+// 14-day cadence), not the old calendar 1st-15th/16th-end split, which routinely split a
+// workweek across two periods. This epoch IS a Monday and IS a period start; every other
+// period boundary is this date shifted by a whole multiple of 14 days, forever in both
+// directions, so the cadence never drifts. Mirrors `PERIOD_EPOCH` in expense_log.py.
+const PERIOD_EPOCH_MS = Date.UTC(2026, 7, 31);
+const MS_PER_DAY = 86_400_000;
+
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
 }
@@ -86,32 +94,43 @@ function parseDate(dateStr: string): Date {
 
 export function periodBounds(dateStr: string): PeriodBounds {
   const d = parseDate(dateStr);
-  const y = d.getUTCFullYear();
-  const m = d.getUTCMonth();
-  const day = d.getUTCDate();
-  if (day <= 15) {
-    return { start: new Date(Date.UTC(y, m, 1)), end: new Date(Date.UTC(y, m, 15)) };
-  }
-  const lastOfMonth = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
-  return { start: new Date(Date.UTC(y, m, 16)), end: new Date(Date.UTC(y, m, lastOfMonth)) };
+  const diffDays = Math.floor((d.getTime() - PERIOD_EPOCH_MS) / MS_PER_DAY);
+  const periodIndex = Math.floor(diffDays / 14);
+  const startMs = PERIOD_EPOCH_MS + periodIndex * 14 * MS_PER_DAY;
+  return { start: new Date(startMs), end: new Date(startMs + 13 * MS_PER_DAY) };
+}
+
+/** The "2026-09a" (first-half) / "2026-09b" (second-half) label a 14-day period is filed
+ * under: whichever month owns the period's 7th day (its midpoint week), read the same way
+ * the old scheme read a single date's own day-of-month. A period straddling a month
+ * boundary (like Aug 31-Sep 13) is filed under the month that holds most of its days. */
+function periodLabelParts(bounds: PeriodBounds): { year: number; month: number; half: "a" | "b" } {
+  const mid = new Date(bounds.start.getTime() + 6 * MS_PER_DAY);
+  return {
+    year: mid.getUTCFullYear(),
+    month: mid.getUTCMonth() + 1,
+    half: mid.getUTCDate() <= 15 ? "a" : "b",
+  };
 }
 
 export function periodKey(dateStr: string): string {
-  const d = parseDate(dateStr);
-  const half = d.getUTCDate() <= 15 ? "a" : "b";
-  return `pp_${d.getUTCFullYear()}_${pad2(d.getUTCMonth() + 1)}${half}`;
+  const { year, month, half } = periodLabelParts(periodBounds(dateStr));
+  return `pp_${year}_${pad2(month)}${half}`;
 }
 
 export function periodLabel(dateStr: string): string {
   const { start, end } = periodBounds(dateStr);
-  const monthName = start.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
-  return `period ${monthName} ${start.getUTCDate()}-${end.getUTCDate()}, ${end.getUTCFullYear()}`;
+  const startMonth = start.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
+  const endMonth = end.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
+  if (startMonth === endMonth && start.getUTCFullYear() === end.getUTCFullYear()) {
+    return `period ${startMonth} ${start.getUTCDate()}-${end.getUTCDate()}, ${end.getUTCFullYear()}`;
+  }
+  return `period ${startMonth} ${start.getUTCDate()} - ${endMonth} ${end.getUTCDate()}, ${end.getUTCFullYear()}`;
 }
 
 export function sheetName(dateStr: string): string {
-  const d = parseDate(dateStr);
-  const half = d.getUTCDate() <= 15 ? "a" : "b";
-  return `expense-report-${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}${half}`;
+  const { year, month, half } = periodLabelParts(periodBounds(dateStr));
+  return `expense-report-${year}-${pad2(month)}${half}`;
 }
 
 /** The Sunday (UTC-date-math) that starts the fixed 7-day workweek California

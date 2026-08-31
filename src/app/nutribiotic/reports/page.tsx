@@ -16,6 +16,7 @@ import {
   reportDateLA,
   signReportPreview,
   weekWindowFor,
+  type PlaybookReportArchive,
 } from "../lib/dal";
 import { DateNav, ReportReview, WeeklyReportReview } from "../lib/report-review-ui";
 
@@ -61,11 +62,11 @@ export default async function ReportsIndex({
 
   const [reports, archive, draft, home, allTime, weeklyDraft, archivedDailyUrl, archivedWeeklyUrl] =
     await Promise.all([
-      listPlaybookReports(),
-      listPlaybookReportArchive(),
+      listPlaybookReports().catch(() => []),
+      listPlaybookReportArchive().catch((): PlaybookReportArchive => ({ reports: [], truncated: {} })),
       getReportDraft(selectedDate, "daily").catch(() => null),
       getHomeEndpoint().catch(() => null),
-      getAllTimeMetrics(),
+      getAllTimeMetrics().catch(() => null),
       weekWindow ? getReportDraft(weekWindow.end, "weekly").catch(() => null) : Promise.resolve(null),
       // The real, already-sent artifact for this day/week (2026-08-28, Juan:
       // "I need to be able to see what was sent, which you should refer to
