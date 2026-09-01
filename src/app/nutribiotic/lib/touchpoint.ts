@@ -91,17 +91,13 @@ const client = process.env.ANTHROPIC_API_KEY
   : null;
 
 /**
- * Kinds that mean Juan was physically at the account, as opposed to kinds
- * that only prove contact (call/text/email_out/email_in/linkedin/newsletter)
- * or don't belong to a single stop at all (order, note). Deliberately
- * excludes "meeting": AGENTS.md HARD RULE 12 already establishes that kind is
- * reserved for something the text itself frames as scheduled/formal, not
- * "in person" -- REMOTE_MEETING_SIGNALS (field_report.py) exists precisely
- * because a Meeting object is sometimes a video call, and marking a route
- * stop serviced off a remote meeting would be a false auto-done exactly like
- * the one that keyword fix was built to stop.
+ * Kinds that mean the stop was serviced (Juan, 2026-08-31: a filed engagement
+ * of any of these means the stop is done, an occasional false positive, e.g.
+ * a remote "meeting", is fine, an unmarked stop he actually serviced is the
+ * worse failure). Async written channels (text/email/linkedin/newsletter) and
+ * kinds that don't belong to a single stop (order, note) stay excluded.
  */
-const IN_PERSON_ENGAGEMENT_KINDS = new Set(["visit", "sample_drop", "staff_training"]);
+const IN_PERSON_ENGAGEMENT_KINDS = new Set(["visit", "meeting", "call", "sample_drop", "staff_training"]);
 
 /**
  * The second auto-done trigger (Juan's ask 2026-08-31): a filed HubSpot
