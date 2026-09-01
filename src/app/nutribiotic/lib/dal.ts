@@ -186,7 +186,15 @@ async function mutate<T>(
     throw new Error(`Supabase ${table} ${method} -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
   }
 
-  return (await res.json()) as T[];
+  // `Prefer: return=minimal` (every report-draft write: save/approve/hold/
+  // rebuild/render) makes PostgREST answer 204 with an EMPTY body, not `[]`.
+  // res.json() on that throws "Unexpected end of JSON input" -- deterministically,
+  // every single time, not a transient blip -- which is exactly what surfaced as
+  // the Reports screen's "This screen didn't load" on every edit/approve. None of
+  // the return=minimal callers read the resolved array (all typed Promise<void>),
+  // so an empty response is `[]` here, never a parse attempt on nothing.
+  const text = await res.text();
+  return text ? (JSON.parse(text) as T[]) : [];
 }
 
 /** Our own id shape throughout this schema: '<prefix>_<6 hex>'. */
