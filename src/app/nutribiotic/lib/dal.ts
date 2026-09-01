@@ -2177,8 +2177,8 @@ export async function getLastLocation(): Promise<LastLocation | null> {
  * route_dwell). Faded completely -- unreliable on the spotty connectivity a
  * field day actually has, and superseded by markRouteStopDoneForAccountToday
  * above, which fires off a real filed HubSpot engagement instead of a GPS
- * proxy for one. route_dwell (0052) is now dead, unwritten weight; left in
- * place rather than migrated away for a column that never held real data.
+ * proxy for one. The column is gone too: migration 0053 dropped route_dwell
+ * the same day, so no code, schema or read path for it survives anywhere.
  *
  * Called from exactly two places, by design: MapScreen.tsx's existing
  * geolocation request (via reportLiveLocation, prefs-actions.ts) and the
