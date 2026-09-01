@@ -14,6 +14,26 @@ import { RouteEndpointField } from "../map/RouteEndpointField";
 import { planningHorizonDates } from "./field-week";
 import { Ico, SuccessNote } from "./ui";
 
+/**
+ * One silent retry before a transient failure reaches the user. Juan, 2026-08-31: he
+ * edited the report, clicked Approve and send, and a Supabase blip threw straight to
+ * the page's error boundary (error.tsx) -- which reads as the edit being lost even
+ * though nothing actually was. The retry runs inside the same startTransition the
+ * caller already awaited, so the button just stays on "Working…" a little longer; nothing
+ * distinguishes a first-try success from a retried one unless both attempts fail.
+ */
+async function withRetry<T>(fn: () => Promise<T>, attempts = 2, delayMs = 1200): Promise<T> {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (i === attempts - 1) throw err;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw new Error("unreachable"); // attempts >= 1 always returns or throws above
+}
+
 const HQ_CATEGORIES = [
   "FORMULATION & PRODUCT",
   "DISCOUNTS & PRICING",
@@ -134,7 +154,7 @@ export function ReportReview({
 
   function save(then?: () => void) {
     startTransition(async () => {
-      await actionSaveReportEdits(draft.report_date, currentEdits());
+      await withRetry(() => actionSaveReportEdits(draft.report_date, currentEdits()));
       setSaved("Saved. The preview is re-rendering.");
       then?.();
       router.refresh();
@@ -145,8 +165,8 @@ export function ReportReview({
     startTransition(async () => {
       // Save first, always: approving something he edited but did not save
       // would mail the version he was looking away from.
-      await actionSaveReportEdits(draft.report_date, currentEdits());
-      await actionDecideReport(draft.report_date, decision, "daily");
+      await withRetry(() => actionSaveReportEdits(draft.report_date, currentEdits()));
+      await withRetry(() => actionDecideReport(draft.report_date, decision, "daily"));
       setSaved(
         decision === "approved"
           ? "Approved. It goes out on the next pass, within a few minutes."
@@ -212,7 +232,7 @@ export function ReportReview({
             <p className="mb-3">Nothing built or sent for {draft.report_date} yet.</p>
             <button
               onClick={() => startTransition(async () => {
-                await actionRequestRebuild(draft.report_date);
+                await withRetry(() => actionRequestRebuild(draft.report_date));
                 router.refresh();
               })}
               disabled={pending}
@@ -238,7 +258,7 @@ export function ReportReview({
             ) : (
               <button
                 onClick={() => startTransition(async () => {
-                  await actionRenderPreview(draft.report_date, "daily");
+                  await withRetry(() => actionRenderPreview(draft.report_date, "daily"));
                   router.refresh();
                 })}
                 disabled={pending}
@@ -250,7 +270,7 @@ export function ReportReview({
             {!sent && (
               <button
                 onClick={() => startTransition(async () => {
-                  await actionRequestRebuild(draft.report_date);
+                  await withRetry(() => actionRequestRebuild(draft.report_date));
                   router.refresh();
                 })}
                 disabled={locked}
@@ -602,7 +622,7 @@ function AddToRouteControl({
 
   function add() {
     startTransition(async () => {
-      await actionAddToRoute(hubspotId, date);
+      await withRetry(() => actionAddToRoute(hubspotId, date));
       const label = new Date(`${date}T00:00:00`).toLocaleDateString("en-US", {
         weekday: "short",
         month: "short",
@@ -684,7 +704,7 @@ export function WeeklyReportReview({
 
   function decide(decision: "approved" | "held" | "pending") {
     startTransition(async () => {
-      await actionDecideReport(draft.report_date, decision, "weekly");
+      await withRetry(() => actionDecideReport(draft.report_date, decision, "weekly"));
       setSaved(
         decision === "approved"
           ? "Approved. It goes out on the next pass, within a few minutes."
@@ -749,7 +769,7 @@ export function WeeklyReportReview({
         ) : (
           <button
             onClick={() => startTransition(async () => {
-              await actionRenderPreview(draft.report_date, "weekly");
+              await withRetry(() => actionRenderPreview(draft.report_date, "weekly"));
               router.refresh();
             })}
             disabled={pending}
