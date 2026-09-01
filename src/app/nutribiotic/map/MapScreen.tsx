@@ -400,42 +400,19 @@ export function MapScreen({
     requestLoc();
   }, [requestLoc]);
 
-  /* Re-asks for a fix every 2 minutes while this tab is actually visible
-   * (Juan's ask 2026-08-31: he wants the dwell-based auto-done -- see
-   * setLastLocationAndAutoComplete's route_dwell -- to actually accumulate
-   * its 10 minutes while the map is open on the dash mount or in his hand,
-   * not sit on a single load-time fix. This is still NOT true OS background
-   * tracking: a locked phone or a closed tab gets nothing, same limitation
-   * 0052's migration header already calls out. That gap is what the HubSpot-
-   * filing trigger (maybeMarkStopServiced, touchpoint.ts) exists to cover. */
-  useEffect(() => {
-    const id = setInterval(() => {
-      if (document.visibilityState === "visible") requestLoc();
-    }, 120_000);
-    return () => clearInterval(id);
-  }, [requestLoc]);
-
-  /* THE ONLY PLACE THIS APP REPORTS A LIVE LOCATION (Juan's ask 2026-08-27):
-   * riding on the geolocation fix requestLoc() already asks for, never a
-   * separate poll of its own. Runs on `loc` rather than inside requestLoc's
-   * own success callback so it always closes over the CURRENT done/toggleDone
-   * from this render, not whichever ones existed when requestLoc was first
-   * memoized. Feeds the widget's live finish-time estimate (last_location,
-   * migration 0044) and the dwell-based auto-done check (0.2mi for 10
-   * continuous minutes, route_dwell, migration 0052) -- occasional false
-   * positives are fine by design (Juan, 2026-08-31), same one-tap-to-undo
-   * cost as any other done mark. */
+  /* Reports the fix for the widget's live finish-time estimate only (Juan's
+   * ask 2026-08-27, last_location, migration 0044). No longer auto-completes
+   * a stop: geolocation-based auto-done (an instant 0.1mi check, then a
+   * 0.2mi/10-minute dwell version, migration 0052) was faded completely on
+   * Juan's call 2026-08-31 -- unreliable on spotty field connectivity, and
+   * superseded by the HubSpot-filing trigger (touchpoint.ts), which fires
+   * off a real filed engagement instead of a GPS proxy for one. */
   useEffect(() => {
     if (!loc) return;
-    reportLiveLocation(loc.lat, loc.lng)
-      .then((res) => {
-        for (const id of res.autoDoneIds) toggleDone(id);
-      })
-      .catch(() => {
-        // A location report is a nice-to-have, not a dependency: the map
-        // already has its fix and keeps working regardless.
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    reportLiveLocation(loc.lat, loc.lng).catch(() => {
+      // A location report is a nice-to-have, not a dependency: the map
+      // already has its fix and keeps working regardless.
+    });
   }, [loc]);
 
   return (

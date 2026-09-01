@@ -9,9 +9,13 @@
  * read-only NB_WIDGET_TOKEN is allowed to make this one write. A coordinate
  * is the same low-stakes class as Juan's own odometer photo -- his own
  * position, never a customer record, never HubSpot. See dal.ts's
- * setLastLocationAndAutoComplete, which enforces this same check again.
+ * setLastLocation, which enforces this same check again.
+ *
+ * No longer auto-completes a stop (Juan, 2026-08-31): geolocation-based
+ * auto-done faded completely, the HubSpot-filing trigger is the only one
+ * left. This still saves the fix for the widget's finish-time estimate.
  */
-import { setLastLocationAndAutoComplete } from "../../lib/dal";
+import { setLastLocation } from "../../lib/dal";
 import { hasAccess } from "../../lib/devices";
 import { hasWidgetToken } from "../../lib/session";
 
@@ -34,8 +38,8 @@ export async function POST(req: Request) {
   }
 
   try {
-    const result = await setLastLocationAndAutoComplete(lat, lng);
-    return Response.json({ ok: true, ...result });
+    await setLastLocation(lat, lng);
+    return Response.json({ ok: true });
   } catch (e) {
     return Response.json({ ok: false, error: e instanceof Error ? e.message : "Failed to save location." }, { status: 500 });
   }

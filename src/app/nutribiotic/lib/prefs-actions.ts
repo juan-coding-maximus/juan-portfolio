@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import {
   sanitizeRouteEndpoint,
-  setLastLocationAndAutoComplete,
+  setLastLocation,
   setRouteCalls,
   setRouteDone,
   setRouteDraft,
@@ -78,13 +78,12 @@ export async function saveRouteDone(byDay: RouteDoneByDay): Promise<void> {
  * every other optimistic write here -- the map already has its fix and
  * doesn't need to wait on this to keep working.
  *
- * Also runs the <0.1mi auto-done check (setLastLocationAndAutoComplete),
- * so a stop can cross itself off from the map screen exactly the same way
- * the widget's "tap to update" does. Returns the ids it marked done so
- * MapScreen can reflect them without waiting for a reload.
+ * No longer auto-completes a stop (Juan, 2026-08-31, geolocation-based
+ * auto-done faded completely -- see setLastLocation in dal.ts). The HubSpot-
+ * filing trigger (markRouteStopDoneForAccountToday) is the only one left.
  */
-export async function reportLiveLocation(lat: number, lng: number): Promise<{ autoDoneIds: string[] }> {
-  return setLastLocationAndAutoComplete(lat, lng);
+export async function reportLiveLocation(lat: number, lng: number): Promise<void> {
+  await setLastLocation(lat, lng);
 }
 
 /**

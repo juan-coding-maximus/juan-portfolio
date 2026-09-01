@@ -1999,29 +1999,6 @@ function parseRouteDone(stored: unknown): RouteDoneByDay {
   return out;
 }
 
-/**
- * First-seen-near timestamps behind the 0.2mi/10-minute location auto-done
- * trigger (migration 0052). Day-partitioned like route_done, but a map
- * rather than a bare array: {"YYYY-MM-DD": {"<account id>": "<ISO
- * first-seen timestamp>"}}. See setLastLocationAndAutoComplete below for how
- * this gets written and cleared.
- */
-export type RouteDwellByDay = Record<string, Record<string, string>>;
-
-function parseRouteDwell(stored: unknown): RouteDwellByDay {
-  if (!stored || typeof stored !== "object") return {};
-  const out: RouteDwellByDay = {};
-  for (const [day, entries] of Object.entries(stored as Record<string, unknown>)) {
-    if (!ISO_DATE_RE.test(day) || !entries || typeof entries !== "object") continue;
-    const accountMap: Record<string, string> = {};
-    for (const [accountId, ts] of Object.entries(entries as Record<string, unknown>)) {
-      if (typeof ts === "string" && ts) accountMap[accountId] = ts;
-    }
-    if (Object.keys(accountMap).length > 0) out[day] = accountMap;
-  }
-  return out;
-}
-
 export type RouteState = {
   draft: RouteDraftByDay;
   calls: RouteCallsByDay;
@@ -2057,14 +2034,16 @@ export async function setRouteDone(byDay: RouteDoneByDay): Promise<void> {
 }
 
 /**
- * A route stop confirmed done by a filed HubSpot engagement (Juan's ask
- * 2026-08-31), not by GPS: he filed a real Visit/Meeting for this account
- * today, which is stronger evidence of "serviced" than any location fix --
- * a phone can sit in a pocket the whole visit, which is exactly the gap
- * route_dwell's own opportunistic sampling can miss (see migration 0052's
- * header). Called from touchpoint.ts's autoFileEngagement hook, after a
- * successful HubSpot file, only for kinds that mean Juan was physically at
- * the account -- never a call/email/text, which prove contact, not presence.
+ * THE ONLY AUTO-DONE TRIGGER LEFT (Juan, 2026-08-31): a stop marks itself done
+ * the moment a real HubSpot engagement is filed for that account, no GPS
+ * involved. Location-based auto-done (the 0.1mi instant check, then the
+ * 0.2mi/10-minute dwell version, migration 0052) was tried and faded
+ * completely -- unreliable on spotty field connectivity and superseded by
+ * this being both simpler and more honest: a filed Visit/Meeting/Call IS the
+ * evidence, not a proxy for it. Called from touchpoint.ts's
+ * autoFileEngagement hook, after a successful HubSpot file, only for kinds
+ * that mean Juan was physically at the account -- never an async written
+ * channel, which proves contact, not presence.
  *
  * A no-op, not an error, when the account isn't a string entry on today's
  * route_draft at all, or is already done: this is a side-effect of filing,
@@ -2188,64 +2167,27 @@ export async function getLastLocation(): Promise<LastLocation | null> {
   return { lat: v.lat, lng: v.lng, at: v.at };
 }
 
-function haversineMilesForLocation(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
-  const R = 3958.8;
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
-  const la1 = (a.lat * Math.PI) / 180;
-  const la2 = (b.lat * Math.PI) / 180;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
-
-/** Close enough to call it "there" for the DWELL trigger (Juan, 2026-08-31,
- *  loosened from the original 0.1mi instant radius): two tenths of a mile
- *  still covers a lot's far corner, wide enough that Juan doesn't have to
- *  park right on the pin. The radius no longer has to filter out a drive-by
- *  on its own -- DWELL_MINUTES below does that instead. */
-const AUTO_DONE_RADIUS_MILES = 0.2;
-
-/** How long a report has to keep landing inside the radius, with no report
- *  outside it in between, before "nearby" becomes "there" (Juan, 2026-08-31):
- *  a single instant fix couldn't tell a stopped car from one idling at the
- *  light out front, which is exactly the false positive the original 0.1mi
- *  instant version risked. Ten minutes is long enough that passing through
- *  never crosses it and short enough that a real stop still confirms before
- *  Juan's back on the road. */
-const DWELL_MINUTES = 10;
-
 /**
- * THE ONE WRITE PATH for "where is Juan right now" (migration 0044), extended
- * 2026-08-31 (migration 0052) from an instant proximity check to a dwell
- * check: a report inside AUTO_DONE_RADIUS_MILES no longer marks a stop done
- * by itself, it starts (or continues) a clock in route_dwell, and only a
- * report that finds DWELL_MINUTES already elapsed since the FIRST nearby
- * report for that stop marks it done. A report outside the radius clears any
- * running clock for that account, so a later pass-by starts fresh rather
- * than reusing a stale sighting.
+ * THE ONE WRITE PATH for "where is Juan right now" (migration 0044). Saves
+ * the fix for the widget's live finish-time estimate, nothing else.
  *
- * OPPORTUNISTIC, NOT A POLL: this still only ever runs from the same two call
- * sites as before -- there is no background location tracking anywhere in
- * this app (see 0052's migration header). A stop Juan dwells at without ever
- * reopening the map or tapping the widget will not confirm through this path;
- * markRouteStopDoneForAccountToday (wired from touchpoint.ts's
- * autoFileEngagement, on a filed HubSpot Visit/Meeting) is what catches that
- * case instead.
+ * NO LONGER MARKS ANYTHING DONE (Juan, 2026-08-31): this used to also check
+ * the fix against today's route and auto-complete a nearby stop, first as an
+ * instant 0.1mi radius, then as a 0.2mi/10-minute dwell (migration 0052,
+ * route_dwell). Faded completely -- unreliable on the spotty connectivity a
+ * field day actually has, and superseded by markRouteStopDoneForAccountToday
+ * above, which fires off a real filed HubSpot engagement instead of a GPS
+ * proxy for one. route_dwell (0052) is now dead, unwritten weight; left in
+ * place rather than migrated away for a column that never held real data.
  *
  * Called from exactly two places, by design: MapScreen.tsx's existing
  * geolocation request (via reportLiveLocation, prefs-actions.ts) and the
- * widget's "tap to update" button (via api/location/route.ts). Nothing else
- * calls this and nothing polls it -- see the migration header.
+ * widget's "tap to update" button (via api/location/route.ts).
  *
  * GATED HERE, NOT VIA mutate() -- same reasoning and same widened bearer as
  * setRouteMileageDay above: Juan's own coordinate, nothing customer-facing.
- *
- * A false-positive auto-done (parked within 0.2mi of a stop for ten minutes
- * without actually going in) costs one tap to undo, the same as any other
- * done mark -- a cheaper mistake than making Juan tap "done" standing at a
- * door he's already at.
  */
-export async function setLastLocationAndAutoComplete(lat: number, lng: number): Promise<{ autoDoneIds: string[] }> {
+export async function setLastLocation(lat: number, lng: number): Promise<void> {
   if (!(await hasWidgetToken()) && !(await hasAccess())) {
     throw new Error("Unauthorized.");
   }
@@ -2254,59 +2196,7 @@ export async function setLastLocationAndAutoComplete(lat: number, lng: number): 
     throw new Error("lat/lng must be finite numbers.");
   }
 
-  const [routeState, accounts, dwellRow] = await Promise.all([
-    getRouteStateByDay(),
-    listOwnerAccounts(),
-    raw<{ route_dwell: unknown }>("nb_ui_prefs?select=route_dwell&id=eq.1"),
-  ]);
-  const days = planningHorizonDates();
-  const day = defaultActiveDay(routeState.draft, days);
-  const draft = routeState.draft[day] ?? [];
-  const doneIds = new Set(routeState.done[day] ?? []);
-  const byId = new Map(accounts.data.map((a) => [a.id, a]));
-
-  const dwellByDay = parseRouteDwell(dwellRow[0]?.route_dwell);
-  const dayDwell = { ...(dwellByDay[day] ?? {}) };
-  const now = new Date();
-  const nowIso = now.toISOString();
-
-  const newlyDone: string[] = [];
-  for (const entry of draft) {
-    if (typeof entry !== "string") continue; // account stops only
-    if (doneIds.has(entry)) continue;
-    const a = byId.get(entry);
-    if (!a) continue;
-
-    const near = haversineMilesForLocation({ lat, lng }, { lat: a.lat, lng: a.lng }) < AUTO_DONE_RADIUS_MILES;
-    if (!near) {
-      delete dayDwell[entry];
-      continue;
-    }
-
-    const firstSeen = dayDwell[entry];
-    if (!firstSeen) {
-      dayDwell[entry] = nowIso;
-      continue;
-    }
-    if ((now.getTime() - new Date(firstSeen).getTime()) / 60_000 >= DWELL_MINUTES) {
-      newlyDone.push(entry);
-      delete dayDwell[entry];
-    }
-  }
-
-  const nextDwellByDay = { ...dwellByDay };
-  if (Object.keys(dayDwell).length > 0) nextDwellByDay[day] = dayDwell;
-  else delete nextDwellByDay[day];
-
-  const body: Record<string, unknown> = {
-    last_location: { lat, lng, at: nowIso },
-    route_dwell: nextDwellByDay,
-    updated_at: nowIso,
-  };
-  if (newlyDone.length > 0) {
-    body.route_done = { ...routeState.done, [day]: [...doneIds, ...newlyDone] };
-  }
-
+  const at = new Date().toISOString();
   const res = await fetch(`${SB_URL}/rest/v1/nb_ui_prefs?id=eq.1`, {
     method: "PATCH",
     headers: {
@@ -2315,12 +2205,11 @@ export async function setLastLocationAndAutoComplete(lat: number, lng: number): 
       "Content-Type": "application/json",
       Prefer: "return=representation",
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ last_location: { lat, lng, at }, updated_at: at }),
   });
   if (!res.ok) {
     throw new Error(`Supabase nb_ui_prefs PATCH -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
   }
-  return { autoDoneIds: newlyDone };
 }
 
 /**
