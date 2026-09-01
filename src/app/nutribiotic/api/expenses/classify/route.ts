@@ -38,6 +38,17 @@ const CLASSIFY_TOOL = {
       merchant: { type: ["string", "null"], description: "Receipt only: the merchant name exactly as printed. Null if not a receipt or unreadable." },
       amount: { type: ["string", "null"], description: "Receipt only: the total amount paid (not subtotal), digits only. Null if not a receipt or unreadable." },
       date: { type: ["string", "null"], description: "Receipt only: the date printed on the receipt, YYYY-MM-DD. Null if not printed or unreadable." },
+      category: {
+        type: ["string", "null"],
+        enum: ["meals", "parking", "tolls", "fuel", "lodging", "supplies", "samples", "shipping", "other", null],
+        description: "Receipt only: what kind of expense this is, read off the merchant/items, not guessed from context. Null if not a receipt or unclear.",
+      },
+      city: { type: ["string", "null"], description: "Receipt only, parking category only: the city printed in the merchant's address, if any. Null otherwise." },
+      item_summary: {
+        type: ["string", "null"],
+        description:
+          "Receipt only, meals category only: the food itself in 1-3 plain words read off the line items (e.g. 'burger', 'chia pudding', 'supermarket sushi'), never a business reason. Null if not a meal receipt or the items aren't legible.",
+      },
       confidence: { type: "string", enum: ["high", "medium", "low"] },
     },
     required: ["photo_type", "confidence"],
@@ -77,7 +88,12 @@ export async function POST(req: Request) {
         "claim and an invented number is a fabricated record. Odometer photos: the total odometer, " +
         "never a trip meter. If a dashboard shows both a colourful screen and a plain digital readout " +
         "across two different moments, that distinction (start vs end) only matters if this single " +
-        "photo makes it obvious; otherwise leave odometer_moment null and let the rep pick.",
+        "photo makes it obvious; otherwise leave odometer_moment null and let the rep pick (the app " +
+        "pairs two odometer photos by which reading is numerically lower, so this field is a hint, " +
+        "not load-bearing). For a receipt, also read its category and, for a meal, what the food " +
+        "actually was in a few words (item_summary) and, for parking, the city on the receipt (city) " +
+        "-- these feed a fixed purpose template (\"Lunch, <item_summary>\" / \"Parking, <city>\"), never " +
+        "a business reason you infer yourself.",
       messages: [
         {
           role: "user",
