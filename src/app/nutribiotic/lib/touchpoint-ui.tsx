@@ -84,6 +84,9 @@ const KIND_OPTIONS = [
   { value: "meeting", label: "Meeting" },
   { value: "call", label: "Call" },
   { value: "email", label: "Email" },
+  // Not a customer contact. Stays in the OS, never files to HubSpot, counts as
+  // a touchpoint but never as a visit, call or email.
+  { value: "field_note", label: "Field note" },
 ] as const;
 type KindOption = (typeof KIND_OPTIONS)[number]["value"];
 
@@ -91,6 +94,15 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
   const router = useRouter();
   const [text, setText] = useState("");
   const [kind, setKind] = useState<KindOption>("meeting");
+  // WHETHER HE ACTUALLY PICKED, as opposed to leaving the default sitting there.
+  // This toggle used to send its value on every submit, so "meeting" was forced
+  // onto every note whether or not he touched it, and the extractor's own read
+  // was overwritten every single time. That is half of why eight notes to self
+  // became Meetings and Calls on 2026-09-02: the other half had no field_note
+  // kind to choose, but even once it does, an untouched default would keep
+  // overriding it. His explicit pick still wins (a rep's own word for what just
+  // happened outranks a model's guess); an untouched default now stays quiet.
+  const [kindTouched, setKindTouched] = useState(false);
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<RecordTouchpointResult | null>(null);
   // A clean file (matched, no follow-up needed) gets its own confirmation
@@ -162,7 +174,7 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
     if (!value.trim() || pending) return;
     startTransition(async () => {
       const res = await recordTouchpoint(value, accountIdHint, null, {
-        kindOverride: kind,
+        kindOverride: kindTouched ? kind : undefined,
         forceNewAccount: newCompany,
       });
       if (res.ok && !res.needsAccount) {
@@ -175,6 +187,7 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
         setText("");
         writeDraft("");
         setKind("meeting");
+        setKindTouched(false);
         setGrade(null);
         setNewCompany(false);
         requestAnimationFrame(() => {
@@ -315,9 +328,15 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
               {KIND_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
-                  onClick={() => setKind(opt.value)}
-                  className={`flex-1 rounded-md border px-3 py-1.5 text-[13px] font-medium transition-colors ${
-                    kind === opt.value
+                  onClick={() => {
+                    setKind(opt.value);
+                    setKindTouched(true);
+                  }}
+                  // Nothing reads as selected until he actually picks one.
+                  // A pre-lit "Meeting" is a claim the note is a meeting, and
+                  // the submit used to send exactly that claim every time.
+                  className={`flex-1 rounded-md border px-2 py-1.5 text-[13px] font-medium transition-colors ${
+                    kindTouched && kind === opt.value
                       ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
                       : "border-[#E2DFD5] bg-transparent text-[#5B6560] hover:bg-[#FAF9F5]"
                   }`}

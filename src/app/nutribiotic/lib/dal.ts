@@ -970,6 +970,41 @@ export async function insertTouchpoint(input: {
   return row;
 }
 
+/**
+ * A capture that was never a customer contact (migration 0058).
+ *
+ * account_id IS NULLABLE HERE AND THAT IS THE WHOLE POINT. nb_activities.account_id
+ * is `not null`, which is correct for an activity and is exactly why a field note
+ * cannot be one: it forces every capture onto a business, and when no business is
+ * named the OS goes and creates one. On 2026-09-02 that turned four notes to self
+ * into four new companies in the shared portal. A field note stands on its own.
+ */
+export async function insertFieldNote(input: {
+  account_id: string | null;
+  touchpoint_id: string | null;
+  at?: string | null;
+  detail: string;
+  raw_text: string | null;
+  topic?: string;
+}): Promise<{ id: string }> {
+  const [row] = await mutate<{ id: string }>("nb_field_notes", "POST", {
+    id: randId("fn"),
+    origin: "manual",
+    topic: "field",
+    ...input,
+  });
+  return row;
+}
+
+/** Queued, never executed on arrival. See migration 0058 and HARD RULE 15. */
+export async function insertDirectives(
+  rows: { field_note_id: string; directive: string; target: string | null; scope: string; account_id: string | null }[],
+): Promise<number> {
+  if (rows.length === 0) return 0;
+  await mutate("nb_directives", "POST", rows.map((r) => ({ id: randId("dir"), status: "pending", ...r })));
+  return rows.length;
+}
+
 /** The note body source is the activity row, never re-parsed; `parsed` here
  * is used only for the per-person detail in the engagement port's people
  * match, mirroring hubspot_notes.py's load_touchpoint(). */

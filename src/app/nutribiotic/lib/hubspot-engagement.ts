@@ -145,7 +145,30 @@ const KIND_LABEL: Record<string, string> = {
   order: "Order",
   sample_drop: "Sample drop",
   staff_training: "Staff training",
+  // Display only. A field note is never filed, see NEVER_FILED below.
+  field_note: "Field note",
 };
+
+/**
+ * Kinds that must never reach the shared portal, whatever the config map says.
+ *
+ * `engagementType()` used to end in `?? "NOTE"`, so any kind the map did not
+ * cover became a Note in an employer's CRM without anyone choosing that. For a
+ * field note that fallback is the exact bug this kind was created to stop: on
+ * 2026-09-02 four notes to self became typed engagements on companies invented
+ * to hold them. So this is a refusal, not a fallback, and it throws rather than
+ * returning quietly, because a field note that silently fails to file is
+ * indistinguishable from one that filed and would send someone looking in the
+ * wrong place.
+ */
+const NEVER_FILED = new Set(["field_note"]);
+
+export class NeverFiledKindError extends Error {
+  constructor(kind: string) {
+    super(`${kind} is never filed to HubSpot. It lives in the OS only.`);
+    this.name = "NeverFiledKindError";
+  }
+}
 
 // ---------------------------------------------------------------------------
 // pure helpers
@@ -154,6 +177,7 @@ const KIND_LABEL: Record<string, string> = {
 type HubspotFieldsConfig = { engagements?: { activity_kind_map?: Record<string, string> } };
 
 async function engagementType(kind: string): Promise<EngagementType> {
+  if (NEVER_FILED.has(kind)) throw new NeverFiledKindError(kind);
   const cfg = await readConfig<HubspotFieldsConfig>("hubspot_fields");
   const mapped = cfg?.engagements?.activity_kind_map?.[kind];
   return (mapped as EngagementType) ?? "NOTE";

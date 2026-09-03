@@ -28,6 +28,8 @@ import {
   insertActivity,
   insertCalendarProposal,
   insertContact,
+  insertDirectives,
+  insertFieldNote,
   insertTouchpoint,
   listAccountsForMatching,
   listContacts,
@@ -150,6 +152,21 @@ export type ParsedTouchpoint = {
   people: ParsedPerson[];
   calendar_actions: ParsedCalendarAction[];
   account_facts: ParsedAccountFacts;
+  directives?: ParsedDirective[];
+};
+
+/**
+ * An instruction Juan aimed at the agency, said in the same breath as a note.
+ * HARD RULE 15 already routed "go find their email from the website" to the
+ * enricher instead of into hubspot_summary; this is that rule generalized to
+ * every agent, and it is queued in nb_directives rather than executed. Root
+ * AGENTS.md P1 does not lapse because Juan is the one who spoke the
+ * instruction: it is still surfaced and drained deliberately, never on arrival.
+ */
+type ParsedDirective = {
+  directive: string;
+  target: string | null;
+  scope: "nutribiotic" | "agency";
 };
 
 /**
@@ -188,8 +205,9 @@ const EXTRACT_TOOL = {
             enum: [
               "visit", "call", "text", "email_out", "email_in", "linkedin",
               "newsletter", "meeting", "note", "order", "sample_drop", "staff_training",
+              "field_note",
             ],
-            description: "An in-person stop at a store or office, walked in or dropped by, is 'visit', even when the rep talks to or 'meets with' someone while there. Use 'meeting' only when the text itself frames it as a scheduled, formal meeting or appointment, not just a conversation that happened in person. This is what titles the HubSpot record ('Visit' vs 'Meeting'), and almost everything a rep dictates from the field is a visit.",
+            description: "An in-person stop at a store or office, walked in or dropped by, is 'visit', even when the rep talks to or 'meets with' someone while there. Use 'meeting' only when the text itself frames it as a scheduled, formal meeting or appointment, not just a conversation that happened in person. This is what titles the HubSpot record ('Visit' vs 'Meeting'), and almost everything a rep dictates from the field is a visit. 'field_note' is the one kind that is NOT a customer contact: no store was called, walked into, emailed or texted. It covers an observation about a market or a storefront the rep only looked at, a note to self about how the work should go, and an instruction aimed at his own agency. A field note never reaches HubSpot, so choosing it wrongly hides real customer contact, and choosing anything else for a note to self invents a customer contact that never happened.",
           },
           direction: { type: "string", enum: ["outbound", "inbound", "internal"] },
           outcome: {
@@ -244,6 +262,29 @@ const EXTRACT_TOOL = {
           required: ["kind", "title"],
         },
       },
+      directives: {
+        type: "array",
+        description: "Instructions the rep aimed at his own agency rather than content about a customer: 'go find their email from the website', 'build me an agent that...', 'draft an action plan and put it on my desktop'. HARD RULE 15: an instruction inside a dictated note is not content for the note. It routes to whoever can act on it and NEVER reaches hubspot_summary. Extract each one verbatim. Empty array is the normal answer; most notes carry none.",
+        items: {
+          type: "object",
+          properties: {
+            directive: {
+              type: "string",
+              description: "the instruction as the rep said it, verbatim, lightly cleaned for filler only. Never re-worded into a task title.",
+            },
+            target: {
+              type: ["string", "null"],
+              description: "who should act, when the text makes it obvious: 'nutribiotic-enricher' (find a missing website/phone/decision maker), 'nutribiotic-route-planner' (go back, go see, plan a day), 'nutribiotic-account-analyst' (who is overdue, what do they buy, scoring), 'head-nutribiotic' (the sales OS itself), 'agent-maker' (build a new agent), 'head-pm' (plan a project). Null when it is not clear.",
+            },
+            scope: {
+              type: "string",
+              enum: ["nutribiotic", "agency"],
+              description: "'nutribiotic' when it is about this territory, its accounts, or this sales OS. 'agency' when it is about Juan's wider operation.",
+            },
+          },
+          required: ["directive", "scope"],
+        },
+      },
       account_facts: {
         type: "object",
         description: "Facts about the BUSINESS itself, only when explicitly stated about the store/office as a whole, never inferred from a person's own contact info in people[]. Null fields are the common case, most visits state none of this.",
@@ -264,7 +305,7 @@ const EXTRACT_TOOL = {
         required: ["business_hours", "phone", "email"],
       },
     },
-    required: ["account_confidence", "business_name_guess", "activity", "people", "calendar_actions", "account_facts"],
+    required: ["account_confidence", "business_name_guess", "activity", "people", "calendar_actions", "account_facts", "directives"],
   },
 };
 
@@ -285,6 +326,9 @@ RULES, all absolute:
 - Only include a person in "people" if the note actually names them or clearly describes a specific individual (a title alone like "the manager" with no name is still worth including with first_name/last_name null, if a real detail like an email or a stated preference is attached to them).
 - Only include a calendar_action if the note describes something that should go on a calendar (a scheduled meeting, an explicit follow-up date, a planned return visit). Do not invent a follow-up that was not mentioned.
 - when_iso must be a real resolved timestamp if a specific day/time was stated; if only vague ("follow up soon") leave it null and say so in notes.
+- FIRST, decide whether a customer was actually contacted. If nobody at a business was spoken to, walked in on, called, emailed or texted, activity.kind is "field_note" and direction is "internal". An observation about a storefront he only looked at or walked through, a thought about the market or the product line, a note to self about how the work should go, and an instruction to his own agency are ALL field notes. Do not reach for "visit", "call" or "meeting" because the note mentions a business name; a business named in passing is not a business contacted. A field note is never written to HubSpot, so hubspot_summary for one is short and plain, and it must never claim a contact happened ("I visited...", "I called...") when none did.
+- Never set account_confidence to "high" on a field note unless the note is genuinely ABOUT that specific account (an observation about that store). A note to self that merely happens to mention a place is account_confidence "none" with account_id null. Attaching a note to self to a business is how a company gets created to receive it, which has already happened once and is what this kind exists to stop.
+- directives carry instructions aimed at the agency, verbatim, and those same words must NOT appear in hubspot_summary. A note can be a real customer visit AND carry a directive; extract both. A note that is nothing but an instruction is a field_note whose detail is the instruction's own content.
 - account_facts is for a fact about the BUSINESS as a whole, not a person: hours, a general store phone, a general ordering email. Only fill a field when the text states it about the store/office itself ("their hours are...", "the store's number is..."); a person's own phone or email belongs in people[], never here. Most visits state none of this, null is the normal answer.`;
 }
 
@@ -297,6 +341,11 @@ export type RecordTouchpointResult =
        * apply a grade Juan picked while typing, without a second lookup. */
       accountId: string | null;
       needsAccount: false;
+      /** True when nothing about this was a customer contact: it lives in
+       *  nb_field_notes, counts as a touchpoint, and never reaches HubSpot. */
+      isFieldNote?: boolean;
+      /** Instructions aimed at the agency, queued in nb_directives. */
+      directiveCount?: number;
       summary: string;
       peopleAdded: number;
       peopleUpdated: number;
@@ -335,7 +384,7 @@ export async function recordTouchpoint(
   occurredAt?: string | null,
   opts: {
     autoFileHubspot?: boolean;
-    kindOverride?: "meeting" | "call" | "email";
+    kindOverride?: "meeting" | "call" | "email" | "field_note";
     /**
      * Juan already knows this is not one of his 273. Skip account matching
      * entirely and park straight into the create-a-business flow.
@@ -396,6 +445,95 @@ export async function recordTouchpoint(
   // never be second-guessed by the extraction.
   if (opts.kindOverride) {
     parsed.activity.kind = opts.kindOverride === "email" ? "email_out" : opts.kindOverride;
+  }
+
+  // A FIELD NOTE LEAVES HERE AND NEVER TOUCHES AN ACTIVITY, AN ACCOUNT IT WAS
+  // NOT ABOUT, OR HUBSPOT.
+  //
+  // This branch is the fix for 2026-09-02. Eight notes that were not customer
+  // contacts went into the Visit tab that evening. With no kind for them, the
+  // extractor picked meeting/call/email_out; with no business named, four
+  // parked as needs_account, and that screen's exits are match-a-client,
+  // create-a-business-from-Places, or leave it in the queue. Four took the
+  // middle exit, so Goat Tree (the restaurant next door on State Street),
+  // Unbound Design and Search Engine Pros were created as companies in the
+  // SHARED portal to receive a note to self, graded, and had typed Meetings and
+  // Calls filed on them. Every one of those steps was the code working as
+  // written. What was missing was a way for a note to be about nothing.
+  //
+  // So: no activity row (nb_activities.account_id is `not null`, which is the
+  // constraint that forces the invention of a company), no needs_account
+  // parking, no HubSpot. A field note keeps its touchpoint credit in
+  // nb_field_notes and its account link only when the note is genuinely about
+  // that account.
+  if (parsed.activity.kind === "field_note") {
+    const noteAccountId = accountIdHint || (parsed.account_confidence === "high" ? parsed.account_id : null);
+    const noteAccount = accountsRes.data.find((a) => a.account_id === noteAccountId);
+
+    const tp = await insertTouchpoint({
+      account_id: noteAccountId,
+      raw_text: text,
+      status: "parsed",
+      account_match_confidence: accountIdHint ? "high" : parsed.account_confidence,
+      parsed,
+    });
+
+    const fieldNote = await insertFieldNote({
+      account_id: noteAccountId,
+      touchpoint_id: tp.id,
+      at: occurredAt ?? now.toISOString(),
+      detail: parsed.activity.detail,
+      raw_text: text,
+      topic: noteAccountId ? "account" : "field",
+    });
+
+    // Verbatim into the queue, drained deliberately. Never executed on arrival.
+    const directiveCount = await insertDirectives(
+      (parsed.directives ?? []).map((d) => ({
+        field_note_id: fieldNote.id,
+        directive: d.directive,
+        target: d.target ?? null,
+        scope: d.scope === "agency" ? "agency" : "nutribiotic",
+        account_id: noteAccountId,
+      })),
+    );
+
+    // A field note can still say "come back tomorrow", and that is a real
+    // calendar action. It stays a proposal: the human click is the gate.
+    let calendarProposals = 0;
+    for (const ca of parsed.calendar_actions ?? []) {
+      await insertCalendarProposal({
+        touchpoint_id: tp.id,
+        account_id: noteAccountId,
+        kind: ca.kind,
+        title: noteAccount ? `${noteAccount.name}: ${ca.title}` : ca.title,
+        starts_at: ca.when_iso,
+        duration_minutes: ca.duration_minutes ?? 60,
+        notes: ca.notes,
+      });
+      calendarProposals += 1;
+    }
+
+    return {
+      ok: true,
+      touchpoint_id: tp.id,
+      accountName: noteAccount?.name ?? null,
+      accountId: noteAccount?.account_id ?? null,
+      needsAccount: false,
+      isFieldNote: true,
+      directiveCount,
+      summary: parsed.activity.detail,
+      peopleAdded: 0,
+      peopleUpdated: 0,
+      calendarProposals,
+      hubspotFiled: false,
+      hubspotNoteId: null,
+      hubspotError: null,
+      hubspotLeaks: 0,
+      companyPhoneFilled: null,
+      companyPhoneConflict: null,
+      accountFacts: null,
+    };
   }
 
   // Explicit account picked by the rep in the UI always wins over the model's guess.
@@ -636,6 +774,14 @@ export async function resolveTouchpointToAccount(
   }
   const parsed = tp.parsed as ParsedTouchpoint | null;
   if (!parsed) return { ok: false, error: "That touchpoint has no parsed data to file." };
+  // The create-a-business exit is exactly how four notes to self became
+  // companies in the shared portal on 2026-09-02. A field note has no business
+  // to be resolved to, and reaching this function with one means the capture
+  // path leaked, so it stops here rather than filing an activity and an
+  // engagement on whatever account the caller had in hand.
+  if (parsed.activity.kind === "field_note") {
+    return { ok: false, error: "That is a field note. It stays in the OS and is never filed to an account." };
+  }
 
   const activity = await insertActivity({
     account_id: accountId,
