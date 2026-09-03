@@ -3181,7 +3181,10 @@ export type ReportDraft = {
   report_date: string;
   kind: "daily" | "weekly";
   payload: ReportPayload | null;
-  status: "pending" | "approved" | "sent" | "held";
+  /** Migration 0060: `pending` = payload built, PDF not rendered yet.
+   *  `published` = the PDF is live in the nb-reports bucket. Nothing is
+   *  emailed, so there is no approved/sent/held any more. */
+  status: "pending" | "published";
   dirty: boolean;
   rebuild_requested: boolean;
   /** True once Juan has saved an edit through this screen (migration 0049).
@@ -3326,22 +3329,6 @@ export async function saveReportDraftPayload(dateISO: string, payload: ReportPay
   );
 }
 
-/** `kind` matters since migration 0050 -- without it, approving/holding a
- *  weekly draft would PATCH a same-date daily row too (and vice versa),
- *  since report_date alone no longer picks one row. */
-export async function setReportDraftStatus(
-  dateISO: string,
-  status: "pending" | "approved" | "held",
-  kind: "daily" | "weekly" = "daily",
-): Promise<void> {
-  await mutate(
-    "nb_report_drafts",
-    "PATCH",
-    { status, decided_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-    { report_date: `eq.${dateISO}`, kind: `eq.${kind}` },
-    "return=minimal",
-  );
-}
 
 /** A short-lived link to the preview PDF, so the review is done against the
  *  real artifact, map and all, rather than a second rendering of the data. */

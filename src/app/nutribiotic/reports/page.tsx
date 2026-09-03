@@ -68,7 +68,7 @@ export default async function ReportsIndex({
       getHomeEndpoint().catch(() => null),
       getAllTimeMetrics().catch(() => null),
       weekWindow ? getReportDraft(weekWindow.end, "weekly").catch(() => null) : Promise.resolve(null),
-      // The real, already-sent artifact for this day/week (2026-08-28, Juan:
+      // The published artifact for this day/week (2026-08-28, Juan:
       // "I need to be able to see what was sent, which you should refer to
       // from the archives, you do have this information already"). Exact
       // filenames field_report.py/weekly_report.py publish on send --
@@ -179,13 +179,13 @@ export default async function ReportsIndex({
         />
       ) : archivedWeeklyUrl && weekWindow ? (
         // No draft row at all (a week from before the review gate existed),
-        // but the real sent PDF is still in the archive -- same "refer to
+        // but the published PDF is still in the archive, same "refer to
         // the archives" fix as the daily side above.
         <section className="mb-8 rounded-xl border border-[#E2DFD5] bg-white p-5">
           <h2 className="mb-3 font-[family-name:var(--font-fraunces)] text-[19px] font-semibold tracking-tight">
             Week of {weekWindow.start} – {weekWindow.end}
           </h2>
-          <p className="mb-3 text-[13.5px] text-[#5B6560]">No draft on file, but a report was sent that week.</p>
+          <p className="mb-3 text-[13.5px] text-[#5B6560]">No draft on file, but a report was published that week.</p>
           <a
             href={archivedWeeklyUrl}
             target="_blank"
@@ -193,7 +193,7 @@ export default async function ReportsIndex({
             className="mb-5 inline-flex items-center gap-1.5 rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90"
           >
             <Ico name="external" size={13} />
-            Open the sent PDF
+            Open the published PDF
           </a>
           <div className="overflow-hidden rounded-lg border border-[#E2DFD5]">
             <iframe
@@ -205,7 +205,7 @@ export default async function ReportsIndex({
         </section>
       ) : weekWindow ? (
         <p className="mb-8 text-[12.5px] text-[#8A928C]">
-          No weekly report staged or sent for {weekWindow.start} – {weekWindow.end}. It appears here once a
+          No weekly report built for {weekWindow.start} – {weekWindow.end}. It appears here once a
           day in that week is rebuilt, or at the Friday 10:00 cron.
         </p>
       ) : null}

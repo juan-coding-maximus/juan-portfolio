@@ -11,19 +11,25 @@ import {
   requestPreviewRender,
   requestReportRebuild,
   saveReportDraftPayload,
-  setReportDraftStatus,
   type RouteEndpoint,
   type ReportHqNote,
   type ReportPayload,
 } from "./dal";
 
 /**
- * The review gate's four actions.
+ * The report screen's actions.
  *
  * THE CLICK RECORDS A DECISION, IT DOES NOT EXECUTE ONE. Same rule as
  * lib/import-actions.ts and the calendar proposals: this app runs on Vercel and
- * can run neither Playwright nor /usr/bin/python3, so every render and the send
- * itself happen on the Mac in field_report.py --serve. What lands here is a row.
+ * can run neither Playwright nor /usr/bin/python3, so the render happens on the
+ * Mac in field_report.py --serve. What lands here is a row.
+ *
+ * THERE IS NO APPROVE AND NO HOLD any more (2026-09-03). Both existed solely to
+ * govern mailing the PDF to Juan's own inbox, and nothing is mailed: "i dont
+ * even want them emailed anymore as long as we keep the records online on the
+ * website accessible and editable thats a better functionality." A report is
+ * built, published, and corrected in place for as long as it is worth
+ * correcting.
  *
  * WHAT MAY BE EDITED. Only the parts of the report the OS itself owns:
  *   - hq_notes, free text the model drafted, with no upstream record to
@@ -59,8 +65,8 @@ export async function actionRequestRebuild(dateISO: string): Promise<void> {
   revalidatePath(PATH);
 }
 
-/** Render-only, no HubSpot pull, no status change -- for a sent (or any)
- *  day that has no preview PDF on hand yet. See requestPreviewRender. */
+/** Render-only, no HubSpot pull, for any day that has no PDF on hand yet.
+ *  See requestPreviewRender. */
 export async function actionRenderPreview(dateISO: string, kind: "daily" | "weekly" = "daily"): Promise<void> {
   await requestPreviewRender(dateISO, kind);
   revalidatePath(PATH);
@@ -76,15 +82,6 @@ export async function actionAddToRoute(hubspotCompanyId: string, date: string): 
   await addAccountToRouteDraft(hubspotCompanyId, date);
   revalidatePath(PATH);
   revalidatePath("/nutribiotic/map");
-}
-
-export async function actionDecideReport(
-  dateISO: string,
-  decision: "approved" | "held" | "pending",
-  kind: "daily" | "weekly" = "daily",
-): Promise<void> {
-  await setReportDraftStatus(dateISO, decision, kind);
-  revalidatePath(PATH);
 }
 
 export type ReportEdits = {
@@ -120,22 +117,18 @@ export type ReportEdits = {
 export async function actionSaveReportEdits(dateISO: string, edits: ReportEdits): Promise<void> {
   const draft = await getReportDraft(dateISO);
   if (!draft?.payload) return;
-  // A SENT REPORT IS STILL EDITABLE (Juan, 2026-09-03: "Everything should be
-  // editable at any point. We only keep the latest updated version.").
+  // NO REPORT IS EVER CLOSED FOR EDITING (Juan, 2026-09-03: "Everything should
+  // be editable at any point. We only keep the latest updated version.").
   //
-  // This used to return early on `sent`, on the reasoning that a sent report is
-  // a record rather than a draft. That reasoning protected the wrong thing. The
-  // point of this screen, in his words, is "to help me edit to reflect
-  // reality", and reality is most often wrong the morning AFTER a report went
-  // out, which is exactly when the old rule locked it. He caught the Sep 2
-  // report calling three notes to self customer visits and starting the day in
-  // a city he had not slept in, and could not fix either from the page.
-  //
-  // What stays true: editing never re-mails. The email that left is the record
-  // of what was mailed, and re-sending on every correction would turn a typo
-  // into an outward send (root AGENTS.md P1). The Reports-tab artifact is
-  // republished in place instead, so the page and the PDF behind it always show
-  // the latest version, which is the only version kept.
+  // This used to return early once a report had been mailed, on the reasoning
+  // that a sent report is a record rather than a draft. That reasoning
+  // protected the wrong thing. The point of this screen, in his words, is "to
+  // help me edit to reflect reality", and reality is most often wrong the
+  // morning AFTER, which is exactly when the old rule locked it. He caught the
+  // Sep 2 report calling three notes to self customer visits and starting the
+  // day in a city he had not slept in, and could not fix either from the page.
+  // Nothing is mailed at all now, so there is no longer even a version out
+  // there for a correction to contradict.
 
   const payload: ReportPayload = { ...draft.payload };
 

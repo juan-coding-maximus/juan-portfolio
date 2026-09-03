@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import type { ReportDraft, ReportHqNote, RouteEndpoint } from "./dal";
 import {
   actionAddToRoute,
-  actionDecideReport,
   actionRenderPreview,
   actionRequestRebuild,
   actionSaveReportEdits,
@@ -45,24 +44,30 @@ const HQ_CATEGORIES = [
 type StopEdit = { hidden: boolean; call_only: boolean; message_only: boolean; field_note?: boolean };
 
 /**
- * Tonight's report, before it goes out.
+ * A day's report. The record itself, not a preview of one.
  *
- * Juan, 2026-08-27: "I want to be able to edit the current report before it
- * goes to my inbox to make sure that all the details are right and that the
- * map looks right... just so I don't have to edit after the fact." And, on the
- * timing: "not necessarily a 7pm daily thing, just like after the day is done
- * and before the 10pm cron."
+ * IT USED TO BE A GATE. Juan, 2026-08-27: "I want to be able to edit the
+ * current report before it goes to my inbox... just so I don't have to edit
+ * after the fact", which built an approve/hold/send flow around a 10pm mail.
+ * 2026-09-03 removed the mail: "i dont even want them emailed anymore as long
+ * as we keep the records online on the website accessible and editable thats a
+ * better functionality." What is left is not a smaller gate, it is a different
+ * thing. There is no before-it-goes-out any more, so there is no after-the-fact
+ * either, and "I don't have to edit after the fact" is answered by making after
+ * the fact the normal time to edit.
  *
- * THE PREVIEW IS THE ARTIFACT. The button opens the actual PDF the Mac
+ * THE PUBLISHED PDF IS THE ARTIFACT. The button opens the actual PDF the Mac
  * rendered from this payload, map included, not a second rendering of the same
- * data in the browser. Two renderings would eventually disagree, and the one
- * he checked would not be the one that got mailed. The cost is that after an
- * edit the PDF is briefly behind the payload, which the screen says outright
- * rather than showing a stale map as though it were final.
+ * data in the browser: two renderings would eventually disagree and he would
+ * have checked the wrong one. The cost is that for a moment after a save the
+ * PDF is behind the payload, which the screen says outright rather than showing
+ * a stale map as though it were current.
  *
- * WHAT IS EDITABLE is only what the OS owns: the HQ notes, each stop's
- * classification, and the mileage. Every other line on the report is a HubSpot
- * record and is corrected in HubSpot. Nothing on this screen writes to the CRM.
+ * WHAT IS EDITABLE is what the OS owns: the HQ notes, each stop's
+ * classification, the day's start and end, the mileage, and the stop order. The
+ * one thing here that reaches the CRM is marking a stop as a field note, which
+ * corrects a record that claims a customer contact happened when none did. See
+ * report-actions.ts.
  */
 export function ReportReview({
   draft,
@@ -72,13 +77,10 @@ export function ReportReview({
 }: {
   draft: ReportDraft;
   previewUrl: string | null;
-  /** The actual daily-{date}.pdf from the Reports archive, when one exists
-   *  (2026-08-28, "I need to be able to see what was sent... refer to from
-   *  the archives, you do have this information already"). This is the real
-   *  artifact for a sent day -- draft-{date}.pdf (previewUrl) is only the
-   *  pre-send preview and often doesn't exist any more once a day is sent
-   *  (see 2026-08-27's correction, which cleared it). Once sent, archivedUrl
-   *  is what's shown; previewUrl only matters while still pending. */
+  /** The actual daily-{date}.pdf in the Reports archive, which since 2026-09-03
+   *  is THE artifact rather than a copy of one that was mailed. previewUrl
+   *  (draft-{date}.pdf) is only what exists in the moment between a save and
+   *  the re-render finishing. Published wins whenever it exists. */
   archivedUrl: string | null;
   /** Juan's apartment, for the start/end pickers' "Home" quick-pick. Null if
       the waypoint account is missing -- the pickers still work, just without
@@ -88,7 +90,9 @@ export function ReportReview({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState<string | null>(null);
-  const shownUrl = draft.status === "sent" && archivedUrl ? archivedUrl : previewUrl;
+  // The published PDF is the record. Nothing is emailed any more (migration
+  // 0060), so this is the only artifact, and it is always the latest version.
+  const shownUrl = draft.status === "published" && archivedUrl ? archivedUrl : previewUrl;
 
   const payload = draft.payload;
   const stops = payload?.stops ?? [];
@@ -138,11 +142,11 @@ export function ReportReview({
     ),
   );
 
-  const sent = draft.status === "sent";
-  // `sent` no longer locks anything (Juan, 2026-09-03: "Everything should be
-  // editable at any point. We only keep the latest updated version."). The only
-  // thing that disables a control now is an in-flight save. See
-  // actionSaveReportEdits for why editing a sent day never re-mails it.
+  const published = draft.status === "published";
+  // Nothing but an in-flight save disables a control (Juan, 2026-09-03:
+  // "Everything should be editable at any point. We only keep the latest
+  // updated version."). There is no send to spend and therefore no state a
+  // report can reach that closes it for editing.
   const locked = pending;
 
   function currentEdits() {
@@ -165,42 +169,21 @@ export function ReportReview({
     });
   }
 
-  function decide(decision: "approved" | "held" | "pending") {
-    startTransition(async () => {
-      // Save first, always: approving something he edited but did not save
-      // would mail the version he was looking away from.
-      await withRetry(() => actionSaveReportEdits(draft.report_date, currentEdits()));
-      await withRetry(() => actionDecideReport(draft.report_date, decision, "daily"));
-      setSaved(
-        decision === "approved"
-          ? "Approved. It goes out on the next pass, within a few minutes."
-          : decision === "held"
-            ? "Held. Nothing goes out tonight unless you release it."
-            : "Back to pending.",
-      );
-      router.refresh();
-    });
-  }
-
-  const statusLine = sent
-    ? `Sent ${draft.sent_at ? new Date(draft.sent_at).toLocaleString("en-US") : ""}`
-    : draft.status === "approved"
-      ? "Approved, sending on the next pass"
-      : draft.status === "held"
-        ? "Held. Nothing goes out tonight."
-        : draft.rebuild_requested
-          ? "Rebuilding from today's data…"
-          : draft.dirty
-            ? "Preview is re-rendering from your edits…"
-            : "Waiting on you";
+  const statusLine = draft.rebuild_requested
+    ? "Rebuilding from today's data…"
+    : draft.dirty
+      ? "Re-rendering from your edits…"
+      : published
+        ? "Published. Edit it any time."
+        : "Building";
 
   return (
     <section className="mb-8 rounded-xl border border-[#E2DFD5] bg-white p-5">
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="font-[family-name:var(--font-fraunces)] text-[19px] font-semibold tracking-tight">
-          Tonight&rsquo;s report
+          The day&rsquo;s report
         </h2>
-        <span className={`text-[12.5px] ${draft.status === "held" ? "text-[#8A6D2F]" : "text-[#8A928C]"}`}>
+        <span className="text-[12.5px] text-[#8A928C]">
           {statusLine}
         </span>
       </div>
@@ -216,7 +199,7 @@ export function ReportReview({
         archivedUrl ? (
           <div>
             <p className="mb-3 text-[13.5px] text-[#5B6560]">
-              No draft on file for {draft.report_date}, but a report was sent that day.
+              No draft on file for {draft.report_date}, but a report was published that day.
             </p>
             <a
               href={archivedUrl}
@@ -225,7 +208,7 @@ export function ReportReview({
               className="mb-5 inline-flex items-center gap-1.5 rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90"
             >
               <Ico name="external" size={13} />
-              Open the sent PDF
+              Open the published PDF
             </a>
             <div className="overflow-hidden rounded-lg border border-[#E2DFD5]">
               <iframe src={archivedUrl} title={`Sent report, ${draft.report_date}`} className="h-[70vh] w-full" />
@@ -233,7 +216,7 @@ export function ReportReview({
           </div>
         ) : (
           <div className="text-[13.5px] text-[#5B6560]">
-            <p className="mb-3">Nothing built or sent for {draft.report_date} yet.</p>
+            <p className="mb-3">Nothing built for {draft.report_date} yet.</p>
             <button
               onClick={() => startTransition(async () => {
                 await withRetry(() => actionRequestRebuild(draft.report_date));
@@ -257,7 +240,7 @@ export function ReportReview({
                 className="inline-flex items-center gap-1.5 rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90"
               >
                 <Ico name="external" size={13} />
-                {shownUrl === archivedUrl ? "Open the sent PDF" : "Open the draft PDF"}
+                {shownUrl === archivedUrl ? "Open the published PDF" : "Open the latest render"}
               </a>
             ) : (
               <button
@@ -286,7 +269,7 @@ export function ReportReview({
             )}
             {draft.dirty && (
               <span className="text-[12px] text-[#8A6D2F]">
-                The PDF is behind{sent ? "" : " your edits"}. It re-renders within a few minutes.
+                The PDF is behind your edits. It re-renders within a few minutes.
               </span>
             )}
           </div>
@@ -296,7 +279,7 @@ export function ReportReview({
               plus a link that leaves the page. This is the same artifact the
               "Open" link above points to (render_pdf(render_html(payload)) on
               the Mac) -- one rendering, shown two ways, never a second one
-              that could disagree with what actually mails. Once sent, this is
+              that could disagree with itself. Once published, this is
               archivedUrl (the real daily-{date}.pdf), not the pre-send draft. */}
           {shownUrl && !draft.dirty && (
             <div className="mb-5 overflow-hidden rounded-lg border border-[#E2DFD5]">
@@ -529,55 +512,25 @@ export function ReportReview({
           {saved && <div className="mb-4"><SuccessNote title={saved} /></div>}
 
           {(
+            {/* ONE BUTTON. Approve, Hold and Release existed only to govern a
+                send, and there is no send (Juan, 2026-09-03: "i dont even want
+                them emailed anymore as long as we keep the records online on
+                the website accessible and editable"). What is left is the thing
+                he actually does here: change something, save it, see it. */}
             <div className="flex flex-wrap gap-2 border-t border-[#EDEBE3] pt-4">
-              {/* Saving stays available forever; only the SEND is spent. A
-                  correction to a report that already went out republishes the
-                  Reports-tab PDF in place and never mails a second copy. */}
-              {!sent && (
-                <button
-                  onClick={() => decide("approved")}
-                  disabled={locked}
-                  className="rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
-                >
-                  {pending ? "Working…" : "Approve and send"}
-                </button>
-              )}
               <button
                 onClick={() => save()}
                 disabled={locked}
-                className={
-                  sent
-                    ? "rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
-                    : "rounded-md border border-[#E2DFD5] px-4 py-2 text-[13px] text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] disabled:opacity-40"
-                }
+                className="rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
               >
-                {sent ? "Save the correction" : "Save edits"}
+                {pending ? "Saving…" : "Save and republish"}
               </button>
-              {sent ? null : draft.status === "held" ? (
-                <button
-                  onClick={() => decide("pending")}
-                  disabled={locked}
-                  className="rounded-md border border-[#E2DFD5] px-4 py-2 text-[13px] text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] disabled:opacity-40"
-                >
-                  Release the hold
-                </button>
-              ) : (
-                <button
-                  onClick={() => decide("held")}
-                  disabled={locked}
-                  title="Nothing goes out tonight, including at the 10pm deadline."
-                  className="rounded-md border border-[#E5D9BF] bg-[#FBF6E9] px-4 py-2 text-[13px] text-[#8A6D2F] transition-colors hover:opacity-90 disabled:opacity-40"
-                >
-                  Hold tonight
-                </button>
-              )}
             </div>
           )}
 
           <p className="mt-4 text-[11.5px] leading-relaxed text-[#8A928C]">
-            {sent
-              ? "This one already went out. Editing it republishes the PDF here, and only the latest version is kept. It never mails a second copy, so the email in your inbox stays the record of what was sent."
-              : "Approving sends within a few minutes. If you never get to it, the report still goes out at 10pm with whatever edits you saved. Hold is how you stop that."}
+            Nothing is emailed. This report lives here, and saving republishes the PDF in place, so
+            what you see is always the latest version. Edit it whenever it stops matching the day.
           </p>
         </>
       )}
@@ -705,7 +658,7 @@ export function WeeklyReportReview({
 }: {
   draft: ReportDraft;
   previewUrl: string | null;
-  /** The real weekly-{start}_to_{end}.pdf, once sent -- same reasoning as
+  /** The real weekly-{start}_to_{end}.pdf, once published, same reasoning as
    *  ReportReview's archivedUrl. */
   archivedUrl: string | null;
 }) {
@@ -715,40 +668,27 @@ export function WeeklyReportReview({
 
   const payload = draft.payload;
   if (!payload) return null;
-  const shownUrl = draft.status === "sent" && archivedUrl ? archivedUrl : previewUrl;
+  // The published PDF is the record. Nothing is emailed any more (migration
+  // 0060), so this is the only artifact, and it is always the latest version.
+  const shownUrl = draft.status === "published" && archivedUrl ? archivedUrl : previewUrl;
 
-  const sent = draft.status === "sent";
-  // `sent` no longer locks anything (Juan, 2026-09-03: "Everything should be
-  // editable at any point. We only keep the latest updated version."). The only
-  // thing that disables a control now is an in-flight save. See
-  // actionSaveReportEdits for why editing a sent day never re-mails it.
+  const published = draft.status === "published";
+  // Nothing but an in-flight save disables a control (Juan, 2026-09-03:
+  // "Everything should be editable at any point. We only keep the latest
+  // updated version."). There is no send to spend and therefore no state a
+  // report can reach that closes it for editing.
   const locked = pending;
   const totals = (payload.totals as WeeklyTotals | undefined) ?? {};
   const rangeLabel = (payload.range_label as string | undefined) ?? draft.report_date;
 
-  function decide(decision: "approved" | "held" | "pending") {
-    startTransition(async () => {
-      await withRetry(() => actionDecideReport(draft.report_date, decision, "weekly"));
-      setSaved(
-        decision === "approved"
-          ? "Approved. It goes out on the next pass, within a few minutes."
-          : decision === "held"
-            ? "Held. Nothing goes out at Friday's deadline unless you release it."
-            : "Back to pending.",
-      );
-      router.refresh();
-    });
-  }
 
-  const statusLine = sent
-    ? `Sent ${draft.sent_at ? new Date(draft.sent_at).toLocaleString("en-US") : ""}`
-    : draft.status === "approved"
-      ? "Approved, sending on the next pass"
-      : draft.status === "held"
-        ? "Held. Nothing goes out at Friday's deadline."
-        : draft.dirty
-          ? "Preview is rendering…"
-          : "Waiting on you";
+  const statusLine = draft.rebuild_requested
+    ? "Rebuilding…"
+    : draft.dirty
+      ? "Re-rendering from your edits…"
+      : published
+        ? "Published. Edit it any time."
+        : "Building";
 
   return (
     <section className="mb-8 rounded-xl border border-[#E2DFD5] bg-white p-5">
@@ -756,7 +696,7 @@ export function WeeklyReportReview({
         <h2 className="font-[family-name:var(--font-fraunces)] text-[19px] font-semibold tracking-tight">
           This week&rsquo;s report · {rangeLabel}
         </h2>
-        <span className={`text-[12.5px] ${draft.status === "held" ? "text-[#8A6D2F]" : "text-[#8A928C]"}`}>
+        <span className="text-[12.5px] text-[#8A928C]">
           {statusLine}
         </span>
       </div>
@@ -788,7 +728,7 @@ export function WeeklyReportReview({
             className="inline-flex items-center gap-1.5 rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90"
           >
             <Ico name="external" size={13} />
-            {shownUrl === archivedUrl ? "Open the sent PDF" : "Open the draft PDF"}
+            {shownUrl === archivedUrl ? "Open the published PDF" : "Open the latest render"}
           </a>
         ) : (
           <button
@@ -812,39 +752,9 @@ export function WeeklyReportReview({
 
       {saved && <div className="mb-4"><SuccessNote title={saved} /></div>}
 
-      {!sent && (
-        <div className="flex flex-wrap gap-2 border-t border-[#EDEBE3] pt-4">
-          <button
-            onClick={() => decide("approved")}
-            disabled={locked}
-            className="rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
-          >
-            {pending ? "Working…" : "Approve and send"}
-          </button>
-          {draft.status === "held" ? (
-            <button
-              onClick={() => decide("pending")}
-              disabled={locked}
-              className="rounded-md border border-[#E2DFD5] px-4 py-2 text-[13px] text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] disabled:opacity-40"
-            >
-              Release the hold
-            </button>
-          ) : (
-            <button
-              onClick={() => decide("held")}
-              disabled={locked}
-              title="Nothing goes out at Friday's deadline."
-              className="rounded-md border border-[#E5D9BF] bg-[#FBF6E9] px-4 py-2 text-[13px] text-[#8A6D2F] transition-colors hover:opacity-90 disabled:opacity-40"
-            >
-              Hold this week
-            </button>
-          )}
-        </div>
-      )}
-
       <p className="mt-4 text-[11.5px] leading-relaxed text-[#8A928C]">
-        Approving sends within a few minutes. If you never get to it, it still goes out Friday evening with
-        whatever HubSpot says by then. Hold is how you stop that.
+        Nothing is emailed. The week&rsquo;s rollup lives here and rebuilds from whatever the days below say,
+        so correcting a day corrects this too.
       </p>
     </section>
   );
