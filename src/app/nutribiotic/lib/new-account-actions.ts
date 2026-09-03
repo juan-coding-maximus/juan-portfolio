@@ -10,11 +10,11 @@
  */
 
 import { revalidatePath } from "next/cache";
-import { getLastVisitedLocationToday, insertAccount, linkAccountHubspotCompany } from "./dal";
+import { getAccountByHubspotCompanyId, getLastVisitedLocationToday, insertAccount, linkAccountHubspotCompany } from "./dal";
 import { createCompany, findPossibleDuplicates, type DuplicateCandidate } from "./hubspot-company";
 import { OWNER_ID } from "./hubspot";
 import { searchPlaces, type PlaceCandidate } from "./places";
-import { resolveTouchpointToAccount } from "./touchpoint";
+import { resolveTouchpointToAccount, type ResolveResult } from "./touchpoint";
 
 export type BusinessSearchOutcome = { ok: true; candidates: PlaceCandidate[] } | { ok: false; error: string };
 
@@ -125,4 +125,29 @@ export async function createBusinessFromPlace(
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/**
+ * The other half of the duplicate block above: when findPossibleDuplicates
+ * turns up a company that IS actually the store Juan just visited, this
+ * files the touchpoint against the local account behind it instead of
+ * forcing a choice between "create a second company" and losing the note.
+ *
+ * Only resolves if that company is already linked to one of Juan's own
+ * accounts (getAccountByHubspotCompanyId is owner-scoped) -- a duplicate
+ * owned by the other rep or nobody is a scope decision for Juan to make by
+ * hand, same as hubspot_create_company.py's own owner check, not a tap.
+ */
+export async function linkTouchpointToExistingCompany(
+  touchpointId: string,
+  hubspotCompanyId: string,
+): Promise<ResolveResult> {
+  const account = await getAccountByHubspotCompanyId(hubspotCompanyId);
+  if (!account) {
+    return {
+      ok: false,
+      error: "That company isn't linked to one of your accounts, so it can't be picked here.",
+    };
+  }
+  return resolveTouchpointToAccount(touchpointId, account.id, account.name);
 }

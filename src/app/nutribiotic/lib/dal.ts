@@ -286,6 +286,31 @@ export async function listAccounts(
   return query<TierRow>("nb_v_account_tier", params);
 }
 
+/**
+ * Every account in Juan's book a touchpoint could legitimately land on:
+ * owned, not closed, not a waypoint. Deliberately WITHOUT chain_excluded/
+ * practice_excluded, unlike listAccounts() above.
+ *
+ * Those two flags exist to keep a Whole Foods or a lone chiropractor's
+ * office off the Territory work-queue page, a display concern for that one
+ * screen. They say nothing about whether the account is real or whether Juan
+ * still calls on it (2026-09-02: Valerie Girard DC, practice_excluded,
+ * dormant but very much an active client, was invisible to the touchpoint
+ * matcher and got offered as a "new client" mid-visit, with the HubSpot
+ * duplicate-company check then blocking the create with no way to say "that
+ * one, use it"). recordTouchpoint()'s account matcher needs every real
+ * account so a rep logging a call never gets told a current client is new.
+ */
+export async function listAccountsForMatching(): Promise<Result<TierRow>> {
+  return query<TierRow>("nb_v_account_tier", {
+    select: "*",
+    hubspot_owner_id: `eq.${JUAN_OWNER_ID}`,
+    closed_at: "is.null",
+    lifecycle: "neq.waypoint",
+    limit: 1000,
+  });
+}
+
 export type CadenceRow = {
   account_id: string;
   name: string;
@@ -1837,6 +1862,22 @@ export async function setRouteDraft(byDay: RouteDraftByDay): Promise<void> {
  *  (see RouteDraftEntry above), so this resolves one from the other first.
  *  Silently a no-op if the account is already on that day's draft -- the
  *  route panel itself treats a double-add as nothing to do, same here. */
+/**
+ * Resolve a HubSpot company id back to the local account behind it, if Juan
+ * owns one. Feeds the "that's it, use the existing account" path off a
+ * blocked new-business create (new-account-ui.tsx): the duplicate check
+ * there only ever sees a HubSpot company id, and linking a touchpoint needs
+ * the nb_accounts id.
+ */
+export async function getAccountByHubspotCompanyId(
+  hubspotCompanyId: string,
+): Promise<{ id: string; name: string } | null> {
+  const rows = await raw<{ id: string; name: string }>(
+    `nb_accounts?select=id,name&hubspot_company_id=eq.${encodeURIComponent(hubspotCompanyId)}&hubspot_owner_id=eq.${JUAN_OWNER_ID}&limit=1`,
+  );
+  return rows[0] ?? null;
+}
+
 export async function addAccountToRouteDraft(hubspotCompanyId: string, date: string): Promise<void> {
   const rows = await raw<{ id: string }>(
     `nb_accounts?select=id&hubspot_company_id=eq.${encodeURIComponent(hubspotCompanyId)}&limit=1`,

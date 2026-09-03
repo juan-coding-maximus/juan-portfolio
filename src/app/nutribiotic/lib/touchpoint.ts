@@ -29,7 +29,7 @@ import {
   insertCalendarProposal,
   insertContact,
   insertTouchpoint,
-  listAccounts,
+  listAccountsForMatching,
   listContacts,
   markRouteStopDoneForAccountToday,
   patchContact,
@@ -356,9 +356,12 @@ export async function recordTouchpoint(
   if (!text) return { ok: false, error: "Nothing to record." };
   if (!client) return { ok: false, error: "ANTHROPIC_API_KEY is not configured on this deployment." };
 
-  // Juan's book only, which listAccounts() now enforces. Matching a spoken store name
-  // against the other rep's accounts could file a touchpoint into his book.
-  const accountsRes = await listAccounts({ limit: 500 });
+  // Juan's book only, which listAccountsForMatching() enforces (owner-scoped, not
+  // closed, not a waypoint), but WITHOUT the Territory page's chain/practice_excluded
+  // filters: a rep logging a real call must never be told an existing client is new
+  // just because that account is hidden from one work-queue screen. See the function
+  // doc for the incident that caught this.
+  const accountsRes = await listAccountsForMatching();
   const candidates = accountsRes.data.map((a) => ({ id: a.account_id, name: a.name, city: null as string | null }));
   if (candidates.length === 0) {
     return { ok: false, error: "No accounts to match against yet." };

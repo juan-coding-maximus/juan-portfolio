@@ -16,7 +16,18 @@
 import "server-only";
 import { batchRead, OWNER_ID, request } from "./hubspot";
 
-export type DuplicateCandidate = { id: string; name: string | null; city: string | null; owner: string | null };
+export type DuplicateCandidate = {
+  id: string;
+  name: string | null;
+  city: string | null;
+  owner: string | null;
+  /** Computed here, server-side, so the client component never needs
+   * OWNER_ID itself (this module carries "server-only"). Gates whether
+   * new-account-ui.tsx can offer "that's it, use the existing account":
+   * a duplicate in Juan's own book is a one-tap fix, one in the other
+   * rep's book or unowned is a scope call only Juan makes by hand. */
+  isJuans: boolean;
+};
 
 /** Portal-wide, not owner-filtered. Juan's local book cannot see Kyle's
  * companies or the unowned ones, so this is the one check nothing else here
@@ -34,11 +45,13 @@ export async function findPossibleDuplicates(name: string, website?: string | nu
       operation: "search",
     });
     for (const r of res.results ?? []) {
+      const owner = r.properties?.hubspot_owner_id ?? null;
       seen.set(r.id, {
         id: r.id,
         name: r.properties?.name ?? null,
         city: r.properties?.city ?? null,
-        owner: r.properties?.hubspot_owner_id ?? null,
+        owner,
+        isJuans: owner === OWNER_ID,
       });
     }
   }
