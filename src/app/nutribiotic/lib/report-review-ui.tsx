@@ -254,19 +254,17 @@ export function ReportReview({
                 {pending ? "Rendering…" : "Render preview"}
               </button>
             )}
-            {(
-              <button
-                onClick={() => startTransition(async () => {
-                  await withRetry(() => actionRequestRebuild(draft.report_date));
-                  router.refresh();
-                })}
-                disabled={locked}
-                title="Re-query HubSpot and rebuild from scratch. Discards the edits below."
-                className="rounded-md border border-[#E2DFD5] px-3 py-2 text-[12.5px] text-[#5B6560] transition-colors hover:bg-[#FAF9F5] disabled:opacity-40"
-              >
-                Rebuild from today&rsquo;s data
-              </button>
-            )}
+            <button
+              onClick={() => startTransition(async () => {
+                await withRetry(() => actionRequestRebuild(draft.report_date));
+                router.refresh();
+              })}
+              disabled={locked}
+              title="Re-query HubSpot and rebuild from scratch. Discards the edits below."
+              className="rounded-md border border-[#E2DFD5] px-3 py-2 text-[12.5px] text-[#5B6560] transition-colors hover:bg-[#FAF9F5] disabled:opacity-40"
+            >
+              Rebuild from today&rsquo;s data
+            </button>
             {draft.dirty && (
               <span className="text-[12px] text-[#8A6D2F]">
                 The PDF is behind your edits. It re-renders within a few minutes.
@@ -511,22 +509,20 @@ export function ReportReview({
 
           {saved && <div className="mb-4"><SuccessNote title={saved} /></div>}
 
-          {(
-            {/* ONE BUTTON. Approve, Hold and Release existed only to govern a
-                send, and there is no send (Juan, 2026-09-03: "i dont even want
-                them emailed anymore as long as we keep the records online on
-                the website accessible and editable"). What is left is the thing
-                he actually does here: change something, save it, see it. */}
-            <div className="flex flex-wrap gap-2 border-t border-[#EDEBE3] pt-4">
-              <button
-                onClick={() => save()}
-                disabled={locked}
-                className="rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
-              >
-                {pending ? "Saving…" : "Save and republish"}
-              </button>
-            </div>
-          )}
+          {/* ONE BUTTON. Approve, Hold and Release existed only to govern a
+              send, and there is no send (Juan, 2026-09-03: "i dont even want
+              them emailed anymore as long as we keep the records online on the
+              website accessible and editable"). What is left is the thing he
+              actually does here: change something, save it, see it. */}
+          <div className="flex flex-wrap gap-2 border-t border-[#EDEBE3] pt-4">
+            <button
+              onClick={() => save()}
+              disabled={locked}
+              className="rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
+            >
+              {pending ? "Saving…" : "Save and republish"}
+            </button>
+          </div>
 
           <p className="mt-4 text-[11.5px] leading-relaxed text-[#8A928C]">
             Nothing is emailed. This report lives here, and saving republishes the PDF in place, so
