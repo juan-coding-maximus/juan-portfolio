@@ -1031,9 +1031,14 @@ export async function insertActivityCorrection(input: {
   await mutate("nb_activity_corrections", "POST", { corrected_by: "juan", ...input });
 }
 
-/** Queued, never executed on arrival. See migration 0058 and HARD RULE 15. */
+/** Queued, never executed on arrival. See migration 0058 and HARD RULE 15.
+ *
+ * `field_note_id` is nullable (0058) and now genuinely gets nulls: a directive
+ * or a stated return visit spoken during a REAL customer visit has an activity
+ * and a touchpoint but no field note, and it belongs in this queue just the
+ * same. It was previously dropped on that path. */
 export async function insertDirectives(
-  rows: { field_note_id: string; directive: string; target: string | null; scope: string; account_id: string | null }[],
+  rows: { field_note_id: string | null; directive: string; target: string | null; scope: string; account_id: string | null }[],
 ): Promise<number> {
   if (rows.length === 0) return 0;
   await mutate("nb_directives", "POST", rows.map((r) => ({ id: randId("dir"), status: "pending", ...r })));
@@ -1241,26 +1246,17 @@ export type CalendarProposal = {
   created_at: string;
 };
 
-export async function insertCalendarProposal(input: {
-  touchpoint_id: string | null;
-  account_id: string | null;
-  kind: "meeting" | "reminder" | "visit";
-  title: string;
-  starts_at: string | null;
-  duration_minutes?: number;
-  notes?: string | null;
-}): Promise<CalendarProposal> {
-  const [row] = await mutate<CalendarProposal>("nb_calendar_proposals", "POST", {
-    id: randId("cp"),
-    status: "pending",
-    origin: "manual",
-    ...input,
-  });
-  return row;
-}
+// nb_calendar_proposals IS READ-ONLY FROM HERE ON (Juan's standing order,
+// 2026-09-03). There is deliberately no insert helper any more. A stated
+// return visit is a route instruction, queued in nb_directives against
+// nutribiotic-route-planner by touchpoint.ts, because a return visit gets
+// scheduled by landing on an upcoming route with its stated time honoured,
+// not by an event this app puts on his real Google Calendar. The table and
+// the two helpers below stay so the rows already in it remain visible and
+// closable; nothing creates a new one.
 
 /** Pending follow-ups, oldest-starting first. This is the human gate: nothing
- * here has touched Google Calendar yet. */
+ * here has touched Google Calendar yet. Legacy rows only, see above. */
 export async function listCalendarProposals(limit = 20): Promise<Result<CalendarProposal>> {
   return query<CalendarProposal>("nb_calendar_proposals", {
     select: "*",

@@ -7,13 +7,21 @@
  * NO FABRICATION (agency AGENTS.md principle 2): the extraction prompt is
  * instructed to pull only what the text actually states, never invent a name,
  * email, phone, or date. Contact detail is filled, never overwritten, so a
- * bad parse can only add a blank field, never clobber a true one. Calendar
- * proposals are the one piece that can affect something outside this app
- * (Juan's real Google Calendar), so per principle 1 they stay a GATED draft:
- * this writes 'pending' rows only, nothing is created until Juan approves one
- * (see setCalendarProposalStatus) and bridges/nutribiotic/calendar_sync.py
- * turns an approved row into a real event, mirroring gcal_client.py's own
- * confirm=True gate.
+ * bad parse can only add a blank field, never clobber a true one.
+ *
+ * A STATED RETURN VISIT IS A ROUTE INSTRUCTION, NOT A CALENDAR EVENT
+ * (Juan's standing order, 2026-09-03). "Come back tomorrow at 12:30" used to
+ * become an nb_calendar_proposals row, and calendar_sync.py picked those up
+ * at status 'pending' and created a real event on his own Google Calendar
+ * with no click in between. That is not how a return visit gets scheduled:
+ * it gets scheduled by landing on an upcoming route with the stated time
+ * honoured, which is nutribiotic-route-planner's job. So every
+ * calendar_action now queues an nb_directives row targeted at
+ * nutribiotic-route-planner, verbatim, status 'pending', alongside the
+ * agency directives Juan spoke. Queued, never executed on arrival (root
+ * AGENTS.md P1, migration 0058). Nothing in this file writes
+ * nb_calendar_proposals any more; the table survives read-only so the rows
+ * already in it stay visible and closable.
  */
 
 "use server";
@@ -26,7 +34,6 @@ import {
   getAccount,
   getTouchpointById,
   insertActivity,
-  insertCalendarProposal,
   insertContact,
   insertDirectives,
   insertFieldNote,
@@ -168,6 +175,68 @@ type ParsedDirective = {
   target: string | null;
   scope: "nutribiotic" | "agency";
 };
+
+type DirectiveRow = {
+  field_note_id: string | null;
+  directive: string;
+  target: string | null;
+  scope: string;
+  account_id: string | null;
+};
+
+/**
+ * One stated follow-up ("come back tomorrow at 12:30", "drop the sample off
+ * Thursday") turned into a route-planner directive.
+ *
+ * WHY THIS IS NOT A CALENDAR PROPOSAL ANY MORE. See the file header. A return
+ * visit is scheduled by landing on an upcoming route with the stated time
+ * honoured, never by an event this code puts on Juan's real calendar. The
+ * directive is what nutribiotic-route-planner drains; nb_directives is the
+ * queue that already exists for exactly this (migration 0058), and the
+ * extraction prompt already names nutribiotic-route-planner as the target for
+ * "go back, go see, plan a day".
+ *
+ * NOTHING IS INVENTED HERE. The title, the notes, the duration and the
+ * resolved timestamp are copied through as the extractor produced them, and a
+ * follow-up with no stated time says so in words rather than acquiring a
+ * default. The old proposal path defaulted duration_minutes to 60; that
+ * default is gone, because a duration nobody stated is a fact nobody stated.
+ */
+function returnVisitDirectiveRows(
+  actions: ParsedCalendarAction[] | undefined,
+  fieldNoteId: string | null,
+  accountId: string | null,
+  accountName: string | null,
+): DirectiveRow[] {
+  return (actions ?? []).map((ca) => {
+    const parts: string[] = [accountName ? `${accountName}: ${ca.title}` : ca.title];
+    parts.push(ca.when_iso ? `Stated time: ${ca.when_iso}` : "No time stated");
+    if (ca.duration_minutes) parts.push(`Stated duration: ${ca.duration_minutes} min`);
+    if (ca.notes) parts.push(ca.notes);
+    return {
+      field_note_id: fieldNoteId,
+      directive: `[follow-up:${ca.kind}] ${parts.join(" · ")}`,
+      target: "nutribiotic-route-planner",
+      scope: "nutribiotic",
+      account_id: accountId,
+    };
+  });
+}
+
+/** Agency instructions spoken inside a note, verbatim. HARD RULE 15. */
+function agencyDirectiveRows(
+  directives: ParsedDirective[] | undefined,
+  fieldNoteId: string | null,
+  accountId: string | null,
+): DirectiveRow[] {
+  return (directives ?? []).map((d) => ({
+    field_note_id: fieldNoteId,
+    directive: d.directive,
+    target: d.target ?? null,
+    scope: d.scope === "agency" ? "agency" : "nutribiotic",
+    account_id: accountId,
+  }));
+}
 
 /**
  * Facts about the BUSINESS itself, stated during the visit, distinct from a
@@ -344,12 +413,16 @@ export type RecordTouchpointResult =
       /** True when nothing about this was a customer contact: it lives in
        *  nb_field_notes, counts as a touchpoint, and never reaches HubSpot. */
       isFieldNote?: boolean;
-      /** Instructions aimed at the agency, queued in nb_directives. */
+      /** Every nb_directives row queued by this note: agency instructions
+       *  plus stated return visits. Queued, never executed on arrival. */
       directiveCount?: number;
+      /** The return-visit subset, aimed at nutribiotic-route-planner. These
+       *  replace what used to be nb_calendar_proposals rows: a stated return
+       *  lands on an upcoming route, never on Juan's Google Calendar. */
+      routeDirectives?: number;
       summary: string;
       peopleAdded: number;
       peopleUpdated: number;
-      calendarProposals: number;
       hubspotFiled: boolean;
       hubspotNoteId: string | null;
       hubspotError: string | null;
@@ -374,7 +447,10 @@ export type RecordTouchpointResult =
       matchAccountName: string | null;
       peopleAdded: 0;
       peopleUpdated: 0;
-      calendarProposals: 0;
+      /** Nothing is queued until the note has an account: a return visit with
+       *  no store to return to is not yet a route instruction. It rides in
+       *  `parsed` and is queued by resolveTouchpointToAccount. */
+      routeDirectives: 0;
     }
   | { ok: false; error: string };
 
@@ -488,31 +564,19 @@ export async function recordTouchpoint(
     });
 
     // Verbatim into the queue, drained deliberately. Never executed on arrival.
-    const directiveCount = await insertDirectives(
-      (parsed.directives ?? []).map((d) => ({
-        field_note_id: fieldNote.id,
-        directive: d.directive,
-        target: d.target ?? null,
-        scope: d.scope === "agency" ? "agency" : "nutribiotic",
-        account_id: noteAccountId,
-      })),
-    );
-
     // A field note can still say "come back tomorrow", and that is a real
-    // calendar action. It stays a proposal: the human click is the gate.
-    let calendarProposals = 0;
-    for (const ca of parsed.calendar_actions ?? []) {
-      await insertCalendarProposal({
-        touchpoint_id: tp.id,
-        account_id: noteAccountId,
-        kind: ca.kind,
-        title: noteAccount ? `${noteAccount.name}: ${ca.title}` : ca.title,
-        starts_at: ca.when_iso,
-        duration_minutes: ca.duration_minutes ?? 60,
-        notes: ca.notes,
-      });
-      calendarProposals += 1;
-    }
+    // return visit: it joins the same queue, aimed at the route planner,
+    // rather than becoming an event on Juan's calendar.
+    const routeRows = returnVisitDirectiveRows(
+      parsed.calendar_actions,
+      fieldNote.id,
+      noteAccountId,
+      noteAccount?.name ?? null,
+    );
+    const directiveCount = await insertDirectives([
+      ...agencyDirectiveRows(parsed.directives, fieldNote.id, noteAccountId),
+      ...routeRows,
+    ]);
 
     return {
       ok: true,
@@ -522,10 +586,10 @@ export async function recordTouchpoint(
       needsAccount: false,
       isFieldNote: true,
       directiveCount,
+      routeDirectives: routeRows.length,
       summary: parsed.activity.detail,
       peopleAdded: 0,
       peopleUpdated: 0,
-      calendarProposals,
       hubspotFiled: false,
       hubspotNoteId: null,
       hubspotError: null,
@@ -578,7 +642,7 @@ export async function recordTouchpoint(
       matchAccountName: matchAccount?.name ?? null,
       peopleAdded: 0,
       peopleUpdated: 0,
-      calendarProposals: 0,
+      routeDirectives: 0,
     };
   }
 
@@ -685,7 +749,6 @@ export async function recordTouchpoint(
     }
   }
 
-  let calendarProposals = 0;
   const tp = await insertTouchpoint({
     account_id: accountId,
     raw_text: text,
@@ -695,18 +758,22 @@ export async function recordTouchpoint(
     parsed,
   });
 
-  for (const ca of parsed.calendar_actions ?? []) {
-    await insertCalendarProposal({
-      touchpoint_id: tp.id,
-      account_id: accountId,
-      kind: ca.kind,
-      title: account ? `${account.name}: ${ca.title}` : ca.title,
-      starts_at: ca.when_iso,
-      duration_minutes: ca.duration_minutes ?? 60,
-      notes: ca.notes,
-    });
-    calendarProposals += 1;
-  }
+  // A real customer visit can carry BOTH a directive and a return visit, and
+  // until now this path queued neither: insertDirectives only ran on the
+  // field-note branch, so "go find their email" spoken during an actual visit
+  // was parsed and then dropped, and "come back Thursday" went to a calendar
+  // proposal that auto-pushed to Google Calendar. Both now land in
+  // nb_directives, pending, for the human/route planner to drain.
+  const routeRows = returnVisitDirectiveRows(
+    parsed.calendar_actions,
+    null,
+    accountId,
+    account?.name ?? null,
+  );
+  const directiveCount = await insertDirectives([
+    ...agencyDirectiveRows(parsed.directives, null, accountId),
+    ...routeRows,
+  ]);
 
   const hubspot = autoFileHubspot
     ? await autoFileEngagement(activity.id)
@@ -727,10 +794,11 @@ export async function recordTouchpoint(
     accountName: account?.name ?? null,
     accountId: account?.account_id ?? null,
     needsAccount: false,
+    directiveCount,
+    routeDirectives: routeRows.length,
     summary: parsed.activity.detail,
     peopleAdded,
     peopleUpdated,
-    calendarProposals,
     ...hubspot,
     accountFacts,
   };
@@ -744,7 +812,8 @@ export type ResolveResult =
       summary: string;
       peopleAdded: number;
       peopleUpdated: number;
-      calendarProposals: number;
+      directiveCount: number;
+      routeDirectives: number;
       hubspotFiled: boolean;
       hubspotNoteId: string | null;
       hubspotError: string | null;
@@ -831,24 +900,29 @@ export async function resolveTouchpointToAccount(
     }
   }
 
-  let calendarProposals = 0;
-  for (const ca of parsed.calendar_actions ?? []) {
-    await insertCalendarProposal({
-      touchpoint_id: touchpointId,
-      account_id: accountId,
-      kind: ca.kind,
-      title: `${accountName}: ${ca.title}`,
-      starts_at: ca.when_iso,
-      duration_minutes: ca.duration_minutes ?? 60,
-      notes: ca.notes,
-    });
-    calendarProposals += 1;
-  }
+  // Same queue as the straight-through path above. This note parked as
+  // needs_account when it was spoken, so its follow-up has been waiting for an
+  // account to attach to; now it has one, it goes to the route planner.
+  const routeRows = returnVisitDirectiveRows(parsed.calendar_actions, null, accountId, accountName);
+  const directiveCount = await insertDirectives([
+    ...agencyDirectiveRows(parsed.directives, null, accountId),
+    ...routeRows,
+  ]);
 
   const hubspot = await autoFileEngagement(activity.id);
 
   await maybeMarkStopServiced(accountId, parsed.activity.kind, hubspot.hubspotFiled);
 
   revalidatePath("/nutribiotic/visit");
-  return { ok: true, accountId, accountName, summary: parsed.activity.detail, peopleAdded, peopleUpdated, calendarProposals, ...hubspot };
+  return {
+    ok: true,
+    accountId,
+    accountName,
+    summary: parsed.activity.detail,
+    peopleAdded,
+    peopleUpdated,
+    directiveCount,
+    routeDirectives: routeRows.length,
+    ...hubspot,
+  };
 }

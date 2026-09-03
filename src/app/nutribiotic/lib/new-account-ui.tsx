@@ -235,9 +235,9 @@ export function AccountMatchResolver({
             meta={
               <>
                 <div className="mt-1.5 text-[12px] text-[#8A928C]">{facts.join(", ")}</div>
-                {created.calendarProposals > 0 && (
+                {created.routeDirectives > 0 && (
                   <div className="mt-1.5 text-[12px] text-[#8A928C]">
-                    {created.calendarProposals} follow-up{created.calendarProposals === 1 ? "" : "s"} waiting below
+                    {created.routeDirectives} return visit{created.routeDirectives === 1 ? "" : "s"} queued for the route planner
                   </div>
                 )}
                 <div className="mt-1.5 text-[11px] uppercase tracking-[0.1em] text-[#A9AFA9]">Tap for the next one</div>

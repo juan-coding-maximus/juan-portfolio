@@ -47,7 +47,8 @@ export type CreateBusinessOutcome =
       summary: string;
       peopleAdded: number;
       peopleUpdated: number;
-      calendarProposals: number;
+      /** Stated return visits queued for nutribiotic-route-planner. */
+      routeDirectives: number;
       hubspotFiled: boolean;
       hubspotNoteId: string | null;
       hubspotError: string | null;
@@ -117,7 +118,7 @@ export async function createBusinessFromPlace(
       summary: filed.summary,
       peopleAdded: filed.peopleAdded,
       peopleUpdated: filed.peopleUpdated,
-      calendarProposals: filed.calendarProposals,
+      routeDirectives: filed.routeDirectives,
       hubspotFiled: filed.hubspotFiled,
       hubspotNoteId: filed.hubspotNoteId,
       hubspotError: filed.hubspotError,

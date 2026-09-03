@@ -286,13 +286,13 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
               hubspotError={success.hubspotError}
               meta={
                 <>
-                  {(success.peopleAdded > 0 || success.peopleUpdated > 0 || success.calendarProposals > 0) && (
+                  {(success.peopleAdded > 0 || success.peopleUpdated > 0 || (success.routeDirectives ?? 0) > 0) && (
                     <div className="mt-1.5 text-[12px] text-[#8A928C]">
                       {success.peopleAdded > 0 && `${success.peopleAdded} contact${success.peopleAdded === 1 ? "" : "s"} added`}
                       {success.peopleAdded > 0 && success.peopleUpdated > 0 && ", "}
                       {success.peopleUpdated > 0 && `${success.peopleUpdated} updated`}
-                      {success.calendarProposals > 0 &&
-                        `${success.peopleAdded || success.peopleUpdated ? " · " : ""}${success.calendarProposals} follow-up${success.calendarProposals === 1 ? "" : "s"} waiting below`}
+                      {(success.routeDirectives ?? 0) > 0 &&
+                        `${success.peopleAdded || success.peopleUpdated ? " · " : ""}${success.routeDirectives} return visit${success.routeDirectives === 1 ? "" : "s"} queued for the route planner`}
                     </div>
                   )}
                   {success.companyPhoneFilled && (
