@@ -996,6 +996,33 @@ export async function insertFieldNote(input: {
   return row;
 }
 
+/** The activity behind a HubSpot engagement, so a stop on the report can be
+ *  traced back to the ledger row that produced it. */
+export async function getActivityByEngagementId(engagementId: string): Promise<
+  { id: number; account_id: string; kind: string; detail: string | null; at: string } | null
+> {
+  const res = await query<{ id: number; account_id: string; kind: string; detail: string | null; at: string }>(
+    "nb_activities",
+    { select: "id,account_id,kind,detail,at", hubspot_engagement_id: `eq.${engagementId}`, limit: "1" },
+  );
+  return res.data[0] ?? null;
+}
+
+/**
+ * Reclassify an activity WITHOUT touching it. nb_activities is append-only
+ * (migration 0002) and stays that way: the ledger keeps what it first recorded,
+ * and every counting surface reads nb_v_activities_effective instead, which is
+ * what nets the correction out. See HARD RULE 18.
+ */
+export async function insertActivityCorrection(input: {
+  activity_id: number;
+  original_kind: string;
+  corrected_kind: string;
+  reason: string;
+}): Promise<void> {
+  await mutate("nb_activity_corrections", "POST", { corrected_by: "juan", ...input });
+}
+
 /** Queued, never executed on arrival. See migration 0058 and HARD RULE 15. */
 export async function insertDirectives(
   rows: { field_note_id: string; directive: string; target: string | null; scope: string; account_id: string | null }[],

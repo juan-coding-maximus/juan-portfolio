@@ -1,9 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { archiveEngagement } from "./hubspot-engagement";
 import {
   addAccountToRouteDraft,
+  getActivityByEngagementId,
   getReportDraft,
+  insertActivityCorrection,
+  insertFieldNote,
   requestPreviewRender,
   requestReportRebuild,
   saveReportDraftPayload,
@@ -34,9 +38,18 @@ import {
  *     overnight reported as a round trip from Manhattan Beach because the
  *     report never looked at the route plan);
  *   - miles, when the computed drive is wrong even with the right start/end.
- * Everything else on the report is a HubSpot record. Correcting one of those
- * means correcting the CRM, which is a separate and separately-gated write.
- * Nothing here touches HubSpot.
+ *
+ * ONE EXCEPTION, ADDED 2026-09-03: marking a stop as a field note. That one DOES
+ * reach HubSpot, and deliberately. Juan: "the report page shows the current
+ * states, but doesn't allow changes. One of the biggest functionalities of this
+ * page is to help me edit to reflect reality." The reality being corrected is
+ * that a thing filed as a customer contact never was one, and leaving the
+ * engagement in the shared portal while the report calls it a note would be two
+ * systems disagreeing about the same event. So it logs an
+ * nb_activity_corrections row (nb_activities stays append-only), writes the
+ * nb_field_notes twin that carries the touchpoint credit, and archives the
+ * engagement with scope asserted twice, exactly as field_note_correct.py does on
+ * the Mac side. See HARD RULES 17 and 18.
  */
 
 const PATH = "/nutribiotic/reports";
@@ -81,7 +94,7 @@ export type ReportEdits = {
    *  undefined = leave whatever override is already stored untouched. */
   routeStart?: RouteEndpoint | null;
   routeEnd?: RouteEndpoint | null;
-  stops: Record<string, { hidden: boolean; call_only: boolean; message_only: boolean }>;
+  stops: Record<string, { hidden: boolean; call_only: boolean; message_only: boolean; field_note?: boolean }>;
   /** Display order, as stop `n` values, in the order Juan arranged them
    *  (2026-08-28, "move things around"). field_report.py's apply_edits()
    *  renumbers and draws the route/mileage straight off array order, so
@@ -107,7 +120,22 @@ export type ReportEdits = {
 export async function actionSaveReportEdits(dateISO: string, edits: ReportEdits): Promise<void> {
   const draft = await getReportDraft(dateISO);
   if (!draft?.payload) return;
-  if (draft.status === "sent") return; // a sent report is a record, not a draft
+  // A SENT REPORT IS STILL EDITABLE (Juan, 2026-09-03: "Everything should be
+  // editable at any point. We only keep the latest updated version.").
+  //
+  // This used to return early on `sent`, on the reasoning that a sent report is
+  // a record rather than a draft. That reasoning protected the wrong thing. The
+  // point of this screen, in his words, is "to help me edit to reflect
+  // reality", and reality is most often wrong the morning AFTER a report went
+  // out, which is exactly when the old rule locked it. He caught the Sep 2
+  // report calling three notes to self customer visits and starting the day in
+  // a city he had not slept in, and could not fix either from the page.
+  //
+  // What stays true: editing never re-mails. The email that left is the record
+  // of what was mailed, and re-sending on every correction would turn a typo
+  // into an outward send (root AGENTS.md P1). The Reports-tab artifact is
+  // republished in place instead, so the page and the PDF behind it always show
+  // the latest version, which is the only version kept.
 
   const payload: ReportPayload = { ...draft.payload };
 
@@ -143,6 +171,53 @@ export async function actionSaveReportEdits(dateISO: string, edits: ReportEdits)
     payload.stops = [...ordered, ...rest];
   }
 
+  // Stops he marked as "not a customer contact" are corrected at the source
+  // before the payload is written, so the rebuilt PDF reads the corrected world
+  // rather than carrying an override the CRM disagrees with.
+  for (const [n, e] of Object.entries(edits.stops)) {
+    if (!e.field_note) continue;
+    const stop = (draft.payload.stops ?? []).find((s) => String(s.n) === n);
+    if (stop) await reclassifyStopAsFieldNote(stop);
+  }
+
   await saveReportDraftPayload(dateISO, payload);
   revalidatePath(PATH);
+}
+
+/**
+ * One stop, corrected from "a customer was contacted" to "a note was recorded".
+ *
+ * Order matters and is the same order field_note_correct.py uses: the OS rows
+ * first, the portal last. If the archive fails, the OS already says field note
+ * and the engagement is a visible leftover someone can delete; the reverse
+ * order would delete the shared-portal record and then possibly fail to record
+ * why, which is unrecoverable.
+ */
+async function reclassifyStopAsFieldNote(
+  stop: NonNullable<ReportPayload["stops"]>[number],
+): Promise<void> {
+  for (const ev of stop.events ?? []) {
+    // `events` is typed `unknown[]` on the payload: it is field_report.py's
+    // shape, not this app's, so it is narrowed here rather than trusted.
+    const engagementId = (ev as { id?: string } | null)?.id;
+    if (!engagementId) continue;
+    const activity = await getActivityByEngagementId(engagementId);
+    if (!activity || activity.kind === "field_note") continue;
+
+    await insertActivityCorrection({
+      activity_id: activity.id,
+      original_kind: activity.kind,
+      corrected_kind: "field_note",
+      reason: "Marked on the report as not a customer contact.",
+    });
+    await insertFieldNote({
+      account_id: activity.account_id,
+      touchpoint_id: null,
+      at: activity.at,
+      detail: activity.detail ?? "",
+      raw_text: null,
+      topic: "account",
+    });
+    await archiveEngagement(engagementId);
+  }
 }

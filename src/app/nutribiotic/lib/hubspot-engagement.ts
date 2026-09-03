@@ -163,6 +163,56 @@ const KIND_LABEL: Record<string, string> = {
  */
 const NEVER_FILED = new Set(["field_note"]);
 
+/**
+ * Archive one engagement, with scope asserted twice.
+ *
+ * HubSpot's DELETE moves the object to the portal recycling bin, recoverable
+ * for 90 days, which is as close to permanent as the API gets and is what
+ * delete_closed.py already relies on. The type is not assumed from the kind
+ * map: an engagement filed before a kind was remapped can sit in a different
+ * object than today's map predicts, and guessing wrong would archive nothing
+ * while reporting success, leaving the portal dirty and the ledger claiming it
+ * was cleaned. So each type is probed and the read-back is what decides.
+ *
+ * The company it sits on is re-read live and must be Juan's. 2026-08-01 is why:
+ * a push went to all 392 linked companies and had to be reverted out of
+ * nb_hubspot_sync_log. An engagement on someone else's record is left alone and
+ * reported, never archived.
+ */
+export async function archiveEngagement(
+  engagementId: string,
+): Promise<"archived" | "not_found" | "refused"> {
+  for (const objectType of ["notes", "calls", "meetings", "emails"] as const) {
+    let companyIds: string[];
+    try {
+      const r = await request<{
+        associations?: { companies?: { results?: { id: string }[] } };
+      }>({
+        method: "GET",
+        path: `/crm/v3/objects/${objectType}/${engagementId}`,
+        qs: { associations: "companies" },
+        entity: objectType,
+        operation: "read_for_archive",
+      });
+      companyIds = (r.associations?.companies?.results ?? []).map((c) => c.id);
+    } catch {
+      continue; // not this object type
+    }
+
+    const verdict = await assertJuansBook(companyIds);
+    if (verdict.allowed.length === 0) return "refused";
+
+    await request({
+      method: "DELETE",
+      path: `/crm/v3/objects/${objectType}/${engagementId}`,
+      entity: objectType,
+      operation: "archive",
+    });
+    return "archived";
+  }
+  return "not_found";
+}
+
 export class NeverFiledKindError extends Error {
   constructor(kind: string) {
     super(`${kind} is never filed to HubSpot. It lives in the OS only.`);

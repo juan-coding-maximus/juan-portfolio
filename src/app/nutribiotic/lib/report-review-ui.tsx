@@ -42,7 +42,7 @@ const HQ_CATEGORIES = [
   "OTHER",
 ];
 
-type StopEdit = { hidden: boolean; call_only: boolean; message_only: boolean };
+type StopEdit = { hidden: boolean; call_only: boolean; message_only: boolean; field_note?: boolean };
 
 /**
  * Tonight's report, before it goes out.
@@ -139,7 +139,11 @@ export function ReportReview({
   );
 
   const sent = draft.status === "sent";
-  const locked = sent || pending;
+  // `sent` no longer locks anything (Juan, 2026-09-03: "Everything should be
+  // editable at any point. We only keep the latest updated version."). The only
+  // thing that disables a control now is an in-flight save. See
+  // actionSaveReportEdits for why editing a sent day never re-mails it.
+  const locked = pending;
 
   function currentEdits() {
     return {
@@ -267,7 +271,7 @@ export function ReportReview({
                 {pending ? "Rendering…" : "Render preview"}
               </button>
             )}
-            {!sent && (
+            {(
               <button
                 onClick={() => startTransition(async () => {
                   await withRetry(() => actionRequestRebuild(draft.report_date));
@@ -312,33 +316,21 @@ export function ReportReview({
           <div className="mb-5 grid gap-3 sm:grid-cols-2">
             <div>
               <div className="mb-1 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">Route starts</div>
-              {sent ? (
-                <span className="text-[13.5px] text-[#5B6560]">
-                  {(routeStart ?? payload.route_start ?? home)?.label ?? "—"}
-                </span>
-              ) : (
-                <RouteEndpointField
-                  value={routeStart}
-                  home={home}
-                  fallback={payload.route_start ?? home}
-                  onChange={setRouteStart}
-                />
-              )}
+              <RouteEndpointField
+                value={routeStart}
+                home={home}
+                fallback={payload.route_start ?? home}
+                onChange={setRouteStart}
+              />
             </div>
             <div>
               <div className="mb-1 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">Route ends</div>
-              {sent ? (
-                <span className="text-[13.5px] text-[#5B6560]">
-                  {(routeEnd ?? payload.route_end ?? home)?.label ?? "—"}
-                </span>
-              ) : (
-                <RouteEndpointField
-                  value={routeEnd}
-                  home={home}
-                  fallback={payload.route_end ?? home}
-                  onChange={setRouteEnd}
-                />
-              )}
+              <RouteEndpointField
+                value={routeEnd}
+                home={home}
+                fallback={payload.route_end ?? home}
+                onChange={setRouteEnd}
+              />
             </div>
           </div>
 
@@ -360,7 +352,7 @@ export function ReportReview({
                 {orderedStops.map((s, i) => {
                   const key = String(s.n);
                   const n = s.n ?? 0;
-                  const e = stopEdits[key] ?? { hidden: false, call_only: false, message_only: false };
+                  const e = stopEdits[key] ?? { hidden: false, call_only: false, message_only: false, field_note: false };
                   const set = (patch: Partial<StopEdit>) =>
                     setStopEdits((prev) => ({ ...prev, [key]: { ...e, ...patch } }));
                   return (
@@ -399,6 +391,21 @@ export function ReportReview({
                       <div className="flex shrink-0 items-center gap-1.5">
                         <Toggle on={e.call_only} onClick={() => set({ call_only: !e.call_only })} disabled={locked}>
                           Call only
+                        </Toggle>
+                        {/* NOT A CUSTOMER CONTACT AT ALL. Unlike the other two
+                            toggles, which only change how a real touch is drawn,
+                            this one corrects the record: on save it logs an
+                            nb_activity_corrections row, writes the field-note
+                            twin that keeps the touchpoint credit, and archives
+                            the engagement in the shared portal. It is why Juan
+                            could not fix Sep 2 from this page. */}
+                        <Toggle
+                          on={Boolean(e.field_note)}
+                          onClick={() => set({ field_note: !e.field_note })}
+                          disabled={locked}
+                          title="Not a visit, call or email. Moves it to Field notes and removes the engagement from HubSpot."
+                        >
+                          Field note
                         </Toggle>
                         {s.hubspot_id && (
                           <AddToRouteControl
@@ -521,23 +528,32 @@ export function ReportReview({
 
           {saved && <div className="mb-4"><SuccessNote title={saved} /></div>}
 
-          {!sent && (
+          {(
             <div className="flex flex-wrap gap-2 border-t border-[#EDEBE3] pt-4">
-              <button
-                onClick={() => decide("approved")}
-                disabled={locked}
-                className="rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
-              >
-                {pending ? "Working…" : "Approve and send"}
-              </button>
+              {/* Saving stays available forever; only the SEND is spent. A
+                  correction to a report that already went out republishes the
+                  Reports-tab PDF in place and never mails a second copy. */}
+              {!sent && (
+                <button
+                  onClick={() => decide("approved")}
+                  disabled={locked}
+                  className="rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
+                >
+                  {pending ? "Working…" : "Approve and send"}
+                </button>
+              )}
               <button
                 onClick={() => save()}
                 disabled={locked}
-                className="rounded-md border border-[#E2DFD5] px-4 py-2 text-[13px] text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] disabled:opacity-40"
+                className={
+                  sent
+                    ? "rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
+                    : "rounded-md border border-[#E2DFD5] px-4 py-2 text-[13px] text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] disabled:opacity-40"
+                }
               >
-                Save edits
+                {sent ? "Save the correction" : "Save edits"}
               </button>
-              {draft.status === "held" ? (
+              {sent ? null : draft.status === "held" ? (
                 <button
                   onClick={() => decide("pending")}
                   disabled={locked}
@@ -559,8 +575,9 @@ export function ReportReview({
           )}
 
           <p className="mt-4 text-[11.5px] leading-relaxed text-[#8A928C]">
-            Approving sends within a few minutes. If you never get to it, the report still goes out at 10pm
-            with whatever edits you saved. Hold is how you stop that.
+            {sent
+              ? "This one already went out. Editing it republishes the PDF here, and only the latest version is kept. It never mails a second copy, so the email in your inbox stays the record of what was sent."
+              : "Approving sends within a few minutes. If you never get to it, the report still goes out at 10pm with whatever edits you saved. Hold is how you stop that."}
           </p>
         </>
       )}
@@ -573,12 +590,14 @@ function Toggle({
   onClick,
   disabled,
   danger,
+  title,
   children,
 }: {
   on: boolean;
   onClick: () => void;
   disabled?: boolean;
   danger?: boolean;
+  title?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -586,6 +605,7 @@ function Toggle({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      title={title}
       aria-pressed={on}
       className={`rounded-md border px-2 py-1 text-[11.5px] font-medium transition-colors disabled:opacity-40 ${
         on
@@ -698,7 +718,11 @@ export function WeeklyReportReview({
   const shownUrl = draft.status === "sent" && archivedUrl ? archivedUrl : previewUrl;
 
   const sent = draft.status === "sent";
-  const locked = sent || pending;
+  // `sent` no longer locks anything (Juan, 2026-09-03: "Everything should be
+  // editable at any point. We only keep the latest updated version."). The only
+  // thing that disables a control now is an in-flight save. See
+  // actionSaveReportEdits for why editing a sent day never re-mails it.
+  const locked = pending;
   const totals = (payload.totals as WeeklyTotals | undefined) ?? {};
   const rangeLabel = (payload.range_label as string | undefined) ?? draft.report_date;
 
