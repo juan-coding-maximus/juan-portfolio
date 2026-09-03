@@ -3251,17 +3251,22 @@ export function reportDateLA(): string {
  *  derived from daily so should auto update"). Plain calendar math on a
  *  YYYY-MM-DD string, no timezone in play. Null for a Fri/Sat/Sun date --
  *  Juan doesn't work the field then, so no Mon-Thu week contains it. */
-export function weekWindowFor(dateISO: string): { start: string; end: string } | null {
+export function weekWindowFor(dateISO: string): { start: string; end: string } {
+  // SEVEN DAYS, MONDAY TO SUNDAY, and every date has one. Juan, 2026-08-31:
+  // "seven day is a standard, every week starts on a Monday." This returned
+  // null for a Fri/Sat/Sun pick, because the week was Mon-Thu and no such week
+  // contained one, so picking a weekend date showed no weekly section at all.
+  // That was built on the assumption he never works Fri-Sun, which Sunday Aug
+  // 30 (a real stop, 34 miles) disproved.
   const d = new Date(`${dateISO}T00:00:00`);
   const jsDay = d.getDay(); // Sun=0 .. Sat=6
   const day = jsDay === 0 ? 6 : jsDay - 1; // Monday=0 .. Sunday=6
-  if (day > 3) return null;
   const monday = new Date(d);
   monday.setDate(d.getDate() - day);
-  const thursday = new Date(monday);
-  thursday.setDate(monday.getDate() + 3);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
   const fmt = (x: Date) => x.toISOString().slice(0, 10);
-  return { start: fmt(monday), end: fmt(thursday) };
+  return { start: fmt(monday), end: fmt(sunday) };
 }
 
 /** `kind` matters since migration 0050: nb_report_drafts's primary key is

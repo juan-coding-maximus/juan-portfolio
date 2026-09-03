@@ -56,8 +56,8 @@ export default async function ReportsIndex({
 
   // "Weekly is derived from daily so should auto update" (2026-08-28,
   // Juan's follow-up): no separate weekly picker. Whichever day is selected,
-  // the weekly section below always shows the Mon-Thu week that day falls
-  // in -- null on a Fri/Sat/Sun pick, since no such week contains it.
+  // the weekly section below always shows the Mon-Sun week that day falls in.
+  // Every date has one (2026-09-03); it used to be null on a Fri/Sat/Sun pick.
   const weekWindow = weekWindowFor(selectedDate);
 
   const [reports, archive, draft, home, allTime, weeklyDraft, archivedDailyUrl, archivedWeeklyUrl] =
@@ -166,7 +166,7 @@ export default async function ReportsIndex({
           derived from daily", his follow-up) -- and field_report.py's
           build_draft() cascades a rebuild here whenever a day inside this
           window is rebuilt, so it's never stale relative to a daily edit.
-          Absent on a Fri/Sat/Sun pick (no Mon-Thu week contains it) or
+          Absent only when no week has been built yet, or
           before com.agency.nutribiotic-weekly-summary/a daily rebuild has
           ever staged one for this window -- no build button, staging one is
           what a daily rebuild in-window (or the Friday cron) is for. */}
