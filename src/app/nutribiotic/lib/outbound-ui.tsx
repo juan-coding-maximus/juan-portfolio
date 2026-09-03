@@ -89,6 +89,39 @@ export type DraftLite = {
   to_email: string | null;
 };
 
+export type ChannelKind = "email" | "whatsapp" | "imessage";
+
+const CHANNEL_TEXT: Record<ChannelKind, string> = {
+  email: "Email",
+  whatsapp: "WhatsApp",
+  imessage: "iMessage",
+};
+
+/**
+ * Channel badge at the top of a draft card. Green + filled only for a
+ * PREFERRED channel actually on record (`preferred=true`, e.g. Mahsa at
+ * Beverly Microblading asking for WhatsApp by name, 2026-08-29) — the same
+ * green as the WhatsApp send button below, so the two read as one signal.
+ * Anything else (no stated preference, just the drafted channel) stays the
+ * quiet uppercase label this replaces, so a real preference stands out
+ * rather than every card turning green.
+ */
+export function ChannelLabel({ channel, preferred }: { channel: ChannelKind; preferred: boolean }) {
+  if (preferred) {
+    return (
+      <span
+        className="rounded bg-[#25D366] px-1.5 py-0.5 text-[11px] font-medium text-white"
+        title="This account asked for this channel by name."
+      >
+        {CHANNEL_TEXT[channel]}
+      </span>
+    );
+  }
+  return (
+    <span className="text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">{CHANNEL_TEXT[channel] ?? channel}</span>
+  );
+}
+
 /**
  * The action row for one draft card: attach, then whichever real channel(s)
  * are actually reachable for this account. The stored `channel` on the draft

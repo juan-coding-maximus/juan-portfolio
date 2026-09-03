@@ -57,7 +57,9 @@ function snippet(text: string, max = 160): string {
   return t.length > max ? `${t.slice(0, max).trimEnd()}…` : t;
 }
 
-type SearchMode = "company" | "person";
+type DirectoryMatch =
+  | { kind: "account"; key: string; account: OutreachAccount }
+  | { kind: "contact"; key: string; contact: OutreachContactLite; account: OutreachAccount };
 
 export function OutreachComposer({
   accounts,
@@ -68,7 +70,6 @@ export function OutreachComposer({
   contacts: OutreachContactLite[];
   files: MarketingFile[];
 }) {
-  const [mode, setMode] = useState<SearchMode>("company");
   const [search, setSearch] = useState("");
   const [accountId, setAccountId] = useState<string | null>(null);
   const [recipientKey, setRecipientKey] = useState<string | null>(null); // "account" or a contact id
@@ -89,23 +90,24 @@ export function OutreachComposer({
     () => contacts.filter((c) => c.account_id === accountId),
     [contacts, accountId],
   );
-  const accountNameById = useMemo(() => new Map(accounts.map((a) => [a.id, a.name])), [accounts]);
-
-  const accountMatches = useMemo(() => {
-    if (mode !== "company") return [];
+  // One directory, companies and named people together — ranked by which
+  // field actually matched (a company hit on its own name outranks a
+  // contact hit found only through their account's name), never gated
+  // behind a mode toggle Juan has to pick before he can even type.
+  const directoryMatches = useMemo<DirectoryMatch[]>(() => {
     const q = search.trim().toLowerCase();
     if (!q) return [];
-    return accounts.filter((a) => a.name.toLowerCase().includes(q)).slice(0, 8);
-  }, [mode, accounts, search]);
-
-  const contactMatches = useMemo(() => {
-    if (mode !== "person") return [];
-    const q = search.trim().toLowerCase();
-    if (!q) return [];
-    return contacts
-      .filter((c) => [c.first_name, c.last_name].filter(Boolean).join(" ").toLowerCase().includes(q))
-      .slice(0, 8);
-  }, [mode, contacts, search]);
+    const accountHits: DirectoryMatch[] = accounts
+      .filter((a) => a.name.toLowerCase().includes(q))
+      .map((a): DirectoryMatch => ({ kind: "account", key: `a:${a.id}`, account: a }));
+    const contactHits: DirectoryMatch[] = [];
+    for (const c of contacts) {
+      if (![c.first_name, c.last_name].filter(Boolean).join(" ").toLowerCase().includes(q)) continue;
+      const a = accounts.find((x) => x.id === c.account_id);
+      if (a) contactHits.push({ kind: "contact", key: `c:${c.id}`, contact: c, account: a });
+    }
+    return [...accountHits, ...contactHits].slice(0, 8);
+  }, [accounts, contacts, search]);
 
   function loadDraftFor(a: OutreachAccount) {
     setOpenedChannel(null);
@@ -192,30 +194,9 @@ export function OutreachComposer({
   return (
     <div className="space-y-3">
       <Card>
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
-            <Ico name="phone" size={13} />
-            Who
-          </div>
-          <div className="flex gap-1 rounded-md border border-[#E2DFD5] p-0.5">
-            {(["company", "person"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => {
-                  setMode(m);
-                  setSearch("");
-                  setAccountId(null);
-                  setRecipientKey(null);
-                }}
-                className={`rounded px-2.5 py-1 text-[11.5px] font-medium transition-colors ${
-                  mode === m ? "bg-[#14201B] text-[#F7F6F1]" : "text-[#5B6560] hover:bg-[#FAF9F5]"
-                }`}
-              >
-                {m === "company" ? "Company" : "Person"}
-              </button>
-            ))}
-          </div>
+        <div className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
+          <Ico name="phone" size={13} />
+          Who
         </div>
         <input
           value={search}
@@ -224,44 +205,39 @@ export function OutreachComposer({
             setAccountId(null);
             setRecipientKey(null);
           }}
-          placeholder={mode === "company" ? "Search an account by name..." : "Search by first or last name..."}
+          placeholder="Search a company or a person's name..."
           className="w-full rounded-md border border-[#E2DFD5] bg-[#FAF9F5] px-3 py-2 text-[13.5px] text-[#14201B] placeholder:text-[#A9AFA9] focus:border-[#14201B] focus:outline-none"
         />
-        {mode === "company" && accountMatches.length > 0 && (
+        {directoryMatches.length > 0 && (
           <ul className="mt-1.5 divide-y divide-[#E2DFD5] rounded-md border border-[#E2DFD5]">
-            {accountMatches.map((a) => (
-              <li key={a.id}>
-                <button
-                  onClick={() => pickAccount(a)}
-                  className="flex w-full items-center justify-between px-3 py-2 text-left text-[13px] hover:bg-[#FAF9F5]"
-                >
-                  <span>{a.name}</span>
-                  <span className="text-[11.5px] text-[#8A928C]">{a.city ?? ""}</span>
-                </button>
+            {directoryMatches.map((m) => (
+              <li key={m.key}>
+                {m.kind === "account" ? (
+                  <button
+                    onClick={() => pickAccount(m.account)}
+                    className="flex w-full items-center justify-between px-3 py-2 text-left text-[13px] hover:bg-[#FAF9F5]"
+                  >
+                    <span>{m.account.name}</span>
+                    <span className="text-[11.5px] text-[#8A928C]">{m.account.city ?? ""}</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => pickContact(m.contact)}
+                    className="flex w-full items-center justify-between px-3 py-2 text-left text-[13px] hover:bg-[#FAF9F5]"
+                  >
+                    <span>
+                      {[m.contact.first_name, m.contact.last_name].filter(Boolean).join(" ")}
+                      {m.contact.title ? <span className="text-[#8A928C]"> · {m.contact.title}</span> : null}
+                    </span>
+                    <span className="text-[11.5px] text-[#8A928C]">{m.account.name}</span>
+                  </button>
+                )}
               </li>
             ))}
           </ul>
         )}
-        {mode === "person" && contactMatches.length > 0 && (
-          <ul className="mt-1.5 divide-y divide-[#E2DFD5] rounded-md border border-[#E2DFD5]">
-            {contactMatches.map((c) => (
-              <li key={c.id}>
-                <button
-                  onClick={() => pickContact(c)}
-                  className="flex w-full items-center justify-between px-3 py-2 text-left text-[13px] hover:bg-[#FAF9F5]"
-                >
-                  <span>
-                    {[c.first_name, c.last_name].filter(Boolean).join(" ")}
-                    {c.title ? <span className="text-[#8A928C]"> · {c.title}</span> : null}
-                  </span>
-                  <span className="text-[11.5px] text-[#8A928C]">{accountNameById.get(c.account_id) ?? ""}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        {mode === "person" && search.trim() && contactMatches.length === 0 && (
-          <p className="mt-1.5 text-[12px] text-[#8A928C]">No named contact on file matches that.</p>
+        {search.trim() && directoryMatches.length === 0 && (
+          <p className="mt-1.5 text-[12px] text-[#8A928C]">No company or contact on file matches that.</p>
         )}
 
         {account && (
@@ -406,13 +382,7 @@ export function OutreachComposer({
 
       {account && (
         <Card>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="max-w-[46ch] text-[11.5px] leading-snug text-[#8A928C]">
-              Opens WhatsApp or Messages with this text pre-filled. Nothing sends until you press send there
-              yourself. iMessage sends from whichever number Messages &gt; Settings &gt; iMessage is set to
-              start new conversations from, check that&apos;s your 707 line before sending. Any attachment you
-              picked above already downloaded, drag it into the chat.
-            </p>
+          <div className="flex flex-wrap items-center justify-end gap-3">
             <div className="flex shrink-0 gap-2">
               <button
                 onClick={openWhatsApp}

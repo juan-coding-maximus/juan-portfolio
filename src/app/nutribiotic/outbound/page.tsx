@@ -32,7 +32,7 @@ import {
   isConfigured,
 } from "../lib/dal";
 import { ManualEmailComposer } from "../lib/manual-email-ui";
-import { DraftActions } from "../lib/outbound-ui";
+import { ChannelLabel, DraftActions, type ChannelKind } from "../lib/outbound-ui";
 import { OutreachComposer } from "../lib/outreach-ui";
 import { Card, Empty, PageHead, daysAgo } from "../lib/ui";
 
@@ -100,7 +100,7 @@ export default async function Outbound() {
             <li key={d.id}>
               <Card>
                 <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <span className="text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">{d.channel}</span>
+                  <ChannelLabel channel={d.preferred_channel ?? (d.channel as ChannelKind)} preferred={Boolean(d.preferred_channel)} />
                   {d.subject && <span className="text-[14px] font-medium">{d.subject}</span>}
                   {d.to_email && (
                     <span className="text-[12px] text-[#8A928C]">

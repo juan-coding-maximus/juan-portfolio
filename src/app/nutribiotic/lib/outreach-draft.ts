@@ -72,7 +72,16 @@ export async function draftOutreachMessage(accountId: string, accountName: strin
     listActivities(accountId, 5),
     getLatestDraftForAccount(accountId),
   ]);
-  const last = activities.data.find((a) => (a.detail ?? "").trim().length > 0) ?? null;
+  // Skip enrichment-authored notes (geocoding, web corroboration, etc.) —
+  // real, but never something a client actually said or did. Grounding a
+  // message in "confirmed your address" instead of the real conversation
+  // reads as a form letter and drafted exactly that once, caught 2026-08-29
+  // (Beverly Microblading: the only activity on file was a geocoding note,
+  // so that became "just tidying up our records" — nothing a client should
+  // ever receive). A logged interaction with the client outranks any system
+  // note regardless of which is more recent.
+  const last =
+    activities.data.find((a) => a.origin !== "enriched" && (a.detail ?? "").trim().length > 0) ?? null;
   const note = last ? { detail: last.detail as string, kind: last.kind, at: last.at } : null;
   const lastDraft: LastDraftLite | null = lastDraftRow
     ? {

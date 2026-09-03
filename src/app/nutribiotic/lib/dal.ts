@@ -1001,10 +1001,18 @@ export async function insertFieldNote(input: {
 export async function getActivityByEngagementId(engagementId: string): Promise<
   { id: number; account_id: string; kind: string; detail: string | null; at: string } | null
 > {
-  const res = await query<{ id: number; account_id: string; kind: string; detail: string | null; at: string }>(
-    "nb_activities",
-    { select: "id,account_id,kind,detail,at", hubspot_engagement_id: `eq.${engagementId}`, limit: "1" },
-  );
+  const res = await query<{
+    id: number;
+    account_id: string;
+    kind: string;
+    detail: string | null;
+    at: string;
+    origin?: Origin;
+  }>("nb_activities", {
+    select: "id,account_id,kind,detail,at,origin",
+    hubspot_engagement_id: `eq.${engagementId}`,
+    limit: "1",
+  });
   return res.data[0] ?? null;
 }
 
