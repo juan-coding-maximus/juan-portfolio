@@ -439,15 +439,17 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
           matchAccountName={result.matchAccountName}
           pendingGrade={grade}
           onResolved={() => {
-            // `result` deliberately stays: the resolver replaces itself with
-            // its own success note, and clearing it here would erase the
-            // confirmation the rep is reading. Only the inputs reset, so the
-            // card above is a blank slate for the next stop.
+            // Fires 5s after the resolver's own success note lands (or on a
+            // tap to skip the wait, same pattern as `success` above). Clears
+            // `result` too, which unmounts the resolver and drops its note:
+            // before 2026-09-02 this stayed forever and the only way back to
+            // a loggable screen was reloading the page.
             setText("");
             writeDraft("");
             setKind("meeting");
             setGrade(null);
             setNewCompany(false);
+            setResult(null);
             requestAnimationFrame(() => textareaRef.current && autosize(textareaRef.current));
           }}
         />
