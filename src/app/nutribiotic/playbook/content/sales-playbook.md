@@ -73,7 +73,33 @@ distinct from Section 6's reactivation motion (which works dormant *existing* ac
 Scoped-down option if this gets greenlit: build discovery only first (verticals × areas →
 `nb_prospects`), prove the list is good, then add the script/template generator.
 
+## 9. Weekly action checklist (derived from Sections 1-3, 6, 7 above, not new claims)
+
+A run-order version of the rules already field-tested elsewhere in this doc, for the
+next 3-6 months against G1's overdue list. Each line cites the section it comes from;
+two are marked TODO because they aren't tested yet.
+
+1. Work the 66 overdue accounts before 2026-09-30 (Section 1, the overdue list).
+2. Friday, 20 min: Metrics tab against the overdue list, set next week's clusters (Section 2).
+3. Plan field days as 10-stop geographic clusters, never alphabetical (Section 2).
+4. Any account Places reports closed gets a call before a drive (Section 2, call-first rule).
+5. Read the account dossier on the phone before the door (Section 3, step 1).
+6. No named contact on file: leaving with a name and role is the visit's job (Section 3, step 2).
+7. Overdue-active: ask directly for the reorder on what they already buy (Section 3, step 3).
+8. Dormant: open with "what changed" before any pitch (Section 3, step 3).
+9. Prospect: open with the fit question (Section 3, step 3).
+10. Log the visit as a HubSpot Note same day, after the door (Section 3, step 4).
+11. Every follow-up goes out as a calendar proposal, human-approved (Section 3, step 4).
+12. Work the overdue plus pre-2024 dormant set in route clusters, never alphabetically (Section 6).
+13. `TODO` set the max touches before a dormant account gets parked (Section 6, still open).
+14. Log every reactivation, it's G1's scoreboard number (Section 6).
+15. `TODO` ask for a referral on every close and every "no", not yet field-tested here.
+16. One paragraph per goal in `qbr/`, red/yellow/green, monthly not just quarterly (GOALS.md cadence).
+17. If Section 8 (new-door prospecting) is greenlit, build discovery only first, prove the list, then the script.
+18. Use the Sales OS (`juanarenas.bio/nutribiotic`) and Desktop bundle as the single source for all of the above, never a parallel list.
+
 ## Changelog
 
+- 2026-09-04 · added Section 9 (weekly action checklist, a run-order compression of Sections 1-3/6/7, two items marked TODO).
 - 2026-08-14 · added Section 8 (new-account prospecting kit, proposed, awaiting go-ahead).
 - 2026-08-02 · v0 skeleton, structure and the already-proven sections.
