@@ -336,13 +336,34 @@ export function SkeletonBar({ className = "" }: { className?: string }) {
  * across the bottom-nav routes so each gets a real Suspense boundary: without
  * one, Next prefetches the whole dynamic page and holds it client-side until
  * the app reloads, which is why the tab bar's targets need this, not polish.
+ *
+ * `sub` and `width` exist for the same reason visit/loading.tsx is hand-shaped:
+ * a skeleton of the wrong height is a skeleton that causes the jank it exists
+ * to hide. Most screens render PageHead WITH a sub line (one 14px row plus its
+ * 1.5 mt), and several cap themselves at 720px rather than filling the shell,
+ * so a skeleton that omits either one shoves the real content sideways or
+ * down the moment it streams in. Pass what the page actually renders.
  */
-export function PageSkeleton({ rows = 4 }: { rows?: number }) {
+export function PageSkeleton({
+  rows = 4,
+  sub = false,
+  width,
+  rowHeight = "h-16",
+}: {
+  rows?: number;
+  sub?: boolean;
+  width?: string;
+  rowHeight?: string;
+}) {
   return (
-    <div className="flex flex-col gap-3">
-      <SkeletonBar className="mb-4 h-7 w-40" />
+    <div className={`flex flex-col ${width ? `${width} ` : ""}gap-3`}>
+      {/* mb-3 + the parent's gap-3 lands on PageHead's own mb-6. */}
+      <div className="mb-3">
+        <SkeletonBar className="h-[27px] w-40" />
+        {sub && <SkeletonBar className="mt-1.5 h-[19px] w-[46ch] max-w-full" />}
+      </div>
       {Array.from({ length: rows }).map((_, i) => (
-        <SkeletonBar key={i} className="h-16 w-full" />
+        <SkeletonBar key={i} className={`${rowHeight} w-full`} />
       ))}
     </div>
   );

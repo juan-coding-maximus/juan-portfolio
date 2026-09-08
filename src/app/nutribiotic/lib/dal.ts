@@ -1609,6 +1609,12 @@ export type MapAccount = {
   lifetime_revenue: number | null;
   top_category_12m: string | null;
   top_category_lifetime: string | null;
+  /* The account's own reorder rhythm, set from its order history rather than
+     from a global "90 days". Null on most rows and that is a finding, not a
+     default: lib/outreach-templates.ts's timed messages fire only where the
+     cadence is actually known. */
+  expected_reorder_at: string | null;
+  expected_reorder_days: number | null;
 };
 
 /**
@@ -1634,7 +1640,7 @@ export async function listOwnerAccounts(ownerName = "Juan Arenas Martin"): Promi
   const [result, grades, mix] = await Promise.all([
     query<Omit<MapAccount, "tier" | "top_category_12m" | "top_category_lifetime">>("nb_accounts", {
       select:
-        "id,name,street,city,state,postal,lat,lng,phone,website,channel,lifecycle,do_not_visit,chain_excluded,practice_excluded,hubspot_company_id,origin,area,lead_status,last_order_at,trailing_12m_revenue,lifetime_revenue",
+        "id,name,street,city,state,postal,lat,lng,phone,website,channel,lifecycle,do_not_visit,chain_excluded,practice_excluded,hubspot_company_id,origin,area,lead_status,last_order_at,trailing_12m_revenue,lifetime_revenue,expected_reorder_at,expected_reorder_days",
       owner_name: `eq.${ownerName}`,
       lat: "not.is.null",
       /* CLOSED ACCOUNTS ARE NOT PINS. No toggle, unlike chains and practices:

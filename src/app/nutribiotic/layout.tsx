@@ -5,6 +5,7 @@ import { LAUNCHERS } from "./lib/launchers";
 import { ModalProvider } from "./lib/modal";
 import { MobileNav } from "./lib/MobileNav";
 import { MoreMenu } from "./lib/MoreMenu";
+import { QuickCapture } from "./lib/QuickCapture";
 import { RefreshOnForeground } from "./lib/RefreshOnForeground";
 import { RouteProvider } from "./lib/route-context";
 import { SyntheticBanner } from "./lib/SyntheticBanner";
@@ -234,6 +235,13 @@ export default async function NutribioticLayout({
         {/* The OS mobile nav: the same items as the sidebar, same gating rules,
             rendered as a bottom tab bar below 2xl where the sidebar disappears. */}
         <MobileNav items={nav} moreItems={MORE_NAV} />
+
+        {/* Capture from every screen, not just /visit (Juan, fn_d8ea70). A
+            button and nothing else until it is pressed: the capture component
+            and its recorder are behind a dynamic import, so the no-data,
+            no-open-stream contract this layout keeps is unchanged. See
+            lib/QuickCapture.tsx. */}
+        <QuickCapture />
       </div>
       </ModalProvider>
       </RouteProvider>

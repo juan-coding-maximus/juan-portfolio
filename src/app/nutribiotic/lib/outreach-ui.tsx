@@ -6,10 +6,53 @@ import type { MarketingFile } from "./dal";
 import type { RecordTouchpointResult } from "./touchpoint";
 import { recordOutreachSent } from "./outreach-actions";
 import { draftOutreachMessage, type LastDraftLite } from "./outreach-draft";
-import { OUTREACH_TEMPLATES } from "./outreach-templates";
+import {
+  genericTemplates,
+  timedTemplatesFor,
+  type OutreachTemplate,
+  type TemplateAccount,
+} from "./outreach-templates";
 import { Card, Ico } from "./ui";
 
-export type OutreachAccount = { id: string; name: string; phone: string | null; city: string | null };
+/**
+ * The composer reads the account's own record, not just its name (2026-09-08,
+ * fn_16cd3a). Everything past `city` is here so lib/outreach-templates.ts can
+ * decide WHICH message is the right one today and ground what it says. All of
+ * it is already on the row listOwnerAccounts returns, so this costs no extra
+ * query.
+ */
+export type OutreachAccount = {
+  id: string;
+  name: string;
+  phone: string | null;
+  city: string | null;
+  channel?: string | null;
+  tier?: string | null;
+  lifecycle?: string | null;
+  last_order_at?: string | null;
+  expected_reorder_at?: string | null;
+  expected_reorder_days?: number | null;
+  top_category_12m?: string | null;
+  top_category_lifetime?: string | null;
+};
+
+/** Narrow an account down to exactly what a template may read. Anything the
+ *  caller did not supply arrives as null, so a missing field can only ever
+ *  make a template NOT fire, never make it guess. */
+function templateAccount(a: OutreachAccount): TemplateAccount {
+  return {
+    name: a.name,
+    city: a.city ?? null,
+    channel: a.channel ?? null,
+    tier: a.tier ?? null,
+    lifecycle: a.lifecycle ?? null,
+    last_order_at: a.last_order_at ?? null,
+    expected_reorder_at: a.expected_reorder_at ?? null,
+    expected_reorder_days: a.expected_reorder_days ?? null,
+    top_category_12m: a.top_category_12m ?? null,
+    top_category_lifetime: a.top_category_lifetime ?? null,
+  };
+}
 export type OutreachContactLite = {
   id: string;
   account_id: string;
@@ -86,6 +129,13 @@ export function OutreachComposer({
   const [result, setResult] = useState<RecordTouchpointResult | null>(null);
 
   const account = accounts.find((a) => a.id === accountId) ?? null;
+  /* Which preloaded messages this account's own record makes timely. Pure
+     field reads, no request, so it recomputes on selection rather than
+     fetching anything. See lib/outreach-templates.ts. */
+  const timedTemplates = useMemo(
+    () => (account ? timedTemplatesFor(templateAccount(account)) : []),
+    [account],
+  );
   const accountContacts = useMemo(
     () => contacts.filter((c) => c.account_id === accountId),
     [contacts, accountId],
@@ -146,10 +196,9 @@ export function OutreachComposer({
     loadDraftFor(a);
   }
 
-  function applyTemplate(id: string) {
-    setTemplateId(id);
-    const t = OUTREACH_TEMPLATES.find((x) => x.id === id);
-    if (t && account) setMessage(t.body(account.name));
+  function applyTemplate(t: OutreachTemplate) {
+    setTemplateId(t.id);
+    if (account) setMessage(t.body(templateAccount(account)));
   }
 
   const recipientPhone =
@@ -359,13 +408,67 @@ export function OutreachComposer({
             <AttachmentButton files={files} selected={attached} onChange={setAttached} />
           </div>
 
+          {/* Timed messages, chosen by this account's own record (fn_16cd3a).
+              Each one prints the fields it read, so nothing in the message is
+              unaccounted for and a wrong-looking sentence is traceable to the
+              column that produced it rather than to a model. When none fit,
+              that is stated plainly instead of a generic being promoted into
+              the slot. */}
+          <div className="mt-4 border-t border-[#EDEBE3] pt-3">
+            <div className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
+              Timed for this account
+            </div>
+            {timedTemplates.length === 0 ? (
+              <p className="text-[12px] leading-relaxed text-[#8A928C]">
+                Nothing on this record makes one message more timely than another right now. Its order
+                history and reorder date are what these read, and one or both are blank.
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {timedTemplates.map((t) => {
+                  const grounds = account ? t.grounds(templateAccount(account)) : [];
+                  const on = templateId === t.id;
+                  return (
+                    <li key={t.id}>
+                      <button
+                        onClick={() => applyTemplate(t)}
+                        className={`w-full rounded-md border px-3 py-2 text-left transition-colors ${
+                          on
+                            ? "border-[#14201B] bg-[#FAF9F5]"
+                            : "border-[#E2DFD5] hover:bg-[#FAF9F5]"
+                        }`}
+                      >
+                        <span className="flex flex-wrap items-baseline gap-x-2">
+                          <span className="text-[13px] font-medium text-[#14201B]">{t.label}</span>
+                          <span className="text-[11.5px] text-[#8A928C]">{t.when}</span>
+                        </span>
+                        {grounds.length > 0 && (
+                          <span className="mt-1 block text-[11.5px] leading-relaxed text-[#5B6560]">
+                            {grounds.map((g) => `${g.field}: ${g.value}`).join(" · ")}
+                          </span>
+                        )}
+                        {t.suggestsDocument && (
+                          <span className="mt-1 flex items-center gap-1.5 text-[11.5px] text-[#8A928C]">
+                            <Ico name="plus" size={10} />
+                            Worth attaching: {t.suggestsDocument}. Pick it under Attach, the message
+                            names only what you actually attach.
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
           <details className="mt-2">
             <summary className="cursor-pointer text-[11.5px] text-[#8A928C]">Use a generic template instead</summary>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {OUTREACH_TEMPLATES.map((t) => (
+              {genericTemplates().map((t) => (
                 <button
                   key={t.id}
-                  onClick={() => applyTemplate(t.id)}
+                  onClick={() => applyTemplate(t)}
                   className={`rounded-full border px-2.5 py-1 text-[12px] transition-colors ${
                     templateId === t.id
                       ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"

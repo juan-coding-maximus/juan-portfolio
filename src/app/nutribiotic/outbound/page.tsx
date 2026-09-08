@@ -46,8 +46,26 @@ export default async function Outbound() {
     listMarketingFiles(),
   ]);
   const synthetic = res.mode === "synthetic";
+  /* Name and phone are what the picker needs; everything after `city` is what
+     lib/outreach-templates.ts reads to decide which preloaded message is the
+     timely one for this account and to ground what it says (fn_16cd3a). All of
+     it is already on the row listOwnerAccounts returned, so nothing extra is
+     queried and nothing is derived here. */
   const accounts = accountsResult.data
-    .map((a) => ({ id: a.id, name: a.name, phone: a.phone, city: a.city }))
+    .map((a) => ({
+      id: a.id,
+      name: a.name,
+      phone: a.phone,
+      city: a.city,
+      channel: a.channel,
+      tier: a.tier,
+      lifecycle: a.lifecycle,
+      last_order_at: a.last_order_at,
+      expected_reorder_at: a.expected_reorder_at,
+      expected_reorder_days: a.expected_reorder_days,
+      top_category_12m: a.top_category_12m,
+      top_category_lifetime: a.top_category_lifetime,
+    }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   // account -> best phone on file (the account's own line, else the first
