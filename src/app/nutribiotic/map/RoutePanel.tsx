@@ -973,11 +973,11 @@ export function RoutePanel({
       <h2 className="font-[family-name:var(--font-fraunces)] text-[19px] font-semibold tracking-tight">
         Route
       </h2>
-      <span className="text-[12px] text-[#8A928C]">
-        {stops.length === 0
-          ? "built by hand, kept until you clear it"
-          : `${stops.length} stop${stops.length === 1 ? "" : "s"}, in your order`}
-      </span>
+      {stops.length > 0 && (
+        <span className="text-[12px] text-[#8A928C]">
+          {stops.length} stop{stops.length === 1 ? "" : "s"}, in your order
+        </span>
+      )}
     </div>
   );
 

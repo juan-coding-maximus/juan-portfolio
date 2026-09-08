@@ -15,7 +15,6 @@
  */
 
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { addSdrScheduleItem, flagNeedsEmail, searchSdrAccounts, updateSdrScheduleStatus } from "./sdr-actions";
 import type { SdrScheduleItem } from "./dal";
 import { TouchpointCapture } from "./touchpoint-ui";
@@ -51,7 +50,7 @@ function dayLabel(iso: string, todayIso: string): string {
 
 type AccountHit = { id: string; name: string; city: string | null; phone: string | null };
 
-function AddToDayForm({ date, onAdded }: { date: string; onAdded: () => void }) {
+function AddToDayForm({ date, onAdded }: { date: string; onAdded: (item: SdrDayItem) => void }) {
   const [mode, setMode] = useState<"account" | "prospect">("account");
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<AccountHit[]>([]);
@@ -90,7 +89,7 @@ function AddToDayForm({ date, onAdded }: { date: string; onAdded: () => void }) 
     if (mode === "account" && !picked) return;
     if (mode === "prospect" && !prospectName.trim()) return;
     startTransition(async () => {
-      await addSdrScheduleItem({
+      const row = await addSdrScheduleItem({
         account_id: mode === "account" ? picked!.id : null,
         prospect_name: mode === "prospect" ? prospectName.trim() : null,
         prospect_phone: mode === "prospect" ? prospectPhone.trim() || null : null,
@@ -98,8 +97,17 @@ function AddToDayForm({ date, onAdded }: { date: string; onAdded: () => void }) 
         scheduled_date: date,
         notes: notes.trim() || null,
       });
+      // The row the server just created has no joined account name/phone on
+      // it (nb_sdr_schedule doesn't carry a copy, see getAccountCallCards's
+      // comment); this form already has it live from the picker/typed fields,
+      // so it builds the display item itself instead of waiting on a refetch
+      // that a mounted client component's own state would ignore anyway.
+      onAdded({
+        ...row,
+        displayName: mode === "account" ? picked!.name : prospectName.trim(),
+        displayPhone: mode === "account" ? picked!.phone : prospectPhone.trim() || null,
+      });
       reset();
-      onAdded();
     });
   }
 
@@ -329,7 +337,6 @@ function ScheduleRow({
 }
 
 export function SdrScreen({ initialItems, todayIso, days }: { initialItems: SdrDayItem[]; todayIso: string; days: number }) {
-  const router = useRouter();
   const [items, setItems] = useState(initialItems);
   const [active, setActive] = useState<SdrDayItem | null>(null);
 
@@ -339,8 +346,13 @@ export function SdrScreen({ initialItems, todayIso, days }: { initialItems: SdrD
     return out;
   }, [todayIso, days]);
 
-  function refresh() {
-    router.refresh();
+  // Appended straight into local state, not a router.refresh(): this component
+  // already mounted with initialItems, and a Server Component re-render after
+  // revalidatePath() hands it a fresh initialItems prop that useState's own
+  // rules say a mounted component ignores. Juan hit exactly this, 2026-09-08:
+  // adding a call did nothing visible until a hard reload.
+  function addItem(item: SdrDayItem) {
+    setItems((prev) => [...prev, item]);
   }
 
   function setStatus(id: string, status: "done" | "skipped", completedActivityId?: number) {
@@ -380,7 +392,7 @@ export function SdrScreen({ initialItems, todayIso, days }: { initialItems: SdrD
                 ))}
               </ul>
               <div className="mt-2">
-                <AddToDayForm date={iso} onAdded={refresh} />
+                <AddToDayForm date={iso} onAdded={addItem} />
               </div>
             </div>
           );
