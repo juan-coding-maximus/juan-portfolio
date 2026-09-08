@@ -996,6 +996,54 @@ export async function insertFieldNote(input: {
   return row;
 }
 
+export type TouchpointAttachment = { name: string; url: string; uploaded_at: string };
+
+/**
+ * Photo attachments on a capture, per 0060. One row per submission
+ * (nb_touchpoints), regardless of which kind the extractor picked, so this
+ * is the single place a photo lives no matter whether the note became a
+ * visit, a call, a meeting, or a field_note. Uploads to Drive via
+ * lib/gdrive.ts (the same OAuth-delegated pattern Expenses receipts use),
+ * never Supabase Storage, per the 2026-09-02 egress suspension.
+ */
+export async function attachTouchpointPhoto(
+  touchpointId: string,
+  photo: { bytes: ArrayBuffer; mimeType: string; filename: string },
+): Promise<{ attachments: TouchpointAttachment[] }> {
+  await verifySession();
+  if (!isConfigured()) throw new Error("Cannot attach a photo: no data source configured.");
+
+  const { ensureFolder, uploadFile, asOwnerLink } = await import("./gdrive");
+  const dateFolder = new Date().toISOString().slice(0, 10);
+  const root = await ensureFolder("NutriBiotic Field Notes", null);
+  const day = await ensureFolder(dateFolder, root.id);
+  const ext = photo.filename.includes(".") ? photo.filename.slice(photo.filename.lastIndexOf(".")) : ".jpg";
+  const name = `${touchpointId}_${Date.now().toString(36)}${ext}`;
+  const uploaded = await uploadFile(photo.bytes, photo.mimeType, day.id, name);
+
+  const res = await fetch(`${SB_URL}/rest/v1/nb_touchpoints?select=attachments&id=eq.${touchpointId}&limit=1`, {
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Accept: "application/json" },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(`Supabase nb_touchpoints -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  }
+  const rows = (await res.json()) as { attachments: TouchpointAttachment[] }[];
+  const existing = rows[0]?.attachments ?? [];
+  const attachments: TouchpointAttachment[] = [
+    ...existing,
+    { name, url: asOwnerLink(uploaded.webViewLink), uploaded_at: new Date().toISOString() },
+  ];
+
+  const [row] = await mutate<{ attachments: TouchpointAttachment[] }>(
+    "nb_touchpoints",
+    "PATCH",
+    { attachments },
+    { id: `eq.${touchpointId}` },
+  );
+  return row;
+}
+
 /** The activity behind a HubSpot engagement, so a stop on the report can be
  *  traced back to the ledger row that produced it. */
 export async function getActivityByEngagementId(engagementId: string): Promise<

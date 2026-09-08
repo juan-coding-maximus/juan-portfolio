@@ -128,12 +128,46 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
   const t0Ref = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Photo attach (0060 / dir_67b159). A ref, not state, so it can gate the
+  // dismiss timer below without re-triggering router.refresh() on every
+  // upload phase change.
+  const photoBusyRef = useRef(false);
+  const [photoUiState, setPhotoUiState] = useState<"idle" | "uploading" | "attached" | "error">("idle");
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (!success) return;
     router.refresh();
-    const t = setTimeout(() => setSuccess(null), 2200);
+    const t = setTimeout(() => {
+      // Still uploading a photo onto this note: let attachPhoto's own
+      // finally-block close the toast once the upload settles instead.
+      if (photoBusyRef.current) return;
+      setSuccess(null);
+    }, 2200);
     return () => clearTimeout(t);
   }, [success, router]);
+
+  async function attachPhoto(touchpointId: string, file: File) {
+    photoBusyRef.current = true;
+    setPhotoUiState("uploading");
+    try {
+      const form = new FormData();
+      form.set("touchpoint_id", touchpointId);
+      form.set("photo", file);
+      const res = await fetch("/nutribiotic/api/visits/attach", { method: "POST", body: form });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Attach failed.");
+      setPhotoUiState("attached");
+    } catch {
+      setPhotoUiState("error");
+    } finally {
+      photoBusyRef.current = false;
+      setTimeout(() => {
+        setSuccess(null);
+        setPhotoUiState("idle");
+      }, 1200);
+    }
+  }
 
   useEffect(() => {
     if (voice !== "uploaded") return;
@@ -276,8 +310,21 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
         {success ? (
           // The confirmation beat: tappable to skip the wait and start the
           // next one immediately, otherwise clears itself (see the effect
-          // above) once the lists below have had a chance to refresh.
-          <button onClick={() => setSuccess(null)} className="block w-full text-left">
+          // above) once the lists below have had a chance to refresh. A
+          // plain div, not a button, because the photo-attach control below
+          // is its own interactive element and HTML forbids nesting one
+          // button inside another.
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              if (!photoBusyRef.current) setSuccess(null);
+            }}
+            onKeyDown={(e) => {
+              if ((e.key === "Enter" || e.key === " ") && !photoBusyRef.current) setSuccess(null);
+            }}
+            className="block w-full cursor-pointer text-left"
+          >
             <SuccessNote
               title={`Logged${success.accountName ? `: ${success.accountName}` : ""}`}
               detail={success.summary}
@@ -321,8 +368,43 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
                 </>
               }
             />
-          </button>
-        ) : (
+          </div>
+        ) : null}
+        {success && (
+          <div className="mt-2 flex items-center gap-2 border-t border-[#E2DFD5] pt-2">
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file && success) void attachPhoto(success.touchpoint_id, file);
+              }}
+            />
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                photoInputRef.current?.click();
+              }}
+              disabled={photoUiState === "uploading"}
+              className="flex items-center gap-1.5 rounded-md border border-[#E2DFD5] px-2.5 py-1 text-[12px] font-medium text-[#5B6560] transition-colors hover:bg-[#F7F6F1] disabled:opacity-60"
+            >
+              <Ico name={photoUiState === "attached" ? "check" : "camera"} size={13} />
+              {photoUiState === "uploading"
+                ? "Attaching…"
+                : photoUiState === "attached"
+                  ? "Attached"
+                  : photoUiState === "error"
+                    ? "Failed, try again"
+                    : "Attach a photo"}
+            </button>
+          </div>
+        )}
+        {!success && (
           <>
             <div className="mb-3 flex gap-1.5">
               {KIND_OPTIONS.map((opt) => (
