@@ -15,6 +15,11 @@ not because it sounded right the first time it worked.
   shop stop is rarely worth a special trip on its own; check what else sits
   in range first (other independents, clinics, gyms, specialty grocery) and
   decide the stop as part of a cluster, not in isolation.
+- **The person at the door is rarely the buyer.** Mountain Air Sports (Santa
+  Barbara, 2026-09-03): left product with Alec, the floor manager assistant,
+  who named Joey as the real buyer/manager on the spot. Joey needs a week's
+  advance notice to schedule, not a next-day return. Always ask who actually
+  buys, in the same visit, before assuming the door contact can decide.
 
 ## Value propositions by account type
 
@@ -32,4 +37,5 @@ visit.
 
 ## Changelog
 
+- 2026-09-08 · added the Mountain Air Sports buyer-identification lesson from field notes.
 - 2026-08-13 · started, seeded with the standing prospecting and VP notes.

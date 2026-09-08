@@ -74,7 +74,7 @@ The legacy goal. Infrastructure over immediacy, stated as a deliverable.
 
 ## Year 2 to 4 arc (to VP of Commercialization / CCO)
 
-- **Y2 (to 2028-08)** Playbook v3 running in 2+ territories through hires; seasonal wheel on its second cycle with year-over-year comparisons; Juan carries the Commercial Director title and a team goal, not a personal quota alone.
+- **Y2 (to 2028-08)** Playbook v3 running in 2+ territories through hires; seasonal wheel on its second cycle with year-over-year comparisons; Juan carries the Commercial Director title and a team goal, not a personal quota alone. Team-structure math (comp, headcount, sequencing) is under "Team expansion" in [`hiring/README.md`](hiring/README.md); it does not start until hire #1 has run solo.
 - **Y3 (to 2029-08)** 3+ territories or channels; marketing calendar, in-store program, and field sales reporting into one commercial plan Juan writes; hiring and onboarding fully delegated to the runbook.
 - **Y4 (to 2030-08)** The commercial org is the infrastructure: people, playbooks, stack. The VP or CCO conversation is about ratifying what already runs.
 

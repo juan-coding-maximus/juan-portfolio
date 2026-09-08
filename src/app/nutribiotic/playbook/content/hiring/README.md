@@ -33,3 +33,39 @@ When this phase starts, agents draft and stage; Juan decides and sends:
 
 Nothing outward (posting the job, contacting a candidate) goes without Juan's
 explicit approval per item.
+
+## Team expansion (beyond hire #1)
+
+Juan dictated a team structure on 2026-09-03: a sales manager coach, four BDRs
+across two areas, a $100k+ commission path, a prospecting academy, and a
+recruiting bounty. Tested against the territory on 2026-09-08 in the full plan and research pack
+at `projects/nutribiotic-recruiting-strategy/` in the agency repo, published
+as the [NutriBiotic Recruiting Action Plan](https://claude.ai/code/artifact/8535b30f-9277-4c0b-9001-cb535e609768).
+This section is the pointer, not a second copy of the numbers, so it can't
+drift from the plan.
+
+**What held up**: recurring commissions (the strongest idea in the directive)
+and the 5% territory-growth share as a comp instrument, once it's a signed,
+computable agreement per CA Labor Code 2751.
+
+**What didn't, at today's size**: the two-area / four-BDR split (the unstaffed
+outer ring outproduces both proposed "major" areas), the $100k path (needs
+$1M-$500k of revenue per rep against a $27,864 trailing-12 territory), the flat
+$400 bounty (a non-employee earning it fails the ABC test's prong B), and a
+loaded sales-manager hire before hire #1 has even run the system solo.
+
+**Why this doesn't start now**: the team as dictated costs a $380,316/yr floor
+against $27,864 of current territory revenue. The case for headcount beyond
+hire #1 is a reactivation forecast built from the $2,002,272 of lifetime
+revenue sitting in 246 accounts (14 of the top 20 dormant), not an argument.
+That forecast is unbuilt.
+
+**Sequencing**: hire #1 above (G6) is the pilot that tests this structure's
+comp design and academy on one person before it's proposed for five. Go/no-go
+on the multi-rep structure sits two quarters after hire #1 starts, on measured
+results, not on this plan alone.
+
+**Open, and it can move every number above**: whether distributor pull-through
+is credited to Juan's owner id. If a real share of SoCal volume moves through
+a distributor untracked here, the whole revenue baseline understates the
+territory. First question for HQ, before the forecast is built.
