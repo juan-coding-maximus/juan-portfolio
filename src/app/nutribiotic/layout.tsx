@@ -77,17 +77,22 @@ const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>
      See lib/hubspot-engagement.ts. */
   { href: "/nutribiotic/visit", label: "Visit", icon: "mic" },
   { href: "/nutribiotic/outbound", label: "Outbound", icon: "outbound" },
-  /* Expenses, 2026-08-14: the `expensos` CLI skill's Drive/Sheets tree, now
-     also reachable by hand: clock in/out with a break in minutes, a photo
-     dropzone that auto-sorts odometer vs receipt, and a link to the current
-     semi-monthly pay period's sheet. Writes via a service account (Vercel
-     has no access to the Mac-side OAuth token the CLI uses); see lib/gdrive.ts
-     and lib/expenses.ts. */
-  { href: "/nutribiotic/expenses", label: "Expenses", icon: "receipt" },
+  /* SDR, 2026-09-08 (Juan's ask), IN EXPENSES' OLD SLOT. Schedule calls and
+     visits onto specific days, dial out (a tel: link, see lib/sdr-ui.tsx for
+     why nothing fancier yet), log what happened through the same box /visit
+     uses, and flag Outbound, all from one desk screen. This bumps Expenses to
+     More: expense filing happens twice a month at a desk, not door to door,
+     which is exactly the "occasional-use" test the 2026-08-18 More cut used
+     for Goals/Playbook/the offer trio, while a prospecting queue is a daily
+     tool the same way Visit is. */
+  { href: "/nutribiotic/sdr", label: "SDR", icon: "clock" },
 ];
 
 const MORE_NAV: typeof NAV = [
   { href: "/nutribiotic/clients", label: "Clients", icon: "accounts" },
+  /* Demoted from the top-level bar 2026-09-08 when SDR took its slot, see
+     above. Still a twice-a-month task, not a daily-loop one. */
+  { href: "/nutribiotic/expenses", label: "Expenses", icon: "receipt" },
   /* Goals earns its slot on the same rule the top-level items do: it is the
      standing ladder (Director in one, VP in four) and the six SMART goals it
      decomposes into, content meant to be seen every day, not a promise of a

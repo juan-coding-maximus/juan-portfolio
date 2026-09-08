@@ -842,7 +842,7 @@ export async function insertActivity(input: NewActivity): Promise<Activity> {
  *  that actually applies right now (PST or PDT) -- computed from Intl rather
  *  than a hardcoded "-07:00" or "-08:00", so it stays correct across the
  *  March/November transitions without a yearly edit. */
-function todayStartLA(): string {
+export function todayStartLA(): string {
   const now = new Date();
   const dateParts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Los_Angeles",
@@ -1135,6 +1135,142 @@ export async function getAccountNames(ids: string[]): Promise<Record<string, str
     id: `in.(${ids.join(",")})`,
   });
   return Object.fromEntries(res.data.map((a) => [a.id, a.name]));
+}
+
+/** id -> {name, phone} for the SDR schedule's day view. A schedule row keyed
+ * to an existing account carries no phone of its own (the account's phone can
+ * change; a copy on the schedule row would go stale and disagree with it),
+ * so the day view joins this in at read time instead. */
+export async function getAccountCallCards(ids: string[]): Promise<Record<string, { name: string; phone: string | null }>> {
+  if (ids.length === 0) return {};
+  const res = await query<{ id: string; name: string; phone: string | null; origin?: Origin }>("nb_accounts", {
+    select: "id,name,phone",
+    id: `in.(${ids.join(",")})`,
+  });
+  return Object.fromEntries(res.data.map((a) => [a.id, { name: a.name, phone: a.phone }]));
+}
+
+// ---------------------------------------------------------------------------
+// SDR schedule (0061). Calls and visits planned onto a day, ahead of doing
+// them, see the migration for why this is its own table rather than an
+// nb_ui_prefs.route_draft entry or an nb_activities row.
+// ---------------------------------------------------------------------------
+
+export type SdrScheduleItem = {
+  id: string;
+  account_id: string | null;
+  prospect_name: string | null;
+  prospect_phone: string | null;
+  kind: "call" | "visit";
+  scheduled_date: string;
+  status: "pending" | "done" | "skipped";
+  notes: string | null;
+  completed_activity_id: number | null;
+  created_at: string;
+  origin: Origin;
+};
+
+/** A light, single-account-name-search picker for the SDR schedule's "add"
+ * form. Deliberately not listAccountsForMatching()'s full 1000-row book: this
+ * is typed against interactively, so it filters server-side instead of
+ * shipping the whole territory to the client on every keystroke. */
+export async function searchOwnedAccounts(nameQuery: string, limit = 8): Promise<Result<{
+  id: string;
+  name: string;
+  city: string | null;
+  phone: string | null;
+  origin?: Origin;
+}>> {
+  const q = nameQuery.trim();
+  if (!q) return { mode: "empty", data: [], origins: [] };
+  return query<{ id: string; name: string; city: string | null; phone: string | null; origin?: Origin }>("nb_accounts", {
+    select: "id,name,city,phone",
+    hubspot_owner_id: `eq.${JUAN_OWNER_ID}`,
+    closed_at: "is.null",
+    name: `ilike.*${q.replace(/[%,]/g, "")}*`,
+    order: "name.asc",
+    limit,
+  });
+}
+
+/** From today through `days` out, oldest first. Juan reads this as a week,
+ * not a backlog: nothing before today, nothing past the horizon he asked to
+ * plan. */
+export async function listSdrSchedule(days = 8): Promise<Result<SdrScheduleItem>> {
+  const from = todayStartLA().slice(0, 10);
+  const to = new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+  return query<SdrScheduleItem>("nb_sdr_schedule", {
+    select: "*",
+    scheduled_date: `gte.${from}`,
+    order: "scheduled_date.asc,created_at.asc",
+    limit: 500,
+  }).then((res) => ({ ...res, data: res.data.filter((r) => r.scheduled_date <= to) }));
+}
+
+export type NewSdrScheduleItem = {
+  account_id?: string | null;
+  prospect_name?: string | null;
+  prospect_phone?: string | null;
+  kind: "call" | "visit";
+  scheduled_date: string;
+  notes?: string | null;
+};
+
+export async function insertSdrScheduleItem(input: NewSdrScheduleItem): Promise<SdrScheduleItem> {
+  const [row] = await mutate<SdrScheduleItem>("nb_sdr_schedule", "POST", {
+    id: randId("sdr"),
+    account_id: input.account_id ?? null,
+    prospect_name: input.prospect_name ?? null,
+    prospect_phone: input.prospect_phone ?? null,
+    kind: input.kind,
+    scheduled_date: input.scheduled_date,
+    notes: input.notes ?? null,
+    status: "pending",
+    origin: "manual",
+  });
+  return row;
+}
+
+/** Never a hard delete: a skipped call is a real fact about the day (Juan
+ * decided against it), not something to erase. `completedActivityId` is set
+ * only on the 'done' path, when the log that happened flows through the same
+ * extractor /visit uses (see touchpoint.ts, sdr-actions.ts). */
+export async function setSdrScheduleStatus(
+  id: string,
+  status: "pending" | "done" | "skipped",
+  completedActivityId?: number | null,
+): Promise<SdrScheduleItem> {
+  const patch: Record<string, unknown> = { status };
+  if (completedActivityId !== undefined) patch.completed_activity_id = completedActivityId;
+  const [row] = await mutate<SdrScheduleItem>("nb_sdr_schedule", "PATCH", patch, { id: `eq.${id}` });
+  return row;
+}
+
+/**
+ * "Tell outbound a client needs an email with specifics", filed straight into
+ * the SAME queue decideDraft()/listDrafts() already read (nb_outbound_drafts),
+ * not a second one. `urgency` is left null on purpose: that column is set by
+ * bridges/nutribiotic/draft_urgency.py FROM what the account's HubSpot notes
+ * actually say (see its column comment above), never from this row's own
+ * text, and a fresh ask typed here has no note history yet to grade it against.
+ */
+export async function insertDraftRequest(input: {
+  account_id: string;
+  specifics: string;
+  subject?: string | null;
+}): Promise<Draft> {
+  const [row] = await mutate<Draft>("nb_outbound_drafts", "POST", {
+    id: randId("draft"),
+    account_id: input.account_id,
+    channel: "email",
+    subject: input.subject ?? null,
+    body_md: input.specifics,
+    play_key: null,
+    campaign_id: null,
+    status: "pending",
+    origin: "manual",
+  });
+  return row;
 }
 
 /**

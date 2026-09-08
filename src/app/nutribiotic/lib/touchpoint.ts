@@ -409,6 +409,11 @@ export type RecordTouchpointResult =
       /** The account this landed on. Carried back so the capture surface can
        * apply a grade Juan picked while typing, without a second lookup. */
       accountId: string | null;
+      /** The nb_activities row this call/visit was actually filed as, null
+       *  for a field note (isFieldNote true), which never gets one, see
+       *  HARD RULE 17. See nb_sdr_schedule (0061): a scheduled item links to
+       *  this rather than duplicating what happened in its own text. */
+      activityId: number | null;
       needsAccount: false;
       /** True when nothing about this was a customer contact: it lives in
        *  nb_field_notes, counts as a touchpoint, and never reaches HubSpot. */
@@ -583,6 +588,7 @@ export async function recordTouchpoint(
       touchpoint_id: tp.id,
       accountName: noteAccount?.name ?? null,
       accountId: noteAccount?.account_id ?? null,
+      activityId: null,
       needsAccount: false,
       isFieldNote: true,
       directiveCount,
@@ -793,6 +799,10 @@ export async function recordTouchpoint(
     touchpoint_id: tp.id,
     accountName: account?.name ?? null,
     accountId: account?.account_id ?? null,
+    // Carried back so a caller that scheduled this contact (the SDR page) can
+    // link its own planning row to the real logged activity instead of
+    // keeping a second opinion about what happened. See nb_sdr_schedule (0061).
+    activityId: activity.id,
     needsAccount: false,
     directiveCount,
     routeDirectives: routeRows.length,

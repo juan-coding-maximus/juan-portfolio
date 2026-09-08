@@ -60,7 +60,7 @@ function mtMimeType(): string {
   return "";
 }
 
-type FiledTouchpoint = Extract<RecordTouchpointResult, { ok: true; needsAccount: false }>;
+export type FiledTouchpoint = Extract<RecordTouchpointResult, { ok: true; needsAccount: false }>;
 
 function fmtTimer(ms: number): string {
   const s = Math.floor(ms / 1000);
@@ -90,7 +90,18 @@ const KIND_OPTIONS = [
 ] as const;
 type KindOption = (typeof KIND_OPTIONS)[number]["value"];
 
-export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | null }) {
+export function TouchpointCapture({
+  accountIdHint,
+  onFiled,
+}: {
+  accountIdHint?: string | null;
+  /** Fires once, right after a clean file (matched, no follow-up needed).
+   * Never fires on the needsAccount/error paths, those still need Juan to
+   * act, not a caller-side side effect. The SDR schedule uses this to mark
+   * its own planning row done without keeping a second opinion about what
+   * happened (see lib/dal.ts's setSdrScheduleStatus). */
+  onFiled?: (result: FiledTouchpoint) => void;
+}) {
   const router = useRouter();
   const [text, setText] = useState("");
   const [kind, setKind] = useState<KindOption>("meeting");
@@ -231,6 +242,7 @@ export function TouchpointCapture({ accountIdHint }: { accountIdHint?: string | 
           }
         });
         setSuccess(res);
+        onFiled?.(res);
       } else {
         // Parked or failed: the text stays in the box AND in storage. This is
         // the case where the rep still has work to do on this note.
