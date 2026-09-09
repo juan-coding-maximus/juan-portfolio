@@ -1807,7 +1807,19 @@ export async function getPriorityBook(): Promise<PriorityBook> {
         // apartment is not an account), and not a closed one. A closed store
         // is not a low priority, it is not a customer, and ranking it at all
         // would put it on a list headed "work this first".
-        "&lifecycle=neq.waypoint&closed_at=is.null&limit=2000",
+        //
+        // NOT chain_excluded (Juan's ask, 2026-09-08, after the ranking put
+        // Whole Foods at the top): a Whole Foods or a Sprouts has the revenue
+        // to dominate this ranking on paper, but nobody behind the register
+        // can say yes to a new line, that decision needs a corporate/broker
+        // engagement this list has no room for (exclude_chains.py's own
+        // reasoning, 2026-08-04). Excluded here entirely rather than merely
+        // suppressed to a low score, unlike closed_at/do_not_visit above:
+        // those describe an account Juan might still work someday, this
+        // describes an account that was never SDR-shaped to begin with.
+        // Regional chains Juan actually calls on (Lazy Acres, Lassens,
+        // Mother's Market) were never chain_excluded, so they are unaffected.
+        "&lifecycle=neq.waypoint&closed_at=is.null&chain_excluded=eq.false&limit=2000",
     ),
     raw<{ account_id: string; potential_grade: string | null }>(
       "nb_v_account_potential?select=account_id,potential_grade&limit=2000",
