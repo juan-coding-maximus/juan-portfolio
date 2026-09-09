@@ -1041,11 +1041,13 @@ export function SdrScreen({
      lib/account-filters.ts. Empty set is unfiltered, multi-select, AND'd
      across sections and against the day.
 
-     Open by default here, unlike the map. On /map the bar covers the thing you
-     came to read; on /sdr it sits above a rail of day columns and covers
-     nothing, and the queue routinely spans a dozen territories at once. */
+     COLLAPSED BY DEFAULT, same as the map (Juan, 2026-09-09). Five sections
+     is a wall of controls to open a page onto, and filtering is something you
+     do occasionally while the queue behind it is what you came for. The
+     summary line and the active-filter badge stay visible either way, so a
+     filtered queue never looks like an empty one. */
   const [filters, setFilters] = useState<AccountFilterState>(emptyFilters);
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   /* One subject per SCHEDULED ROW, not per account, because that is what this
      screen filters: two calls booked on the same store are two rows here and

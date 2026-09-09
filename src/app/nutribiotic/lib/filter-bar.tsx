@@ -30,6 +30,7 @@ import {
   LEAD_STAGE_COLOR,
   LEAD_STAGE_LABEL,
   LEAD_STAGE_TITLE,
+  READINESS_EFFECT,
   READINESS_FILTERS,
   READINESS_LABEL,
   UNTYPED_CHANNELS,
@@ -50,6 +51,18 @@ const POTENTIAL_COLOR: Partial<Record<Tier, string>> = {
   C: "#D97E2B",
   D: "#C79A1E",
   E: "#8A928C",
+};
+
+/* The readiness ladder, hot to cold, matching the direction each tag pushes
+   the score (+20 / +10 / 0 / -10). Same four-step ramp language the HQ
+   potential dots use: red, orange, then grey once the tag stops being a
+   reason to drive. Blue for Cold rather than a paler grey, because a rep
+   explicitly writing an account off is a statement, not an absence. */
+const READINESS_COLOR: Record<ReadinessFilter, string> = {
+  urgent: "#B5372A",
+  hot: "#D97E2B",
+  normal: "#8A928C",
+  cold: "#4E7FA8",
 };
 
 const ON = "border-[#14201B] bg-[#14201B] text-[#F7F6F1]";
@@ -251,14 +264,14 @@ export function AccountFilterBar({
                 type="button"
                 onClick={() => onChange({ ...value, readiness: toggle(value.readiness, r) })}
                 aria-pressed={on}
-                title={
-                  r === "urgent"
-                    ? "Tagged Urgent by hand. Adds +20 to the priority score."
-                    : "Tagged Hot by hand. Adds +10 to the priority score."
-                }
+                title={`Tagged ${READINESS_LABEL[r]} by hand, on a call or standing in the store. ${READINESS_EFFECT[r]}. An untagged account matches no chip here.`}
                 className={`${CHIP} ${on ? ON : OFF}`}
               >
-                <Ico name={r === "urgent" ? "alert" : "wand"} size={12} />
+                <span
+                  aria-hidden
+                  className="h-2 w-2 rounded-full"
+                  style={{ background: on ? "#F7F6F1" : READINESS_COLOR[r] }}
+                />
                 {READINESS_LABEL[r]}{" "}
                 <span className="tabular-nums opacity-70">{counts.readiness[r] ?? 0}</span>
               </button>

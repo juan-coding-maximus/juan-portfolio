@@ -32,21 +32,37 @@ import type { Readiness } from "./priority";
 // ---------------------------------------------------------------------------
 
 /**
- * Urgent and Hot are NOT new labels. nb_accounts.readiness has carried exactly
- * four values since migration 0069 (urgent / hot / normal / cold), with a
- * stated point adjustment into lib/priority.ts's score (+20 / +10 / 0 / -10).
- * These two chips are the top two of that existing ladder, reused verbatim.
+ * NOT NEW LABELS, and this is the point. nb_accounts.readiness has carried
+ * exactly these four values since migration 0069 (urgent / hot / normal /
+ * cold), each with a stated point adjustment into lib/priority.ts's score
+ * (+20 / +10 / 0 / -10). The chips are that existing ladder, whole, in its own
+ * order, reused verbatim rather than re-banded here.
  *
- * Normal and Cold get no chip on purpose: "show me the accounts a rep has
- * explicitly called cold" is not a question either screen exists to answer,
- * and the row is already four controls wide.
+ * ALL FOUR, not the top two (Juan, 2026-09-09, same day, after seeing Urgent
+ * and Hot alone). A rep who tagged an account Cold made a real call about it,
+ * and "what did I already write off" is a question worth being able to ask;
+ * Normal is likewise a tag someone applied, not the absence of one. An
+ * untagged account carries null and matches no chip, which is what keeps
+ * "nobody has read this account yet" from reading as Normal.
  */
-export const READINESS_FILTERS = ["urgent", "hot"] as const;
+export const READINESS_FILTERS = ["urgent", "hot", "normal", "cold"] as const;
 export type ReadinessFilter = (typeof READINESS_FILTERS)[number];
 
 export const READINESS_LABEL: Record<ReadinessFilter, string> = {
   urgent: "Urgent",
   hot: "Hot",
+  normal: "Normal",
+  cold: "Cold",
+};
+
+/** The 0069 adjustment each tag makes to the priority score, shown in the
+ *  chip's own tooltip so the ladder is legible from the control rather than
+ *  from the migration. Signed strings, not numbers: "+0" is not a thing. */
+export const READINESS_EFFECT: Record<ReadinessFilter, string> = {
+  urgent: "+20 to the priority score",
+  hot: "+10 to the priority score",
+  normal: "no change to the priority score",
+  cold: "-10 to the priority score",
 };
 
 /**
