@@ -34,6 +34,7 @@ import {
   getAccount,
   getTouchpointById,
   insertActivity,
+  insertCloseSignal,
   insertContact,
   insertDirectives,
   insertDraftRequest,
@@ -309,6 +310,14 @@ const EXTRACT_TOOL = {
           outcome: {
             type: ["string", "null"],
             enum: ["reached", "no_decision_maker", "closed", "declined", "reschedule", "no_answer", "left_sample", null],
+            /* 'closed' CARRIES WEIGHT NOW (2026-09-09) and needs saying out
+               loud: it queues a proposal to mark the company Closed in the
+               shared HubSpot portal (nb_close_signals, migration 0073). It
+               means THE BUSINESS IS GONE, not that a deal was closed or that
+               the shop was shut at the hour the rep walked past. A rep who
+               won an order said 'reached', and a rep who found the lights off
+               on a Sunday said nothing about the business existing. */
+            description: "Use 'closed' only when the text says the BUSINESS ITSELF has shut down for good (out of business, permanently closed, the space is empty or another business is in it). Not for a deal being closed or won, and not for a store that merely happened to be closed at the time the rep stopped by, which is 'no_answer'.",
           },
           detail: {
             type: "string",
@@ -704,6 +713,33 @@ export async function recordTouchpoint(
     detail: parsed.activity.detail,
     ...(occurredAt ? { at: occurredAt } : {}),
   });
+
+  /* A LOG THAT SAID THE DOORS ARE SHUT (Juan, 2026-09-09: a meeting log "may
+     signal the change to closed ... and should make the HubSpot account be
+     marked as closed").
+
+     Both halves of that, in order. The first is already done above: the
+     activity is an ordinary row, so it counts toward this account's
+     touchpoints exactly like any other visit, which is what Juan asked for
+     and is why the closure is not filed as some separate non-touchpoint
+     event. The second is an outward write to a portal shared with another
+     rep, so it QUEUES rather than fires. HARD RULE 8: closed is evidence, not
+     a routing decision. Nothing here sets closed_at or do_not_visit, the pin
+     stays on the map, and set_lead_status.py --from-signals is the only door
+     onward, dry by default and not on launchd.
+
+     Never blocks the visit itself, same treatment as account facts above. */
+  if (parsed.activity.outcome === "closed") {
+    try {
+      await insertCloseSignal({
+        account_id: accountId,
+        activity_id: activity.id,
+        evidence: parsed.activity.detail,
+      });
+    } catch {
+      /* the touchpoint is filed either way */
+    }
+  }
 
   // A fact stated about the business itself (hours, general phone/email)
   // updates nb_accounts regardless of whether this call also files to

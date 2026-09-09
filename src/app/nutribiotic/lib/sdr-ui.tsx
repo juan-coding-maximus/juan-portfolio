@@ -26,7 +26,16 @@ import {
   type SdrAccountPanel,
   type SdrSearchHit,
 } from "./sdr-actions";
-import type { PriorityBook, SdrPriority, SdrScheduleItem } from "./dal";
+import type { PriorityBook, SdrPriority, SdrScheduleItem, Tier } from "./dal";
+import { AccountFilterBar } from "./filter-bar";
+import {
+  countSubjects,
+  emptyFilters,
+  matchesFilters,
+  type AccountFilterState,
+  type FilterSubject,
+  type LeadStage,
+} from "./account-filters";
 import { planningHorizonDates } from "./field-week";
 import { laTodayKey, type BusinessHours } from "./hours";
 import type { Readiness } from "./priority";
@@ -72,6 +81,16 @@ export type SdrDayItem = SdrScheduleItem & {
    *  same contract 0035 set for urgency_reason. */
   priorityReason: string | null;
   priorityBand: "now" | "soon" | "later" | "unscored" | null;
+  /* THE FOUR FIELDS THE SHARED FILTER BAR READS (2026-09-09). Juan: "map
+     filters (for map and SDR, they should be same)." A chip that exists on
+     both screens has to read the same column on both, so the queue carries
+     them per row from the account behind it. All four are null on a prospect
+     with no account yet, and a null never matches a chip rather than being
+     bucketed into one. */
+  tier: Tier | null;
+  channel: string | null;
+  readiness: Readiness | null;
+  leadStage: LeadStage | null;
 };
 
 /** Adds `n` calendar days to a YYYY-MM-DD string, anchored to the date the
@@ -168,6 +187,13 @@ function AddToDayForm({ date, onAdded }: { date: string; onAdded: (item: SdrDayI
         priorityScore: null,
         priorityReason: null,
         priorityBand: null,
+        /* Not loaded on a row this component just built or stood in for.
+           Null, never a guess: the next server render fills all four from
+           the account, and until then this row simply matches no chip. */
+        tier: null,
+        channel: null,
+        readiness: null,
+        leadStage: null,
       });
       reset();
     });
@@ -353,6 +379,13 @@ function GlobalSearch({
         priorityScore: null,
         priorityReason: null,
         priorityBand: null,
+        /* Not loaded on a row this component just built or stood in for.
+           Null, never a guess: the next server render fills all four from
+           the account, and until then this row simply matches no chip. */
+        tier: null,
+        channel: null,
+        readiness: null,
+        leadStage: null,
       });
       setAddingFor(null);
       setQuery("");
@@ -753,10 +786,14 @@ function AccountPanel({ item, onFiled }: { item: SdrDayItem; onFiled: (r: FiledT
             {!item.account_id && (
               <div className="mt-0.5 text-[12px] text-[#8A928C]">New prospect, not yet an account</div>
             )}
-            {panel && (
+            {panel && (panel.channel !== "unknown" || panel.currentState || panel.quirks) && (
               <div className="mt-0.5 text-[12.5px] text-[#5B6560]">
-                {panel.channel.replace(/_/g, " ")}
-                {panel.currentState ? ` · ${panel.currentState}` : panel.quirks ? ` · ${panel.quirks}` : ""}
+                {panel.channel !== "unknown" ? panel.channel.replace(/_/g, " ") : ""}
+                {panel.currentState
+                  ? `${panel.channel !== "unknown" ? " · " : ""}${panel.currentState}`
+                  : panel.quirks
+                    ? `${panel.channel !== "unknown" ? " · " : ""}${panel.quirks}`
+                    : ""}
               </div>
             )}
           </div>
@@ -878,9 +915,14 @@ function AccountPanel({ item, onFiled }: { item: SdrDayItem; onFiled: (r: FiledT
               <div className="mt-3 flex flex-col gap-1.5 border-t border-[#E2DFD5] pt-3">
                 {panel.contacts.map((c) => (
                   <div key={c.id} className="flex items-baseline justify-between gap-2 text-[12.5px]">
-                    <span className="font-medium text-[#3D4A44]">
+                    <span className="flex items-center gap-1.5 font-medium text-[#3D4A44]">
                       Contact: {c.name}
                       {c.title ? `, ${c.title}` : ""}
+                      {c.isDecisionMaker && (
+                        <span className="rounded bg-[#ECEAE1] px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-[#3D4A44] uppercase">
+                          Decision maker
+                        </span>
+                      )}
                     </span>
                     <span className="shrink-0 text-[#8A928C]">{c.phone ?? c.email ?? ""}</span>
                   </div>
@@ -993,18 +1035,47 @@ export function SdrScreen({
   const [items, setItems] = useState(initialItems);
   const [active, setActive] = useState<SdrDayItem | null>(null);
 
-  /* Area filter, same convention as the map's chips (AccountsMap.tsx):
-     empty set is unfiltered, multi-select, AND'd against the day. Juan's ask,
-     2026-09-09: the queue can span 14 territories at once and he wants to
-     narrow to the ones he's actually driving to today before picking a call. */
-  const [activeAreas, setActiveAreas] = useState<Set<string>>(new Set());
+  /* THE SAME FILTER BAR THE MAP RENDERS, not a second one that happens to
+     look like it (Juan, 2026-09-09: "map filters (for map and SDR, they should
+     be same)"). Five sections, one vocabulary, one predicate, all in
+     lib/account-filters.ts. Empty set is unfiltered, multi-select, AND'd
+     across sections and against the day.
 
-  function toggleArea(id: string) {
-    setActiveAreas((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
+     Open by default here, unlike the map. On /map the bar covers the thing you
+     came to read; on /sdr it sits above a rail of day columns and covers
+     nothing, and the queue routinely spans a dozen territories at once. */
+  const [filters, setFilters] = useState<AccountFilterState>(emptyFilters);
+  const [filtersOpen, setFiltersOpen] = useState(true);
+
+  /* One subject per SCHEDULED ROW, not per account, because that is what this
+     screen filters: two calls booked on the same store are two rows here and
+     the counts have to say two. Built with the same shape the map builds, so
+     lib/account-filters.ts counts and matches both screens identically. */
+  const subjects = useMemo<FilterSubject[]>(
+    () =>
+      items.map((it) => ({
+        id: it.id,
+        area: it.area,
+        tier: it.tier,
+        readiness: it.readiness,
+        score: it.priorityScore,
+        channel: it.channel,
+        leadStage: it.leadStage,
+      })),
+    [items],
+  );
+
+  const filterCounts = useMemo(() => countSubjects(subjects), [subjects]);
+
+  function itemMatchesFilters(it: SdrDayItem): boolean {
+    return matchesFilters(filters, {
+      id: it.id,
+      area: it.area,
+      tier: it.tier,
+      readiness: it.readiness,
+      score: it.priorityScore,
+      channel: it.channel,
+      leadStage: it.leadStage,
     });
   }
 
@@ -1045,6 +1116,13 @@ export function SdrScreen({
       priorityScore: null,
       priorityReason: null,
       priorityBand: null,
+      /* Not loaded on a row this component just built or stood in for.
+         Null, never a guess: the next server render fills all four from
+         the account, and until then this row simply matches no chip. */
+      tier: null,
+      channel: null,
+      readiness: null,
+      leadStage: null,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusAccountId]);
@@ -1126,6 +1204,13 @@ export function SdrScreen({
       priorityScore: null,
       priorityReason: null,
       priorityBand: null,
+      /* Not loaded on a row this component just built or stood in for.
+         Null, never a guess: the next server render fills all four from
+         the account, and until then this row simply matches no chip. */
+      tier: null,
+      channel: null,
+      readiness: null,
+      leadStage: null,
     });
   }
 
@@ -1133,41 +1218,21 @@ export function SdrScreen({
     <div className="flex flex-col gap-4">
       <GlobalSearch todayIso={todayIso} onView={viewHit} onAdded={addItem} />
 
-      {/* Area filter, same chips as the map: each carries its area's colour,
-          picking one narrows every day column to it and hides the noise from
-          territories Juan isn't calling into right now. Empty = unfiltered. */}
-      {areas.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {areas.map((a) => {
-            const on = activeAreas.has(a.id);
-            return (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => toggleArea(a.id)}
-                aria-pressed={on}
-                className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] transition-colors ${
-                  on ? "text-[#F7F6F1]" : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
-                }`}
-                style={on ? { background: a.color, borderColor: a.color } : undefined}
-              >
-                <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: on ? "#F7F6F1" : a.color }} />
-                {a.label}
-                <span className={`tabular-nums ${on ? "opacity-70" : "text-[#8A928C]"}`}>{a.prospects}</span>
-              </button>
-            );
-          })}
-          {activeAreas.size > 0 && (
-            <button
-              type="button"
-              onClick={() => setActiveAreas(new Set())}
-              className="rounded-md px-2 py-1 text-[12.5px] text-[#8A928C] underline-offset-2 hover:text-[#3D4A44] hover:underline"
-            >
-              clear
-            </button>
-          )}
-        </div>
-      )}
+      {/* THE FILTER BAR, the same component /map renders (lib/filter-bar.tsx).
+          No hide toggles: chains, practices and the 0072 prospect layer hide
+          PINS on a map, and a call Juan deliberately scheduled is not noise to
+          be swept off his own queue. */}
+      <div className="overflow-hidden rounded-lg border border-[#E2DFD5] [&>*:last-child]:border-b-0">
+        <AccountFilterBar
+          value={filters}
+          onChange={setFilters}
+          counts={filterCounts}
+          areas={areas}
+          summary={`${items.filter(itemMatchesFilters).length} of ${items.length}`}
+          open={filtersOpen}
+          onToggleOpen={() => setFiltersOpen((v) => !v)}
+        />
+      </div>
 
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
       {/* The queue, 2026-09-08 redesign: this used to be the main view (a
@@ -1179,10 +1244,12 @@ export function SdrScreen({
         {dayIsos.map((iso) => {
           const dayItems = items
             .filter((it) => it.scheduled_date === iso)
-            // Same rule as the map: empty selection is unfiltered; a picked
-            // area hides everything else, including rows with no area at all
-            // (a cold prospect can't be "in" the area Juan just chose).
-            .filter((it) => activeAreas.size === 0 || (it.area !== null && activeAreas.has(it.area)))
+            // The same predicate the map applies, from lib/account-filters.ts.
+            // Empty selection is unfiltered; a picked chip hides everything
+            // else, including rows carrying null for that field (a prospect
+            // with no account behind it can't be "in" the area Juan chose, and
+            // is not a Dormant account either).
+            .filter(itemMatchesFilters)
             // Pending first, so a fresh Today never buries an open call under
             // yesterday's already-done rows carried in the same fetch window.
             // Then by priority INSIDE the pending block (2026-09-08): the old

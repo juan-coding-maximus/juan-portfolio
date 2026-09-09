@@ -75,6 +75,14 @@ export default async function SdrPage({
       priorityScore: p?.score ?? null,
       priorityReason: p?.reason ?? null,
       priorityBand: p?.band ?? null,
+      /* What the shared filter bar reads (2026-09-09). All four come off the
+         account behind the row, and stay null for a prospect that is not an
+         account yet: a null never matches a chip rather than being bucketed
+         into one it was never classified as. */
+      tier: card?.tier ?? null,
+      channel: card?.channel ?? null,
+      readiness: card?.readiness ?? null,
+      leadStage: card?.leadStage ?? null,
     };
   });
 

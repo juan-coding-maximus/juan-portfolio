@@ -39,6 +39,7 @@ import { redirect } from "next/navigation";
 import { hasAccess } from "./devices";
 import { hasWidgetToken } from "./session";
 import { areaProspectCounts, byPriority, computePriority, type PriorityInput, type PriorityResult, type Readiness } from "./priority";
+import type { LeadStage } from "./account-filters";
 
 const SB_URL = process.env.NB_SUPABASE_URL ?? "";
 const SB_KEY = process.env.NB_SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -1116,6 +1117,33 @@ export async function insertDirectives(
   return rows.length;
 }
 
+/**
+ * A field log that said a business is closed, queued as EVIDENCE (0073).
+ *
+ * HARD RULE 8: "Closed is evidence, not a routing decision." Nothing here sets
+ * closed_at, do_not_visit, or hs_lead_status. The pin stays on the map, the
+ * account stays in the book, and the only thing that changes is that a row now
+ * exists for a human to look at. bridges/nutribiotic/set_lead_status.py
+ * --from-signals is the one door onward, dry by default, owner scope asserted
+ * twice, and it is not on launchd.
+ *
+ * Idempotent per activity: an extraction re-run on the same visit does not
+ * queue the same closure twice.
+ */
+export async function insertCloseSignal(input: {
+  account_id: string;
+  activity_id: number | null;
+  evidence: string;
+}): Promise<void> {
+  if (input.activity_id !== null) {
+    const seen = await raw<{ id: string }>(
+      `nb_close_signals?select=id&activity_id=eq.${input.activity_id}&limit=1`,
+    );
+    if (seen.length > 0) return;
+  }
+  await mutate("nb_close_signals", "POST", { id: randId("cls"), status: "pending", ...input });
+}
+
 /** The note body source is the activity row, never re-parsed; `parsed` here
  * is used only for the per-person detail in the engagement port's people
  * match, mirroring hubspot_notes.py's load_touchpoint(). */
@@ -1180,28 +1208,67 @@ export async function getAccountHoursMap(ids: string[]): Promise<Record<string, 
 export async function getAccountCallCards(
   ids: string[],
 ): Promise<
-  Record<string, { name: string; phone: string | null; area: string | null; businessHours: Record<string, string[][]> | null }>
+  Record<
+    string,
+    {
+      name: string;
+      phone: string | null;
+      area: string | null;
+      businessHours: Record<string, string[][]> | null;
+      /* The three fields the shared filter bar reads that the day view did
+         not already need (2026-09-09). Carried here rather than in a second
+         query because this is the one join the SDR page already makes, and
+         the department has a live egress ceiling it was suspended over once
+         (2026-09-02). */
+      channel: string | null;
+      readiness: Readiness | null;
+      tier: Tier | null;
+      leadStage: LeadStage | null;
+    }
+  >
 > {
   if (ids.length === 0) return {};
-  const res = await query<{
-    id: string;
-    name: string;
-    phone: string | null;
-    area: string | null;
-    business_hours: Record<string, string[][]> | null;
-    origin?: Origin;
-  }>("nb_accounts", {
-    // `area` rides along for the SDR queue's area grouping (Juan, 2026-09-08).
-    // `business_hours` rides along too (2026-09-09, Juan: "informs when I
-    // bring up a potential meeting and when I plan on calling them next"),
-    // same reasoning: this is the one join the day view already makes, and
-    // the department has a live egress ceiling it was suspended over once
-    // (2026-09-02).
-    select: "id,name,phone,area,business_hours",
-    id: `in.(${ids.join(",")})`,
-  });
+  const [res, grades, stages] = await Promise.all([
+    query<{
+      id: string;
+      name: string;
+      phone: string | null;
+      area: string | null;
+      business_hours: Record<string, string[][]> | null;
+      channel: string | null;
+      readiness: Readiness | null;
+      origin?: Origin;
+    }>("nb_accounts", {
+      // `area` rides along for the SDR queue's area grouping (Juan, 2026-09-08).
+      // `business_hours` rides along too (2026-09-09, Juan: "informs when I
+      // bring up a potential meeting and when I plan on calling them next"),
+      // same reasoning.
+      select: "id,name,phone,area,business_hours,channel,readiness",
+      id: `in.(${ids.join(",")})`,
+    }),
+    raw<{ account_id: string; potential_grade: Tier }>(
+      `nb_v_account_potential?select=account_id,potential_grade&account_id=in.(${ids.join(",")})`,
+    ),
+    raw<{ account_id: string; lead_stage: LeadStage }>(
+      `nb_v_account_lead_stage?select=account_id,lead_stage&account_id=in.(${ids.join(",")})`,
+    ),
+  ]);
+  const tierById = new Map(grades.map((g) => [g.account_id, g.potential_grade]));
+  const stageById = new Map(stages.map((s) => [s.account_id, s.lead_stage]));
   return Object.fromEntries(
-    res.data.map((a) => [a.id, { name: a.name, phone: a.phone, area: a.area, businessHours: a.business_hours }]),
+    res.data.map((a) => [
+      a.id,
+      {
+        name: a.name,
+        phone: a.phone,
+        area: a.area,
+        businessHours: a.business_hours,
+        channel: a.channel,
+        readiness: a.readiness,
+        tier: tierById.get(a.id) ?? null,
+        leadStage: stageById.get(a.id) ?? null,
+      },
+    ]),
   );
 }
 
@@ -2064,6 +2131,14 @@ export type MapAccount = {
   area: string | null;
   /** Mirror of HubSpot's hs_lead_status, pull-only (0028). Null = unset there. */
   lead_status: string | null;
+  /** The rep's own read of how close this account is to buying (0069).
+   *  Local only, never synced. Null = nobody has tagged it. */
+  readiness: Readiness | null;
+  /** One of the five stages of migration 0073, computed by
+   *  nb_v_account_lead_stage. NOT lead_status: that column is HubSpot's and is
+   *  pull-only, this is the OS's own funnel position derived from touchpoints
+   *  and orders, with `closed` mirroring HubSpot's Closed. */
+  lead_stage: LeadStage | null;
   /* What the route card needs to answer "what is this account to me" without a
      tap (Juan, 2026-08-05). The three money facts are columns on nb_accounts;
      the category comes from nb_v_account_product_mix (0030). Every one of them
@@ -2102,10 +2177,10 @@ export type MapAccount = {
  * one table.
  */
 export async function listOwnerAccounts(): Promise<Result<MapAccount>> {
-  const [result, grades, mix] = await Promise.all([
-    query<Omit<MapAccount, "tier" | "top_category_12m" | "top_category_lifetime">>("nb_accounts", {
+  const [result, grades, mix, stages] = await Promise.all([
+    query<Omit<MapAccount, "tier" | "top_category_12m" | "top_category_lifetime" | "lead_stage">>("nb_accounts", {
       select:
-        "id,name,street,city,state,postal,lat,lng,phone,website,channel,lifecycle,do_not_visit,chain_excluded,practice_excluded,hubspot_company_id,origin,area,lead_status,last_order_at,trailing_12m_revenue,lifetime_revenue,expected_reorder_at,expected_reorder_days",
+        "id,name,street,city,state,postal,lat,lng,phone,website,channel,lifecycle,do_not_visit,chain_excluded,practice_excluded,hubspot_company_id,origin,area,lead_status,readiness,last_order_at,trailing_12m_revenue,lifetime_revenue,expected_reorder_at,expected_reorder_days",
       // hubspot_owner_id, not owner_name: owner_name is free text mirrored from
       // HubSpot and carries two different spellings for Juan on real rows
       // ("Juan Arenas" on 49, "Juan Arenas Martin" on 349, 2026-09-09), so
@@ -2130,9 +2205,18 @@ export async function listOwnerAccounts(): Promise<Result<MapAccount>> {
     raw<{ account_id: string; top_category_12m: string | null; top_category_lifetime: string | null }>(
       "nb_v_account_product_mix?select=account_id,top_category_12m,top_category_lifetime&limit=1000",
     ),
+    // Migration 0073. Joined here rather than recomputed on the client: the
+    // stage depends on a touchpoint COUNT and an order MAX, neither of which
+    // is a column on nb_accounts, and shipping 622 activity rows to a phone to
+    // re-derive what one view already answers is exactly the egress this
+    // department was suspended over once (2026-09-02).
+    raw<{ account_id: string; lead_stage: LeadStage }>(
+      "nb_v_account_lead_stage?select=account_id,lead_stage&limit=2000",
+    ),
   ]);
   const tierById = new Map(grades.map((t) => [t.account_id, t.potential_grade]));
   const mixById = new Map(mix.map((m) => [m.account_id, m]));
+  const stageById = new Map(stages.map((s) => [s.account_id, s.lead_stage]));
   return {
     ...result,
     data: result.data.map((a) => ({
@@ -2140,6 +2224,7 @@ export async function listOwnerAccounts(): Promise<Result<MapAccount>> {
       tier: tierById.get(a.id) ?? null,
       top_category_12m: mixById.get(a.id)?.top_category_12m ?? null,
       top_category_lifetime: mixById.get(a.id)?.top_category_lifetime ?? null,
+      lead_stage: stageById.get(a.id) ?? null,
     })),
   };
 }

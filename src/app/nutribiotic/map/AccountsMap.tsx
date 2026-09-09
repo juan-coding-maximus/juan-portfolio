@@ -19,6 +19,14 @@ import { laTodayIso } from "../lib/field-week";
 import { AccountLink } from "../lib/modal";
 import { addAccountToSdr } from "../lib/sdr-actions";
 import { appleMapsUrl, CUSTOM_STOP_LABEL, Ico, ReachLinks, realChannel } from "../lib/ui";
+import { AccountFilterBar } from "../lib/filter-bar";
+import {
+  countSubjects,
+  emptyFilters,
+  matchesFilters,
+  type AccountFilterState,
+  type FilterSubject,
+} from "../lib/account-filters";
 import type { DriveLeg } from "./drive-actions";
 import type { FocusRequest, RouteStopView } from "./MapScreen";
 import { BAND_STYLE, driveBand } from "./traffic";
@@ -163,41 +171,17 @@ const MAP_STYLE: google.maps.MapTypeStyle[] = [
    F and G keep their area dot, both being empty in this territory today; if
    they ever fill, they belong at the grey end with E rather than in a new hue.
    The same colours mark the filter chips, so the legend is the control. */
-/* HubSpot's own Lead Status labels, read from the hs_lead_status property
-   definition on 2026-08-05 (/crm/v3/properties/companies/hs_lead_status), not
-   invented here. Kept as a value -> label map because HubSpot's stored value
-   and its displayed label are NOT the same string for every option: 'No follow
-   ups' is shown to a user as "Active - no follow ups". Filtering on the value
-   and showing the label is the only way this menu matches the portal.
+/* THE FOUR HUBSPOT LEAD-STATUS LABELS THAT USED TO LIVE HERE ARE GONE
+   (Juan, 2026-09-09). "New to activate / To reactivate / Active - follow ups /
+   New to open" mirrored hs_lead_status, which is HQ's property in a shared
+   portal and which nobody here can constrain. The filter now reads the five
+   OS stages of migration 0073 (nb_v_account_lead_stage), and the names and
+   colours for those live in lib/account-filters.ts so /sdr renders the same
+   five words. The only one still sourced from HubSpot is Closed, which the
+   view mirrors rather than computes.
 
-   An unrecognised value renders as itself rather than being dropped, so this
-   map going stale degrades to slightly-wrong wording, never to a missing
-   filter or a silently empty result.
-
-   NEW -> "Prospects" (Juan, 2026-09-09; was "New to open"). This is the one
-   label this map renames rather than mirrors verbatim: these are the
-   unworked, top-of-funnel accounts (see isProspect below and the Prospects
-   toggle), and "Prospects" is what Juan calls that bucket, not what the
-   portal calls the raw status. */
-const LEAD_STATUS_LABEL: Record<string, string> = {
-  "Active - follow ups": "Active - follow ups",
-  "No follow ups": "Active - no follow ups",
-  NEW: "Prospects",
-  Discarded: "Discarded",
-  "To reactivate": "To reactivate",
-};
-
-// Sentinel for "HubSpot has no status on this company". A real filter choice,
-// since 27 of Juan's accounts are in exactly that state and finding them is a
-// reasonable thing to want; null would be indistinguishable from "no filter".
-//
-// Shown as "New to activate", Juan's name for the bucket on 2026-08-05: an
-// account nobody has given a status is one nobody has started working. This is
-// a LABEL ON THE NULL BUCKET, not a value: nothing is written to HubSpot, and
-// "New to activate" is not one of hs_lead_status's six options (the nearest,
-// 'NEW', displays as "New to open" and is a different, real, set status).
-const NO_LEAD_STATUS = "__none__";
-const NO_LEAD_STATUS_LABEL = "New to activate";
+   `lead_status` itself is still read on this screen, twice and only twice: to
+   keep Closed accounts off a field map at all, and for isProspect below. */
 
 const POTENTIAL_COLOR: Partial<Record<Tier, string>> = {
   A: "#B5372A",
@@ -213,17 +197,18 @@ const POTENTIAL_COLOR: Partial<Record<Tier, string>> = {
    instead of the potential ramp above and is hidden by default, same shape
    as the chains/practices toggle.
 
-   IT STOPS BEING A "PROSPECT" THE MOMENT IT EARNS A REAL GRADE: once an
-   account has both a real HubSpot company (hubspot_company_id) and a tier,
-   it is no longer an unqualified lead, it is graded territory, and it wears
-   its tier colour and is always shown, same as every other account. Since
-   0072 also floors any HubSpot company with no grade at D, in practice the
-   only accounts left in this blue bucket are the ones with no HubSpot
-   company at all. */
+   PURELY lead_status, NOT ALSO GATED ON hubspot_company_id/tier. That was
+   the first cut (2026-09-09) and it was wrong: potential_hq (HubSpot's own
+   potential__cloned_ mirror) is set independently of lead status, so 34 of
+   Juan's 35 "New to open" accounts already had a real tier the moment this
+   shipped, which "graduated" them out of the blue bucket immediately and
+   left the toggle with nothing to show (Juan: "the prospects showed
+   immediately... I don't see the new filter classifiers"). lead_status is
+   the actual signal for "unworked lead", so that is the only gate now. */
 const PROSPECT_COLOR = "#3D6E99";
 
-function isProspect(a: Pick<MapAccount, "lead_status" | "hubspot_company_id" | "tier">): boolean {
-  return a.lead_status === "NEW" && !(a.hubspot_company_id && a.tier);
+function isProspect(a: Pick<MapAccount, "lead_status">): boolean {
+  return a.lead_status === "NEW";
 }
 
 /**
@@ -298,20 +283,15 @@ export function AccountsMap({
   // bodies share nothing: there is no grade, no order history, no portal record
   // behind a hotel.
   const [selectedStop, setSelectedStop] = useState<CustomStop | null>(null);
-  // Empty set reads as "no filter", not "nothing matches" -- the default view
-  // is every pin, same as the map before tiers existed on it.
-  const [activeTiers, setActiveTiers] = useState<Set<Tier>>(new Set());
-  // Same convention as the tier filter: empty means unfiltered, so a chip narrows
-  // on click and widens again on the second click.
-  const [activeAreas, setActiveAreas] = useState<Set<string>>(new Set());
+  /* ONE FILTER STATE, five sections, shared with /nutribiotic/sdr (Juan,
+     2026-09-09: "map filters (for map and SDR, they should be same)"). The
+     shape, the counting and the predicate all live in lib/account-filters.ts;
+     this screen holds the state and draws the map behind it.
 
-  /* Empty set is unfiltered, same convention as the tier and area chips.
-     Was a single-choice dropdown for a few hours on 2026-08-05; Juan asked for
-     chips like the potential row instead, which also makes it multi-select,
-     since a set of chips that only allowed one would be a radio group wearing
-     the wrong clothes. "Active - follow ups OR New to activate" is a real
-     question, and the dropdown could not ask it. */
-  const [activeLeadStatuses, setActiveLeadStatuses] = useState<Set<string>>(new Set());
+     Empty set reads as "no filter", not "nothing matches" -- the default view
+     is every pin, same as the map before tiers existed on it, and a chip
+     narrows on click and widens again on the second click. */
+  const [filters, setFilters] = useState<AccountFilterState>(emptyFilters);
 
   // Closed by default: on a phone the map is what you came for. Desktop
   // ignores this entirely (md:contents), so the state is mobile-only.
@@ -434,15 +414,6 @@ export function AccountsMap({
     });
   }, [routeLegs, chainPoints]);
 
-  function toggleLeadStatus(v: string) {
-    setSelected(null);
-    setActiveLeadStatuses((prev) => {
-      const next = new Set(prev);
-      if (next.has(v)) next.delete(v);
-      else next.add(v);
-      return next;
-    });
-  }
   const mapRef = useRef<google.maps.Map | null>(null);
 
   const areaById = useMemo(() => new Map(areas.map((a) => [a.id, a])), [areas]);
@@ -492,7 +463,7 @@ export function AccountsMap({
   useEffect(() => {
     // Either door needs the polygons: picking a single area's chip, or turning
     // the whole overlay on. Still fetched once per page view, never on load.
-    if ((activeAreas.size === 0 && !showAreas) || boundaryAsked.current) return;
+    if ((filters.areas.size === 0 && !showAreas) || boundaryAsked.current) return;
     boundaryAsked.current = true;
     let live = true;
     listAreaBoundaries()
@@ -503,7 +474,7 @@ export function AccountsMap({
     return () => {
       live = false;
     };
-  }, [activeAreas.size, showAreas]);
+  }, [filters.areas.size, showAreas]);
 
   /* WITH THE OVERLAY ON, EVERY AREA IS DRAWN, including ones the chips are
      currently filtering pins out of. The two controls answer different
@@ -513,12 +484,12 @@ export function AccountsMap({
      asked, and the frontier is a fact about the ground either way. */
   const shownAreas = useMemo(() => {
     if (!boundaries) return [];
-    if (!showAreas && activeAreas.size === 0) return [];
+    if (!showAreas && filters.areas.size === 0) return [];
     return areas
-      .filter((a) => showAreas || activeAreas.has(a.id))
+      .filter((a) => showAreas || filters.areas.has(a.id))
       .map((a) => ({ ...a, boundary: a.boundary ?? boundaries.get(a.id) ?? null }))
       .filter((a) => a.boundary);
-  }, [areas, activeAreas, boundaries, showAreas]);
+  }, [areas, filters.areas, boundaries, showAreas]);
 
   /* What every badge below counts FROM. Chains, practices and prospects are
      excluded here whenever their toggle is off (the resting state), same
@@ -546,63 +517,56 @@ export function AccountsMap({
     [accounts, showChains, showPractices, showProspects],
   );
 
-  const tierCounts = useMemo(() => {
-    const counts: Record<Tier, number> = { A: 0, B: 0, C: 0, D: 0, E: 0, F: 0, G: 0 };
-    for (const a of visibleAccounts) if (a.tier) counts[a.tier] += 1;
-    return counts;
-  }, [visibleAccounts]);
+  /* THE SUBJECTS THE SHARED BAR COUNTS AND FILTERS OVER. One shape, defined in
+     lib/account-filters.ts, built identically here and on /sdr, so a chip
+     means the same thing on both screens.
 
-  /* LEAD STATUS (0028), a dropdown rather than another chip row: six options
-     on top of the seven tier chips and fourteen area chips would be a wall of
-     controls, and unlike those two this one is a single choice, not a set.
+     A WAYPOINT IS NOT AN ACCOUNT. Juan's own apartment was the entire "New to
+     activate (1)" bucket on 2026-08-05, reading as a sales lead nobody had
+     worked. It is left out of the counts rather than filed into a stage. */
+  const subjects = useMemo<FilterSubject[]>(
+    () =>
+      visibleAccounts
+        .filter((a) => a.lifecycle !== "waypoint")
+        .map((a) => ({
+          id: a.id,
+          area: a.area,
+          tier: a.tier,
+          readiness: a.readiness,
+          score: priorityById[a.id]?.score ?? null,
+          channel: a.channel,
+          leadStage: a.lead_stage,
+        })),
+    [visibleAccounts, priorityById],
+  );
 
-     Options are built from what is actually in the territory, not from the six
-     the property defines, so the menu never offers a status that would return
-     an empty map. Labels come from LEAD_STATUS_LABEL where known and fall
-     back to the raw value, so a seventh option added in HubSpot tomorrow shows
-     up as itself instead of disappearing. Counted the same way the chips are. */
-  const leadStatusOptions = useMemo(() => {
-    const c = new Map<string, number>();
-    for (const a of visibleAccounts) {
-      // A WAYPOINT HAS NO LEAD STATUS AND NEVER WILL. Juan's apartment was the
-      // entire "New to activate (1)" bucket on 2026-08-05, which read as a
-      // sales lead nobody had worked and was really just his front door. Its
-      // null is not a gap in the CRM, it is a category error, so it is left out
-      // of this filter rather than counted as an unworked account.
-      if (a.lifecycle === "waypoint") continue;
-      const key = a.lead_status ?? NO_LEAD_STATUS;
-      c.set(key, (c.get(key) ?? 0) + 1);
-    }
-    return [...c.entries()]
-      .sort((x, y) => y[1] - x[1])
-      .map(([value, count]) => ({
-        value,
-        count,
-        label: value === NO_LEAD_STATUS ? NO_LEAD_STATUS_LABEL : LEAD_STATUS_LABEL[value] ?? value,
-      }));
-  }, [visibleAccounts]);
+  const counts = useMemo(() => countSubjects(subjects), [subjects]);
 
-  // What the collapsed Filters button has to admit to hiding. Chains,
-  // practices and prospects are counted only when SHOWN, because hidden is
-  // their resting state and a badge that reads "2" on a map nobody has
-  // touched is noise.
-  const activeFilterCount =
-    activeAreas.size +
-    activeTiers.size +
-    activeLeadStatuses.size +
-    (showChains ? 1 : 0) +
-    (showPractices ? 1 : 0) +
-    (showProspects ? 1 : 0);
+  /* Every section narrows INDEPENDENTLY and combines with AND, and the rule
+     lives in matchesFilters(), not here. Picking "A" and "Palm Desert" and
+     "Dormant" asks for the A accounts in Palm Desert that stopped buying,
+     which is a question worth asking; making one section reset another would
+     make it unaskable. showChains/showPractices/showProspects are applied
+     above instead: OFF drops every matching pin regardless of any chip. */
+  const filtered = useMemo(
+    () =>
+      visibleAccounts.filter((a) =>
+        matchesFilters(filters, {
+          id: a.id,
+          area: a.area,
+          tier: a.tier,
+          readiness: a.readiness,
+          score: priorityById[a.id]?.score ?? null,
+          channel: a.channel,
+          leadStage: a.lead_stage,
+        }),
+      ),
+    [visibleAccounts, filters, priorityById],
+  );
 
-  const areaCounts = useMemo(() => {
-    const c: Record<string, number> = {};
-    for (const a of visibleAccounts) if (a.area) c[a.area] = (c[a.area] ?? 0) + 1;
-    return c;
-  }, [visibleAccounts]);
-
-  // How many each chip is currently hiding, for its own label. Not a
-  // tier/area chip because neither is exploratory the way those are: they
-  // are the semi-permanent classifications from exclude_chains.py (0024) and
+  // How many each hide-toggle is currently hiding, for its own label. Not a
+  // filter chip because neither is exploratory the way those are: they are
+  // the semi-permanent classifications from exclude_chains.py (0024) and
   // exclude_practices.py (0025), and these buttons are only the show/hide
   // half of it, not the tag itself.
   const chainExcludedCount = useMemo(
@@ -617,48 +581,24 @@ export function AccountsMap({
   // a stored classification, so it is not "semi-permanent" the way
   // chain_excluded/practice_excluded are, but the count-and-toggle pattern
   // is identical.
+  //
+  // NOT THE SAME THING as the Lead status "Prospect" chip, and the two are
+  // kept apart on purpose. This one is HubSpot's 'NEW' lead status with no
+  // company/tier behind it yet (0072); that one is "nobody has logged a
+  // touchpoint" (0073). An account can be either without being the other, so
+  // one lives in the Hidden group and the other in Lead status, each saying
+  // exactly what it is in its own tooltip.
   const prospectExcludedCount = useMemo(
     () => accounts.filter((a) => isProspect(a)).length,
     [accounts],
   );
 
-  /* Tier and area narrow INDEPENDENTLY and combine with AND. Picking "A" and
-     "San Diego" asks for the A accounts in San Diego, which is a question worth
-     asking; making one filter reset the other would make it unaskable. showChains
-     and showPractices are the last two: OFF drops every matching pin regardless
-     of tier or area, same as do_not_visit would if the map filtered it out
-     outright. */
-  const filtered = useMemo(
-    () =>
-      visibleAccounts.filter(
-        (a) =>
-          (activeTiers.size === 0 || (a.tier !== null && activeTiers.has(a.tier))) &&
-          (activeAreas.size === 0 || (a.area !== null && activeAreas.has(a.area))) &&
-          (activeLeadStatuses.size === 0 ||
-            activeLeadStatuses.has(a.lead_status ?? NO_LEAD_STATUS)),
-      ),
-    [visibleAccounts, activeTiers, activeAreas, activeLeadStatuses],
-  );
-
-  function toggleArea(id: string) {
+  /* Selecting a chip closes any open pin card: the card belongs to an account
+     the filter may have just removed from the map. */
+  const setFiltersAndClose = useCallback((next: AccountFilterState) => {
     setSelected(null);
-    setActiveAreas((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleTier(t: Tier) {
-    setSelected(null);
-    setActiveTiers((prev) => {
-      const next = new Set(prev);
-      if (next.has(t)) next.delete(t);
-      else next.add(t);
-      return next;
-    });
-  }
+    setFilters(next);
+  }, []);
 
   const [mapReady, setMapReady] = useState(false);
   const onLoad = useCallback((map: google.maps.Map) => {
@@ -725,21 +665,21 @@ export function AccountsMap({
    * which of the two it used, so the refinement is one more idle, not a
    * competing answer.
    */
-  const areaFitKey = useMemo(() => [...activeAreas].sort().join(","), [activeAreas]);
+  const areaFitKey = useMemo(() => [...filters.areas].sort().join(","), [filters.areas]);
 
   const fitToPins = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    if (activeAreas.size > 0) {
-      const havePolys = areas.some((a) => activeAreas.has(a.id) && (a.boundary ?? boundaries?.get(a.id)));
+    if (filters.areas.size > 0) {
+      const havePolys = areas.some((a) => filters.areas.has(a.id) && (a.boundary ?? boundaries?.get(a.id)));
       const key = `area:${areaFitKey}:${havePolys ? "frontier" : "pins"}`;
       if (fittedRef.current === key) return;
       const bounds = new google.maps.LatLngBounds();
       let points = 0;
       if (havePolys) {
         for (const a of areas) {
-          if (!activeAreas.has(a.id)) continue;
+          if (!filters.areas.has(a.id)) continue;
           const b = a.boundary ?? boundaries?.get(a.id) ?? null;
           if (!b) continue;
           for (const poly of b.coordinates) {
@@ -785,7 +725,7 @@ export function AccountsMap({
     for (const a of filtered) bounds.extend({ lat: a.lat, lng: a.lng });
     map.fitBounds(bounds, 48);
     fittedRef.current = fitKey;
-  }, [filtered, fitKey, routeStops, routeFitKey, routeStart, routeEnd, activeAreas, areaFitKey, areas, boundaries]);
+  }, [filtered, fitKey, routeStops, routeFitKey, routeStart, routeEnd, filters.areas, areaFitKey, areas, boundaries]);
 
   // A new filter, a change to the active day's route, a different set of areas
   // picked, or the frontier polygons finally landing: each means the previous
@@ -819,12 +759,12 @@ export function AccountsMap({
        area fit and quietly undo it. An area chip is an explicit instruction;
        "recentre on wherever he is standing" is a default, and a default never
        overwrites an instruction. */
-    if (!map || !userLoc || !mapReady || userCentredRef.current || routeStops.length > 0 || activeAreas.size > 0) return;
+    if (!map || !userLoc || !mapReady || userCentredRef.current || routeStops.length > 0 || filters.areas.size > 0) return;
     map.setCenter(userLoc);
     map.setZoom(12);
     fittedRef.current = fitKey;
     userCentredRef.current = true;
-  }, [userLoc, mapReady, fitKey, routeStops.length, activeAreas.size]);
+  }, [userLoc, mapReady, fitKey, routeStops.length, filters.areas.size]);
 
   /**
    * REFIT WHEN THE PANE CHANGES SHAPE (2026-08-26, with the two-pane layout).
@@ -870,7 +810,7 @@ export function AccountsMap({
      the account, and opens that account's InfoWindow exactly as a click on
      its pin would (the info card renders at the account's coordinates whether
      or not a tier/area filter currently hides its dot). Deliberately does not
-     touch activeTiers/activeAreas: clearing them would change `filtered`,
+     touch the filter chips: clearing them would change `filtered`,
      which changes fitKey, which would trip the fitKey effect above and refit
      the camera back out to every pin one tick after this one zoomed in. */
   useEffect(() => {
@@ -936,324 +876,143 @@ export function AccountsMap({
 
   return (
     <div ref={containerRef} className="flex h-full flex-col">
-      {/* THE FILTERS COLLAPSE BY DEFAULT (Juan, 2026-08-28), at every width.
-          These three chip rows are 14 areas + 7 grades + up to 5 lead
-          statuses: a wall of buttons nobody needs on screen just to read the
-          map. Filtering is a thing you do occasionally; the map is a thing
-          you read constantly. The summary line stays visible whether the
-          rows are open or not, so "112 of 253" and any active narrowing are
-          never hidden behind a tap: a filtered map that looks unfiltered is
-          how you conclude a territory is empty. */}
-      <div className="flex items-center justify-between gap-2 border-b border-[#E2DFD5] bg-white px-3 py-2">
-        <button
-          type="button"
-          onClick={() => setFiltersOpen((v) => !v)}
-          aria-expanded={filtersOpen}
-          className="inline-flex items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white px-2.5 py-1.5 text-[12.5px] font-medium text-[#3D4A44]"
-        >
-          <Ico name={filtersOpen ? "chevron-up" : "chevron-down"} size={13} />
-          Filters
-          {activeFilterCount > 0 && (
-            <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#14201B] px-1 text-[10.5px] font-semibold tabular-nums text-[#F7F6F1]">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
-        <span className="text-[12px] tabular-nums text-[#8A928C]">
-          {filtered.length} of {accounts.length}
-        </span>
-      </div>
-
-      <div className={filtersOpen ? "contents" : "hidden"}>
-      {/* Area filter. Each chip carries its area's colour, and that same colour fills
-          the area's frontier on the map, so the control and the region it controls are
-          visibly one thing. */}
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-[#E2DFD5] bg-white px-3 py-2">
-        {areas.map((a) => {
-          const active = activeAreas.has(a.id);
-          return (
-            <button
-              key={a.id}
-              type="button"
-              onClick={() => toggleArea(a.id)}
-              aria-pressed={active}
-              title={a.brief ?? undefined}
-              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] transition-colors ${
-                active ? "text-[#F7F6F1]" : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
-              }`}
-              style={active ? { background: a.color, borderColor: a.color } : undefined}
-            >
-              <span
-                aria-hidden
-                className="h-2 w-2 shrink-0 rounded-full"
-                style={{ background: active ? "#F7F6F1" : a.color }}
-              />
-              {a.label}
-              <span className={`tabular-nums ${active ? "opacity-70" : "text-[#8A928C]"}`}>
-                {areaCounts[a.id] ?? 0}
+      {/* THE FILTER BAR, five labelled sections, the SAME component /sdr
+          renders (lib/filter-bar.tsx). Juan, 2026-09-09: "map filters (for map
+          and SDR, they should be same). they need to be divided by section."
+          Everything about what a chip means lives in lib/account-filters.ts;
+          this screen supplies the accounts, the priority scores, and the three
+          map-side hide toggles, and draws the pins behind it. */}
+      <AccountFilterBar
+        value={filters}
+        onChange={setFiltersAndClose}
+        counts={counts}
+        areas={areas}
+        summary={`${filtered.length} of ${accounts.length}`}
+        open={filtersOpen}
+        onToggleOpen={() => setFiltersOpen((v) => !v)}
+        hideToggles={[
+          ...(chainExcludedCount > 0
+            ? [{
+                key: "chains",
+                count: chainExcludedCount,
+                shown: showChains,
+                onToggle: onToggleShowChains,
+                shownLabel: "Chains shown",
+                hiddenLabel: "Chains",
+                icon: "accounts",
+                title: showChains
+                  ? "Hide the big national chains again"
+                  : `${chainExcludedCount} big-chain account(s) hidden (Whole Foods, Sprouts, Trader Joe's, CVS/Walgreens, Target)`,
+              }]
+            : []),
+          ...(practiceExcludedCount > 0
+            ? [{
+                key: "practices",
+                count: practiceExcludedCount,
+                shown: showPractices,
+                onToggle: onToggleShowPractices,
+                shownLabel: "Practices shown",
+                hiddenLabel: "Practices",
+                icon: "review",
+                title: showPractices
+                  ? "Hide single-practitioner offices again"
+                  : `${practiceExcludedCount} private-practice account(s) hidden (chiropractors, MDs, NDs, L.Ac.s, ...)`,
+              }]
+            : []),
+          ...(prospectExcludedCount > 0
+            ? [{
+                key: "prospects",
+                count: prospectExcludedCount,
+                shown: showProspects,
+                onToggle: onToggleShowProspects,
+                shownLabel: "New leads shown",
+                hiddenLabel: "New leads",
+                dot: PROSPECT_COLOR,
+                title: showProspects
+                  ? "Hide unworked 'New to open' leads again"
+                  : `${prospectExcludedCount} account(s) hidden: HubSpot lead status 'NEW' with no company or grade behind them yet (migration 0072). Not the same as the Lead status 'Prospect' chip, which means no touchpoint has been logged.`,
+              }]
+            : []),
+        ]}
+        trailing={
+          /* MAP DISPLAY, not filters. These two draw things on the map rather
+             than narrowing what is on it, which is why they sit in their own
+             row under the five sections instead of inside one of them. Neither
+             exists on /sdr, so neither is in the shared component. */
+          (routeStops.length > 0 || areas.length > 0 || chainSegments.length > 0) && (
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1.5 border-b border-[#E2DFD5] bg-white px-3 py-2">
+              <span className="mt-1 w-[86px] shrink-0 text-[11px] font-medium uppercase tracking-[0.06em] text-[#8A928C]">
+                Map
               </span>
-            </button>
-          );
-        })}
-        {activeAreas.size > 0 && (
-          <button
-            type="button"
-            onClick={() => setActiveAreas(new Set())}
-            className="rounded-md px-2 py-1 text-[12.5px] text-[#8A928C] underline-offset-2 hover:text-[#3D4A44] hover:underline"
-          >
-            clear
-          </button>
-        )}
-      </div>
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                {/* Only offered once there is a route to chain -- two straight
+                    lines to nowhere is not a control worth showing. */}
+                {routeStops.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowRouteChain((v) => !v)}
+                    aria-pressed={showRouteChain}
+                    title={
+                      showRouteChain
+                        ? "Hide the route line and stop numbers"
+                        : "Draw straight lines between the route stops, in order, numbered"
+                    }
+                    className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
+                      showRouteChain
+                        ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
+                        : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
+                    }`}
+                  >
+                    <Ico name="route" size={12} />
+                    {showRouteChain ? "Route line on" : "Route line"}{" "}
+                    <span className="tabular-nums opacity-70">{routeStops.length}</span>
+                  </button>
+                )}
+                {areas.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAreas((v) => !v)}
+                    aria-pressed={showAreas}
+                    title={
+                      showAreas
+                        ? "Hide the coloured area boundaries"
+                        : "Shade each territory area in its own colour, the same colour as its chip above"
+                    }
+                    className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
+                      showAreas
+                        ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
+                        : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
+                    }`}
+                  >
+                    <Ico name="pin" size={12} />
+                    {showAreas ? "Areas on" : "Areas off"}{" "}
+                    <span className="tabular-nums opacity-70">{areas.length}</span>
+                  </button>
+                )}
+                {/* THE KEY TO THE BANDS. Four colours mean nothing without it,
+                    and the one that matters most, walkable, is the one nobody
+                    would guess. Only rendered when there are bands on screen to
+                    explain: a legend for a line that is not drawn is chrome. */}
+                {chainSegments.length > 0 && (
+                  <span className="flex items-center gap-2.5 text-[11.5px] text-[#8A928C]">
+                    {(["walk", "near", "far", "haul"] as const).map((band) => (
+                      <span key={band} className="inline-flex items-center gap-1" title={BAND_STYLE[band].title}>
+                        <span
+                          aria-hidden
+                          className="inline-block h-2 w-2 rounded-full ring-1 ring-[#14201B]/40"
+                          style={{ backgroundColor: BAND_STYLE[band].color }}
+                        />
+                        {band === "walk" ? "walk" : band === "near" ? "25m" : band === "far" ? "45m" : "45m+"}
+                      </span>
+                    ))}
+                  </span>
+                )}
+              </div>
+            </div>
+          )
+        }
+      />
 
-      {/* HQ POTENTIAL filter, multi-select. Empty selection means unfiltered
-          rather than empty, so clicking a letter narrows and clicking it again
-          widens back out -- there is no separate "all" button to hunt for.
-
-          LABELLED, since 2026-08-02. These letters are nb_accounts.potential_hq
-          (A-G, mirrored from HubSpot's potential__cloned_), NOT the A-D OS tier
-          the Clients table and the week plan rank by. Unlabelled they read as one
-          number that contradicts itself: 214 of the 273 accounts carry a different
-          letter on each scale, by design. See TierChip in lib/ui.tsx. */}
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-[#E2DFD5] bg-white px-3 py-2">
-        <span
-          className="mr-0.5 text-[12px] text-[#8A928C]"
-          title="HubSpot's own potential grade (potential__cloned_, A-G). HQ owns it; the OS mirrors it. Not the A-D OS tier."
-        >
-          HQ potential
-        </span>
-        {TIERS.map((t) => {
-          const active = activeTiers.has(t);
-          const dot = POTENTIAL_COLOR[t];
-          return (
-            <button
-              key={t}
-              type="button"
-              onClick={() => toggleTier(t)}
-              aria-pressed={active}
-              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
-                active
-                  ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
-                  : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
-              }`}
-            >
-              {/* The chip wears the same dot its pins wear, so the legend and
-                  the control are one thing. Gradeless letters get no dot. */}
-              {dot && (
-                <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: dot }} />
-              )}
-              {t} <span className="tabular-nums opacity-70">{tierCounts[t]}</span>
-            </button>
-          );
-        })}
-        {activeTiers.size > 0 && (
-          <button
-            type="button"
-            onClick={() => setActiveTiers(new Set())}
-            className="rounded-md px-2 py-1 text-[12.5px] text-[#8A928C] underline-offset-2 hover:text-[#3D4A44] hover:underline"
-          >
-            clear
-          </button>
-        )}
-
-        {/* THE CHAINS BUTTON. Juan's ask 2026-08-04: the big national chains
-            (Whole Foods, Sprouts, Trader Joe's, CVS/Walgreens, Target)
-            crowd out the independent stores this territory is actually
-            built on, so they are hidden by default. This chip is only the
-            undo, and it is semi-permanent same as the hide: the click
-            persists to nb_ui_prefs (migration 0024) so it survives a
-            reload and follows Juan to his other device, it does not just
-            flip a local filter back for this page view. */}
-        {chainExcludedCount > 0 && (
-          <button
-            type="button"
-            onClick={onToggleShowChains}
-            aria-pressed={showChains}
-            title={
-              showChains
-                ? "Hide the big national chains again"
-                : `${chainExcludedCount} big-chain account(s) hidden (Whole Foods, Sprouts, Trader Joe's, CVS/Walgreens, Target)`
-            }
-            className={`ml-1 inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
-              showChains
-                ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
-                : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
-            }`}
-          >
-            <Ico name="accounts" size={12} />
-            {showChains ? "Chains shown" : "Chains hidden"}{" "}
-            <span className="tabular-nums opacity-70">{chainExcludedCount}</span>
-          </button>
-        )}
-        {/* THE PRACTICES BUTTON, same shape and same day as the chains one.
-            Juan's ask: single-practitioner offices (a chiropractor, an M.D.,
-            an N.D., an L.Ac.) are not a store either, and channel = 'clinic'
-            is already how the enrichment pipeline tells them apart from one
-            (see 0025). Same persistence, same nb_ui_prefs row, independent
-            of the chains toggle: showing chains back does not also show
-            practices, and vice versa. */}
-        {practiceExcludedCount > 0 && (
-          <button
-            type="button"
-            onClick={onToggleShowPractices}
-            aria-pressed={showPractices}
-            title={
-              showPractices
-                ? "Hide single-practitioner offices again"
-                : `${practiceExcludedCount} private-practice account(s) hidden (chiropractors, MDs, NDs, L.Ac.s, ...)`
-            }
-            className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
-              showPractices
-                ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
-                : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
-            }`}
-          >
-            <Ico name="review" size={12} />
-            {showPractices ? "Practices shown" : "Practices hidden"}{" "}
-            <span className="tabular-nums opacity-70">{practiceExcludedCount}</span>
-          </button>
-        )}
-        {/* THE PROSPECTS BUTTON (0072, Juan's ask 2026-09-09). Unworked
-            lead_status = 'NEW' accounts with no HubSpot company/tier yet are
-            hidden by default, same shape as chains/practices: this chip is
-            the undo, semi-permanent (nb_ui_prefs, migration 0072) so it
-            survives a reload and follows Juan to his other device. Its dot
-            wears the same blue the pins wear while hidden, so the legend and
-            the control are one thing, same convention as the tier chips. */}
-        {prospectExcludedCount > 0 && (
-          <button
-            type="button"
-            onClick={onToggleShowProspects}
-            aria-pressed={showProspects}
-            title={
-              showProspects
-                ? "Hide Prospects again"
-                : `${prospectExcludedCount} Prospect account(s) hidden (unworked, no HubSpot company/tier yet)`
-            }
-            className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
-              showProspects
-                ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
-                : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
-            }`}
-          >
-            <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: PROSPECT_COLOR }} />
-            {showProspects ? "Prospects shown" : "Prospects hidden"}{" "}
-            <span className="tabular-nums opacity-70">{prospectExcludedCount}</span>
-          </button>
-        )}
-        {/* THE CHAIN TOGGLE. Only offered once there is a route to chain --
-            two straight lines to nowhere is not a control worth showing on an
-            empty map. */}
-        {routeStops.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setShowRouteChain((v) => !v)}
-            aria-pressed={showRouteChain}
-            title={
-              showRouteChain
-                ? "Hide the route line and stop numbers"
-                : "Draw straight lines between the route stops, in order, numbered"
-            }
-            className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
-              showRouteChain
-                ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
-                : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
-            }`}
-          >
-            <Ico name="route" size={12} />
-            {showRouteChain ? "Route line on" : "Route line"}{" "}
-            <span className="tabular-nums opacity-70">{routeStops.length}</span>
-          </button>
-        )}
-        {/* THE AREAS OVERLAY TOGGLE (Juan, 2026-09-09). Same row, same shape
-            and same interaction as Route line: on or off, no persistence, no
-            second meaning. The count is how many areas would be painted, so
-            the button says what it is about to do before it is pressed. */}
-        {areas.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setShowAreas((v) => !v)}
-            aria-pressed={showAreas}
-            title={
-              showAreas
-                ? "Hide the coloured area boundaries"
-                : "Shade each territory area in its own colour, the same colour as its chip above"
-            }
-            className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
-              showAreas
-                ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
-                : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
-            }`}
-          >
-            <Ico name="pin" size={12} />
-            {showAreas ? "Areas on" : "Areas off"}{" "}
-            <span className="tabular-nums opacity-70">{areas.length}</span>
-          </button>
-        )}
-        {/* THE KEY TO THE BANDS. Four colours mean nothing without it, and the
-            one that matters most, walkable, is the one nobody would guess. Only
-            rendered when there are bands on screen to explain: a legend for a
-            line that is not drawn is chrome. */}
-        {chainSegments.length > 0 && (
-          <span className="flex items-center gap-2.5 text-[11.5px] text-[#8A928C]">
-            {(["walk", "near", "far", "haul"] as const).map((band) => (
-              <span key={band} className="inline-flex items-center gap-1" title={BAND_STYLE[band].title}>
-                <span
-                  aria-hidden
-                  className="inline-block h-2 w-2 rounded-full ring-1 ring-[#14201B]/40"
-                  style={{ backgroundColor: BAND_STYLE[band].color }}
-                />
-                {band === "walk" ? "walk" : band === "near" ? "25m" : band === "far" ? "45m" : "45m+"}
-              </span>
-            ))}
-          </span>
-        )}
-      </div>
-
-      {/* LEAD STATUS, Juan's ask 2026-08-05, chips rather than the dropdown it
-          shipped as earlier that day. Same grammar as the potential row above:
-          multi-select, empty means unfiltered, click again to widen.
-
-          Options are built from what is actually in the territory rather than
-          from the six the property defines, so a chip never offers a status
-          that would empty the map. "New to activate" is the null bucket, not a
-          HubSpot value: see NO_LEAD_STATUS_LABEL. */}
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-[#E2DFD5] bg-white px-3 py-2">
-        <span
-          className="mr-0.5 text-[12px] text-[#8A928C]"
-          title="HubSpot's Lead Status (hs_lead_status). HQ owns it; the OS mirrors it, pull-only."
-        >
-          Lead status
-        </span>
-        {leadStatusOptions.map((o) => {
-          const active = activeLeadStatuses.has(o.value);
-          return (
-            <button
-              key={o.value}
-              type="button"
-              onClick={() => toggleLeadStatus(o.value)}
-              aria-pressed={active}
-              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
-                active
-                  ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
-                  : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
-              }`}
-            >
-              {o.label} <span className="tabular-nums opacity-70">{o.count}</span>
-            </button>
-          );
-        })}
-        {activeLeadStatuses.size > 0 && (
-          <button
-            type="button"
-            onClick={() => setActiveLeadStatuses(new Set())}
-            className="rounded-md px-2 py-1 text-[12.5px] text-[#8A928C] underline-offset-2 hover:text-[#3D4A44] hover:underline"
-          >
-            clear
-          </button>
-        )}
-      </div>
-      </div>
 
       <div className="min-h-0 flex-1">
         <GoogleMap
