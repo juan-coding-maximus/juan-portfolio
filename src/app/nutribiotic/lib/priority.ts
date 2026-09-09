@@ -28,9 +28,19 @@
  * PriorityResult, assembled from the same values that produced the number, so
  * there is no code path that can render a score without one.
  *
- * A NULL SCORE IS NOT A ZERO. Same rule 0035 wrote down for urgency: an
- * account none of whose inputs are known scores `null` and sorts last, rather
- * than being laundered into "we looked and it is worth nothing".
+ * NO INFO IS A SCORE OF 50, NOT A ZERO (Juan, 2026-09-08, superseding this
+ * file's original "null sorts last" stance for the true no-data case). An
+ * account none of whose inputs are known used to score `null`; now it scores
+ * a flat, neutral 50, since he reads unmeasured as neutral, not as worst in
+ * the book. `score` can therefore still technically be `null` in the type
+ * (the field predates this change and a defensive `null` branch stays below),
+ * but `computePriority` no longer produces one for this case. Three real,
+ * measured facts still override the arithmetic outright, each stated as its
+ * own clause rather than folded silently into the number: a hard suppressor
+ * (closed / do-not-visit / Places-closed) caps the score at 10; a client of
+ * 2+ years with under $300 lifetime is classified E for this score only and
+ * capped below 50; and a Mother's Market location is floored at 78 regardless
+ * of its own order history, a named business call, not a measurement.
  *
  * INPUTS, and where each one really comes from:
  *
@@ -39,6 +49,8 @@
  *                                                over the last 12 months
  *              nb_accounts.lifetime_revenue      ERP TOTAL_SALES, via
  *                                                normalize_xlsx.py -> promote_import.py
+ *              nb_accounts.first_order_at        ERP first invoice date, tenure for
+ *                                                the long-tenure/no-revenue rule only
  *              nb_accounts.potential_hq          HQ's own A-G capacity grade,
  *                                                mirrored from HubSpot
  *                                                (potential__cloned_), surfaced
@@ -82,6 +94,9 @@ export type PriorityInput = {
   tier: string | null;
   trailing_12m_revenue: number | null;
   lifetime_revenue: number | null;
+  /** ERP first invoice date. Used only for the long-tenure-low-revenue rule
+   *  below; nowhere else needed a tenure figure. */
+  first_order_at: string | null;
   last_order_at: string | null;
   expected_reorder_days: number | null;
   places_status?: string | null;
@@ -184,6 +199,26 @@ export function computePriority(rows: PriorityInput[], nowMs = Date.now()): Map<
     else if (r.do_not_visit) suppressed = "do not visit";
     else if (r.places_status === "CLOSED_PERMANENTLY" && !boughtRecently) suppressed = "Places says closed permanently";
 
+    /*
+     * LONG-TENURE, NO REVENUE (Juan, 2026-09-08). An account that has been a
+     * client for more than two years and never crossed $300 lifetime is not
+     * an unmeasured account, it is a measured one that answered "no". HQ's own
+     * A-G grade is pulled from HubSpot and this department never overwrites
+     * it there (see PriorityInput.tier's own comment), so this forces the
+     * grade used IN THIS SCORE ONLY to "E", the same way `suppressed` already
+     * overrides a component without touching the stored column, and puts a
+     * hard ceiling under the final score so a stale confidence-boosting HQ
+     * letter grade elsewhere cannot buy it back above 50.
+     */
+    const tenureDays = daysBetween(r.first_order_at, nowMs);
+    const deadWeight =
+      !suppressed &&
+      typeof r.lifetime_revenue === "number" &&
+      r.lifetime_revenue < 300 &&
+      tenureDays !== null &&
+      tenureDays > 730;
+    const effectiveTier = deadWeight ? "E" : r.tier;
+
     // ---------------------------------------------------------------- revenue
     const revSubs: number[] = [];
     if (typeof r.trailing_12m_revenue === "number" && r.trailing_12m_revenue > 0) {
@@ -193,11 +228,25 @@ export function computePriority(rows: PriorityInput[], nowMs = Date.now()): Map<
       revSubs.push(percentile(life, r.lifetime_revenue));
       clauses.push(`${usd(r.lifetime_revenue)} lifetime`);
     }
-    if (r.tier && r.tier in GRADE_SCALE) {
-      revSubs.push(GRADE_SCALE[r.tier]);
-      clauses.push(`HQ potential ${r.tier}`);
+    if (effectiveTier && effectiveTier in GRADE_SCALE) {
+      revSubs.push(GRADE_SCALE[effectiveTier]);
+      clauses.push(
+        deadWeight
+          ? `under $300 in ${Math.floor((tenureDays as number) / 365)}y as a client, classified E`
+          : `HQ potential ${effectiveTier}`,
+      );
     }
     const revenue = revSubs.length ? revSubs.reduce((a, b) => a + b, 0) / revSubs.length : null;
+
+    /*
+     * NAMED CHAINS (Juan, 2026-09-08): "Mother's Market" locations are a
+     * strategic account regardless of what this store's own order history
+     * says yet. This is a stated business call, not a measurement, so it
+     * shows up as its own clause and floors the score rather than silently
+     * replacing a real number, the same transparency rule 0035 set for
+     * urgency and this file already applies to `suppressed`.
+     */
+    const isMothersMarket = /mother'?s market/i.test(r.name);
 
     // ------------------------------------------------------------- engagement
     const engSubs: number[] = [];
@@ -265,8 +314,29 @@ export function computePriority(rows: PriorityInput[], nowMs = Date.now()): Map<
     const known = pairs.filter(([v]) => v !== null) as [number, number][];
     const totalW = PRIORITY_WEIGHTS.revenue + PRIORITY_WEIGHTS.engagement + PRIORITY_WEIGHTS.viability;
     const knownW = known.reduce((a, [, w]) => a + w, 0);
-    let score: number | null = knownW > 0 ? Math.round((known.reduce((a, [v, w]) => a + v * w, 0) / knownW) * 100) : null;
+    /*
+     * NO INFO IS A SCORE OF 50 (Juan, 2026-09-08, overriding this file's
+     * original "null sorts last" rule for the true no-data case only). An
+     * account with not one measured input used to score null and sort last;
+     * Juan's call is that "unmeasured" reads as neutral, not as bottom of the
+     * book, so it lands exactly on the midpoint instead. `band` still needs
+     * to know this happened (see below), so `noInfo` is kept, not inferred
+     * back from `score === 50`, a real 50 computed from real inputs is a
+     * different fact than a default one.
+     */
+    const noInfo = knownW === 0;
+    let score: number | null = noInfo ? 50 : Math.round((known.reduce((a, [v, w]) => a + v * w, 0) / knownW) * 100);
     if (suppressed && score !== null) score = Math.min(score, 10);
+    // A history of under $300 across 2+ years is a measured fact, not a gap,
+    // and it caps the score below the "soon" band regardless of what else
+    // fed into it (Juan, 2026-09-08).
+    if (deadWeight && score !== null) score = Math.min(score, 49);
+    // Named-chain floor, applied last so a real suppressor still wins over it
+    // (a closed Mother's Market is closed, not merely deprioritized).
+    if (isMothersMarket && !suppressed && score !== null) {
+      score = Math.max(score, 78);
+      clauses.push("Mother's Market, flagged high priority");
+    }
 
     const inputsKnown = known.length;
     /*
@@ -289,14 +359,15 @@ export function computePriority(rows: PriorityInput[], nowMs = Date.now()): Map<
     let reason: string;
     if (suppressed) {
       reason = `${suppressed}${clauses.length ? ` · ${clauses.join(" · ")}` : ""}`;
-    } else if (score === null) {
+    } else if (noInfo) {
       // Not prose about nothing: it names which columns are empty, so the fix
-      // is obvious (run the enricher, load the orders).
-      reason = "no revenue, engagement or lifecycle data on file yet";
+      // is obvious (run the enricher, load the orders), and says plainly that
+      // 50 is a default, not a measurement.
+      reason = "no revenue, engagement or lifecycle data on file yet, scored neutral at 50";
     } else {
       reason = clauses.join(" · ");
     }
-    if (score !== null && confidence < 0.6) {
+    if (!noInfo && confidence < 0.6) {
       reason += ` · scored on ${revSubs.length + engSubs.length + viaSubs.length} of 6 inputs`;
     }
 

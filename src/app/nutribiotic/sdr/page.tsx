@@ -7,7 +7,6 @@
 
 import { getAccountCallCards, getPriorityBook, isConfigured, listSdrSchedule, todayStartLA } from "../lib/dal";
 import { PageHead, Empty } from "../lib/ui";
-import { PriorityPanel } from "../lib/priority-ui";
 import { SdrScreen, type SdrDayItem } from "../lib/sdr-ui";
 
 export const dynamic = "force-dynamic";
@@ -73,10 +72,6 @@ export default async function SdrPage({
   return (
     <>
       <PageHead title="SDR" />
-      {/* Same component as Map and Outbound: the ranked book sits above the
-          day rail, so picking tomorrow's calls does not mean opening another
-          screen to find out which accounts are worth the dial. */}
-      <PriorityPanel book={priority} surface="sdr" limit={8} />
       <SdrScreen
         initialItems={items}
         todayIso={todayIso}
@@ -84,6 +79,11 @@ export default async function SdrPage({
         focusAccountId={focusAccountId}
         focusAccountName={focusAccountId ? (cards[focusAccountId]?.name ?? null) : null}
         focusAccountPhone={focusAccountId ? (cards[focusAccountId]?.phone ?? null) : null}
+        // Plain array, not the book: PriorityBook.byId is a Map, which cannot
+        // cross into this client component. See priority-ui.tsx's
+        // TopOpportunities for where this lands, the SDR page's own right
+        // rail (Juan, 2026-09-08: "right is all time best").
+        topRanked={priority.ranked}
       />
     </>
   );

@@ -137,3 +137,57 @@ export function PriorityPanel({
     </section>
   );
 }
+
+/**
+ * The SDR page's right rail, 2026-09-08: "all time best" beside "SDR work to
+ * do" (the day rail) and whichever account is centered in the panel. Narrower
+ * than PriorityPanel's rows (no evidence sentence, no action button, just
+ * rank/score/name), because this is a scan-and-pick list of up to 100, not a
+ * short prescriptive one, and it needs to fit beside two other columns.
+ *
+ * EVERY ROW OPENS IN THE SDR QUEUE (Juan, 2026-09-08), not a read-only
+ * account popup: `/nutribiotic/sdr?account=<id>` is the same deep link
+ * PriorityPanel's action button already uses, and SdrScreen already knows
+ * how to open that account in the center panel whether or not it has a row
+ * scheduled (see sdr-ui.tsx's `focusAccountId`).
+ */
+export function TopOpportunities({
+  ranked,
+  limit = 100,
+}: {
+  /** `PriorityBook.ranked` itself, NOT the book: `PriorityBook.byId` is a
+   *  `Map`, which cannot cross the server/client prop boundary, and this
+   *  component is rendered from sdr-ui.tsx's client-side SdrScreen so it
+   *  can sit in the same row as the (client-state-driven) day rail and
+   *  account panel. `ranked` is a plain array, serializes fine. */
+  ranked: PriorityBook["ranked"];
+  limit?: number;
+}) {
+  const rows = ranked.slice(0, limit);
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="w-full lg:w-[220px] lg:shrink-0">
+      <div className="mb-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#5B6560]">Top Opportunities</div>
+      <div className="max-h-[600px] overflow-y-auto rounded-lg border border-[#E2DFD5] bg-white">
+        <ul className="flex flex-col">
+          {rows.map(({ account, result }) => (
+            <li key={account.id} className="border-b border-[#F0EEE6] last:border-b-0">
+              <Link
+                href={`/nutribiotic/sdr?account=${account.id}`}
+                className="flex items-center gap-2 px-2.5 py-2 hover:bg-[#FAF9F5]"
+              >
+                <span
+                  className={`w-7 shrink-0 rounded px-1 py-0.5 text-center text-[10.5px] font-medium tabular-nums ${BAND_CLASS[result.band]}`}
+                >
+                  {result.score}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[#14201B]">{account.name}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}

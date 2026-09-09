@@ -25,7 +25,9 @@ import {
   type SdrAccountPanel,
   type SdrSearchHit,
 } from "./sdr-actions";
+import type { PriorityBook } from "./dal";
 import type { SdrScheduleItem } from "./dal";
+import { TopOpportunities } from "./priority-ui";
 import { TouchpointCapture } from "./touchpoint-ui";
 import type { FiledTouchpoint } from "./touchpoint-ui";
 import { Ico, HUBSPOT_COMPANY_URL, daysAgo, fullAddress, googleMapsUrl } from "./ui";
@@ -709,6 +711,7 @@ export function SdrScreen({
   focusAccountId,
   focusAccountName,
   focusAccountPhone,
+  topRanked,
 }: {
   initialItems: SdrDayItem[];
   todayIso: string;
@@ -721,6 +724,11 @@ export function SdrScreen({
   focusAccountId?: string | null;
   focusAccountName?: string | null;
   focusAccountPhone?: string | null;
+  /** PriorityBook.ranked, plain array (see priority-ui.tsx's TopOpportunities
+   *  for why it's this and not the book itself). Optional only so this
+   *  component doesn't hard-fail if a caller ever renders it without a
+   *  priority book computed; the SDR page always passes it. */
+  topRanked?: PriorityBook["ranked"];
 }) {
   const [items, setItems] = useState(initialItems);
   const [active, setActive] = useState<SdrDayItem | null>(null);
@@ -894,6 +902,10 @@ export function SdrScreen({
           </div>
         )}
       </div>
+
+      {/* Left is SDR work to do, center is the selected account, right is
+          all-time best (Juan, 2026-09-08). */}
+      {topRanked && topRanked.length > 0 && <TopOpportunities ranked={topRanked} />}
       </div>
     </div>
   );

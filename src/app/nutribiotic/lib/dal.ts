@@ -1794,13 +1794,14 @@ export async function getPriorityBook(): Promise<PriorityBook> {
       phone: string | null;
       trailing_12m_revenue: number | null;
       lifetime_revenue: number | null;
+      first_order_at: string | null;
       last_order_at: string | null;
       expected_reorder_days: number | null;
       places_status: string | null;
       closed_at: string | null;
       do_not_visit: boolean | null;
     }>(
-      "nb_accounts?select=id,name,lifecycle,phone,trailing_12m_revenue,lifetime_revenue,last_order_at," +
+      "nb_accounts?select=id,name,lifecycle,phone,trailing_12m_revenue,lifetime_revenue,first_order_at,last_order_at," +
         `expected_reorder_days,places_status,closed_at,do_not_visit&hubspot_owner_id=eq.${JUAN_OWNER_ID}` +
         // Same scope every other surface uses: not the waypoint (Juan's own
         // apartment is not an account), and not a closed one. A closed store
