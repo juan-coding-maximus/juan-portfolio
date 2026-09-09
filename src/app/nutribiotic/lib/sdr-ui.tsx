@@ -677,13 +677,21 @@ function ScheduleRow({
 }
 
 /** One labeled fact. Empty/null stays out entirely, HARD RULE 1: a blank
- * field is never shown as a dash or a guess, it just isn't a row. */
-function Fact({ label, value }: { label: string; value: string | null }) {
+ * field is never shown as a dash or a guess, it just isn't a row. `href`
+ * makes the value itself a clickable new-tab link (the website field, so
+ * Juan doesn't have to scroll down to "Open website" to open it). */
+function Fact({ label, value, href }: { label: string; value: string | null; href?: string }) {
   if (!value) return null;
   return (
     <div className="flex items-baseline gap-1.5 text-[13px]">
       <span className="text-[#8A928C]">{label}</span>
-      <span className="text-[#3D4A44]">{value}</span>
+      {href ? (
+        <a href={href} target="_blank" rel="noopener noreferrer" className="text-[#3D6B4A] hover:underline">
+          {value}
+        </a>
+      ) : (
+        <span className="text-[#3D4A44]">{value}</span>
+      )}
     </div>
   );
 }
@@ -743,7 +751,11 @@ function AccountPanel({ item, onFiled }: { item: SdrDayItem; onFiled: (r: FiledT
         {panel && (
           <>
             <div className="mt-3 flex flex-col gap-1.5">
-              <Fact label="Website" value={panel.website} />
+              <Fact
+                label="Website"
+                value={panel.website}
+                href={panel.website ? (panel.website.startsWith("http") ? panel.website : `https://${panel.website}`) : undefined}
+              />
               <Fact label="Address" value={address} />
               <Fact label="Status" value={panel.lifecycle} />
               <Fact label="Potential" value={panel.potentialJuan} />
@@ -932,6 +944,21 @@ export function SdrScreen({
   const [items, setItems] = useState(initialItems);
   const [active, setActive] = useState<SdrDayItem | null>(null);
 
+  /* Area filter, same convention as the map's chips (AccountsMap.tsx):
+     empty set is unfiltered, multi-select, AND'd against the day. Juan's ask,
+     2026-09-09: the queue can span 14 territories at once and he wants to
+     narrow to the ones he's actually driving to today before picking a call. */
+  const [activeAreas, setActiveAreas] = useState<Set<string>>(new Set());
+
+  function toggleArea(id: string) {
+    setActiveAreas((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   /* Opening on a deep-linked account when it has no scheduled row means
      showing AccountPanel for something nb_sdr_schedule does not contain. The
      stand-in exists only in this component's state and is never written: it
@@ -1055,6 +1082,42 @@ export function SdrScreen({
     <div className="flex flex-col gap-4">
       <GlobalSearch todayIso={todayIso} onView={viewHit} onAdded={addItem} />
 
+      {/* Area filter, same chips as the map: each carries its area's colour,
+          picking one narrows every day column to it and hides the noise from
+          territories Juan isn't calling into right now. Empty = unfiltered. */}
+      {areas.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {areas.map((a) => {
+            const on = activeAreas.has(a.id);
+            return (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => toggleArea(a.id)}
+                aria-pressed={on}
+                className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] transition-colors ${
+                  on ? "text-[#F7F6F1]" : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
+                }`}
+                style={on ? { background: a.color, borderColor: a.color } : undefined}
+              >
+                <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: on ? "#F7F6F1" : a.color }} />
+                {a.label}
+                <span className={`tabular-nums ${on ? "opacity-70" : "text-[#8A928C]"}`}>{a.prospects}</span>
+              </button>
+            );
+          })}
+          {activeAreas.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setActiveAreas(new Set())}
+              className="rounded-md px-2 py-1 text-[12.5px] text-[#8A928C] underline-offset-2 hover:text-[#3D4A44] hover:underline"
+            >
+              clear
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
       {/* The queue, 2026-09-08 redesign: this used to be the main view (a
           grid of day columns) with a generic capture box off to the side.
@@ -1065,6 +1128,10 @@ export function SdrScreen({
         {dayIsos.map((iso) => {
           const dayItems = items
             .filter((it) => it.scheduled_date === iso)
+            // Same rule as the map: empty selection is unfiltered; a picked
+            // area hides everything else, including rows with no area at all
+            // (a cold prospect can't be "in" the area Juan just chose).
+            .filter((it) => activeAreas.size === 0 || (it.area !== null && activeAreas.has(it.area)))
             // Pending first, so a fresh Today never buries an open call under
             // yesterday's already-done rows carried in the same fetch window.
             // Then by priority INSIDE the pending block (2026-09-08): the old
