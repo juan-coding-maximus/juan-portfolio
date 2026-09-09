@@ -93,6 +93,7 @@ type KindOption = (typeof KIND_OPTIONS)[number]["value"];
 export function TouchpointCapture({
   accountIdHint,
   onFiled,
+  lockKind,
 }: {
   accountIdHint?: string | null;
   /** Fires once, right after a clean file (matched, no follow-up needed).
@@ -101,10 +102,16 @@ export function TouchpointCapture({
    * its own planning row done without keeping a second opinion about what
    * happened (see lib/dal.ts's setSdrScheduleStatus). */
   onFiled?: (result: FiledTouchpoint) => void;
+  /** SDR's account panel, 2026-09-08: this box only ever logs a call there,
+   * so the Meeting/Email/Field note choice (a real choice on /visit, where
+   * Juan could be doing any of them) is just noise to hide, not disable. When
+   * set, the kind selector never renders and every submit sends this kind,
+   * touched or not. */
+  lockKind?: KindOption;
 }) {
   const router = useRouter();
   const [text, setText] = useState("");
-  const [kind, setKind] = useState<KindOption>("meeting");
+  const [kind, setKind] = useState<KindOption>(lockKind ?? "meeting");
   // WHETHER HE ACTUALLY PICKED, as opposed to leaving the default sitting there.
   // This toggle used to send its value on every submit, so "meeting" was forced
   // onto every note whether or not he touched it, and the extractor's own read
@@ -113,7 +120,7 @@ export function TouchpointCapture({
   // kind to choose, but even once it does, an untouched default would keep
   // overriding it. His explicit pick still wins (a rep's own word for what just
   // happened outranks a model's guess); an untouched default now stays quiet.
-  const [kindTouched, setKindTouched] = useState(false);
+  const [kindTouched, setKindTouched] = useState(Boolean(lockKind));
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<RecordTouchpointResult | null>(null);
   // A clean file (matched, no follow-up needed) gets its own confirmation
@@ -231,8 +238,8 @@ export function TouchpointCapture({
         if (grade && res.accountId) void setPotentialJuan(res.accountId, grade);
         setText("");
         writeDraft("");
-        setKind("meeting");
-        setKindTouched(false);
+        setKind(lockKind ?? "meeting");
+        setKindTouched(Boolean(lockKind));
         setGrade(null);
         setNewCompany(false);
         requestAnimationFrame(() => {
@@ -418,7 +425,7 @@ export function TouchpointCapture({
         )}
         {!success && (
           <>
-            <div className="mb-3 flex gap-1.5">
+            {!lockKind && <div className="mb-3 flex gap-1.5">
               {KIND_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
@@ -438,7 +445,7 @@ export function TouchpointCapture({
                   {opt.label}
                 </button>
               ))}
-            </div>
+            </div>}
 
             <div className="relative">
               <textarea
@@ -559,7 +566,7 @@ export function TouchpointCapture({
             // a loggable screen was reloading the page.
             setText("");
             writeDraft("");
-            setKind("meeting");
+            setKind(lockKind ?? "meeting");
             setGrade(null);
             setNewCompany(false);
             setResult(null);

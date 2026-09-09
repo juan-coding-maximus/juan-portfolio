@@ -11,12 +11,78 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  getAccount,
   insertSdrScheduleItem,
+  listActivities,
+  listContacts,
   searchOwnedAccounts,
   setSdrScheduleStatus,
   type NewSdrScheduleItem,
   type SdrScheduleItem,
 } from "./dal";
+
+export type SdrAccountPanel = {
+  id: string;
+  name: string;
+  channel: string;
+  street: string | null;
+  city: string | null;
+  phone: string | null;
+  website: string | null;
+  lifecycle: string;
+  potentialJuan: string | null;
+  quirks: string | null;
+  currentState: string | null;
+  lastOrderAt: string | null;
+  hubspotCompanyId: string | null;
+  contacts: { id: string; name: string; title: string | null; phone: string | null; email: string | null; isDecisionMaker: boolean }[];
+  lastActivity: { at: string; kind: string; detail: string | null } | null;
+};
+
+/**
+ * The account context for one SDR call, deliberately narrow. Juan's ask,
+ * 2026-09-08: "a lot of information about the business... but less crowded,
+ * only the important information", not the full /nutribiotic/account/[id]
+ * page (activities table, order history, everything AccountDetailBody
+ * shows). This picks the fields that matter for a cold or warm call, in the
+ * seconds before he dials: what the business is, how to reach it, what's
+ * already on file at HubSpot, who's there, and the one most recent thing
+ * that actually happened.
+ */
+export async function getSdrAccountPanel(accountId: string): Promise<SdrAccountPanel | null> {
+  const [accRes, contactsRes, activitiesRes] = await Promise.all([
+    getAccount(accountId),
+    listContacts(accountId),
+    listActivities(accountId, 1),
+  ]);
+  const a = accRes.data[0];
+  if (!a) return null;
+  const last = activitiesRes.data[0] ?? null;
+  return {
+    id: a.id,
+    name: a.name,
+    channel: a.channel,
+    street: a.street,
+    city: a.city,
+    phone: a.phone,
+    website: a.website,
+    lifecycle: a.lifecycle,
+    potentialJuan: a.potential_juan,
+    quirks: a.quirks,
+    currentState: a.current_state,
+    lastOrderAt: a.last_order_at,
+    hubspotCompanyId: a.hubspot_company_id,
+    contacts: contactsRes.data.map((c) => ({
+      id: c.id,
+      name: [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed contact",
+      title: c.title,
+      phone: c.phone,
+      email: c.email,
+      isDecisionMaker: c.is_decision_maker,
+    })),
+    lastActivity: last ? { at: last.at, kind: last.kind, detail: last.detail } : null,
+  };
+}
 
 export async function searchSdrAccounts(query: string) {
   const res = await searchOwnedAccounts(query);

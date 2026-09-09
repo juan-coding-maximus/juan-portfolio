@@ -14,12 +14,18 @@
  * phone involved at all is a real, separate build once Juan picks a provider.
  */
 
-import { useMemo, useState, useTransition } from "react";
-import { addSdrScheduleItem, searchSdrAccounts, updateSdrScheduleStatus } from "./sdr-actions";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import {
+  addSdrScheduleItem,
+  getSdrAccountPanel,
+  searchSdrAccounts,
+  updateSdrScheduleStatus,
+  type SdrAccountPanel,
+} from "./sdr-actions";
 import type { SdrScheduleItem } from "./dal";
 import { TouchpointCapture } from "./touchpoint-ui";
 import type { FiledTouchpoint } from "./touchpoint-ui";
-import { Ico } from "./ui";
+import { Ico, HUBSPOT_COMPANY_URL, daysAgo } from "./ui";
 
 export type SdrDayItem = SdrScheduleItem & {
   displayName: string;
@@ -240,6 +246,12 @@ function ViewInOutbound({ accountId }: { accountId: string }) {
   );
 }
 
+/**
+ * One row in the day list. Deliberately thin (2026-09-08 redesign): the
+ * notes preview and the Outbound link used to print on every row, which is
+ * exactly the "crowded" Juan pointed at. Both moved into AccountPanel below,
+ * which only ever shows one account at a time and has the room for them.
+ */
 function ScheduleRow({
   item,
   active,
@@ -255,51 +267,181 @@ function ScheduleRow({
   const skipped = item.status === "skipped";
 
   return (
-    <li className={`rounded-md border p-2.5 ${active ? "border-[#14201B]" : "border-[#E2DFD5]"} ${done ? "opacity-60" : ""} ${skipped ? "opacity-40" : ""}`}>
-      <div className="flex items-start justify-between gap-2">
-        <button onClick={onSelect} className="min-w-0 flex-1 text-left">
-          <div className="truncate text-[13.5px] font-medium text-[#14201B]">{item.displayName}</div>
-          <div className="mt-0.5 flex items-center gap-1.5 text-[11.5px] uppercase tracking-[0.08em] text-[#8A928C]">
-            <span>{item.kind}</span>
-            {item.status !== "pending" && <span>· {item.status}</span>}
-          </div>
-          {item.notes && <div className="mt-1 text-[12.5px] text-[#5B6560]">{item.notes}</div>}
-        </button>
-        <div className="flex shrink-0 items-center gap-1.5">
-          {item.displayPhone && (
-            <a
-              href={`tel:${item.displayPhone.replace(/[^0-9+]/g, "")}`}
-              className="flex items-center gap-1 rounded-md bg-[#8A2E2E] px-2.5 py-1.5 text-[12px] font-medium text-white hover:opacity-90"
-              title={`Call ${item.displayPhone}`}
+    <li
+      className={`flex items-center gap-2 rounded-md border p-2 ${active ? "border-[#14201B] bg-[#FAF9F5]" : "border-[#E2DFD5]"} ${done ? "opacity-60" : ""} ${skipped ? "opacity-40" : ""}`}
+    >
+      <button onClick={onSelect} className="min-w-0 flex-1 text-left">
+        <div className="truncate text-[13px] font-medium text-[#14201B]">{item.displayName}</div>
+        <div className="mt-0.5 flex items-center gap-1.5 text-[11px] uppercase tracking-[0.08em] text-[#8A928C]">
+          <span>{item.kind}</span>
+          {item.status !== "pending" && <span>· {item.status}</span>}
+        </div>
+      </button>
+      <div className="flex shrink-0 items-center gap-1">
+        {item.displayPhone && (
+          <a
+            href={`tel:${item.displayPhone.replace(/[^0-9+]/g, "")}`}
+            className="flex items-center gap-1 rounded-md bg-[#8A2E2E] px-2 py-1 text-[11.5px] font-medium text-white hover:opacity-90"
+            title={`Call ${item.displayPhone}`}
+          >
+            <Ico name="phone" size={11} />
+            Call
+          </a>
+        )}
+        {!done && !skipped && (
+          <>
+            <button
+              onClick={() => onStatus("done")}
+              title="Mark done"
+              className="flex h-6 w-6 items-center justify-center rounded-md border border-[#E2DFD5] text-[#5B6560] hover:bg-[#F7F6F1]"
             >
-              <Ico name="phone" size={12} />
-              Call
+              <Ico name="check" size={12} />
+            </button>
+            <button
+              onClick={() => onStatus("skipped")}
+              title="Skip"
+              className="flex h-6 w-6 items-center justify-center rounded-md border border-[#E2DFD5] text-[#8A928C] hover:bg-[#F7F6F1]"
+            >
+              <Ico name="close" size={12} />
+            </button>
+          </>
+        )}
+      </div>
+    </li>
+  );
+}
+
+/** One labeled fact. Empty/null stays out entirely, HARD RULE 1: a blank
+ * field is never shown as a dash or a guess, it just isn't a row. */
+function Fact({ label, value }: { label: string; value: string | null }) {
+  if (!value) return null;
+  return (
+    <div className="flex items-baseline gap-1.5 text-[13px]">
+      <span className="text-[#8A928C]">{label}</span>
+      <span className="text-[#3D4A44]">{value}</span>
+    </div>
+  );
+}
+
+/**
+ * The main working surface: what the business is, how to reach it, what's
+ * already on file, who's there, the one most recent thing that happened, and
+ * the call log itself. Modeled on Juan's own Salesloft reference, but
+ * deliberately thinner: no activity table, no order history, no full
+ * property dump, just what he'd want in front of him before dialing.
+ */
+function AccountPanel({ item, onFiled }: { item: SdrDayItem; onFiled: (r: FiledTouchpoint) => void }) {
+  const [panel, setPanel] = useState<SdrAccountPanel | null>(null);
+  const [loading, startTransition] = useTransition();
+
+  useEffect(() => {
+    setPanel(null);
+    if (!item.account_id) return;
+    startTransition(async () => {
+      setPanel(await getSdrAccountPanel(item.account_id!));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.account_id]);
+
+  const phone = panel?.phone ?? item.displayPhone;
+  const address = panel ? [panel.street, panel.city].filter(Boolean).join(", ") : null;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="rounded-lg border border-[#E2DFD5] bg-white p-4">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <div className="text-[17px] font-semibold text-[#14201B]">{item.displayName}</div>
+            {!item.account_id && (
+              <div className="mt-0.5 text-[12px] text-[#8A928C]">New prospect, not yet an account</div>
+            )}
+            {panel && (
+              <div className="mt-0.5 text-[12.5px] text-[#5B6560]">
+                {panel.channel.replace(/_/g, " ")}
+                {panel.currentState ? ` · ${panel.currentState}` : panel.quirks ? ` · ${panel.quirks}` : ""}
+              </div>
+            )}
+          </div>
+          {phone && (
+            <a
+              href={`tel:${phone.replace(/[^0-9+]/g, "")}`}
+              className="flex shrink-0 items-center gap-1.5 rounded-md bg-[#8A2E2E] px-3 py-1.5 text-[13px] font-medium text-white hover:opacity-90"
+            >
+              <Ico name="phone" size={13} />
+              Call {phone}
             </a>
           )}
-          {!done && !skipped && (
-            <>
-              <button
-                onClick={() => onStatus("done")}
-                title="Mark done"
-                className="flex h-7 w-7 items-center justify-center rounded-md border border-[#E2DFD5] text-[#5B6560] hover:bg-[#F7F6F1]"
-              >
-                <Ico name="check" size={13} />
-              </button>
-              <button
-                onClick={() => onStatus("skipped")}
-                title="Skip"
-                className="flex h-7 w-7 items-center justify-center rounded-md border border-[#E2DFD5] text-[#8A928C] hover:bg-[#F7F6F1]"
-              >
-                <Ico name="close" size={13} />
-              </button>
-            </>
-          )}
         </div>
+
+        {loading && <div className="mt-3 text-[12.5px] text-[#8A928C]">Loading account…</div>}
+
+        {panel && (
+          <>
+            <div className="mt-3 flex flex-col gap-1.5">
+              <Fact label="Website" value={panel.website} />
+              <Fact label="Address" value={address} />
+              <Fact label="Status" value={panel.lifecycle} />
+              <Fact label="Potential" value={panel.potentialJuan} />
+              <Fact label="Last order" value={panel.lastOrderAt ? daysAgo(panel.lastOrderAt) : null} />
+            </div>
+
+            {panel.website && (
+              <a
+                href={panel.website.startsWith("http") ? panel.website : `https://${panel.website}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex items-center gap-1 text-[12.5px] font-medium text-[#3D6B4A] hover:underline"
+              >
+                <Ico name="external" size={12} />
+                Open website
+              </a>
+            )}
+
+            <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-[#E2DFD5] pt-3">
+              {panel.hubspotCompanyId && (
+                <a
+                  href={HUBSPOT_COMPANY_URL(panel.hubspotCompanyId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-[12.5px] font-medium text-[#5B6560] hover:text-[#14201B]"
+                >
+                  <Ico name="external" size={12} />
+                  Open in HubSpot
+                </a>
+              )}
+              <ViewInOutbound accountId={panel.id} />
+            </div>
+
+            {panel.lastActivity && (
+              <div className="mt-3 rounded-md bg-[#FAF9F5] p-2.5 text-[12.5px] text-[#5B6560]">
+                <span className="font-medium text-[#3D4A44] capitalize">{panel.lastActivity.kind}</span>{" "}
+                <span className="text-[#8A928C]">{daysAgo(panel.lastActivity.at)}</span>
+                {panel.lastActivity.detail && <div className="mt-0.5 line-clamp-2">{panel.lastActivity.detail}</div>}
+              </div>
+            )}
+
+            {panel.contacts.length > 0 && (
+              <div className="mt-3 flex flex-col gap-1.5 border-t border-[#E2DFD5] pt-3">
+                {panel.contacts.map((c) => (
+                  <div key={c.id} className="flex items-baseline justify-between gap-2 text-[12.5px]">
+                    <span className="font-medium text-[#3D4A44]">
+                      {c.name}
+                      {c.title && <span className="font-normal text-[#8A928C]"> · {c.title}</span>}
+                    </span>
+                    <span className="shrink-0 text-[#8A928C]">{c.phone ?? c.email ?? ""}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </div>
-      {item.account_id && <div className="mt-1.5">
-        <ViewInOutbound accountId={item.account_id} />
-      </div>}
-    </li>
+
+      <div>
+        <div className="mb-2 text-[12px] uppercase tracking-[0.1em] text-[#8A928C]">Log this call</div>
+        <TouchpointCapture accountIdHint={item.account_id} onFiled={onFiled} lockKind="call" />
+      </div>
+    </div>
   );
 }
 
@@ -335,7 +477,12 @@ export function SdrScreen({ initialItems, todayIso, days }: { initialItems: SdrD
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-      <div className="grid flex-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {/* The queue, 2026-09-08 redesign: this used to be the main view (a
+          grid of day columns) with a generic capture box off to the side.
+          Juan's ask was the other way round, an account panel doing the real
+          work, this list just picks what goes in it, so it's now a narrow
+          rail rather than the dominant surface. */}
+      <div className="flex w-full flex-col gap-4 lg:w-[300px] lg:shrink-0">
         {dayIsos.map((iso) => {
           const dayItems = items
             .filter((it) => it.scheduled_date === iso)
@@ -344,10 +491,10 @@ export function SdrScreen({ initialItems, todayIso, days }: { initialItems: SdrD
             .sort((a, b) => (a.status === b.status ? 0 : a.status === "pending" ? -1 : 1));
           return (
             <div key={iso} className="rounded-lg border border-[#E2DFD5] bg-white p-3">
-              <div className="mb-2 text-[12.5px] font-semibold uppercase tracking-[0.08em] text-[#5B6560]">
+              <div className="mb-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#5B6560]">
                 {dayLabel(iso, todayIso)}
               </div>
-              <ul className="flex flex-col gap-2">
+              <ul className="flex flex-col gap-1.5">
                 {dayItems.map((it) => (
                   <ScheduleRow
                     key={it.id}
@@ -366,11 +513,14 @@ export function SdrScreen({ initialItems, todayIso, days }: { initialItems: SdrD
         })}
       </div>
 
-      <div className="w-full lg:sticky lg:top-7 lg:w-[360px] lg:shrink-0">
-        <div className="mb-2 text-[12px] uppercase tracking-[0.1em] text-[#8A928C]">
-          {active ? `Logging: ${active.displayName}` : "Pick a call or visit to log it"}
-        </div>
-        <TouchpointCapture accountIdHint={active?.account_id ?? null} onFiled={onFiled} />
+      <div className="min-w-0 flex-1">
+        {active ? (
+          <AccountPanel item={active} onFiled={onFiled} />
+        ) : (
+          <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-[#D8D4C8] text-[13px] text-[#8A928C]">
+            Pick a call or visit from the queue
+          </div>
+        )}
       </div>
     </div>
   );
