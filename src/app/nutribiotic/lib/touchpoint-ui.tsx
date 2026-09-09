@@ -572,7 +572,7 @@ export function TouchpointCapture({
                 account is to buying, not how big it could get. Feeds the
                 priority score as a stated point shift the moment it's set. */}
             <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-2">
-              <span className="text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">Readiness</span>
+              <span className="text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">Lead readiness</span>
               <div className="flex gap-1">
                 {READINESS_OPTIONS.map((opt) => {
                   const active = readiness === opt.value;

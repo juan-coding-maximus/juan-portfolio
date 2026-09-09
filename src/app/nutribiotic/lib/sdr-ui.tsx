@@ -756,7 +756,7 @@ function AccountPanel({ item, onFiled }: { item: SdrDayItem; onFiled: (r: FiledT
               <Fact label="Address" value={address} />
               <Fact label="Status" value={panel.lifecycle} />
               <Fact label="Potential" value={panel.potentialJuan} />
-              <Fact label="Readiness" value={panel.readiness ? READINESS_FACT_LABEL[panel.readiness] : null} />
+              <Fact label="Lead readiness" value={panel.readiness ? READINESS_FACT_LABEL[panel.readiness] : null} />
               <Fact label="Last order" value={panel.lastOrderAt ? daysAgo(panel.lastOrderAt) : null} />
             </div>
 

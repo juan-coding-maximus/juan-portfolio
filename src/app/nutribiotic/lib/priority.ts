@@ -383,7 +383,7 @@ export function computePriority(rows: PriorityInput[], nowMs = Date.now()): Map<
     // itself is a real, stated fact.
     if (r.readiness && score !== null) {
       score = Math.max(0, Math.min(100, score + READINESS_ADJUSTMENT[r.readiness]));
-      clauses.push(`rep read: ${r.readiness}`);
+      clauses.push(`Lead readiness: ${r.readiness}`);
     }
     if (suppressed && score !== null) score = Math.min(score, 10);
     // A history of under $300 across 2+ years is a measured fact, not a gap,
@@ -425,7 +425,7 @@ export function computePriority(rows: PriorityInput[], nowMs = Date.now()): Map<
       // itself here, since it is a real fact even when nothing else is known.
       reason =
         "no revenue, engagement or lifecycle data on file yet, scored neutral at 50" +
-        (r.readiness ? ` · rep read: ${r.readiness}` : "");
+        (r.readiness ? ` · Lead readiness: ${r.readiness}` : "");
     } else {
       reason = clauses.join(" · ");
     }
