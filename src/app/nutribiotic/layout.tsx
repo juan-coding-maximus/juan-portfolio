@@ -86,6 +86,15 @@ const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>
      for Goals/Playbook/the offer trio, while a prospecting queue is a daily
      tool the same way Visit is. */
   { href: "/nutribiotic/sdr", label: "SDR", icon: "phone-arrow" },
+  /* Search, PROMOTED OUT OF MORE 2026-09-09, the same day it landed there
+     (Juan: "I dont see the new tab, put it in a main button tab right of
+     SDR"). The More reasoning below was wrong about the job: this is not
+     occasional reference like Goals or Playbook, it is where the SDR queue's
+     rows come from. A prospecting console that feeds the tab next to it
+     belongs next to it, and behind a flyout it was invisible enough that its
+     first version went unseen. Immediately right of SDR on purpose: find the
+     businesses, then work them, left to right. */
+  { href: "/nutribiotic/search", label: "Search", icon: "search" },
 ];
 
 const MORE_NAV: typeof NAV = [
