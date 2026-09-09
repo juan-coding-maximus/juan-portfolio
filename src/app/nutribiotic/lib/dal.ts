@@ -38,7 +38,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { hasAccess } from "./devices";
 import { hasWidgetToken } from "./session";
-import { areaProspectCounts, byPriority, computePriority, type PriorityInput, type PriorityResult } from "./priority";
+import { areaProspectCounts, byPriority, computePriority, type PriorityInput, type PriorityResult, type Readiness } from "./priority";
 
 const SB_URL = process.env.NB_SUPABASE_URL ?? "";
 const SB_KEY = process.env.NB_SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -417,6 +417,11 @@ export type Account = {
   potential_hq: string | null;
   /** Juan's own read of potential, A-G, set by hand on the account card (migration 0039). A non-null value is picked up within a minute by bridges/nutribiotic/hubspot_sync.py's --watch loop and pushed onto HubSpot's potential__cloned_, overwriting HQ's grade there (hubspot_fields.json's potential_juan entry, 2026-08-21); clearing stays local only, the loop never fires on null. */
   potential_juan: Tier | null;
+  /** The rep's own read of how close this account is to buying, set by hand
+   *  on the call/visit capture box (migration 0069). Never synced to
+   *  HubSpot, local only. Feeds lib/priority.ts's score as a stated point
+   *  adjustment, never silently. Null means no rep has tagged it yet. */
+  readiness: Readiness | null;
   origin: Origin;
 };
 
@@ -427,6 +432,17 @@ export async function getAccount(id: string): Promise<Result<Account>> {
 /** Sets or clears Juan's own potential read (see Account.potential_juan). Local only, in nb_accounts; never touches HubSpot itself, see the column's own comment above for how it gets there. */
 export async function setAccountPotentialJuan(id: string, grade: Tier | null): Promise<Account | null> {
   const rows = await mutate<Account>("nb_accounts", "PATCH", { potential_juan: grade }, { id: `eq.${id}` });
+  return rows[0] ?? null;
+}
+
+/** Sets or clears the rep's readiness tag (see Account.readiness). Local only, never touches HubSpot; see the column's own comment above and migration 0069. */
+export async function setAccountReadiness(id: string, readiness: Readiness | null): Promise<Account | null> {
+  const rows = await mutate<Account>(
+    "nb_accounts",
+    "PATCH",
+    { readiness, readiness_set_at: readiness ? new Date().toISOString() : null },
+    { id: `eq.${id}` },
+  );
   return rows[0] ?? null;
 }
 
@@ -1843,9 +1859,10 @@ export async function getPriorityBook(): Promise<PriorityBook> {
       closed_at: string | null;
       do_not_visit: boolean | null;
       area: string | null;
+      readiness: Readiness | null;
     }>(
       "nb_accounts?select=id,name,lifecycle,phone,area,trailing_12m_revenue,lifetime_revenue,first_order_at,last_order_at," +
-        `expected_reorder_days,places_status,closed_at,do_not_visit&hubspot_owner_id=eq.${JUAN_OWNER_ID}` +
+        `expected_reorder_days,places_status,closed_at,do_not_visit,readiness&hubspot_owner_id=eq.${JUAN_OWNER_ID}` +
         // Same scope every other surface uses: not the waypoint (Juan's own
         // apartment is not an account), and not a closed one. A closed store
         // is not a low priority, it is not a customer, and ranking it at all

@@ -28,6 +28,7 @@ import {
 } from "./sdr-actions";
 import type { PriorityBook, SdrPriority, SdrScheduleItem } from "./dal";
 import { planningHorizonDates } from "./field-week";
+import type { Readiness } from "./priority";
 import { TopOpportunities } from "./priority-ui";
 import { TouchpointCapture } from "./touchpoint-ui";
 import type { FiledTouchpoint } from "./touchpoint-ui";
@@ -676,10 +677,11 @@ function ScheduleRow({
   );
 }
 
+const READINESS_FACT_LABEL: Record<Readiness, string> = { urgent: "Urgent", hot: "Hot", normal: "Normal", cold: "Cold" };
+
 /** One labeled fact. Empty/null stays out entirely, HARD RULE 1: a blank
  * field is never shown as a dash or a guess, it just isn't a row. `href`
- * makes the value itself a clickable new-tab link (the website field, so
- * Juan doesn't have to scroll down to "Open website" to open it). */
+ * makes the value itself a clickable new-tab link. */
 function Fact({ label, value, href }: { label: string; value: string | null; href?: string }) {
   if (!value) return null;
   return (
@@ -751,22 +753,35 @@ function AccountPanel({ item, onFiled }: { item: SdrDayItem; onFiled: (r: FiledT
         {panel && (
           <>
             <div className="mt-3 flex flex-col gap-1.5">
-              <Fact
-                label="Website"
-                value={panel.website}
-                href={panel.website ? (panel.website.startsWith("http") ? panel.website : `https://${panel.website}`) : undefined}
-              />
               <Fact label="Address" value={address} />
               <Fact label="Status" value={panel.lifecycle} />
               <Fact label="Potential" value={panel.potentialJuan} />
+              <Fact label="Readiness" value={panel.readiness ? READINESS_FACT_LABEL[panel.readiness] : null} />
               <Fact label="Last order" value={panel.lastOrderAt ? daysAgo(panel.lastOrderAt) : null} />
             </div>
 
-            {/* The two ways to look the place up before dialing: their own
-                site, and their Google Maps profile (hours, photos, reviews,
-                and often a phone the ERP never had). Maps always renders,
-                because it needs only a name; the website renders only when one
-                is on file. */}
+            {panel.businessHours && (
+              <div className="mt-3 flex flex-col gap-1 border-t border-[#E2DFD5] pt-3">
+                <span className="text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">Hours</span>
+                {Object.entries(panel.businessHours).map(([day, ranges]) => (
+                  <div key={day} className="flex items-baseline justify-between gap-3 text-[13px]">
+                    <span className="capitalize text-[#8A928C]">{day}</span>
+                    <span className="tabular-nums text-[#3D4A44]">
+                      {ranges.length ? ranges.map((r) => r.join(" to ")).join(", ") : "closed"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* The website, when there's one on file, is only ever a link:
+                the URL string itself is not information worth reading in a
+                panel this tight, so nothing above duplicates it as plain
+                text (Juan, 2026-09-09). The two ways to look the place up
+                before dialing: their own site, and their Google Maps profile
+                (photos, reviews, and often a phone the ERP never had). Maps
+                always renders, because it needs only a name; the website link
+                renders only when one is on file. */}
             <div className="mt-3 flex flex-wrap items-center gap-4">
               {panel.website ? (
                 <a

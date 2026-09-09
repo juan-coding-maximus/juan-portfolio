@@ -73,6 +73,24 @@
 /** The weights. Stated once, here, so a change to the ranking is a diff. */
 export const PRIORITY_WEIGHTS = { revenue: 45, engagement: 30, viability: 25 } as const;
 
+/**
+ * READINESS (Juan, 2026-09-09): a fourth tag, set by hand on the call/visit
+ * capture box (touchpoint-ui.tsx), alongside HQ's A-G potential grade,
+ * Juan's own potential_juan correction, and outbound's urgency. None of
+ * those answer "is this account close to buying right now": this is the
+ * rep's own read of that, formed on the call or standing in the store.
+ *
+ * A STATED ADJUSTMENT, NOT A FOURTH WEIGHTED COMPONENT. revenue/engagement/
+ * viability are percentiles blended by weight; readiness is a flat point
+ * shift on the final number, so a rep's tag always shows in the score as
+ * exactly what it is, never folded invisibly into a blend where its real
+ * effect could not be read back out. Applied after the weighted score (or
+ * the noInfo=50 default) and before the hard suppressors below, so a closed
+ * door or a Mother's Market floor still has the last word over a rep's tag.
+ */
+export const READINESS_ADJUSTMENT = { urgent: 20, hot: 10, normal: 0, cold: -10 } as const;
+export type Readiness = keyof typeof READINESS_ADJUSTMENT;
+
 /** How far back a touch still counts as a live conversation, and where it
  *  decays to nothing. Both are shaping constants, not measurements, and they
  *  are named rather than buried so the curve can be argued with. */
@@ -135,6 +153,11 @@ export type PriorityInput = {
   urgency_reason?: string | null;
   /** Most recent nb_v_activities_effective.at for this account. */
   last_touch_at?: string | null;
+  /** nb_accounts.readiness, the rep's own read of how close this account is
+   *  to buying, set by hand on the call/visit capture box. Null means no rep
+   *  has tagged it yet, never "normal" (a real "normal" tag still means the
+   *  rep looked; null means nobody has). */
+  readiness?: Readiness | null;
 };
 
 export type NextAction = {
@@ -352,6 +375,16 @@ export function computePriority(rows: PriorityInput[], nowMs = Date.now()): Map<
      */
     const noInfo = knownW === 0;
     let score: number | null = noInfo ? 50 : Math.round((known.reduce((a, [v, w]) => a + v * w, 0) / knownW) * 100);
+
+    // -------------------------------------------------------------- readiness
+    // A flat point shift, not a blended input (see READINESS_ADJUSTMENT's own
+    // comment). Applied even in the noInfo case: a rep who just got a hot read
+    // on an otherwise-unmeasured account is not "no information," the tag
+    // itself is a real, stated fact.
+    if (r.readiness && score !== null) {
+      score = Math.max(0, Math.min(100, score + READINESS_ADJUSTMENT[r.readiness]));
+      clauses.push(`rep read: ${r.readiness}`);
+    }
     if (suppressed && score !== null) score = Math.min(score, 10);
     // A history of under $300 across 2+ years is a measured fact, not a gap,
     // and it caps the score below the "soon" band regardless of what else
@@ -388,8 +421,11 @@ export function computePriority(rows: PriorityInput[], nowMs = Date.now()): Map<
     } else if (noInfo) {
       // Not prose about nothing: it names which columns are empty, so the fix
       // is obvious (run the enricher, load the orders), and says plainly that
-      // 50 is a default, not a measurement.
-      reason = "no revenue, engagement or lifecycle data on file yet, scored neutral at 50";
+      // 50 is a default, not a measurement. A readiness tag still speaks for
+      // itself here, since it is a real fact even when nothing else is known.
+      reason =
+        "no revenue, engagement or lifecycle data on file yet, scored neutral at 50" +
+        (r.readiness ? ` · rep read: ${r.readiness}` : "");
     } else {
       reason = clauses.join(" · ");
     }

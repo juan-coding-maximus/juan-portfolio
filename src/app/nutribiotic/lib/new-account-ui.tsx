@@ -21,8 +21,9 @@
  */
 
 import { useEffect, useState, useTransition } from "react";
-import { setPotentialJuan } from "./account-actions";
+import { setPotentialJuan, setReadiness } from "./account-actions";
 import type { Tier } from "./dal";
+import type { Readiness } from "./priority";
 import {
   createBusinessFromPlace,
   linkTouchpointToExistingCompany,
@@ -71,6 +72,7 @@ export function AccountMatchResolver({
   matchAccountId,
   matchAccountName,
   pendingGrade = null,
+  pendingReadiness = null,
   onResolved,
 }: {
   touchpointId: string;
@@ -80,6 +82,9 @@ export function AccountMatchResolver({
   /** A potential letter the rep picked on the capture card before the account
    * was known. Applied the moment one exists, whether by match or by create. */
   pendingGrade?: Tier | null;
+  /** A readiness tag the rep picked on the capture card before the account
+   * was known. Same hold-until-resolved pattern as pendingGrade. */
+  pendingReadiness?: Readiness | null;
   onResolved?: () => void;
 }) {
   const [matchResult, setMatchResult] = useState<ResolveResult | null>(null);
@@ -114,6 +119,7 @@ export function AccountMatchResolver({
    * here: it fires on a delay below, once there's been time to read the note. */
   function applyPendingGrade(accountId: string) {
     if (pendingGrade) void setPotentialJuan(accountId, pendingGrade);
+    if (pendingReadiness) void setReadiness(accountId, pendingReadiness);
   }
 
   /**
@@ -218,6 +224,7 @@ export function AccountMatchResolver({
       "lead status set to New to open",
       "owner set to you",
       pendingGrade && `potential set to ${pendingGrade}`,
+      pendingReadiness && `readiness set to ${pendingReadiness}`,
       created.peopleAdded > 0 &&
         `${created.peopleAdded} contact${created.peopleAdded === 1 ? "" : "s"} added`,
       created.peopleUpdated > 0 && `${created.peopleUpdated} contact${created.peopleUpdated === 1 ? "" : "s"} updated`,

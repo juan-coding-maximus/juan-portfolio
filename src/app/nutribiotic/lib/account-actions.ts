@@ -6,6 +6,7 @@ import {
   listContacts,
   listPurchases,
   setAccountPotentialJuan,
+  setAccountReadiness,
   type Account,
   type Activity,
   type Contact,
@@ -13,6 +14,7 @@ import {
   type PurchaseOrder,
   type Tier,
 } from "./dal";
+import type { Readiness } from "./priority";
 
 export type AccountDetailData = {
   account: Account;
@@ -47,4 +49,14 @@ export async function getAccountDetail(id: string): Promise<AccountDetailData> {
  */
 export async function setPotentialJuan(id: string, grade: Tier | null): Promise<void> {
   await setAccountPotentialJuan(id, grade);
+}
+
+/**
+ * Sets (or clears, readiness=null) the rep's own readiness tag from the call
+ * or visit capture box, migration 0069. Local only, never reaches HubSpot;
+ * it feeds lib/priority.ts's score as a stated point adjustment the next time
+ * the priority book is read, never a background push.
+ */
+export async function setReadiness(id: string, readiness: Readiness | null): Promise<void> {
+  await setAccountReadiness(id, readiness);
 }

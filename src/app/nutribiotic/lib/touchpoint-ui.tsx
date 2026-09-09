@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { setPotentialJuan } from "./account-actions";
+import { setPotentialJuan, setReadiness } from "./account-actions";
 import { decideCalendarProposal } from "./calendar-actions";
 import type { Tier } from "./dal";
+import type { Readiness } from "./priority";
 import { AccountMatchResolver } from "./new-account-ui";
 import { recordTouchpoint, type RecordTouchpointResult } from "./touchpoint";
 import { Ico, SuccessNote } from "./ui";
@@ -28,6 +29,19 @@ const GRADE_TITLE: Record<string, string> = {
   D: "D · small",
   E: "E · very small",
 };
+
+/**
+ * Readiness, a separate axis from the size grade above: how close this
+ * account is to buying right now, not how big it could get. Set by the rep
+ * on the same call/visit, converges into lib/priority.ts's 0-100 score as a
+ * stated point adjustment (see READINESS_ADJUSTMENT there), never silently.
+ */
+const READINESS_OPTIONS: { value: Readiness; label: string; title: string }[] = [
+  { value: "urgent", label: "Urgent", title: "Urgent · ready now, +20 to priority" },
+  { value: "hot", label: "Hot", title: "Hot · close, +10 to priority" },
+  { value: "normal", label: "Normal", title: "Normal · no change to priority" },
+  { value: "cold", label: "Cold", title: "Cold · not close, -10 to priority" },
+];
 
 /** Survives a gate redirect, an iOS eviction, or a version-skew reload. The
  * key is per-surface, so a draft typed in ClientOS is the one ClientOS
@@ -141,6 +155,10 @@ export function TouchpointCapture({
   // lands on. Held here rather than written immediately because the account is
   // not known until the note is filed.
   const [grade, setGrade] = useState<Tier | null>(null);
+  // The rep's own read of how close this account is to buying, formed on the
+  // same call/visit. Same hold-until-filed pattern as `grade` above: the
+  // account is not known until the note lands.
+  const [readiness, setReadiness_] = useState<Readiness | null>(null);
   const [newCompany, setNewCompany] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const restoredRef = useRef(false);
@@ -255,11 +273,13 @@ export function TouchpointCapture({
         // cycle either way, and making the rep wait for it would undo the
         // point of this screen.
         if (grade && res.accountId) void setPotentialJuan(res.accountId, grade);
+        if (readiness && res.accountId) void setReadiness(res.accountId, readiness);
         setText("");
         writeDraft("");
         setKind(lockKind ?? "meeting");
         setKindTouched(Boolean(lockKind));
         setGrade(null);
+        setReadiness_(null);
         setNewCompany(false);
         requestAnimationFrame(() => {
           if (textareaRef.current) {
@@ -548,6 +568,34 @@ export function TouchpointCapture({
               </button>
             </div>
 
+            {/* Readiness: a separate read from Potential above, how close this
+                account is to buying, not how big it could get. Feeds the
+                priority score as a stated point shift the moment it's set. */}
+            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-2">
+              <span className="text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">Readiness</span>
+              <div className="flex gap-1">
+                {READINESS_OPTIONS.map((opt) => {
+                  const active = readiness === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      aria-pressed={active}
+                      title={opt.title}
+                      onClick={() => setReadiness_(active ? null : opt.value)}
+                      className={`rounded-md px-2.5 py-1.5 text-[12.5px] font-medium transition-colors ${
+                        active
+                          ? "bg-[#14201B] text-[#F7F6F1]"
+                          : "bg-[#ECEAE1] text-[#3D4A44] hover:bg-[#E2DFD5]"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="mt-3 flex items-center justify-between gap-3">
               <span className="min-h-[1em] text-[12px] leading-relaxed text-[#8A6D2F]">
                 {voice === "uploaded" ? "Recording sent, transcribing." : voiceError}
@@ -577,6 +625,7 @@ export function TouchpointCapture({
           matchAccountId={result.matchAccountId}
           matchAccountName={result.matchAccountName}
           pendingGrade={grade}
+          pendingReadiness={readiness}
           onResolved={() => {
             // Fires 5s after the resolver's own success note lands (or on a
             // tap to skip the wait, same pattern as `success` above). Clears
@@ -587,6 +636,7 @@ export function TouchpointCapture({
             writeDraft("");
             setKind(lockKind ?? "meeting");
             setGrade(null);
+            setReadiness_(null);
             setNewCompany(false);
             setResult(null);
             requestAnimationFrame(() => textareaRef.current && autosize(textareaRef.current));

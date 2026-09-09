@@ -24,6 +24,7 @@ import {
   type SdrPriority,
   type SdrScheduleItem,
 } from "./dal";
+import type { Readiness } from "./priority";
 
 export type SdrSearchHit = {
   accountId: string;
@@ -92,9 +93,16 @@ export type SdrAccountPanel = {
   website: string | null;
   lifecycle: string;
   potentialJuan: string | null;
+  /** The rep's own readiness tag (migration 0069), set from this same panel's
+   *  capture box. Null means no rep has tagged it yet. */
+  readiness: Readiness | null;
   quirks: string | null;
   currentState: string | null;
   lastOrderAt: string | null;
+  /** Google Places hours, same shape account-detail.tsx already renders.
+   *  Null on an account the enricher hasn't reached yet, a real gap, never a
+   *  guess (HARD RULE 1). */
+  businessHours: Record<string, string[][]> | null;
   hubspotCompanyId: string | null;
   contacts: { id: string; name: string; title: string | null; phone: string | null; email: string | null; isDecisionMaker: boolean }[];
   lastActivity: { at: string; kind: string; detail: string | null } | null;
@@ -133,9 +141,11 @@ export async function getSdrAccountPanel(accountId: string): Promise<SdrAccountP
     website: a.website,
     lifecycle: a.lifecycle,
     potentialJuan: a.potential_juan,
+    readiness: a.readiness,
     quirks: a.quirks,
     currentState: a.current_state,
     lastOrderAt: a.last_order_at,
+    businessHours: a.business_hours,
     hubspotCompanyId: a.hubspot_company_id,
     contacts: contactsRes.data.map((c) => ({
       id: c.id,
