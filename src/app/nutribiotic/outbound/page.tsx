@@ -24,6 +24,7 @@
  * [[nutribiotic-whatsapp-bridge]].
  */
 
+import Link from "next/link";
 import {
   listDrafts,
   listMarketingFiles,
@@ -38,7 +39,18 @@ import { Card, Empty, PageHead, daysAgo } from "../lib/ui";
 
 export const dynamic = "force-dynamic";
 
-export default async function Outbound() {
+export default async function Outbound({
+  searchParams,
+}: {
+  /* SDR's "View in Outbound" button, 2026-09-08: it opens this exact page in
+     a new tab scoped to one account, so Juan sees what's already queued for
+     whoever he just called before flagging anything new. A query param, not
+     a separate route, because it's still the same one-queue screen the file
+     header insists on, just pre-filtered. */
+  searchParams: Promise<{ account?: string }>;
+}) {
+  const sp = await searchParams;
+  const accountFilter = sp.account?.trim() || null;
   const [res, accountsResult, contacts, files] = await Promise.all([
     listDrafts(),
     listOwnerAccounts(),
@@ -68,6 +80,9 @@ export default async function Outbound() {
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  const filteredAccount = accountFilter ? accounts.find((a) => a.id === accountFilter) : null;
+  const drafts = accountFilter ? res.data.filter((d) => d.account_id === accountFilter) : res.data;
+
   // account -> best phone on file (the account's own line, else the first
   // named contact's cell), used so every draft card can offer WhatsApp
   // regardless of what channel it was originally generated as.
@@ -82,20 +97,35 @@ export default async function Outbound() {
         sub="Draft a WhatsApp or iMessage and open it pre-filled, or work through drafts waiting on you. Nothing on this screen sends anything."
       />
 
-      <div className="mb-6">
-        <div className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">WhatsApp / iMessage</div>
-        {accounts.length === 0 ? (
-          <Card>
-            <p className="text-[13px] text-[#8A928C]">No accounts loaded yet.</p>
-          </Card>
-        ) : (
-          <OutreachComposer accounts={accounts} contacts={contacts} files={files} />
-        )}
-      </div>
+      {/* Scoped view from SDR's "View in Outbound" button: one account, what's
+          already queued for them, nothing else on the screen to scan past. */}
+      {accountFilter && (
+        <div className="mb-5 flex items-center justify-between rounded-md border border-[#E2DFD5] bg-[#FAF9F5] px-3 py-2">
+          <span className="text-[13px] text-[#3D4A44]">
+            Showing Outbound for <span className="font-medium">{filteredAccount?.name ?? "this account"}</span> only
+          </span>
+          <Link href="/nutribiotic/outbound" className="text-[12.5px] font-medium text-[#5B6560] hover:text-[#14201B]">
+            Show all
+          </Link>
+        </div>
+      )}
+
+      {!accountFilter && (
+        <div className="mb-6">
+          <div className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">WhatsApp / iMessage</div>
+          {accounts.length === 0 ? (
+            <Card>
+              <p className="text-[13px] text-[#8A928C]">No accounts loaded yet.</p>
+            </Card>
+          ) : (
+            <OutreachComposer accounts={accounts} contacts={contacts} files={files} />
+          )}
+        </div>
+      )}
 
       <div className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">Waiting on you</div>
 
-      {accounts.length > 0 && (
+      {!accountFilter && accounts.length > 0 && (
         <div className="mb-3">
           <ManualEmailComposer accounts={accounts} contacts={contacts} />
         </div>
@@ -110,11 +140,17 @@ export default async function Outbound() {
         </Card>
       )}
 
-      {res.data.length === 0 ? (
-        <Empty>{!isConfigured() ? "No data source configured." : "No drafts waiting on you."}</Empty>
+      {drafts.length === 0 ? (
+        <Empty>
+          {!isConfigured()
+            ? "No data source configured."
+            : accountFilter
+              ? "Nothing queued for this account right now."
+              : "No drafts waiting on you."}
+        </Empty>
       ) : (
         <ul className="flex flex-col gap-3">
-          {res.data.map((d) => (
+          {drafts.map((d) => (
             <li key={d.id}>
               <Card>
                 <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">

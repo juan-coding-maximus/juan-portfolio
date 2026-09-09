@@ -15,7 +15,7 @@
  */
 
 import { useMemo, useState, useTransition } from "react";
-import { addSdrScheduleItem, flagNeedsEmail, searchSdrAccounts, updateSdrScheduleStatus } from "./sdr-actions";
+import { addSdrScheduleItem, searchSdrAccounts, updateSdrScheduleStatus } from "./sdr-actions";
 import type { SdrScheduleItem } from "./dal";
 import { TouchpointCapture } from "./touchpoint-ui";
 import type { FiledTouchpoint } from "./touchpoint-ui";
@@ -218,58 +218,25 @@ function AddToDayForm({ date, onAdded }: { date: string; onAdded: (item: SdrDayI
   );
 }
 
-function NeedsEmailFlag({ accountId }: { accountId: string }) {
-  const [open, setOpen] = useState(false);
-  const [text, setText] = useState("");
-  const [pending, startTransition] = useTransition();
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  if (sent) {
-    return <span className="text-[12px] font-medium text-[#3D6B4A]">Flagged for Outbound</span>;
-  }
-
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="flex items-center gap-1 text-[12px] font-medium text-[#5B6560] hover:text-[#14201B]"
-      >
-        <Ico name="mail" size={12} />
-        Needs email
-      </button>
-    );
-  }
-
+/**
+ * Opens Outbound for this one account in a new tab. Used to be a manual
+ * "Needs email" flag Juan typed by hand; Juan's ask, 2026-09-08: that should
+ * come from the call he already logged (touchpoint.ts's outreach_asks, filed
+ * automatically), not a second thing to fill in here. So this button doesn't
+ * flag anything itself, it just shows what's already queued for this client
+ * so Juan can check before he moves on.
+ */
+function ViewInOutbound({ accountId }: { accountId: string }) {
   return (
-    <div className="mt-1.5 w-full">
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="What the email needs to cover, specifically"
-        rows={2}
-        className="w-full resize-none rounded-md border border-[#E2DFD5] bg-white px-2 py-1.5 text-[12.5px] outline-none focus:border-[#14201B]"
-      />
-      {error && <div className="mt-1 text-[11.5px] text-[#8A6D2F]">{error}</div>}
-      <div className="mt-1 flex justify-end gap-2">
-        <button onClick={() => setOpen(false)} className="text-[11.5px] text-[#8A928C]">
-          Cancel
-        </button>
-        <button
-          disabled={pending || !text.trim()}
-          onClick={() =>
-            startTransition(async () => {
-              const res = await flagNeedsEmail(accountId, text);
-              if (res.ok) setSent(true);
-              else setError(res.error);
-            })
-          }
-          className="rounded-md bg-[#14201B] px-2.5 py-1 text-[11.5px] font-medium text-[#F7F6F1] disabled:opacity-30"
-        >
-          {pending ? "Sending…" : "Flag to Outbound"}
-        </button>
-      </div>
-    </div>
+    <a
+      href={`/nutribiotic/outbound?account=${accountId}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-1 text-[12px] font-medium text-[#5B6560] hover:text-[#14201B]"
+    >
+      <Ico name="mail" size={12} />
+      View in Outbound
+    </a>
   );
 }
 
@@ -329,8 +296,8 @@ function ScheduleRow({
           )}
         </div>
       </div>
-      {item.account_id && !done && <div className="mt-1.5">
-        <NeedsEmailFlag accountId={item.account_id} />
+      {item.account_id && <div className="mt-1.5">
+        <ViewInOutbound accountId={item.account_id} />
       </div>}
     </li>
   );

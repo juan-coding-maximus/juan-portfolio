@@ -36,6 +36,7 @@ import {
   insertActivity,
   insertContact,
   insertDirectives,
+  insertDraftRequest,
   insertFieldNote,
   insertTouchpoint,
   listAccountsForMatching,
@@ -145,6 +146,8 @@ type ParsedCalendarAction = {
   notes: string | null;
 };
 
+type ParsedOutreachAsk = { ask: string };
+
 export type ParsedTouchpoint = {
   account_id: string | null;
   account_confidence: "high" | "low" | "none";
@@ -160,6 +163,7 @@ export type ParsedTouchpoint = {
   calendar_actions: ParsedCalendarAction[];
   account_facts: ParsedAccountFacts;
   directives?: ParsedDirective[];
+  outreach_asks?: ParsedOutreachAsk[];
 };
 
 /**
@@ -236,6 +240,29 @@ function agencyDirectiveRows(
     scope: d.scope === "agency" ? "agency" : "nutribiotic",
     account_id: accountId,
   }));
+}
+
+/**
+ * "Tell outbound a client needs an email with specifics" used to be a
+ * separate manual flag Juan typed by hand on the SDR page. Juan's ask,
+ * 2026-09-08: it should come straight from the call/visit he already logged,
+ * not a second thing to fill in. So a stated ask ("send me pricing", "email
+ * the catalog", "wants samples info") lands in the same nb_outbound_drafts
+ * queue the Outbound tab reads, exactly like the manual flag did, except it
+ * only fires when the text actually says the customer asked for or was
+ * promised something, never invented to fill a gap. field_note notes never
+ * reach this (no customer was contacted), so this is only called from the
+ * two real-contact branches below.
+ */
+async function fileOutreachAsks(
+  asks: ParsedOutreachAsk[] | undefined,
+  accountId: string | null,
+): Promise<number> {
+  if (!accountId || !asks?.length) return 0;
+  for (const a of asks) {
+    await insertDraftRequest({ account_id: accountId, specifics: a.ask });
+  }
+  return asks.length;
 }
 
 /**
@@ -354,6 +381,20 @@ const EXTRACT_TOOL = {
           required: ["directive", "scope"],
         },
       },
+      outreach_asks: {
+        type: "array",
+        description: "Something the customer explicitly asked to be sent, or was promised, by email: pricing, a catalog, product/samples info, an order form, being added to a mailing list. Extract only when the text says the CUSTOMER asked for or was promised something to follow up on, in the rep's own words. Empty array is the normal answer; most notes carry none. This is content ABOUT the customer, not an instruction to the agency, so never duplicate it into directives, and never invent a need that wasn't actually stated.",
+        items: {
+          type: "object",
+          properties: {
+            ask: {
+              type: "string",
+              description: "what the customer asked for or was promised, in the rep's own words, lightly cleaned for filler only. Never re-worded into an email subject or a task title.",
+            },
+          },
+          required: ["ask"],
+        },
+      },
       account_facts: {
         type: "object",
         description: "Facts about the BUSINESS itself, only when explicitly stated about the store/office as a whole, never inferred from a person's own contact info in people[]. Null fields are the common case, most visits state none of this.",
@@ -374,7 +415,7 @@ const EXTRACT_TOOL = {
         required: ["business_hours", "phone", "email"],
       },
     },
-    required: ["account_confidence", "business_name_guess", "activity", "people", "calendar_actions", "account_facts", "directives"],
+    required: ["account_confidence", "business_name_guess", "activity", "people", "calendar_actions", "account_facts", "directives", "outreach_asks"],
   },
 };
 
@@ -398,7 +439,8 @@ RULES, all absolute:
 - FIRST, decide whether a customer was actually contacted. If nobody at a business was spoken to, walked in on, called, emailed or texted, activity.kind is "field_note" and direction is "internal". An observation about a storefront he only looked at or walked through, a thought about the market or the product line, a note to self about how the work should go, and an instruction to his own agency are ALL field notes. Do not reach for "visit", "call" or "meeting" because the note mentions a business name; a business named in passing is not a business contacted. A field note is never written to HubSpot, so hubspot_summary for one is short and plain, and it must never claim a contact happened ("I visited...", "I called...") when none did.
 - Never set account_confidence to "high" on a field note unless the note is genuinely ABOUT that specific account (an observation about that store). A note to self that merely happens to mention a place is account_confidence "none" with account_id null. Attaching a note to self to a business is how a company gets created to receive it, which has already happened once and is what this kind exists to stop.
 - directives carry instructions aimed at the agency, verbatim, and those same words must NOT appear in hubspot_summary. A note can be a real customer visit AND carry a directive; extract both. A note that is nothing but an instruction is a field_note whose detail is the instruction's own content.
-- account_facts is for a fact about the BUSINESS as a whole, not a person: hours, a general store phone, a general ordering email. Only fill a field when the text states it about the store/office itself ("their hours are...", "the store's number is..."); a person's own phone or email belongs in people[], never here. Most visits state none of this, null is the normal answer.`;
+- account_facts is for a fact about the BUSINESS as a whole, not a person: hours, a general store phone, a general ordering email. Only fill a field when the text states it about the store/office itself ("their hours are...", "the store's number is..."); a person's own phone or email belongs in people[], never here. Most visits state none of this, null is the normal answer.
+- outreach_asks is for something the CUSTOMER asked for or was promised (pricing, a catalog, samples info, an order form), not something the rep decided to go do on his own. Only extract it when the text actually says the customer asked or was told something would be sent. Do not put the same content in both outreach_asks and directives; directives are the rep's own instructions to his agency, outreach_asks are about the customer.`;
 }
 
 export type RecordTouchpointResult =
@@ -780,6 +822,7 @@ export async function recordTouchpoint(
     ...agencyDirectiveRows(parsed.directives, null, accountId),
     ...routeRows,
   ]);
+  await fileOutreachAsks(parsed.outreach_asks, accountId);
 
   const hubspot = autoFileHubspot
     ? await autoFileEngagement(activity.id)
@@ -918,6 +961,7 @@ export async function resolveTouchpointToAccount(
     ...agencyDirectiveRows(parsed.directives, null, accountId),
     ...routeRows,
   ]);
+  await fileOutreachAsks(parsed.outreach_asks, accountId);
 
   const hubspot = await autoFileEngagement(activity.id);
 

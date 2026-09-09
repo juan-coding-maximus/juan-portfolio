@@ -11,7 +11,6 @@
 
 import { revalidatePath } from "next/cache";
 import {
-  insertDraftRequest,
   insertSdrScheduleItem,
   searchOwnedAccounts,
   setSdrScheduleStatus,
@@ -44,24 +43,12 @@ export async function updateSdrScheduleStatus(
   return row;
 }
 
-export type FlagOutboundResult = { ok: true; draftId: string } | { ok: false; error: string };
-
 /**
- * "Tell outbound a client needs an email with specifics." Files straight into
- * the Outbound queue as a pending draft, Juan's own words as the body, exact,
- * never re-summarized (root AGENTS.md P2: no fabrication, nothing invented on
- * the way in). Outbound still requires a human "Mark sent" before anything
- * claims to have gone out, this only ever stages the ask.
+ * "Tell outbound a client needs an email with specifics" used to be a manual
+ * flag here. Juan's ask, 2026-09-08: it should come from the call itself, not
+ * a second thing to type. That's now touchpoint.ts's outreach_asks, filed the
+ * moment the call is logged through the SAME capture box this page already
+ * uses. This page's job is just to show what landed there, see
+ * lib/sdr-ui.tsx's ViewInOutbound, which opens /nutribiotic/outbound?account=
+ * in a new tab instead of flagging anything itself.
  */
-export async function flagNeedsEmail(accountId: string, specifics: string): Promise<FlagOutboundResult> {
-  const text = specifics.trim();
-  if (!text) return { ok: false, error: "Say what the email needs to cover." };
-  try {
-    const draft = await insertDraftRequest({ account_id: accountId, specifics: text });
-    revalidatePath("/nutribiotic/outbound");
-    revalidatePath("/nutribiotic/sdr");
-    return { ok: true, draftId: draft.id };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
-  }
-}
