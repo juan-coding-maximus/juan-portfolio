@@ -440,8 +440,28 @@ export function AccountsMap({
   const [boundaries, setBoundaries] = useState<Map<string, TerritoryArea["boundary"]> | null>(null);
   const boundaryAsked = useRef(false);
 
+  /**
+   * THE AREAS OVERLAY (Juan's ask, 2026-09-09): the coloured territory shading
+   * back on the map, behind a toggle in the same row as Chains / Practices /
+   * Route line, and behaving exactly like Route line.
+   *
+   * OFF BY DEFAULT, which is what it already effectively was: before this,
+   * frontiers only appeared for an area whose filter chip was picked, and the
+   * resting state of that filter is "none picked". So the map still opens as
+   * the map, and the shading is something Juan turns on to read the division.
+   *
+   * LOCAL STATE, not nb_ui_prefs, same as showRouteChain and unlike the
+   * chains/practices toggles. Those two hide ACCOUNTS -- a filtered map that
+   * looks unfiltered is how you conclude a territory is empty, so they persist
+   * and follow him between devices. This one draws an overlay on top of a map
+   * that is showing everything either way; getting it back is one tap.
+   */
+  const [showAreas, setShowAreas] = useState(false);
+
   useEffect(() => {
-    if (activeAreas.size === 0 || boundaryAsked.current) return;
+    // Either door needs the polygons: picking a single area's chip, or turning
+    // the whole overlay on. Still fetched once per page view, never on load.
+    if ((activeAreas.size === 0 && !showAreas) || boundaryAsked.current) return;
     boundaryAsked.current = true;
     let live = true;
     listAreaBoundaries()
@@ -452,15 +472,22 @@ export function AccountsMap({
     return () => {
       live = false;
     };
-  }, [activeAreas.size]);
+  }, [activeAreas.size, showAreas]);
 
+  /* WITH THE OVERLAY ON, EVERY AREA IS DRAWN, including ones the chips are
+     currently filtering pins out of. The two controls answer different
+     questions: a chip asks "show me only these accounts", the overlay asks
+     "where do the areas actually sit". Hiding the shading for a filtered-out
+     area would make the second question unanswerable while the first is being
+     asked, and the frontier is a fact about the ground either way. */
   const shownAreas = useMemo(() => {
-    if (activeAreas.size === 0 || !boundaries) return [];
+    if (!boundaries) return [];
+    if (!showAreas && activeAreas.size === 0) return [];
     return areas
-      .filter((a) => activeAreas.has(a.id))
+      .filter((a) => showAreas || activeAreas.has(a.id))
       .map((a) => ({ ...a, boundary: a.boundary ?? boundaries.get(a.id) ?? null }))
       .filter((a) => a.boundary);
-  }, [areas, activeAreas, boundaries]);
+  }, [areas, activeAreas, boundaries, showAreas]);
 
   /* What every badge below counts FROM. Chains and practices are excluded
      here whenever their toggle is off (the resting state), same predicate as
@@ -991,6 +1018,31 @@ export function AccountsMap({
             <Ico name="route" size={12} />
             {showRouteChain ? "Route line on" : "Route line"}{" "}
             <span className="tabular-nums opacity-70">{routeStops.length}</span>
+          </button>
+        )}
+        {/* THE AREAS OVERLAY TOGGLE (Juan, 2026-09-09). Same row, same shape
+            and same interaction as Route line: on or off, no persistence, no
+            second meaning. The count is how many areas would be painted, so
+            the button says what it is about to do before it is pressed. */}
+        {areas.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowAreas((v) => !v)}
+            aria-pressed={showAreas}
+            title={
+              showAreas
+                ? "Hide the coloured area boundaries"
+                : "Shade each territory area in its own colour, the same colour as its chip above"
+            }
+            className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
+              showAreas
+                ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
+                : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
+            }`}
+          >
+            <Ico name="pin" size={12} />
+            {showAreas ? "Areas on" : "Areas off"}{" "}
+            <span className="tabular-nums opacity-70">{areas.length}</span>
           </button>
         )}
         {/* THE KEY TO THE BANDS. Four colours mean nothing without it, and the
