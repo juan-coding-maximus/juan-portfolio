@@ -30,6 +30,7 @@
  */
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import type {
   CallEntry,
   CustomStop,
@@ -166,6 +167,49 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       ctrl.abort();
     };
   }, [days]);
+
+  /**
+   * RE-HYDRATE ON ARRIVAL AT /map, AND ONLY THEN (2026-09-09).
+   *
+   * SDR's "Add to route" (sdr-ui.tsx's AddToRoute) writes nb_ui_prefs.route_draft
+   * through its own server action, addSdrItemToRoute, deliberately bypassing this
+   * context so the SDR page never has to mount a route provider of its own. That
+   * write's revalidatePath("/nutribiotic/map") only invalidates the RSC cache;
+   * this provider's route state is a client fetch gated by `hydratedRef`, so it
+   * never saw the new stop. Juan would add a stop from /sdr, tap over to /map,
+   * and the route would look exactly like it did before he added anything, until
+   * a hard reload. Same gap for the report screen's addAccountToRouteDraft.
+   *
+   * Scoped to "just landed on /map from somewhere else", not every render or
+   * every foreground return, so it can't race an in-flight optimistic edit made
+   * WHILE already on /map (the exact hazard the mount-effect comment above
+   * describes) -- there is nothing pending the first moment this screen mounts.
+   */
+  const pathname = usePathname();
+  const prevPathRef = useRef(pathname);
+  useEffect(() => {
+    const prevPathname = prevPathRef.current;
+    prevPathRef.current = pathname;
+    if (!hydratedRef.current) return; // initial mount fetch already covers this
+    if (prevPathname === pathname) return;
+    if (pathname !== "/nutribiotic/map") return;
+
+    const ctrl = new AbortController();
+    fetch("/nutribiotic/api/route-state", { signal: ctrl.signal, cache: "no-store" })
+      .then((r) => (r.ok && !r.redirected ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((state: RouteState & { ok: boolean }) => {
+        if (!state.ok) return;
+        setDraftByDay(state.draft);
+        setCallsByDay(state.calls);
+        setDoneByDay(state.done);
+        setTimesByDay(state.times ?? {});
+      })
+      .catch(() => {
+        // Same posture as the mount fetch: an unreachable refresh leaves
+        // whatever was already showing rather than blanking the screen.
+      });
+    return () => ctrl.abort();
+  }, [pathname]);
 
   const routeDraft = useMemo(() => draftByDay[activeDay] ?? [], [draftByDay, activeDay]);
   const calls = useMemo(() => callsByDay[activeDay] ?? [], [callsByDay, activeDay]);
