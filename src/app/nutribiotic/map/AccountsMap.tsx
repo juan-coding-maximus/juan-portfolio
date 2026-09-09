@@ -651,9 +651,73 @@ export function AccountsMap({
     [routeStops, routeStart, routeEnd],
   );
 
+  /**
+   * PICKING AN AREA FRAMES THAT AREA, AND IT OUTRANKS THE ROUTE (Juan,
+   * 2026-09-09, after a screenshot of tapping Palm Desert and watching the
+   * camera stay over the westside).
+   *
+   * THE ROOT CAUSE, and it is not the geometry. The route branch below was
+   * added 2026-08-31 with a `return` in it, on the sound reasoning that a day's
+   * five stops beat 331 scattered pins as a default frame. What it did not
+   * distinguish is a DEFAULT from an INSTRUCTION: with any route on the active
+   * day, and Juan almost always has one, every filter change after it was
+   * swallowed by that early return. The chips filtered the pins correctly and
+   * the camera never moved. That is the "auto-zoom broken" note in
+   * [[nutribiotic-territory-areas]], not a regression from the new frontiers,
+   * and it is why fixing it means ordering the three fits by who asked rather
+   * than by which one was written last.
+   *
+   * ORDER, most explicit first: an area Juan just tapped, then the day's route,
+   * then the whole filtered book.
+   *
+   * FRAMES THE FRONTIER, NOT THE PINS. "Show me Palm Desert" means the area,
+   * and its polygon is the area (assign_areas.py derives it from the very
+   * accounts a pin fit would use, extended to every point in the plane). Eight
+   * pins clustered in Rancho Mirage would frame a corner of it and read as the
+   * whole thing. The polygons load on demand, so until they land this falls
+   * back to the pins and re-fits itself when they arrive: the signature carries
+   * which of the two it used, so the refinement is one more idle, not a
+   * competing answer.
+   */
+  const areaFitKey = useMemo(() => [...activeAreas].sort().join(","), [activeAreas]);
+
   const fitToPins = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
+
+    if (activeAreas.size > 0) {
+      const havePolys = areas.some((a) => activeAreas.has(a.id) && (a.boundary ?? boundaries?.get(a.id)));
+      const key = `area:${areaFitKey}:${havePolys ? "frontier" : "pins"}`;
+      if (fittedRef.current === key) return;
+      const bounds = new google.maps.LatLngBounds();
+      let points = 0;
+      if (havePolys) {
+        for (const a of areas) {
+          if (!activeAreas.has(a.id)) continue;
+          const b = a.boundary ?? boundaries?.get(a.id) ?? null;
+          if (!b) continue;
+          for (const poly of b.coordinates) {
+            for (const ring of poly) {
+              for (const [lng, lat] of ring) {
+                bounds.extend({ lat, lng });
+                points += 1;
+              }
+            }
+          }
+        }
+      } else {
+        // `filtered` is already narrowed to the picked area(s) by the same set.
+        for (const a of filtered) {
+          bounds.extend({ lat: a.lat, lng: a.lng });
+          points += 1;
+        }
+      }
+      if (points > 0) {
+        map.fitBounds(bounds, 32);
+        fittedRef.current = key;
+      }
+      return;
+    }
 
     if (routeStops.length > 0) {
       const key = `route:${routeFitKey}`;
@@ -675,15 +739,17 @@ export function AccountsMap({
     for (const a of filtered) bounds.extend({ lat: a.lat, lng: a.lng });
     map.fitBounds(bounds, 48);
     fittedRef.current = fitKey;
-  }, [filtered, fitKey, routeStops, routeFitKey, routeStart, routeEnd]);
+  }, [filtered, fitKey, routeStops, routeFitKey, routeStart, routeEnd, activeAreas, areaFitKey, areas, boundaries]);
 
-  // A new filter, or a change to the active day's route, means the previous
-  // fit no longer describes what is on screen, so the guard is cleared and
-  // the next idle re-frames.
+  // A new filter, a change to the active day's route, a different set of areas
+  // picked, or the frontier polygons finally landing: each means the previous
+  // fit no longer describes what is on screen, so the guard is cleared and the
+  // next idle re-frames. `boundaries` is in here for the last of those, which
+  // is what upgrades an area fit from its pins to its real frontier.
   useEffect(() => {
     fittedRef.current = "";
     fitToPins();
-  }, [fitKey, routeFitKey, mapReady, fitToPins]);
+  }, [fitKey, routeFitKey, areaFitKey, boundaries, mapReady, fitToPins]);
 
   /* OPEN ON JUAN, kinda zoomed in. The fix arrives async (1-3s on a phone), so
      this cannot be an initial-center option: by then the territory fit has run.
@@ -702,12 +768,17 @@ export function AccountsMap({
   const userCentredRef = useRef(false);
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !userLoc || !mapReady || userCentredRef.current || routeStops.length > 0) return;
+    /* ...and not when he has picked an area (2026-09-09). A GPS fix lands one
+       to three seconds late, which is exactly long enough to land AFTER the
+       area fit and quietly undo it. An area chip is an explicit instruction;
+       "recentre on wherever he is standing" is a default, and a default never
+       overwrites an instruction. */
+    if (!map || !userLoc || !mapReady || userCentredRef.current || routeStops.length > 0 || activeAreas.size > 0) return;
     map.setCenter(userLoc);
     map.setZoom(12);
     fittedRef.current = fitKey;
     userCentredRef.current = true;
-  }, [userLoc, mapReady, fitKey, routeStops.length]);
+  }, [userLoc, mapReady, fitKey, routeStops.length, activeAreas.size]);
 
   /**
    * REFIT WHEN THE PANE CHANGES SHAPE (2026-08-26, with the two-pane layout).
