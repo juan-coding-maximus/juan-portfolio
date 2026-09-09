@@ -18,9 +18,12 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   addSdrScheduleItem,
   getSdrAccountPanel,
+  rescheduleSdrItem,
   searchSdrAccounts,
+  searchSdrClients,
   updateSdrScheduleStatus,
   type SdrAccountPanel,
+  type SdrSearchHit,
 } from "./sdr-actions";
 import type { SdrScheduleItem } from "./dal";
 import { TouchpointCapture } from "./touchpoint-ui";
@@ -30,6 +33,14 @@ import { Ico, HUBSPOT_COMPANY_URL, daysAgo } from "./ui";
 export type SdrDayItem = SdrScheduleItem & {
   displayName: string;
   displayPhone: string | null;
+  /** From lib/priority.ts, computed server-side in sdr/page.tsx. Null on a
+   *  prospect with no account behind it, and on an account none of whose
+   *  inputs are known: not scored is never rendered as a zero. */
+  priorityScore: number | null;
+  /** The evidence that produced the score. Required alongside it everywhere,
+   *  same contract 0035 set for urgency_reason. */
+  priorityReason: string | null;
+  priorityBand: "now" | "soon" | "later" | "unscored" | null;
 };
 
 /** Adds `n` calendar days to a YYYY-MM-DD string, anchored to the date the
@@ -112,6 +123,14 @@ function AddToDayForm({ date, onAdded }: { date: string; onAdded: (item: SdrDayI
         ...row,
         displayName: mode === "account" ? picked!.name : prospectName.trim(),
         displayPhone: mode === "account" ? picked!.phone : prospectPhone.trim() || null,
+        // Unscored until the next server render, deliberately: scoring needs
+        // the whole book's revenue distribution (see priority.ts), and pulling
+        // 437 accounts into this form to rank one freshly typed row would cost
+        // more egress than the ordering is worth. Null renders as no chip at
+        // all rather than as a zero, and the row ranks on the next load.
+        priorityScore: null,
+        priorityReason: null,
+        priorityBand: null,
       });
       reset();
     });
@@ -247,6 +266,137 @@ function ViewInOutbound({ accountId }: { accountId: string }) {
 }
 
 /**
+ * One search bar for both companies and people, no mode toggle (Juan's ask,
+ * 2026-09-08). A hit's "View" opens it in the main panel without scheduling
+ * anything; "Add to day" picks a date and files it into the queue like
+ * AddToDayForm does, from a different starting point (a name he already
+ * knows, not a specific day he's already looking at).
+ */
+function GlobalSearch({
+  todayIso,
+  onView,
+  onAdded,
+}: {
+  todayIso: string;
+  onView: (hit: SdrSearchHit) => void;
+  onAdded: (item: SdrDayItem) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [hits, setHits] = useState<SdrSearchHit[]>([]);
+  const [pending, startTransition] = useTransition();
+  const [addingFor, setAddingFor] = useState<string | null>(null);
+  const [dateValue, setDateValue] = useState(todayIso);
+
+  function search(q: string) {
+    setQuery(q);
+    setAddingFor(null);
+    if (q.trim().length < 2) {
+      setHits([]);
+      return;
+    }
+    startTransition(async () => {
+      setHits(await searchSdrClients(q));
+    });
+  }
+
+  function confirmAdd(hit: SdrSearchHit) {
+    startTransition(async () => {
+      const row = await addSdrScheduleItem({
+        account_id: hit.accountId,
+        kind: "call",
+        scheduled_date: dateValue,
+        notes: null,
+      });
+      onAdded({
+        ...row,
+        displayName: hit.accountName,
+        displayPhone: hit.phone,
+        priorityScore: null,
+        priorityReason: null,
+        priorityBand: null,
+      });
+      setAddingFor(null);
+      setQuery("");
+      setHits([]);
+    });
+  }
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <input
+          value={query}
+          onChange={(e) => search(e.target.value)}
+          placeholder="Search your accounts and contacts by name"
+          className="w-full rounded-md border border-[#E2DFD5] bg-white py-2 pr-3 pl-9 text-[13.5px] outline-none focus:border-[#14201B]"
+        />
+        <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[#8A928C]">
+          <Ico name="search" size={14} />
+        </div>
+      </div>
+
+      {query.trim().length >= 2 && (
+        <div className="absolute z-20 mt-1.5 w-full rounded-md border border-[#E2DFD5] bg-white shadow-sm">
+          {pending && hits.length === 0 ? (
+            <div className="px-3 py-2.5 text-[13px] text-[#8A928C]">Searching…</div>
+          ) : hits.length === 0 ? (
+            <div className="px-3 py-2.5 text-[13px] text-[#8A928C]">No match in your book.</div>
+          ) : (
+            hits.map((hit) => (
+              <div key={hit.accountId} className="flex items-center justify-between gap-2 border-b border-[#F0EEE6] p-2.5 last:border-b-0">
+                <div className="min-w-0">
+                  <div className="truncate text-[13px] font-medium text-[#14201B]">
+                    {hit.contactName
+                      ? `${hit.contactName}${hit.contactTitle ? `, ${hit.contactTitle}` : ""} · ${hit.accountName}`
+                      : hit.accountName}
+                  </div>
+                  <div className="text-[11.5px] text-[#8A928C]">{[hit.city, hit.phone].filter(Boolean).join(" · ") || " "}</div>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {addingFor === hit.accountId ? (
+                    <>
+                      <input
+                        type="date"
+                        value={dateValue}
+                        onChange={(e) => setDateValue(e.target.value)}
+                        className="rounded-md border border-[#E2DFD5] px-1.5 py-1 text-[12px]"
+                      />
+                      <button
+                        onClick={() => confirmAdd(hit)}
+                        disabled={pending}
+                        className="rounded-md bg-[#14201B] px-2.5 py-1 text-[11.5px] font-medium text-[#F7F6F1] disabled:opacity-30"
+                      >
+                        Add
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setAddingFor(hit.accountId);
+                        setDateValue(todayIso);
+                      }}
+                      className="rounded-md border border-[#E2DFD5] px-2.5 py-1 text-[11.5px] font-medium text-[#5B6560] hover:bg-[#F7F6F1]"
+                    >
+                      Add to day
+                    </button>
+                  )}
+                  <button
+                    onClick={() => onView(hit)}
+                    className="rounded-md border border-[#E2DFD5] px-2.5 py-1 text-[11.5px] font-medium text-[#5B6560] hover:bg-[#F7F6F1]"
+                  >
+                    View
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * One row in the day list. Deliberately thin (2026-09-08 redesign): the
  * notes preview and the Outbound link used to print on every row, which is
  * exactly the "crowded" Juan pointed at. Both moved into AccountPanel below,
@@ -257,25 +407,49 @@ function ScheduleRow({
   active,
   onSelect,
   onStatus,
+  onReschedule,
 }: {
   item: SdrDayItem;
   active: boolean;
   onSelect: () => void;
   onStatus: (status: "done" | "skipped") => void;
+  onReschedule: (date: string) => void;
 }) {
   const done = item.status === "done";
   const skipped = item.status === "skipped";
+  const [moving, setMoving] = useState(false);
 
   return (
     <li
-      className={`flex items-center gap-2 rounded-md border p-2 ${active ? "border-[#14201B] bg-[#FAF9F5]" : "border-[#E2DFD5]"} ${done ? "opacity-60" : ""} ${skipped ? "opacity-40" : ""}`}
+      className={`flex flex-wrap items-center gap-2 rounded-md border p-2 ${active ? "border-[#14201B] bg-[#FAF9F5]" : "border-[#E2DFD5]"} ${done ? "opacity-60" : ""} ${skipped ? "opacity-40" : ""}`}
     >
       <button onClick={onSelect} className="min-w-0 flex-1 text-left">
-        <div className="truncate text-[13px] font-medium text-[#14201B]">{item.displayName}</div>
+        <div className="flex items-baseline gap-1.5">
+          {/* The number that put this row where it is, printed on the row
+              rather than only explaining itself in the panel above. */}
+          {item.priorityScore !== null && (
+            <span
+              className={`shrink-0 rounded px-1 py-0.5 text-[10.5px] font-medium tabular-nums ${
+                item.priorityBand === "now" ? "bg-[#F3E3C6] text-[#8A6D2F]" : "bg-[#ECEAE1] text-[#5B6560]"
+              }`}
+            >
+              {item.priorityScore}
+            </span>
+          )}
+          <div className="truncate text-[13px] font-medium text-[#14201B]">{item.displayName}</div>
+        </div>
         <div className="mt-0.5 flex items-center gap-1.5 text-[11px] uppercase tracking-[0.08em] text-[#8A928C]">
           <span>{item.kind}</span>
           {item.status !== "pending" && <span>· {item.status}</span>}
         </div>
+        {/* Why it is ranked here, in words. The rail is narrow, so it clamps
+            to two lines; the full sentence is the title. A score with no
+            visible reason is the black box 0035 refused to build. */}
+        {item.priorityReason && (
+          <div className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-[#8A928C]" title={item.priorityReason}>
+            {item.priorityReason}
+          </div>
+        )}
       </button>
       <div className="flex shrink-0 items-center gap-1">
         {item.displayPhone && (
@@ -290,6 +464,21 @@ function ScheduleRow({
         )}
         {!done && !skipped && (
           <>
+            {/* Move this one to another day. Opens the picker rather than
+                showing a date field on every row: the rail holds a week of
+                calls and a permanent input on each would be more chrome than
+                queue. The date itself is the only thing that moves, and the
+                move is what stops the 30-minute follow-through pass proposing
+                a competing day for this account (migration 0063). */}
+            <button
+              onClick={() => setMoving((v) => !v)}
+              title="Move to another day"
+              className={`flex h-6 w-6 items-center justify-center rounded-md border text-[#5B6560] hover:bg-[#F7F6F1] ${
+                moving ? "border-[#14201B]" : "border-[#E2DFD5]"
+              }`}
+            >
+              <Ico name="clock" size={12} />
+            </button>
             <button
               onClick={() => onStatus("done")}
               title="Mark done"
@@ -307,6 +496,35 @@ function ScheduleRow({
           </>
         )}
       </div>
+
+      {moving && (
+        <div className="flex w-full items-center gap-2 border-t border-[#EFEDE5] pt-2">
+          <label className="text-[11px] uppercase tracking-[0.08em] text-[#8A928C]">Move to</label>
+          {/* A native date input, not a custom calendar: it is the control both
+              iOS and the Mac already know how to open, and this row is worked
+              from a phone as often as a desk. `defaultValue` is the day it is
+              on now, so the picker opens where the row actually is. */}
+          <input
+            type="date"
+            defaultValue={item.scheduled_date}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v || v === item.scheduled_date) return;
+              setMoving(false);
+              onReschedule(v);
+            }}
+            className="rounded-md border border-[#E2DFD5] bg-white px-2 py-1 text-[12.5px] text-[#3D4A44] outline-none focus:border-[#14201B]"
+          />
+          {item.rescheduled_at && (
+            <span
+              className="text-[11px] text-[#8A928C]"
+              title="You moved this one. The automatic follow-up pass will not propose a different day for it."
+            >
+              moved by you
+            </span>
+          )}
+        </div>
+      )}
     </li>
   );
 }
@@ -425,8 +643,8 @@ function AccountPanel({ item, onFiled }: { item: SdrDayItem; onFiled: (r: FiledT
                 {panel.contacts.map((c) => (
                   <div key={c.id} className="flex items-baseline justify-between gap-2 text-[12.5px]">
                     <span className="font-medium text-[#3D4A44]">
-                      {c.name}
-                      {c.title && <span className="font-normal text-[#8A928C]"> · {c.title}</span>}
+                      Contact: {c.name}
+                      {c.title ? `, ${c.title}` : ""}
                     </span>
                     <span className="shrink-0 text-[#8A928C]">{c.phone ?? c.email ?? ""}</span>
                   </div>
@@ -439,15 +657,79 @@ function AccountPanel({ item, onFiled }: { item: SdrDayItem; onFiled: (r: FiledT
 
       <div>
         <div className="mb-2 text-[12px] uppercase tracking-[0.1em] text-[#8A928C]">Log this call</div>
-        <TouchpointCapture accountIdHint={item.account_id} onFiled={onFiled} lockKind="call" />
+        {/* Keyed per item: a fresh TouchpointCapture instance per selection,
+            so the "Called X and spoke with: " template is right for whoever
+            is on the line, not whoever he was calling before. */}
+        <TouchpointCapture
+          key={item.id}
+          accountIdHint={item.account_id}
+          onFiled={onFiled}
+          lockKind="call"
+          initialText={`Called ${item.displayName} and spoke with: `}
+        />
       </div>
     </div>
   );
 }
 
-export function SdrScreen({ initialItems, todayIso, days }: { initialItems: SdrDayItem[]; todayIso: string; days: number }) {
+export function SdrScreen({
+  initialItems,
+  todayIso,
+  days,
+  focusAccountId,
+  focusAccountName,
+  focusAccountPhone,
+}: {
+  initialItems: SdrDayItem[];
+  todayIso: string;
+  days: number;
+  /** From /nutribiotic/sdr?account=<id>, which the priority panel's "Call ..."
+   *  action links to. The panel opens on that account whether or not it has a
+   *  row scheduled: a prescriptive list has to be able to hand off to the
+   *  thing it prescribes, and most high-priority accounts are high priority
+   *  precisely because nothing is scheduled for them yet. */
+  focusAccountId?: string | null;
+  focusAccountName?: string | null;
+  focusAccountPhone?: string | null;
+}) {
   const [items, setItems] = useState(initialItems);
   const [active, setActive] = useState<SdrDayItem | null>(null);
+
+  /* Opening on a deep-linked account when it has no scheduled row means
+     showing AccountPanel for something nb_sdr_schedule does not contain. The
+     stand-in exists only in this component's state and is never written: it
+     carries a synthetic id so nothing can mark it done, and AccountPanel keys
+     entirely off account_id anyway. Adding a real row here instead would put
+     a call on Juan's calendar he never asked for. */
+  useEffect(() => {
+    if (!focusAccountId) return;
+    const existing = initialItems.find((it) => it.account_id === focusAccountId && it.status === "pending");
+    if (existing) {
+      setActive(existing);
+      return;
+    }
+    if (!focusAccountName) return;
+    setActive({
+      id: `unscheduled:${focusAccountId}`,
+      account_id: focusAccountId,
+      prospect_name: null,
+      prospect_phone: null,
+      kind: "call",
+      scheduled_date: todayIso,
+      status: "pending",
+      notes: null,
+      completed_activity_id: null,
+      created_at: new Date().toISOString(),
+      rescheduled_at: null,
+      origin: "manual",
+      displayName: focusAccountName,
+      displayPhone: focusAccountPhone ?? null,
+      priorityScore: null,
+      priorityReason: null,
+      priorityBand: null,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusAccountId]);
 
   const dayIsos = useMemo(() => {
     const out: string[] = [];
@@ -470,13 +752,65 @@ export function SdrScreen({ initialItems, todayIso, days }: { initialItems: SdrD
     void updateSdrScheduleStatus(id, status, completedActivityId);
   }
 
+  /* Optimistic, same as setStatus: the row moves in the rail immediately and
+     the write follows. `rescheduled_at` is stamped locally too so the "moved
+     by you" note and the follow-through pass's stand-down are consistent
+     without waiting for a refetch. */
+  function reschedule(id: string, date: string) {
+    setItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, scheduled_date: date, rescheduled_at: new Date().toISOString() } : it)),
+    );
+    setActive((cur) => (cur?.id === id ? { ...cur, scheduled_date: date, rescheduled_at: new Date().toISOString() } : cur));
+    void rescheduleSdrItem(id, date);
+  }
+
   function onFiled(result: FiledTouchpoint) {
     if (!active) return;
+    // A stand-in for a deep-linked, unscheduled account has no row to close.
+    if (active.id.startsWith("unscheduled:")) {
+      setActive(null);
+      return;
+    }
     setStatus(active.id, "done", result.activityId ?? undefined);
   }
 
+  /* The search bar's "View": same unscheduled stand-in focusAccountId already
+     uses above, so a client found by name behaves exactly like one landed on
+     from the priority panel, opens the panel, schedules nothing. If it's
+     already in today's or a later day's pending queue, that real row wins
+     instead of a second stand-in for the same account. */
+  function viewHit(hit: SdrSearchHit) {
+    const existing = items.find((it) => it.account_id === hit.accountId && it.status === "pending");
+    if (existing) {
+      setActive(existing);
+      return;
+    }
+    setActive({
+      id: `unscheduled:${hit.accountId}`,
+      account_id: hit.accountId,
+      prospect_name: null,
+      prospect_phone: null,
+      kind: "call",
+      scheduled_date: todayIso,
+      status: "pending",
+      notes: null,
+      completed_activity_id: null,
+      created_at: new Date().toISOString(),
+      rescheduled_at: null,
+      origin: "manual",
+      displayName: hit.accountName,
+      displayPhone: hit.phone,
+      priorityScore: null,
+      priorityReason: null,
+      priorityBand: null,
+    });
+  }
+
   return (
-    <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+    <div className="flex flex-col gap-4">
+      <GlobalSearch todayIso={todayIso} onView={viewHit} onAdded={addItem} />
+
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
       {/* The queue, 2026-09-08 redesign: this used to be the main view (a
           grid of day columns) with a generic capture box off to the side.
           Juan's ask was the other way round, an account panel doing the real
@@ -488,7 +822,14 @@ export function SdrScreen({ initialItems, todayIso, days }: { initialItems: SdrD
             .filter((it) => it.scheduled_date === iso)
             // Pending first, so a fresh Today never buries an open call under
             // yesterday's already-done rows carried in the same fetch window.
-            .sort((a, b) => (a.status === b.status ? 0 : a.status === "pending" ? -1 : 1));
+            // Then by priority INSIDE the pending block (2026-09-08): the old
+            // fallback was creation order, which only recorded which row was
+            // typed first. Null sorts last, never as zero, and Array.sort's
+            // stability keeps creation order as the final tiebreak.
+            .sort((a, b) => {
+              if (a.status !== b.status) return a.status === "pending" ? -1 : 1;
+              return (b.priorityScore ?? -1) - (a.priorityScore ?? -1);
+            });
           return (
             <div key={iso} className="rounded-lg border border-[#E2DFD5] bg-white p-3">
               <div className="mb-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#5B6560]">
@@ -502,6 +843,7 @@ export function SdrScreen({ initialItems, todayIso, days }: { initialItems: SdrD
                     active={active?.id === it.id}
                     onSelect={() => setActive(it)}
                     onStatus={(status) => setStatus(it.id, status)}
+                    onReschedule={(date) => reschedule(it.id, date)}
                   />
                 ))}
               </ul>
@@ -521,6 +863,7 @@ export function SdrScreen({ initialItems, todayIso, days }: { initialItems: SdrD
             Pick a call or visit from the queue
           </div>
         )}
+      </div>
       </div>
     </div>
   );

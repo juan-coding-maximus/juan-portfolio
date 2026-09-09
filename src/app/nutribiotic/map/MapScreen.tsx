@@ -29,7 +29,7 @@ import {
   toggleShowPracticeAccounts,
 } from "../lib/prefs-actions";
 import { useRoute } from "../lib/route-context";
-import { AccountsMap } from "./AccountsMap";
+import { AccountsMap, type AccountPriority } from "./AccountsMap";
 import { routeDriveMatrix, type DriveLeg } from "./drive-actions";
 import { cheapestGap, haversineMatrix, optimizedStopOrder, type Matrix } from "./route-optimize";
 import { RoutePanel } from "./RoutePanel";
@@ -49,6 +49,8 @@ export type RouteStopView = { id: string; lat: number; lng: number } & (
 
 export function MapScreen({
   accounts,
+  priorityById,
+  initialFocusId,
   areas,
   initialShowChains,
   initialShowPractices,
@@ -56,6 +58,16 @@ export function MapScreen({
   endpointsByDay,
 }: {
   accounts: MapAccount[];
+  /** lib/priority.ts's score per account, computed server-side (see
+   *  map/page.tsx). Passed through untouched: this component never ranks, it
+   *  only hands the numbers to the pin card and the closest-stops list. An id
+   *  absent from this object is unscored, which is not the same as zero and is
+   *  drawn as nothing at all. */
+  priorityById: Record<string, AccountPriority>;
+  /** From /nutribiotic/map?focus=<id>, which the priority panel's "Put on a
+   *  route" action links to. The map opens with that pin's card already
+   *  showing, so the action lands on the account rather than on the map. */
+  initialFocusId?: string | null;
   areas: TerritoryArea[];
   initialShowChains: boolean;
   initialShowPractices: boolean;
@@ -342,6 +354,16 @@ export function MapScreen({
     if (!alreadyVisible) box.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  // The ?focus= deep link, fired once on mount. Same signal a list tap uses,
+  // so there is one focus path rather than two that can drift apart.
+  useEffect(() => {
+    if (!initialFocusId) return;
+    if (!accounts.some((a) => a.id === initialFocusId)) return;
+    focusN.current += 1;
+    setFocus({ id: initialFocusId, n: focusN.current });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFocusId]);
+
   // Ask for the fix. Callable again from the list's retry button, because the
   // two failures that actually happen here are both recoverable without a
   // reload: an unanswered permission bubble, and a Mac that took its time.
@@ -459,6 +481,7 @@ export function MapScreen({
       >
         <AccountsMap
           accounts={accounts}
+          priorityById={priorityById}
           areas={areas}
           userLoc={loc}
           focus={focus}

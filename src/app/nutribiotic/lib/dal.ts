@@ -38,6 +38,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { hasAccess } from "./devices";
 import { hasWidgetToken } from "./session";
+import { byPriority, computePriority, type PriorityInput, type PriorityResult } from "./priority";
 
 const SB_URL = process.env.NB_SUPABASE_URL ?? "";
 const SB_KEY = process.env.NB_SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -1167,6 +1168,9 @@ export type SdrScheduleItem = {
   notes: string | null;
   completed_activity_id: number | null;
   created_at: string;
+  /** When a human last moved this row to another day (0063). Null means
+   *  nobody has, and follow_through.py may still propose a date for it. */
+  rescheduled_at: string | null;
   origin: Origin;
 };
 
@@ -1193,6 +1197,51 @@ export async function searchOwnedAccounts(nameQuery: string, limit = 8): Promise
   });
 }
 
+/**
+ * A person-name search for SDR's unified search bar. nb_contacts carries no
+ * owner of its own (ownership lives on the account it belongs to), so this
+ * over-fetches contact matches by name, then filters to Juan's owned, open
+ * accounts the same two conditions searchOwnedAccounts uses, in a second
+ * query rather than a client-side join Supabase's REST layer can't express
+ * in one request.
+ */
+export async function searchOwnedContacts(nameQuery: string, limit = 8): Promise<Result<{
+  id: string;
+  name: string;
+  title: string | null;
+  account_id: string;
+  account_name: string;
+  city: string | null;
+  phone: string | null;
+  origin?: Origin;
+}>> {
+  const q = nameQuery.trim().replace(/[%,]/g, "");
+  if (!q) return { mode: "empty", data: [], origins: [] };
+  const hits = await query<{ id: string; first_name: string | null; last_name: string | null; title: string | null; phone: string | null; account_id: string; origin?: Origin }>(
+    "nb_contacts",
+    { select: "id,first_name,last_name,title,phone,account_id", or: `(first_name.ilike.*${q}*,last_name.ilike.*${q}*)`, limit: limit * 3 },
+  );
+  if (hits.data.length === 0) return { mode: hits.mode, data: [], origins: hits.origins };
+  const accountIds = [...new Set(hits.data.map((h) => h.account_id))];
+  const accounts = await query<{ id: string; name: string; city: string | null; phone: string | null; origin?: Origin }>("nb_accounts", {
+    select: "id,name,city,phone",
+    id: `in.(${accountIds.join(",")})`,
+    hubspot_owner_id: `eq.${JUAN_OWNER_ID}`,
+    closed_at: "is.null",
+  });
+  const byId = new Map(accounts.data.map((a) => [a.id, a]));
+  const data = hits.data
+    .map((h) => {
+      const a = byId.get(h.account_id);
+      if (!a) return null;
+      const name = [h.first_name, h.last_name].filter(Boolean).join(" ") || "Unnamed contact";
+      return { id: h.id, name, title: h.title, account_id: a.id, account_name: a.name, city: a.city, phone: h.phone ?? a.phone };
+    })
+    .filter((r): r is NonNullable<typeof r> => r !== null)
+    .slice(0, limit);
+  return { mode: accounts.mode, data, origins: accounts.origins };
+}
+
 /** From today through `days` out, oldest first. Juan reads this as a week,
  * not a backlog: nothing before today, nothing past the horizon he asked to
  * plan. */
@@ -1205,6 +1254,30 @@ export async function listSdrSchedule(days = 8): Promise<Result<SdrScheduleItem>
     order: "scheduled_date.asc,created_at.asc",
     limit: 500,
   }).then((res) => ({ ...res, data: res.data.filter((r) => r.scheduled_date <= to) }));
+}
+
+/**
+ * Move a scheduled call or visit to a different day (Juan's ask, 2026-09-08).
+ *
+ * scheduled_date is the field the whole SDR queue groups and orders by, so
+ * moving it IS the reschedule; there is no second copy of the day anywhere to
+ * keep in step. `rescheduled_at` (migration 0063) is stamped in the same write,
+ * and it is not decoration: follow_through.py proposes dates onto this same
+ * table every 30 minutes, and this stamp is the only thing that tells it a
+ * human already answered for this account. Without it the pass and Juan would
+ * take turns overwriting each other, each correctly.
+ */
+export async function rescheduleSdrScheduleItem(id: string, scheduledDate: string): Promise<SdrScheduleItem> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(scheduledDate)) {
+    throw new Error(`Not a date: ${scheduledDate}`);
+  }
+  const [row] = await mutate<SdrScheduleItem>(
+    "nb_sdr_schedule",
+    "PATCH",
+    { scheduled_date: scheduledDate, rescheduled_at: new Date().toISOString() },
+    { id: `eq.${id}` },
+  );
+  return row;
 }
 
 export type NewSdrScheduleItem = {
@@ -1679,6 +1752,108 @@ export type NearbyAccount = {
  * HubSpot routes on, so this app and the portal cannot disagree about who is in it.
  */
 export const JUAN_OWNER_ID = "36242368";
+
+// ---------------------------------------------------------------------------
+// Account priority (2026-09-08). The inputs to lib/priority.ts, gathered once
+// and scored once, so Map, SDR and Outbound all rank the same account the same
+// way. See priority.ts for what each field is and why nothing is persisted.
+//
+// SCOPED TO JUAN'S BOOK BY hubspot_owner_id, in the query. The portal is
+// shared; another rep's account is not material for Juan's ranking even when a
+// draft or a schedule row happens to point at one, and an id that comes back
+// unscored simply has no entry in the returned map.
+// ---------------------------------------------------------------------------
+
+export type PriorityBook = {
+  byId: Map<string, PriorityResult>;
+  /** Every scored account, best first, for the shared panel. */
+  ranked: { account: PriorityInput; result: PriorityResult }[];
+  /** Honest reporting of what the book could NOT be scored on. */
+  coverage: { accounts: number; scored: number; withRevenue: number; withCadence: number; withUrgency: number };
+};
+
+export async function getPriorityBook(): Promise<PriorityBook> {
+  const empty: PriorityBook = {
+    byId: new Map(),
+    ranked: [],
+    coverage: { accounts: 0, scored: 0, withRevenue: 0, withCadence: 0, withUrgency: 0 },
+  };
+  if (!isConfigured()) return empty;
+
+  const [accounts, grades, drafts, touches] = await Promise.all([
+    raw<{
+      id: string;
+      name: string;
+      lifecycle: string | null;
+      phone: string | null;
+      trailing_12m_revenue: number | null;
+      lifetime_revenue: number | null;
+      last_order_at: string | null;
+      expected_reorder_days: number | null;
+      places_status: string | null;
+      closed_at: string | null;
+      do_not_visit: boolean | null;
+    }>(
+      "nb_accounts?select=id,name,lifecycle,phone,trailing_12m_revenue,lifetime_revenue,last_order_at," +
+        `expected_reorder_days,places_status,closed_at,do_not_visit&hubspot_owner_id=eq.${JUAN_OWNER_ID}` +
+        // Same scope every other surface uses: not the waypoint (Juan's own
+        // apartment is not an account), and not a closed one. A closed store
+        // is not a low priority, it is not a customer, and ranking it at all
+        // would put it on a list headed "work this first".
+        "&lifecycle=neq.waypoint&closed_at=is.null&limit=2000",
+    ),
+    raw<{ account_id: string; potential_grade: string | null }>(
+      "nb_v_account_potential?select=account_id,potential_grade&limit=2000",
+    ),
+    raw<{ account_id: string | null; urgency: number | null; urgency_reason: string | null }>(
+      "nb_outbound_drafts?select=account_id,urgency,urgency_reason&status=eq.pending&limit=500",
+    ),
+    // HARD RULE 18: every counting surface reads the effective view, not the
+    // append-only table, so a touchpoint filed on the wrong account and then
+    // corrected does not keep making that account look freshly worked.
+    raw<{ account_id: string; at: string }>(
+      "nb_v_activities_effective?select=account_id,at&corrected=is.false&order=at.desc&limit=2000",
+    ),
+  ]);
+
+  const gradeById = new Map(grades.map((g) => [g.account_id, g.potential_grade]));
+  const lastTouch = new Map<string, string>();
+  for (const t of touches) if (!lastTouch.has(t.account_id)) lastTouch.set(t.account_id, t.at);
+  // The account's MOST urgent pending draft, not its newest: the queue's own
+  // rule (0035) is that the highest tier is what the account is asking for.
+  const urgencyById = new Map<string, { urgency: number | null; urgency_reason: string | null }>();
+  for (const d of drafts) {
+    if (!d.account_id) continue;
+    const prev = urgencyById.get(d.account_id);
+    if (!prev || (d.urgency ?? -1) > (prev.urgency ?? -1)) urgencyById.set(d.account_id, d);
+  }
+
+  const inputs: PriorityInput[] = accounts.map((a) => ({
+    ...a,
+    tier: gradeById.get(a.id) ?? null,
+    urgency: urgencyById.get(a.id)?.urgency ?? null,
+    urgency_reason: urgencyById.get(a.id)?.urgency_reason ?? null,
+    last_touch_at: lastTouch.get(a.id) ?? null,
+  }));
+
+  const byId = computePriority(inputs);
+  const ranked = inputs
+    .map((account) => ({ account, result: byId.get(account.id)! }))
+    .filter((r) => r.result.score !== null)
+    .sort((x, y) => byPriority(x.result, y.result));
+
+  return {
+    byId,
+    ranked,
+    coverage: {
+      accounts: inputs.length,
+      scored: ranked.length,
+      withRevenue: inputs.filter((a) => a.trailing_12m_revenue || a.lifetime_revenue).length,
+      withCadence: inputs.filter((a) => a.expected_reorder_days).length,
+      withUrgency: inputs.filter((a) => typeof a.urgency === "number").length,
+    },
+  };
+}
 
 export type TerritoryArea = {
   id: string;

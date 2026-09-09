@@ -94,6 +94,7 @@ export function TouchpointCapture({
   accountIdHint,
   onFiled,
   lockKind,
+  initialText,
 }: {
   accountIdHint?: string | null;
   /** Fires once, right after a clean file (matched, no follow-up needed).
@@ -108,6 +109,13 @@ export function TouchpointCapture({
    * set, the kind selector never renders and every submit sends this kind,
    * touched or not. */
   lockKind?: KindOption;
+  /** SDR's call log, 2026-09-08: "Called X and spoke with: " pre-typed so
+   *  Juan only has to add what was actually said. Applied once, on mount
+   *  (this component is keyed per schedule item in sdr-ui.tsx, so a new
+   *  instance mounts, and gets its own initialText, every time he switches
+   *  who he's calling), and only when there's no saved draft to restore, a
+   *  half-typed note always wins over a fresh template. */
+  initialText?: string;
 }) {
   const router = useRouter();
   const [text, setText] = useState("");
@@ -217,9 +225,20 @@ export function TouchpointCapture({
     if (saved) {
       setText(saved);
       requestAnimationFrame(() => textareaRef.current && autosize(textareaRef.current));
+    } else if (initialText) {
+      // Not written to the draft key: a template isn't a thing Juan typed,
+      // and writeDraft() only fires from here on his own keystrokes.
+      setText(initialText);
+      requestAnimationFrame(() => {
+        if (!textareaRef.current) return;
+        autosize(textareaRef.current);
+        // Caret at the end, right after "spoke with: ", so the first
+        // keystroke continues the sentence instead of landing mid-template.
+        textareaRef.current.setSelectionRange(initialText.length, initialText.length);
+      });
     }
     textareaRef.current?.focus({ preventScroll: true });
-  }, [autosize]);
+  }, [autosize, initialText]);
 
   function submit() {
     const value = text;

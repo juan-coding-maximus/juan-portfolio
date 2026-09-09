@@ -118,8 +118,17 @@ const POTENTIAL_COLOR: Partial<Record<Tier, string>> = {
   E: "#8A928C",
 };
 
+/**
+ * One account's priority, computed by lib/priority.ts on the server. Score is
+ * never null here: map/page.tsx drops unscored accounts from the object
+ * entirely, so "absent" and "not scored" are the same state and neither can be
+ * drawn as a zero.
+ */
+export type AccountPriority = { score: number; reason: string; band: "now" | "soon" | "later" | "unscored" };
+
 export function AccountsMap({
   accounts,
+  priorityById,
   areas,
   userLoc,
   focus,
@@ -136,6 +145,13 @@ export function AccountsMap({
   routeEnd,
 }: {
   accounts: MapAccount[];
+  /** Priority per account id, from lib/priority.ts. A WEIGHT AND A LABEL, NOT
+   *  A CONSTRAINT: it decides what the pin card shows and how the closest-stops
+   *  list can be ordered, and it deliberately does not reach route-optimize.ts.
+   *  That module solves a distance problem against real drive times and
+   *  business hours, and letting a revenue score bend it would trade a
+   *  measured constraint for a preference (Juan's ask was a tie-breaker). */
+  priorityById: Record<string, AccountPriority>;
   areas: TerritoryArea[];
   userLoc?: { lat: number; lng: number } | null;
   focus?: FocusRequest | null;
@@ -1275,6 +1291,29 @@ export function AccountsMap({
                   <div className="mt-0.5 text-[12px] text-[#5B6560]">
                     {selected.street}
                     {selected.city ? `, ${selected.city}` : ""}
+                  </div>
+                )}
+                {/* Priority, on the card that answers "should I go here". The
+                    score alone would be a grade nobody can argue with, so the
+                    evidence sentence prints under it rather than hiding in a
+                    tooltip a thumb cannot reach. */}
+                {priorityById[selected.id] && (
+                  <div className="mt-1.5 rounded-md bg-[#FAF9F5] px-2 py-1.5">
+                    <div className="flex items-baseline gap-1.5">
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[11px] font-medium tabular-nums ${
+                          priorityById[selected.id].band === "now"
+                            ? "bg-[#F3E3C6] text-[#8A6D2F]"
+                            : "bg-[#ECEAE1] text-[#5B6560]"
+                        }`}
+                      >
+                        {priorityById[selected.id].score}
+                      </span>
+                      <span className="text-[11px] uppercase tracking-[0.1em] text-[#8A928C]">priority</span>
+                    </div>
+                    <div className="mt-1 text-[11.5px] leading-snug text-[#5B6560]">
+                      {priorityById[selected.id].reason}
+                    </div>
                   </div>
                 )}
                 <div className="mt-1 flex items-center gap-2 text-[11.5px] uppercase tracking-[0.1em] text-[#8A928C]">

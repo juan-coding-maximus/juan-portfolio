@@ -26,6 +26,7 @@
 
 import Link from "next/link";
 import {
+  getPriorityBook,
   listDrafts,
   listMarketingFiles,
   listOwnerAccounts,
@@ -35,6 +36,7 @@ import {
 import { ManualEmailComposer } from "../lib/manual-email-ui";
 import { ChannelLabel, DraftActions, type ChannelKind } from "../lib/outbound-ui";
 import { OutreachComposer } from "../lib/outreach-ui";
+import { PriorityChip, PriorityPanel } from "../lib/priority-ui";
 import { Card, Empty, PageHead, daysAgo } from "../lib/ui";
 
 export const dynamic = "force-dynamic";
@@ -51,11 +53,12 @@ export default async function Outbound({
 }) {
   const sp = await searchParams;
   const accountFilter = sp.account?.trim() || null;
-  const [res, accountsResult, contacts, files] = await Promise.all([
+  const [res, accountsResult, contacts, files, priority] = await Promise.all([
     listDrafts(),
     listOwnerAccounts(),
     listOwnerContactPhones(),
     listMarketingFiles(),
+    getPriorityBook(),
   ]);
   const synthetic = res.mode === "synthetic";
   /* Name and phone are what the picker needs; everything after `city` is what
@@ -81,7 +84,26 @@ export default async function Outbound({
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const filteredAccount = accountFilter ? accounts.find((a) => a.id === accountFilter) : null;
-  const drafts = accountFilter ? res.data.filter((d) => d.account_id === accountFilter) : res.data;
+  /*
+   * URGENCY STILL LEADS. listDrafts() already returned the queue in urgency
+   * order (2 · 1 · 0 · ungraded last, created_at desc inside a tier, migration
+   * 0035). Account priority is layered UNDER that, never over it: what the
+   * conversation said is a fact about this specific thread and outranks a
+   * ranking computed from the account's history. So this only decides which of
+   * two drafts in the SAME urgency tier Juan opens first, which is exactly the
+   * tie the created_at fallback was resolving arbitrarily before. A draft on an
+   * unscored account keeps its place rather than sinking, same rule as an
+   * ungraded urgency: not scored is not zero.
+   */
+  const ordered = [...res.data].sort((a, b) => {
+    const ua = typeof a.urgency === "number" ? a.urgency : -1;
+    const ub = typeof b.urgency === "number" ? b.urgency : -1;
+    if (ua !== ub) return ub - ua;
+    const pa = a.account_id ? (priority.byId.get(a.account_id)?.score ?? -1) : -1;
+    const pb = b.account_id ? (priority.byId.get(b.account_id)?.score ?? -1) : -1;
+    return pb - pa;
+  });
+  const drafts = accountFilter ? ordered.filter((d) => d.account_id === accountFilter) : ordered;
 
   // account -> best phone on file (the account's own line, else the first
   // named contact's cell), used so every draft card can offer WhatsApp
@@ -109,6 +131,10 @@ export default async function Outbound({
           </Link>
         </div>
       )}
+
+      {/* The same ranked list Map and SDR carry, so "what is worth my time" is
+          answered wherever Juan already is instead of on a fourth screen. */}
+      {!accountFilter && <PriorityPanel book={priority} surface="outbound" limit={6} />}
 
       {!accountFilter && (
         <div className="mb-6">
@@ -179,6 +205,10 @@ export default async function Outbound({
                       {d.urgency === 2 ? "needs a reply today" : "soon"}
                     </span>
                   )}
+                  {/* The account's own priority, second to the urgency chip
+                      beside it and printed the same way: a number that carries
+                      its evidence sentence, never a bare grade. */}
+                  {d.account_id && <PriorityChip result={priority.byId.get(d.account_id)} compact />}
                   {d.play_key && (
                     <span
                       className="rounded bg-[#ECEAE1] px-1.5 py-0.5 text-[11px] text-[#3D4A44]"

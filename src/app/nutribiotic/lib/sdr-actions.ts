@@ -15,11 +15,58 @@ import {
   insertSdrScheduleItem,
   listActivities,
   listContacts,
+  rescheduleSdrScheduleItem,
   searchOwnedAccounts,
+  searchOwnedContacts,
   setSdrScheduleStatus,
   type NewSdrScheduleItem,
   type SdrScheduleItem,
 } from "./dal";
+
+export type SdrSearchHit = {
+  accountId: string;
+  accountName: string;
+  city: string | null;
+  phone: string | null;
+  /** Set only when this hit matched on a PERSON's name rather than the
+   *  business name, so the result line can say who, at which business,
+   *  instead of just the business twice. */
+  contactName: string | null;
+  contactTitle: string | null;
+};
+
+/**
+ * One search bar, both a business name and a person's name, no mode toggle
+ * (Juan's ask, 2026-09-08: "without any toggles"). Runs both lookups in
+ * parallel and dedupes by account, a company-name hit and a person-name hit
+ * on the SAME account show once, not twice, with the contact attached to
+ * the account row rather than as a second card.
+ */
+export async function searchSdrClients(q: string): Promise<SdrSearchHit[]> {
+  const query = q.trim();
+  if (query.length < 2) return [];
+  const [accounts, contacts] = await Promise.all([searchOwnedAccounts(query, 6), searchOwnedContacts(query, 6)]);
+  const byAccount = new Map<string, SdrSearchHit>();
+  for (const a of accounts.data) {
+    byAccount.set(a.id, { accountId: a.id, accountName: a.name, city: a.city, phone: a.phone, contactName: null, contactTitle: null });
+  }
+  for (const c of contacts.data) {
+    const existing = byAccount.get(c.account_id);
+    if (existing && !existing.contactName) {
+      byAccount.set(c.account_id, { ...existing, contactName: c.name, contactTitle: c.title });
+    } else if (!existing) {
+      byAccount.set(c.account_id, {
+        accountId: c.account_id,
+        accountName: c.account_name,
+        city: c.city,
+        phone: c.phone,
+        contactName: c.name,
+        contactTitle: c.title,
+      });
+    }
+  }
+  return [...byAccount.values()].slice(0, 8);
+}
 
 export type SdrAccountPanel = {
   id: string;
@@ -91,6 +138,19 @@ export async function searchSdrAccounts(query: string) {
 
 export async function addSdrScheduleItem(input: NewSdrScheduleItem): Promise<SdrScheduleItem> {
   const row = await insertSdrScheduleItem(input);
+  revalidatePath("/nutribiotic/sdr");
+  return row;
+}
+
+/**
+ * Move one scheduled call or visit to another day. Writes
+ * nb_sdr_schedule.scheduled_date, the field the queue actually groups and
+ * orders by, and stamps rescheduled_at so the 30-minute follow-through pass
+ * knows a human has already answered for this account and stands down (see
+ * dal.ts's rescheduleSdrScheduleItem and bridges/nutribiotic/follow_through.py).
+ */
+export async function rescheduleSdrItem(id: string, scheduledDate: string): Promise<SdrScheduleItem> {
+  const row = await rescheduleSdrScheduleItem(id, scheduledDate);
   revalidatePath("/nutribiotic/sdr");
   return row;
 }

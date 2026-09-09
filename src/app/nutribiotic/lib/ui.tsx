@@ -30,6 +30,7 @@ const ICONS: Record<string, ReactNode> = {
   support: <><circle cx="8" cy="8" r="6.2" /><path d="M6.3 6.3a1.8 1.8 0 1 1 2.3 2.3c-.5.2-.6.6-.6 1M8 11.4h.01" /></>,
   metrics: <><path d="M2.5 13V8.4M6.2 13V4.2M9.8 13V6.8M13.5 13V3" /></>,
   clock: <><circle cx="8" cy="8" r="6.2" /><path d="M8 4.6V8l2.3 1.4" /></>,
+  "calendar-check": <><rect x="2.4" y="3.4" width="11.2" height="10.2" rx="1.4" /><path d="M2.4 6.4h11.2" /><path d="M5.4 2.2v2.4M10.6 2.2v2.4" /><path d="m5.4 9.6 1.7 1.7 3.5-3.9" /></>,
   pin: <><path d="M8 14s4.6-4.2 4.6-7.4A4.6 4.6 0 0 0 3.4 6.6C3.4 9.8 8 14 8 14Z" /><circle cx="8" cy="6.5" r="1.7" /></>,
   wand: <><path d="M3 13 11 5M9.6 3.4l.5 1.3 1.3.5-1.3.5-.5 1.3-.5-1.3-1.3-.5 1.3-.5zM13 8.4l.35.9.9.35-.9.35-.35.9-.35-.9-.9-.35.9-.35z" /></>,
   alert: <><path d="M8 2.6 14.2 13H1.8L8 2.6Z" /><path d="M8 6.6v3M8 11.4h.01" /></>,
@@ -72,6 +73,7 @@ const ICONS: Record<string, ReactNode> = {
   camera: <><path d="M2.4 5.4h2.2l1-1.6h4.8l1 1.6h2.2v7.2H2.4z" /><circle cx="8" cy="9" r="2.3" /></>,
   gauge: <><circle cx="8" cy="8.6" r="5.8" /><path d="M8 8.6 10.6 6M5.4 8.6h5.2" strokeLinecap="round" /></>,
   receipt: <><path d="M4 2.4h8v11.2l-1.4-1-1.4 1-1.2-1-1.2 1-1.4-1-1.4 1z" /><path d="M6 5.6h4M6 8h4M6 10.4h2.6" /></>,
+  search: <><circle cx="6.9" cy="6.9" r="4.3" /><path d="m13.2 13.2-3.3-3.3" strokeLinecap="round" /></>,
   more: <><circle cx="4" cy="8" r="1.15" fill="currentColor" stroke="none" /><circle cx="8" cy="8" r="1.15" fill="currentColor" stroke="none" /><circle cx="12" cy="8" r="1.15" fill="currentColor" stroke="none" /></>,
   // Drag handle (2026-08-25): a 2x3 dot grid, the standard "grab this" glyph,
   // distinct from "more" (its 1x3 row) at a glance in the same small control row.
