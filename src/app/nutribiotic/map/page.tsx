@@ -18,7 +18,6 @@ import {
   listOwnerAccounts,
 } from "../lib/dal";
 import type { AccountPriority } from "./AccountsMap";
-import { PriorityPanel } from "../lib/priority-ui";
 import { Empty, PageHead } from "../lib/ui";
 import { MapScreen } from "./MapScreen";
 
@@ -68,11 +67,6 @@ export default async function MapPage({
         </Empty>
       ) : (
         <>
-          {/* The same ranked list SDR and Outbound carry. On the map its job is
-              route shaping: the high-impact stops are named before Juan starts
-              adding pins, without the score ever entering the route solver's
-              own constraints. */}
-          <PriorityPanel book={priority} surface="map" limit={6} />
           <div className="mb-3 text-[12.5px] text-[#5B6560]">{accounts.data.length} accounts</div>
           {/* MapScreen owns the phone's position and shares it between the map
               (opens centred on Juan) and the ten-closest list under it. The

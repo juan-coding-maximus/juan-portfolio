@@ -85,7 +85,7 @@ const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>
      which is exactly the "occasional-use" test the 2026-08-18 More cut used
      for Goals/Playbook/the offer trio, while a prospecting queue is a daily
      tool the same way Visit is. */
-  { href: "/nutribiotic/sdr", label: "SDR", icon: "calendar-check" },
+  { href: "/nutribiotic/sdr", label: "SDR", icon: "phone-arrow" },
 ];
 
 const MORE_NAV: typeof NAV = [
