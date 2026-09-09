@@ -2175,13 +2175,20 @@ export async function countOwnerWithoutCoordinates(): Promise<number> {
  * resetting per browser the way localStorage would. Both default to false
  * (hidden) if the row is ever missing.
  */
-export async function getMapDisplayPrefs(): Promise<{ showChains: boolean; showPractices: boolean }> {
-  const rows = await raw<{ show_chain_accounts: boolean; show_practice_accounts: boolean }>(
-    "nb_ui_prefs?select=show_chain_accounts,show_practice_accounts&id=eq.1",
-  );
+export async function getMapDisplayPrefs(): Promise<{
+  showChains: boolean;
+  showPractices: boolean;
+  showProspects: boolean;
+}> {
+  const rows = await raw<{
+    show_chain_accounts: boolean;
+    show_practice_accounts: boolean;
+    show_prospect_accounts: boolean;
+  }>("nb_ui_prefs?select=show_chain_accounts,show_practice_accounts,show_prospect_accounts&id=eq.1");
   return {
     showChains: rows[0]?.show_chain_accounts ?? false,
     showPractices: rows[0]?.show_practice_accounts ?? false,
+    showProspects: rows[0]?.show_prospect_accounts ?? false,
   };
 }
 
@@ -2193,6 +2200,15 @@ export async function setShowChainAccounts(show: boolean): Promise<void> {
 
 export async function setShowPracticeAccounts(show: boolean): Promise<void> {
   await mutate("nb_ui_prefs", "PATCH", { show_practice_accounts: show, updated_at: new Date().toISOString() }, {
+    id: "eq.1",
+  });
+}
+
+/** The map's "Prospects" button (migration 0072): lead_status = 'NEW'
+ * accounts with no HubSpot company and tier yet, hidden by default same as
+ * showChains/showPractices. */
+export async function setShowProspectAccounts(show: boolean): Promise<void> {
+  await mutate("nb_ui_prefs", "PATCH", { show_prospect_accounts: show, updated_at: new Date().toISOString() }, {
     id: "eq.1",
   });
 }

@@ -13,6 +13,7 @@ import {
   setRouteStopTimes,
   setShowChainAccounts,
   setShowPracticeAccounts,
+  setShowProspectAccounts,
   type RouteCallsByDay,
   type RouteDoneByDay,
   type RouteDraftByDay,
@@ -33,6 +34,14 @@ export async function toggleShowChainAccounts(show: boolean): Promise<void> {
  * (single-practitioner offices, channel = 'clinic'). See migration 0025. */
 export async function toggleShowPracticeAccounts(show: boolean): Promise<void> {
   await setShowPracticeAccounts(show);
+  revalidatePath("/nutribiotic/map");
+}
+
+/** Same as toggleShowChainAccounts, for the map's "Prospects" button
+ * (lead_status = 'NEW' accounts with no HubSpot company/tier yet). See
+ * migration 0072. */
+export async function toggleShowProspectAccounts(show: boolean): Promise<void> {
+  await setShowProspectAccounts(show);
   revalidatePath("/nutribiotic/map");
 }
 

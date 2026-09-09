@@ -27,6 +27,7 @@ import {
   saveRouteStartByDay,
   toggleShowChainAccounts,
   toggleShowPracticeAccounts,
+  toggleShowProspectAccounts,
 } from "../lib/prefs-actions";
 import { useRoute } from "../lib/route-context";
 import { AccountsMap, type AccountPriority } from "./AccountsMap";
@@ -54,6 +55,7 @@ export function MapScreen({
   areas,
   initialShowChains,
   initialShowPractices,
+  initialShowProspects,
   schedulePrefs,
   endpointsByDay,
 }: {
@@ -71,6 +73,7 @@ export function MapScreen({
   areas: TerritoryArea[];
   initialShowChains: boolean;
   initialShowPractices: boolean;
+  initialShowProspects: boolean;
   schedulePrefs: RouteSchedulePrefs;
   endpointsByDay: { start: RouteEndpointsByDay; end: RouteEndpointsByDay };
 }) {
@@ -94,6 +97,16 @@ export function MapScreen({
     const next = !showPractices;
     setShowPractices(next);
     toggleShowPracticeAccounts(next).catch(() => setShowPractices(!next));
+  }
+
+  // Same shape and same persistence as showChains/showPractices (0072): the
+  // "Prospects" undo (lead_status = 'NEW', no HubSpot company/tier yet) is
+  // semi-permanent, not a per-page-view filter.
+  const [showProspects, setShowProspects] = useState(initialShowProspects);
+  function toggleProspects() {
+    const next = !showProspects;
+    setShowProspects(next);
+    toggleShowProspectAccounts(next).catch(() => setShowProspects(!next));
   }
 
   /* THE HAND-BUILT ROUTE (0029), lifted to app-wide state in route-context.tsx
@@ -491,6 +504,8 @@ export function MapScreen({
           onToggleShowChains={toggleChains}
           showPractices={showPractices}
           onToggleShowPractices={togglePractices}
+          showProspects={showProspects}
+          onToggleShowProspects={toggleProspects}
           onAddToRoute={handleAddToRoute}
           inRoute={inRoute}
           customStops={customStops}

@@ -172,11 +172,17 @@ const MAP_STYLE: google.maps.MapTypeStyle[] = [
 
    An unrecognised value renders as itself rather than being dropped, so this
    map going stale degrades to slightly-wrong wording, never to a missing
-   filter or a silently empty result. */
+   filter or a silently empty result.
+
+   NEW -> "Prospects" (Juan, 2026-09-09; was "New to open"). This is the one
+   label this map renames rather than mirrors verbatim: these are the
+   unworked, top-of-funnel accounts (see isProspect below and the Prospects
+   toggle), and "Prospects" is what Juan calls that bucket, not what the
+   portal calls the raw status. */
 const LEAD_STATUS_LABEL: Record<string, string> = {
   "Active - follow ups": "Active - follow ups",
   "No follow ups": "Active - no follow ups",
-  NEW: "New to open",
+  NEW: "Prospects",
   Discarded: "Discarded",
   "To reactivate": "To reactivate",
 };
@@ -201,6 +207,25 @@ const POTENTIAL_COLOR: Partial<Record<Tier, string>> = {
   E: "#8A928C",
 };
 
+/* THE PROSPECTS LAYER (0072, Juan's ask 2026-09-09). A lead_status = 'NEW'
+   account ("Prospects", was labelled "New to open") is a raw HubSpot lead
+   status with no CRM weight behind it yet, so it wears a flat blue dot
+   instead of the potential ramp above and is hidden by default, same shape
+   as the chains/practices toggle.
+
+   IT STOPS BEING A "PROSPECT" THE MOMENT IT EARNS A REAL GRADE: once an
+   account has both a real HubSpot company (hubspot_company_id) and a tier,
+   it is no longer an unqualified lead, it is graded territory, and it wears
+   its tier colour and is always shown, same as every other account. Since
+   0072 also floors any HubSpot company with no grade at D, in practice the
+   only accounts left in this blue bucket are the ones with no HubSpot
+   company at all. */
+const PROSPECT_COLOR = "#3D6E99";
+
+function isProspect(a: Pick<MapAccount, "lead_status" | "hubspot_company_id" | "tier">): boolean {
+  return a.lead_status === "NEW" && !(a.hubspot_company_id && a.tier);
+}
+
 /**
  * One account's priority, computed by lib/priority.ts on the server. Score is
  * never null here: map/page.tsx drops unscored accounts from the object
@@ -219,6 +244,8 @@ export function AccountsMap({
   onToggleShowChains,
   showPractices,
   onToggleShowPractices,
+  showProspects,
+  onToggleShowProspects,
   onAddToRoute,
   inRoute,
   customStops,
@@ -244,6 +271,10 @@ export function AccountsMap({
   onToggleShowChains: () => void;
   showPractices: boolean;
   onToggleShowPractices: () => void;
+  /** The "Prospects" toggle (0072): lead_status = 'NEW' accounts with no
+   *  HubSpot company/tier yet, hidden by default same as showChains. */
+  showProspects: boolean;
+  onToggleShowProspects: () => void;
   onAddToRoute: (id: string, lat: number, lng: number) => void;
   inRoute: Set<string>;
   /** The hand-built route, in Juan's order, same array RoutePanel numbers. */
@@ -489,14 +520,15 @@ export function AccountsMap({
       .filter((a) => a.boundary);
   }, [areas, activeAreas, boundaries, showAreas]);
 
-  /* What every badge below counts FROM. Chains and practices are excluded
-     here whenever their toggle is off (the resting state), same predicate as
-     `filtered` uses for pins. Without this, a badge counts the whole book
-     while the map only draws the chain/practice-free subset, so "HQ potential
-     A 5" reads as a lie when four of the five are Whole Foods pins nobody can
-     see (Juan, 2026-08-06). Deliberately NOT filtered by tier/area/lead
-     status: those chips ask "how many of X", so X's own count must stay
-     whole for every OTHER chip to still make sense picked alongside it. */
+  /* What every badge below counts FROM. Chains, practices and prospects are
+     excluded here whenever their toggle is off (the resting state), same
+     predicate as `filtered` uses for pins. Without this, a badge counts the
+     whole book while the map only draws the chain/practice/prospect-free
+     subset, so "HQ potential A 5" reads as a lie when four of the five are
+     Whole Foods pins nobody can see (Juan, 2026-08-06). Deliberately NOT
+     filtered by tier/area/lead status: those chips ask "how many of X", so
+     X's own count must stay whole for every OTHER chip to still make sense
+     picked alongside it. */
   const visibleAccounts = useMemo(
     () =>
       accounts.filter(
@@ -505,9 +537,13 @@ export function AccountsMap({
           (showPractices || !a.practice_excluded) &&
           // Closed is a HQ lead-status bucket, not a place Juan drives: it never
           // belongs on a field map, filterable or not (Juan, 2026-08-28).
-          a.lead_status !== "Closed",
+          a.lead_status !== "Closed" &&
+          // THE PROSPECTS LAYER (0072): unqualified lead_status='NEW' accounts
+          // are hidden by default same as chains/practices. An account leaves
+          // this bucket the moment it earns a real HubSpot company + tier.
+          (showProspects || !isProspect(a)),
       ),
-    [accounts, showChains, showPractices],
+    [accounts, showChains, showPractices, showProspects],
   );
 
   const tierCounts = useMemo(() => {
@@ -546,15 +582,17 @@ export function AccountsMap({
       }));
   }, [visibleAccounts]);
 
-  // What the collapsed Filters button has to admit to hiding. Chains and
-  // practices are counted only when SHOWN, because hidden is their resting
-  // state and a badge that reads "2" on a map nobody has touched is noise.
+  // What the collapsed Filters button has to admit to hiding. Chains,
+  // practices and prospects are counted only when SHOWN, because hidden is
+  // their resting state and a badge that reads "2" on a map nobody has
+  // touched is noise.
   const activeFilterCount =
     activeAreas.size +
     activeTiers.size +
     activeLeadStatuses.size +
     (showChains ? 1 : 0) +
-    (showPractices ? 1 : 0);
+    (showPractices ? 1 : 0) +
+    (showProspects ? 1 : 0);
 
   const areaCounts = useMemo(() => {
     const c: Record<string, number> = {};
@@ -573,6 +611,14 @@ export function AccountsMap({
   );
   const practiceExcludedCount = useMemo(
     () => accounts.filter((a) => a.practice_excluded).length,
+    [accounts],
+  );
+  // Same shape, for the Prospects button (0072): isProspect is computed, not
+  // a stored classification, so it is not "semi-permanent" the way
+  // chain_excluded/practice_excluded are, but the count-and-toggle pattern
+  // is identical.
+  const prospectExcludedCount = useMemo(
+    () => accounts.filter((a) => isProspect(a)).length,
     [accounts],
   );
 
@@ -1067,6 +1113,34 @@ export function AccountsMap({
             <span className="tabular-nums opacity-70">{practiceExcludedCount}</span>
           </button>
         )}
+        {/* THE PROSPECTS BUTTON (0072, Juan's ask 2026-09-09). Unworked
+            lead_status = 'NEW' accounts with no HubSpot company/tier yet are
+            hidden by default, same shape as chains/practices: this chip is
+            the undo, semi-permanent (nb_ui_prefs, migration 0072) so it
+            survives a reload and follows Juan to his other device. Its dot
+            wears the same blue the pins wear while hidden, so the legend and
+            the control are one thing, same convention as the tier chips. */}
+        {prospectExcludedCount > 0 && (
+          <button
+            type="button"
+            onClick={onToggleShowProspects}
+            aria-pressed={showProspects}
+            title={
+              showProspects
+                ? "Hide Prospects again"
+                : `${prospectExcludedCount} Prospect account(s) hidden (unworked, no HubSpot company/tier yet)`
+            }
+            className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
+              showProspects
+                ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
+                : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
+            }`}
+          >
+            <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: PROSPECT_COLOR }} />
+            {showProspects ? "Prospects shown" : "Prospects hidden"}{" "}
+            <span className="tabular-nums opacity-70">{prospectExcludedCount}</span>
+          </button>
+        )}
         {/* THE CHAIN TOGGLE. Only offered once there is a route to chain --
             two straight lines to nowhere is not a control worth showing on an
             empty map. */}
@@ -1218,7 +1292,14 @@ export function AccountsMap({
           ))}
 
           {filtered.map((a) => {
-            const potential = a.tier ? POTENTIAL_COLOR[a.tier] : undefined;
+            const prospect = isProspect(a);
+            // A prospect wears its flat blue regardless of what tier logic
+            // would otherwise say (see isProspect: it has neither a real
+            // HubSpot company nor a tier while it holds this state, so
+            // `potential` is always undefined here anyway; the explicit
+            // check just makes the priority order readable rather than
+            // relying on that fact staying true).
+            const potential = !prospect && a.tier ? POTENTIAL_COLOR[a.tier] : undefined;
             const routeNum = showRouteChain ? routeNumberById.get(a.id) : undefined;
             return (
               <MarkerF
@@ -1233,7 +1314,11 @@ export function AccountsMap({
                 icon={{
                   path: google.maps.SymbolPath.CIRCLE,
                   scale: routeNum ? 11 : potential ? 7 : 6,
-                  fillColor: routeNum ? "#14201B" : potential ?? ((a.area && areaById.get(a.area)?.color) || "#5B6560"),
+                  fillColor: routeNum
+                    ? "#14201B"
+                    : prospect
+                      ? PROSPECT_COLOR
+                      : potential ?? ((a.area && areaById.get(a.area)?.color) || "#5B6560"),
                   fillOpacity: 1,
                   strokeColor: "#F7F6F1",
                   strokeWeight: routeNum ? 2 : 1.5,

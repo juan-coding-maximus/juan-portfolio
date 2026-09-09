@@ -94,6 +94,7 @@ export default async function MapPage({
             areas={orderedAreas}
             initialShowChains={displayPrefs.showChains}
             initialShowPractices={displayPrefs.showPractices}
+            initialShowProspects={displayPrefs.showProspects}
             schedulePrefs={schedulePrefs}
             endpointsByDay={endpointsByDay}
           />
