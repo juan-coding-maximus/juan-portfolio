@@ -18,12 +18,20 @@ The route is deliberate: be the best rep the company has, write down how, make t
 written thing hire-scalable, then run the people who run it. Infrastructure over
 immediacy, exactly because the infrastructure is what a Director owns.
 
-## Baselines (measured 2026-08-02)
+## Baselines
 
-- 273 SoCal accounts owned (HubSpot owner id 36242368); 459 accounts in the OS overall. Source: `nb_accounts` / HubSpot.
-- 61 of 273 have ordered since 2024; the rest last ordered before 2024. Source: `nb_orders` from the 2024+ ERP export.
-- 66 accounts are overdue for a reorder against the territory's median inter-order gap of 41 days. Source: `nb_orders` rollup.
-- 133 of 273 have at least one named contact. Source: `nb_contacts`.
+Refreshed 2026-09-08 (`bridges/nutribiotic/check_config_drift.py`), account count/ordered/
+contact lines only, the territory grew from 273 to 398 owned since the 2026-08-02 measurement.
+"Overdue for reorder" and "median inter-order gap" are left at their 2026-08-02 values below,
+unverified since: they are methodologically coupled (overdue is defined relative to the gap
+figure), no live query for the median gap exists yet in this codebase, and G1's own `proposed`
+target quotes both together, changing one without the other and without Juan's sign-off would
+silently change what the ratified-pending target means.
+
+- 398 SoCal accounts owned (HubSpot owner id 36242368); 613 accounts in the OS overall. Source: `nb_accounts` / HubSpot. (was 273 / 459, 2026-08-02)
+- 56 of 398 have ordered since 2024; the rest last ordered before 2024. Source: `nb_orders` from the 2024+ ERP export. (was 61 of 273, 2026-08-02)
+- 66 accounts were overdue for a reorder against the territory's median inter-order gap of 41 days, as of 2026-08-02. Unverified since; no live query exists for either number yet.
+- 185 of 398 have at least one named contact. Source: `nb_contacts`. (was 133 of 273, 2026-08-02)
 - Loaded 2024+ revenue: $340,665.96 across 146 accounts (includes pre-assignment history; the personal baseline starts at hire). Source: ERP invoice lines in `nb_order_lines`.
 
 ## The six Year-1 goals

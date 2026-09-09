@@ -24,13 +24,18 @@ export const NORTH_STAR = {
   ],
 };
 
-/* Measured 2026-08-02, sources in GOALS.md (nb_accounts, nb_orders, nb_contacts, ERP). */
+/* Refreshed 2026-09-08 via bridges/nutribiotic/check_config_drift.py against nb_accounts/
+ * nb_contacts live (owner 36242368, not closed); territory grew from 273 to 398 owned since
+ * the 2026-08-02 measurement. "overdue for reorder" and "median reorder gap" are left at
+ * their 2026-08-02 values below, unverified since: they are methodologically coupled (overdue
+ * is defined relative to the gap figure) and no live query for the median gap exists yet in
+ * this codebase, see GOALS.md's Baselines section. */
 export const BASELINES = [
-  { value: "273", label: "SoCal accounts owned" },
-  { value: "61", label: "ordered since 2024" },
-  { value: "66", label: "overdue for reorder" },
-  { value: "41d", label: "median reorder gap" },
-  { value: "133", label: "with a named contact" },
+  { value: "398", label: "SoCal accounts owned" },
+  { value: "56", label: "ordered since 2024" },
+  { value: "66", label: "overdue for reorder (2026-08-02, unverified since)" },
+  { value: "41d", label: "median reorder gap (2026-08-02, unverified since)" },
+  { value: "185", label: "with a named contact" },
 ];
 
 export type Goal = {
