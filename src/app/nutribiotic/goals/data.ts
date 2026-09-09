@@ -101,6 +101,15 @@ export const GOALS: Goal[] = [
     deadline: "Jun 2027",
     proposed: true,
   },
+  {
+    id: "G7",
+    title: "Double the territory",
+    what: "Grow accounts owned through new-door prospecting, not reactivation of accounts already in the book (that's G1).",
+    measure:
+      "398 to 796 owned accounts (baseline Sep 9, 2026) by Dec 31, 2026, roughly 4 new accounts a week.",
+    deadline: "Dec 2026",
+    proposed: true,
+  },
 ];
 
 export const ARC = [

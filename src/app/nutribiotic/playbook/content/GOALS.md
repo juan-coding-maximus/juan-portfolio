@@ -80,6 +80,13 @@ The legacy goal. Infrastructure over immediacy, stated as a deliverable.
 - **R** Managing a rep who succeeds on your system is the difference between claiming Director and demonstrating it.
 - **T** Dates above; the promotion conversation is calendar-driven, not mood-driven.
 
+### G7 · Double the territory
+- **S** Grow the number of SoCal accounts owned, new-door prospecting, not reactivation (that's G1's job).
+- **M** `proposed` 398 -> 796 owned accounts (baseline 2026-09-09) by 2026-12-31. Juan, verbatim, 2026-09-09: "grow the book to double by the end of 2026."
+- **A** The daily protected prospecting block (`score_weights.json`'s `capacity.prospect_block`, 09:00-09:30) is the mechanism; `lifecycle='prospect'` accounts (104 as of 2026-09-09) are the leading indicator to watch, not lagging revenue.
+- **R** A bigger book is the base every other goal compounds on: more accounts to revive (G1), more territory for the playbook (G2) to prove itself against.
+- **T** Tracked live: `bridges/nutribiotic/check_config_drift.py`'s book-growth check. 796 by 2026-12-31 is roughly 4 new accounts/week from today.
+
 ## Year 2 to 4 arc (to VP of Commercialization / CCO)
 
 - **Y2 (to 2028-08)** Playbook v3 running in 2+ territories through hires; seasonal wheel on its second cycle with year-over-year comparisons; Juan carries the Commercial Director title and a team goal, not a personal quota alone. Team-structure math (comp, headcount, sequencing) is under "Team expansion" in [`hiring/README.md`](hiring/README.md); it does not start until hire #1 has run solo.
