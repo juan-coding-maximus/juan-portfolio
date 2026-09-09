@@ -1160,6 +1160,19 @@ export async function getAccountNames(ids: string[]): Promise<Record<string, str
   return Object.fromEntries(res.data.map((a) => [a.id, a.name]));
 }
 
+/** id -> business_hours, for a list of accounts already on screen (the clients
+ *  table, the map). nb_v_account_tier doesn't carry it, so a screen built on
+ *  that view joins it in with this rather than switching the view's shape for
+ *  every caller. */
+export async function getAccountHoursMap(ids: string[]): Promise<Record<string, Record<string, string[][]> | null>> {
+  if (ids.length === 0) return {};
+  const res = await query<{ id: string; business_hours: Record<string, string[][]> | null; origin?: Origin }>(
+    "nb_accounts",
+    { select: "id,business_hours", id: `in.(${ids.join(",")})` },
+  );
+  return Object.fromEntries(res.data.map((a) => [a.id, a.business_hours]));
+}
+
 /** id -> {name, phone} for the SDR schedule's day view. A schedule row keyed
  * to an existing account carries no phone of its own (the account's phone can
  * change; a copy on the schedule row would go stale and disagree with it),

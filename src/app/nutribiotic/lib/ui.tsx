@@ -13,6 +13,7 @@
 
 import type { ReactNode } from "react";
 import type { CustomStopKind } from "./dal";
+import { hoursStatus, type BusinessHours } from "./hours";
 
 /** What a non-account route stop is called on screen. One noun, no adjectives. */
 export const CUSTOM_STOP_LABEL: Record<CustomStopKind, string> = {
@@ -304,6 +305,34 @@ export function Confidence({
     >
       {known != null && total != null ? `${known} of ${total} inputs` : `${(c * 100).toFixed(0)}%`}
       {low && <span className="font-medium">· low</span>}
+    </span>
+  );
+}
+
+/** Open now / closed, computed client- or server-side off nb_accounts.business_hours
+ *  (lib/hours.ts, Los Angeles wall-clock). Renders nothing when there is no
+ *  business_hours on file, HARD RULE 1: a gap is a gap, never a guess. Full
+ *  label ("Open · closes 6PM") by default; `dot` for a bare status pip where
+ *  a table row has no room for the sentence (the title carries it instead). */
+export function OpenBadge({ businessHours, dot }: { businessHours: BusinessHours | null | undefined; dot?: boolean }) {
+  const status = hoursStatus(businessHours);
+  if (!status) return null;
+  if (dot) {
+    return (
+      <span
+        className={`inline-block h-[7px] w-[7px] shrink-0 rounded-full ${status.open ? "bg-[#3D6B4A]" : "bg-[#B7ACA0]"}`}
+        title={status.label}
+      />
+    );
+  }
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium ${
+        status.open ? "bg-[#E3EFE6] text-[#3D6B4A]" : "bg-[#ECEAE1] text-[#8A928C]"
+      }`}
+    >
+      <span className={`h-[6px] w-[6px] rounded-full ${status.open ? "bg-[#3D6B4A]" : "bg-[#B7ACA0]"}`} />
+      {status.label}
     </span>
   );
 }

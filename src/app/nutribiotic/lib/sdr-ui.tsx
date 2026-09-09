@@ -28,11 +28,12 @@ import {
 } from "./sdr-actions";
 import type { PriorityBook, SdrPriority, SdrScheduleItem } from "./dal";
 import { planningHorizonDates } from "./field-week";
+import { laTodayKey, type BusinessHours } from "./hours";
 import type { Readiness } from "./priority";
 import { TopOpportunities } from "./priority-ui";
 import { TouchpointCapture } from "./touchpoint-ui";
 import type { FiledTouchpoint } from "./touchpoint-ui";
-import { Ico, HUBSPOT_COMPANY_URL, daysAgo, fullAddress, googleMapsUrl } from "./ui";
+import { Ico, HUBSPOT_COMPANY_URL, OpenBadge, daysAgo, fullAddress, googleMapsUrl } from "./ui";
 
 /** One territory area, in the order the SDR queue and the map legend both use:
  *  most 80+ prospects first (see sdr/page.tsx and lib/priority.ts). `prospects`
@@ -57,6 +58,12 @@ export type SdrDayItem = SdrScheduleItem & {
    *  that is not an account yet. Null groups under "No area", never into a
    *  territory nobody assigned it to. */
   area: string | null;
+  /** nb_accounts.business_hours, so the queue itself can show open-now and
+   *  today's window without a click into the account panel (Juan, 2026-09-09:
+   *  "it informs when I bring up a potential meeting and when I plan on
+   *  calling them next"). Null on a prospect with no account, or an account
+   *  enrichment hasn't reached yet, renders no badge at all (HARD RULE 1). */
+  businessHours: BusinessHours | null;
   /** From lib/priority.ts, computed server-side in sdr/page.tsx. Null on a
    *  prospect with no account behind it, and on an account none of whose
    *  inputs are known: not scored is never rendered as a zero. */
@@ -150,6 +157,9 @@ function AddToDayForm({ date, onAdded }: { date: string; onAdded: (item: SdrDayI
         // From the picker, so the new row appears under the right area header
         // straight away. A typed prospect has none, and says so.
         area: mode === "account" ? picked!.area : null,
+        // AccountHit doesn't carry hours (same egress reasoning as the score
+        // below); no badge on this row until the next server render.
+        businessHours: null,
         // Unscored until the next server render, deliberately: scoring needs
         // the whole book's revenue distribution (see priority.ts), and pulling
         // 437 accounts into this form to rank one freshly typed row would cost
@@ -339,6 +349,7 @@ function GlobalSearch({
         displayName: hit.accountName,
         displayPhone: hit.phone,
         area: hit.area,
+        businessHours: null,
         priorityScore: null,
         priorityReason: null,
         priorityBand: null,
@@ -574,6 +585,15 @@ function ScheduleRow({
           )}
           {item.status !== "pending" && <span>· {item.status}</span>}
         </div>
+        {/* Open now / closes-at / opens-at, right on the row: this is what
+            decides whether "call them next" means now or later today (Juan,
+            2026-09-09). Renders nothing when the account carries no hours,
+            never a guess. */}
+        {item.businessHours && (
+          <div className="mt-1">
+            <OpenBadge businessHours={item.businessHours} />
+          </div>
+        )}
         {/* Why it is ranked here, in words. The rail is narrow, so it clamps
             to two lines; the full sentence is the title. A score with no
             visible reason is the black box 0035 refused to build. */}
@@ -726,7 +746,10 @@ function AccountPanel({ item, onFiled }: { item: SdrDayItem; onFiled: (r: FiledT
       <div className="rounded-lg border border-[#E2DFD5] bg-white p-4">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <div className="text-[17px] font-semibold text-[#14201B]">{item.displayName}</div>
+            <div className="flex items-center gap-2">
+              <div className="text-[17px] font-semibold text-[#14201B]">{item.displayName}</div>
+              {panel?.businessHours && <OpenBadge businessHours={panel.businessHours} />}
+            </div>
             {!item.account_id && (
               <div className="mt-0.5 text-[12px] text-[#8A928C]">New prospect, not yet an account</div>
             )}
@@ -763,14 +786,23 @@ function AccountPanel({ item, onFiled }: { item: SdrDayItem; onFiled: (r: FiledT
             {panel.businessHours && (
               <div className="mt-3 flex flex-col gap-1 border-t border-[#E2DFD5] pt-3">
                 <span className="text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">Hours</span>
-                {Object.entries(panel.businessHours).map(([day, ranges]) => (
-                  <div key={day} className="flex items-baseline justify-between gap-3 text-[13px]">
-                    <span className="capitalize text-[#8A928C]">{day}</span>
-                    <span className="tabular-nums text-[#3D4A44]">
-                      {ranges.length ? ranges.map((r) => r.join(" to ")).join(", ") : "closed"}
-                    </span>
-                  </div>
-                ))}
+                {Object.entries(panel.businessHours).map(([day, ranges]) => {
+                  const isToday = day === laTodayKey();
+                  return (
+                    <div
+                      key={day}
+                      className={`flex items-baseline justify-between gap-3 text-[13px] ${isToday ? "font-medium" : ""}`}
+                    >
+                      <span className={`capitalize ${isToday ? "text-[#14201B]" : "text-[#8A928C]"}`}>
+                        {day}
+                        {isToday ? " (today)" : ""}
+                      </span>
+                      <span className={`tabular-nums ${isToday ? "text-[#14201B]" : "text-[#3D4A44]"}`}>
+                        {ranges.length ? ranges.map((r) => r.join(" to ")).join(", ") : "closed"}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -933,6 +965,7 @@ export function SdrScreen({
   focusAccountId,
   focusAccountName,
   focusAccountPhone,
+  focusAccountBusinessHours,
   topRanked,
 }: {
   initialItems: SdrDayItem[];
@@ -950,6 +983,7 @@ export function SdrScreen({
   focusAccountId?: string | null;
   focusAccountName?: string | null;
   focusAccountPhone?: string | null;
+  focusAccountBusinessHours?: BusinessHours | null;
   /** PriorityBook.ranked, plain array (see priority-ui.tsx's TopOpportunities
    *  for why it's this and not the book itself). Optional only so this
    *  component doesn't hard-fail if a caller ever renders it without a
@@ -1007,6 +1041,7 @@ export function SdrScreen({
       origin: "manual",
       displayName: focusAccountName,
       displayPhone: focusAccountPhone ?? null,
+      businessHours: focusAccountBusinessHours ?? null,
       priorityScore: null,
       priorityReason: null,
       priorityBand: null,
@@ -1087,6 +1122,7 @@ export function SdrScreen({
       origin: "manual",
       displayName: hit.accountName,
       displayPhone: hit.phone,
+      businessHours: null,
       priorityScore: null,
       priorityReason: null,
       priorityBand: null,

@@ -20,6 +20,7 @@ import {
   Empty,
   HUBSPOT_COMPANY_URL,
   Ico,
+  OpenBadge,
   PhoneDisplay,
   TierChip,
   absoluteUrl,
@@ -442,8 +443,9 @@ export function AccountDetailBody({
 
         {a.business_hours && (
           <Card>
-            <div className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
-              Hours
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">Hours</div>
+              <OpenBadge businessHours={a.business_hours} />
             </div>
             <dl className="flex flex-col gap-1 text-[13px]">
               {Object.entries(a.business_hours).map(([day, ranges]) => (

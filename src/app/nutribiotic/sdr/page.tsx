@@ -69,6 +69,9 @@ export default async function SdrPage({
       /* A prospect with no account has no area, and gets its own group at the
          bottom rather than being filed into a territory nobody put it in. */
       area: card?.area ?? null,
+      /* Null on a prospect with no account behind it, same as area above:
+         there is nothing to read hours off yet. */
+      businessHours: card?.businessHours ?? null,
       priorityScore: p?.score ?? null,
       priorityReason: p?.reason ?? null,
       priorityBand: p?.band ?? null,
@@ -103,6 +106,7 @@ export default async function SdrPage({
         focusAccountId={focusAccountId}
         focusAccountName={focusAccountId ? (cards[focusAccountId]?.name ?? null) : null}
         focusAccountPhone={focusAccountId ? (cards[focusAccountId]?.phone ?? null) : null}
+        focusAccountBusinessHours={focusAccountId ? (cards[focusAccountId]?.businessHours ?? null) : null}
         // Plain array, not the book: PriorityBook.byId is a Map, which cannot
         // cross into this client component. See priority-ui.tsx's
         // TopOpportunities for where this lands, the SDR page's own right

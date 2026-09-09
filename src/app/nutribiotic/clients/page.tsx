@@ -21,6 +21,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import Link from "next/link";
 import {
+  getAccountHoursMap,
   listAccounts,
   listAreas,
   listDeals,
@@ -29,7 +30,7 @@ import {
   isConfigured,
 } from "../lib/dal";
 import { AccountLink } from "../lib/modal";
-import { Card, Confidence, Empty, Ico, PageHead, TierChip } from "../lib/ui";
+import { Card, Confidence, Empty, Ico, OpenBadge, PageHead, TierChip } from "../lib/ui";
 import { UnmatchedTouchpoints } from "../lib/unmatched-ui";
 import { VisitQueues } from "../lib/visit-queues-ui";
 
@@ -86,6 +87,10 @@ export default async function Clients({
   });
   const rows = accounts.data;
   const areaQuery = area ? `area=${area.id}` : "";
+  // Open-now badge per row (Juan, 2026-09-09). nb_v_account_tier doesn't carry
+  // business_hours, so this is the one extra join, same pattern SDR's
+  // getAccountCallCards already uses for the same reason.
+  const hoursById = await getAccountHoursMap(rows.map((r) => r.account_id));
 
   const byTier = { A: 0, B: 0, C: 0, D: 0 } as Record<string, number>;
   for (const r of rows) {
@@ -296,6 +301,9 @@ export default async function Clients({
                 <tr className="border-b border-[#E2DFD5] text-left text-[11px] uppercase tracking-[0.12em] text-[#8A928C]">
                   <th className="px-4 py-2.5 font-medium">OS tier</th>
                   <th className="px-4 py-2.5 font-medium">Account</th>
+                  <th className="px-4 py-2.5 font-medium" title="Open now, from business_hours on file">
+                    Open
+                  </th>
                   <th className="px-4 py-2.5 font-medium">State</th>
                   <th className="px-4 py-2.5 text-right font-medium">Fit</th>
                   <th className="px-4 py-2.5 font-medium">Known</th>
@@ -317,6 +325,9 @@ export default async function Clients({
                         >
                           {r.name}
                         </AccountLink>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <OpenBadge businessHours={hoursById[r.account_id]} dot />
                       </td>
                       <td className="px-4 py-2.5 text-[#5B6560]">{r.lifecycle || "unknown"}</td>
                       {/* Low-confidence scores are visually demoted so a weak
