@@ -163,6 +163,16 @@ const KIND_LABEL: Record<string, string> = {
  */
 const NEVER_FILED = new Set(["field_note"]);
 
+/** The same refusal, asked as a question, for callers that run BEFORE the
+ * engagement itself. hubspot-graduate.ts is the one that needs it: a field note
+ * must not create a company either. On 2026-09-02 four notes to self got
+ * companies invented out of Google Places to receive them (HARD RULE 17), and
+ * a graduation path that fired on any activity kind would be that same bug with
+ * a different door. */
+export function isNeverFiledKind(kind: string): boolean {
+  return NEVER_FILED.has(kind);
+}
+
 /**
  * Archive one engagement, with scope asserted twice.
  *
@@ -478,7 +488,7 @@ async function findContactByPhone(phone: string | null | undefined): Promise<str
  * Best-effort by design: a read or detach failure is reported, never allowed to
  * unwind an engagement that already filed correctly.
  */
-async function checkAssociationLeak(
+export async function checkAssociationLeak(
   objectType: string,
   objectId: string,
   expectedCompanyId: string,

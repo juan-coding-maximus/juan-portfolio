@@ -64,7 +64,7 @@ function PotentialGrade({
       <div className="mb-2.5 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">Potential</div>
       <div className="flex items-center justify-between gap-3 text-[13px]">
         <span className="text-[#5B6560]">HQ grade</span>
-        {hqLetter ? <TierChip tier={hqLetter} scale="hq" /> : <span className="text-[#A9AFA9]">unknown</span>}
+        {hqLetter ? <TierChip tier={hqLetter} scale="hq" /> : <span className="text-[#A9AFA9]">not graded yet</span>}
       </div>
       <div className="mt-3 flex items-center justify-between gap-2">
         <span className="text-[13px] text-[#5B6560]">Your read</span>

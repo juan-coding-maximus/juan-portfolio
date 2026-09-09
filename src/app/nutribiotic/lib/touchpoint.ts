@@ -47,6 +47,7 @@ import {
   type AccountFactsReport,
 } from "./dal";
 import { Blocked, runEngagement } from "./hubspot-engagement";
+import { ensurePortalCompanyForActivity } from "./hubspot-graduate";
 import { formatBusinessHours, pushBusinessHours, pushCompanyEmail, pushCompanyPhone } from "./hubspot-company";
 
 /**
@@ -57,14 +58,40 @@ import { formatBusinessHours, pushBusinessHours, pushCompanyEmail, pushCompanyPh
  * AGENTS.md's "Automate housekeeping" standing order. A filing failure never
  * unwinds the touchpoint itself, the activity just stays unfiled and drops
  * into the Visit tab's manual queue below for a retry.
+ *
+ * AN ACCOUNT WITH NO PORTAL COMPANY IS NOW GRADUATED HERE, not refused (Juan,
+ * 2026-09-09). runEngagement still throws Blocked on a null hubspot_company_id,
+ * which is right for every other caller; this door runs
+ * ensurePortalCompanyForActivity first, so an SDR-originated prospect he just
+ * called gets its company, its address, its hours and its people pushed, and
+ * then files the note down the one normal path. A possible duplicate in the
+ * shared portal still stops the whole thing and comes back as
+ * hubspotError for Juan to resolve by hand: see hubspot-graduate.ts.
  */
 export async function autoFileEngagement(activityId: number): Promise<HubspotFilingReport> {
   try {
+    const grad = await ensurePortalCompanyForActivity(activityId);
+    if (grad.status === "blocked") {
+      return {
+        hubspotFiled: false,
+        hubspotNoteId: null,
+        hubspotError: grad.reason,
+        hubspotLeaks: 0,
+        companyPhoneFilled: null,
+        companyPhoneConflict: null,
+        companyCreatedId: null,
+        contactsFiled: [],
+      };
+    }
     const filed = await runEngagement(activityId, { write: true });
     return {
       hubspotFiled: filed.wrote || Boolean(filed.alreadyFiledId),
       hubspotNoteId: filed.noteId ?? filed.alreadyFiledId,
-      hubspotError: null,
+      hubspotError: grad.status === "created" && grad.contactErrors.length
+        ? `Company created, but ${grad.contactErrors.length} contact(s) did not file: ${grad.contactErrors.join("; ")}`
+        : null,
+      companyCreatedId: grad.status === "created" ? grad.companyId : null,
+      contactsFiled: grad.status === "created" ? grad.contactsFiled : [],
       // Carried to the screen rather than only to the sync log. A link HubSpot
       // made on its own and this run undid is exactly the kind of thing that
       // previously surfaced days later in a field report.
@@ -81,6 +108,8 @@ export async function autoFileEngagement(activityId: number): Promise<HubspotFil
       hubspotLeaks: 0,
       companyPhoneFilled: null,
       companyPhoneConflict: null,
+      companyCreatedId: null,
+      contactsFiled: [],
     };
   }
 }
@@ -95,6 +124,12 @@ export type HubspotFilingReport = {
   companyPhoneFilled: string | null;
   /** The number already on the company, when it disagreed and was kept. */
   companyPhoneConflict: string | null;
+  /** Set when THIS filing is what earned the account its portal company
+   *  (HARD RULE 20's graduation). Null on every ordinary filing. */
+  companyCreatedId: string | null;
+  /** Named people pushed onto that brand-new company, in full. Empty on an
+   *  ordinary filing; the engagement's own contact matching is unchanged. */
+  contactsFiled: string[];
 };
 
 const client = process.env.ANTHROPIC_API_KEY
@@ -869,6 +904,8 @@ export async function recordTouchpoint(
         hubspotLeaks: 0,
         companyPhoneFilled: null,
         companyPhoneConflict: null,
+        companyCreatedId: null,
+        contactsFiled: [],
       } satisfies HubspotFilingReport);
 
   await maybeMarkStopServiced(accountId, parsed.activity.kind, hubspot.hubspotFiled);

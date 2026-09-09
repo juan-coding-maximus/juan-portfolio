@@ -66,13 +66,19 @@ export async function findPossibleDuplicates(name: string, website?: string | nu
 
 export type NewCompany = {
   name: string;
+  /** address/zip. Present in hubspot_create_company.py's FIELD_MAP since
+   * 2026-08-14 and missing here until 2026-09-09: every company this path
+   * created went into the portal with no street address at all, the exact
+   * drift that script's own comment records fixing on its side. */
+  street?: string | null;
+  postal?: string | null;
   city?: string | null;
   state?: string | null;
   phone?: string | null;
   website?: string | null;
 };
 
-/** Only name/city/state/phone/website, and only the ones that are actually
+/** Only the declared standard fields, and only the ones that are actually
  * non-empty, same as hubspot_create_company.py's build_properties(). Owner
  * is always Juan's: this path only ever runs when he is the one filing.
  *
@@ -90,6 +96,8 @@ export async function createCompany(input: NewCompany): Promise<string> {
     name: input.name,
     hs_lead_status: "NEW",
   };
+  if (input.street) properties.address = input.street;
+  if (input.postal) properties.zip = input.postal;
   if (input.city) properties.city = input.city;
   if (input.state) properties.state = input.state;
   if (input.phone) properties.phone = input.phone;

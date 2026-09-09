@@ -690,6 +690,62 @@ export async function getAccountForEngagement(id: string): Promise<EngagementAcc
   return res.data[0] ?? null;
 }
 
+/**
+ * Everything that goes onto a company record the FIRST time an account earns
+ * one (hubspot-graduate.ts). Wider than EngagementAccount on purpose: a company
+ * created from the field used to carry name/city/state/phone/website and
+ * nothing else, so the street address, the hours the enricher had already
+ * found and the channel all sat in the OS where nobody in the shared portal
+ * could see them. `hubspot_sync_eligible` rides along because HARD RULE 20
+ * makes it the gate this path is the graduation from.
+ */
+export type GraduatingAccount = {
+  id: string;
+  name: string;
+  hubspot_company_id: string | null;
+  hubspot_owner_id: string | null;
+  owner_name: string | null;
+  street: string | null;
+  city: string | null;
+  state: string | null;
+  postal: string | null;
+  phone: string | null;
+  website: string | null;
+  email: string | null;
+  channel: string | null;
+  business_hours: Record<string, string[][]> | null;
+  hubspot_sync_eligible: boolean;
+  source: string | null;
+  origin: Origin;
+};
+
+export async function getAccountForGraduation(id: string): Promise<GraduatingAccount | null> {
+  const res = await query<GraduatingAccount>("nb_accounts", {
+    select:
+      "id,name,hubspot_company_id,hubspot_owner_id,owner_name,street,city,state,postal," +
+      "phone,website,email,channel,business_hours,hubspot_sync_eligible,source,origin",
+    id: `eq.${id}`,
+    limit: 1,
+  });
+  return res.data[0] ?? null;
+}
+
+/**
+ * The HARD RULE 20 flip, and the only place in the TypeScript half that does
+ * it: a bulk-imported prospect lands with `hubspot_sync_eligible = false` and
+ * earns `true` the day a real touchpoint is logged against it. Guarded on the
+ * account actually having a company id by then, so the flag can never say
+ * "allowed near the portal" for a row that never got there.
+ */
+export async function markHubspotSyncEligible(accountId: string): Promise<void> {
+  await mutate<Account>(
+    "nb_accounts",
+    "PATCH",
+    { hubspot_sync_eligible: true },
+    { id: `eq.${accountId}`, hubspot_company_id: "not.is.null" },
+  );
+}
+
 export type PurchaseOrder = {
   id: string;
   ordered_at: string;
