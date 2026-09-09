@@ -5,7 +5,86 @@ import { AttachmentButton, attachmentNote } from "./attachments-ui";
 import type { MarketingFile } from "./dal";
 import { decideDraft, type DraftSentResult } from "./outbound-actions";
 import { imessageLink, toWhatsAppPhone, waLink } from "./outreach-ui";
-import { SuccessNote } from "./ui";
+import { Ico, SuccessNote } from "./ui";
+
+/**
+ * The three ways to say one short thing to one account, when the queue has
+ * nothing for them. Juan's ask, 2026-09-08: the scoped Outbound view used to
+ * end in "Nothing queued for this account right now", which is true and
+ * useless, and the thing he actually wanted from that screen was to send a
+ * quick note.
+ *
+ * NOTHING HERE SENDS, same as every other button on this page. Each is a deep
+ * link that opens the app Juan sends from with the message pre-filled: mailto:
+ * into his mail client, sms: into Messages, wa.me into WhatsApp. The OS cannot
+ * see whether he pressed send on any of them, and does not claim to.
+ *
+ * A CHANNEL WITH NOTHING ON FILE DOES NOT RENDER. No greyed button, no
+ * placeholder address: an account with no email simply has two buttons. That
+ * is the same rule Fact and PriorityChip follow, and the reason is the same,
+ * a control that cannot work is worse than an absence, because it reads as a
+ * capability.
+ */
+export function QuickReach({
+  reach,
+}: {
+  reach: { name: string; email: string | null; phone: string | null; contactFirstName: string | null };
+}) {
+  // The greeting uses the contact's first name when one is on file and the
+  // business name when one is not. Never "there", never a blank: both are
+  // things nobody said (HARD RULE 1).
+  const greetName = reach.contactFirstName ?? reach.name;
+  const body = `Hi ${greetName},\n\nThank you,\nJuan`;
+  const wa = toWhatsAppPhone(reach.phone);
+
+  const cls =
+    "flex items-center gap-1.5 rounded-md border border-[#D8D4C8] px-3 py-2 text-[13px] font-medium text-[#3D4A44] transition-colors hover:bg-[#FAF9F5]";
+
+  return (
+    <div className="rounded-lg border border-[#E2DFD5] bg-white p-4">
+      <p className="text-[13.5px] leading-relaxed text-[#5B6560]">
+        Nothing is queued for {reach.name}. Open a short note to them instead, pre-filled and ready to send from your
+        own account.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {reach.email && (
+          <a
+            href={`mailto:${reach.email}?subject=${encodeURIComponent(reach.name)}&body=${encodeURIComponent(body)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cls}
+          >
+            <Ico name="mail" size={13} />
+            Email
+          </a>
+        )}
+        {wa && (
+          <a href={imessageLink(wa, body)} target="_blank" rel="noopener noreferrer" className={cls}>
+            <Ico name="imessage" size={13} />
+            iMessage
+          </a>
+        )}
+        {wa && (
+          <a href={waLink(wa, body)} target="_blank" rel="noopener noreferrer" className={cls}>
+            <Ico name="whatsapp" size={13} />
+            WhatsApp
+          </a>
+        )}
+      </div>
+      {/* Both of these are findings, not failures, and they name the fix. */}
+      {!reach.email && !wa && (
+        <p className="mt-3 text-[12.5px] text-[#8A928C]">
+          No email and no usable phone on file for this account yet.
+        </p>
+      )}
+      {(!reach.email || !wa) && (reach.email || wa) && (
+        <p className="mt-3 text-[12.5px] text-[#8A928C]">
+          {!reach.email ? "No email on file yet." : "No usable phone on file yet."}
+        </p>
+      )}
+    </div>
+  );
+}
 
 /**
  * Copy a draft body to the clipboard.

@@ -27,6 +27,7 @@
 import Link from "next/link";
 import {
   getPriorityBook,
+  getQuickReach,
   listDrafts,
   listMarketingFiles,
   listOwnerAccounts,
@@ -34,7 +35,7 @@ import {
   isConfigured,
 } from "../lib/dal";
 import { ManualEmailComposer } from "../lib/manual-email-ui";
-import { ChannelLabel, DraftActions, type ChannelKind } from "../lib/outbound-ui";
+import { ChannelLabel, DraftActions, QuickReach, type ChannelKind } from "../lib/outbound-ui";
 import { OutreachComposer } from "../lib/outreach-ui";
 import { PriorityChip, PriorityPanel } from "../lib/priority-ui";
 import { Card, Empty, PageHead, daysAgo } from "../lib/ui";
@@ -53,6 +54,10 @@ export default async function Outbound({
 }) {
   const sp = await searchParams;
   const accountFilter = sp.account?.trim() || null;
+  // Only fetched in the scoped view, and only to fill the three quick-action
+  // buttons below. Null when the id is not in Juan's book, which is a real
+  // scope answer and not an error state.
+  const quickReach = accountFilter ? await getQuickReach(accountFilter) : null;
   const [res, accountsResult, contacts, files, priority] = await Promise.all([
     listDrafts(),
     listOwnerAccounts(),
@@ -167,13 +172,23 @@ export default async function Outbound({
       )}
 
       {drafts.length === 0 ? (
-        <Empty>
-          {!isConfigured()
-            ? "No data source configured."
-            : accountFilter
-              ? "Nothing queued for this account right now."
-              : "No drafts waiting on you."}
-        </Empty>
+        /* THE SCOPED VIEW IS NOT A DEAD END ANY MORE (Juan, 2026-09-08). An
+           account with nothing queued is the normal case, and the answer to it
+           is a message, not a sentence saying there is no message. Three plain
+           deep links, each pre-filled and each opening the app that actually
+           sends: nothing here sends anything itself, exactly as the file header
+           insists. */
+        accountFilter && quickReach ? (
+          <QuickReach reach={quickReach} />
+        ) : (
+          <Empty>
+            {!isConfigured()
+              ? "No data source configured."
+              : accountFilter
+                ? "Nothing queued for this account right now."
+                : "No drafts waiting on you."}
+          </Empty>
+        )
       ) : (
         <ul className="flex flex-col gap-3">
           {drafts.map((d) => (

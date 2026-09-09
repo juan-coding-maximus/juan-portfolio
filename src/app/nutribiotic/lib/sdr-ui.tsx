@@ -28,7 +28,7 @@ import {
 import type { SdrScheduleItem } from "./dal";
 import { TouchpointCapture } from "./touchpoint-ui";
 import type { FiledTouchpoint } from "./touchpoint-ui";
-import { Ico, HUBSPOT_COMPANY_URL, daysAgo } from "./ui";
+import { Ico, HUBSPOT_COMPANY_URL, daysAgo, fullAddress, googleMapsUrl } from "./ui";
 
 export type SdrDayItem = SdrScheduleItem & {
   displayName: string;
@@ -603,17 +603,47 @@ function AccountPanel({ item, onFiled }: { item: SdrDayItem; onFiled: (r: FiledT
               <Fact label="Last order" value={panel.lastOrderAt ? daysAgo(panel.lastOrderAt) : null} />
             </div>
 
-            {panel.website && (
+            {/* The two ways to look the place up before dialing: their own
+                site, and their Google Maps profile (hours, photos, reviews,
+                and often a phone the ERP never had). Maps always renders,
+                because it needs only a name; the website renders only when one
+                is on file. */}
+            <div className="mt-3 flex flex-wrap items-center gap-4">
+              {panel.website ? (
+                <a
+                  href={panel.website.startsWith("http") ? panel.website : `https://${panel.website}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[12.5px] font-medium text-[#3D6B4A] hover:underline"
+                >
+                  <Ico name="external" size={12} />
+                  Open website
+                </a>
+              ) : (
+                /* NOT A UI BUG, A DATA GAP, and it says which. 35 of Juan's
+                   accounts carry no website; the fix is the enricher's
+                   blank-fill job against Places/web search, never a URL this
+                   component guesses from the business name. */
+                <span className="inline-flex items-center gap-1 text-[12.5px] text-[#8A928C]">
+                  <Ico name="alert" size={12} />
+                  No website on file
+                </span>
+              )}
               <a
-                href={panel.website.startsWith("http") ? panel.website : `https://${panel.website}`}
+                href={googleMapsUrl({
+                  name: panel.name,
+                  address: fullAddress({ street: panel.street, city: panel.city, state: panel.state, postal: panel.postal }),
+                  lat: panel.lat,
+                  lng: panel.lng,
+                })}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-3 inline-flex items-center gap-1 text-[12.5px] font-medium text-[#3D6B4A] hover:underline"
+                className="inline-flex items-center gap-1 text-[12.5px] font-medium text-[#3D6B4A] hover:underline"
               >
-                <Ico name="external" size={12} />
-                Open website
+                <Ico name="pin" size={12} />
+                Open in Google Maps
               </a>
-            )}
+            </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-[#E2DFD5] pt-3">
               {panel.hubspotCompanyId && (

@@ -123,6 +123,20 @@ export function appleMapsUrl(dest: { address?: string | null; lat: number; lng: 
 }
 
 /**
+ * The Google Maps business PROFILE for an account, not turn-by-turn nav (that
+ * stays appleMapsUrl's job via the GO button). Same by-address-when-there-is-one
+ * rule: name+address resolves to the actual listing (reviews, hours, photos),
+ * a bare coordinate pair does not. No place_id is stored on nb_accounts, so
+ * this is Google's documented query-based place search, not a place-id deep
+ * link; good enough to land on the right listing for a named, addressed account.
+ */
+export function googleMapsUrl(dest: { name?: string | null; address?: string | null; lat?: number | null; lng?: number | null }): string {
+  const address = dest.address?.trim();
+  const query = address ? [dest.name?.trim(), address].filter(Boolean).join(", ") : dest.lat != null && dest.lng != null ? `${dest.lat},${dest.lng}` : null;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query ?? dest.name?.trim() ?? "")}`;
+}
+
+/**
  * "621 RUSHING CREEK PL, THOUSAND OAKS, CA, 91360", or null when the record is
  * too thin to name a place. Street AND city are both required: "CA, 91360"
  * alone geocodes to a postal centroid, which is the very thing the coordinate

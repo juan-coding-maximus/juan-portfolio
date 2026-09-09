@@ -74,6 +74,13 @@ export type SdrAccountPanel = {
   channel: string;
   street: string | null;
   city: string | null;
+  state: string | null;
+  postal: string | null;
+  /** For the Google Maps link when the address is too thin to search on.
+   *  Null on an account with no verified pin, which is a real state: the
+   *  link then falls back to the business name, never to a made-up point. */
+  lat: number | null;
+  lng: number | null;
   phone: string | null;
   website: string | null;
   lifecycle: string;
@@ -111,6 +118,10 @@ export async function getSdrAccountPanel(accountId: string): Promise<SdrAccountP
     channel: a.channel,
     street: a.street,
     city: a.city,
+    state: a.state,
+    postal: a.postal,
+    lat: a.lat,
+    lng: a.lng,
     phone: a.phone,
     website: a.website,
     lifecycle: a.lifecycle,

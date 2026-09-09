@@ -388,7 +388,13 @@ export type Account = {
   channel: string;
   street: string | null;
   city: string | null;
+  /* Already selected (getAccount reads `*`), typed here 2026-09-08 so the SDR
+     panel can build a Google Maps search from a full address, and fall back to
+     the pin when the address is too thin, rather than to nothing. */
+  state: string | null;
   postal: string | null;
+  lat: number | null;
+  lng: number | null;
   phone: string | null;
   website: string | null;
   email: string | null;
@@ -3471,6 +3477,48 @@ export async function listOwnerContactPhones(ownerName = "Juan Arenas Martin"): 
   return raw<OutreachContact>(
     `nb_contacts?select=id,account_id,first_name,last_name,title,phone&account_id=in.(${ids})&phone=not.is.null`,
   );
+}
+
+/**
+ * Everything the Outbound page needs to offer a one-off message to ONE
+ * account, when nothing is queued for it (Juan, 2026-09-08: the scoped view
+ * used to be a dead end reading "Nothing queued for this account right now").
+ *
+ * Scoped to Juan's book in the query, like every other read here. Returns
+ * nulls freely: a channel with no address or number on file must render as
+ * absent rather than as a button that opens a dead link, which is the same
+ * rule the rest of this screen already follows.
+ */
+export async function getQuickReach(accountId: string): Promise<{
+  name: string;
+  email: string | null;
+  phone: string | null;
+  /** The person to greet, when one is on file. Falls back to the business
+   *  name at the call site; never to "there" or a placeholder. */
+  contactFirstName: string | null;
+} | null> {
+  await verifySession();
+  if (!isConfigured()) return null;
+  const [accounts, contacts] = await Promise.all([
+    raw<{ id: string; name: string; email: string | null; phone: string | null }>(
+      `nb_accounts?select=id,name,email,phone&id=eq.${accountId}&hubspot_owner_id=eq.${JUAN_OWNER_ID}&limit=1`,
+    ),
+    raw<{ first_name: string | null; email: string | null; phone: string | null; is_decision_maker: boolean }>(
+      `nb_contacts?select=first_name,email,phone,is_decision_maker&account_id=eq.${accountId}` +
+        "&order=is_decision_maker.desc&limit=5",
+    ),
+  ]);
+  const a = accounts[0];
+  if (!a) return null;
+  const withEmail = contacts.find((c) => c.email);
+  const withPhone = contacts.find((c) => c.phone);
+  const named = contacts.find((c) => c.first_name);
+  return {
+    name: a.name,
+    email: a.email ?? withEmail?.email ?? null,
+    phone: a.phone ?? withPhone?.phone ?? null,
+    contactFirstName: named?.first_name ?? null,
+  };
 }
 
 // ---------------------------------------------------------------------------
