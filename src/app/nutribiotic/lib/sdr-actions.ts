@@ -11,6 +11,7 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  addOwnedAccountToRouteDraft,
   getAccount,
   insertSdrScheduleItem,
   listActivities,
@@ -20,6 +21,7 @@ import {
   searchOwnedContacts,
   setSdrScheduleStatus,
   type NewSdrScheduleItem,
+  type SdrPriority,
   type SdrScheduleItem,
 } from "./dal";
 
@@ -33,6 +35,10 @@ export type SdrSearchHit = {
    *  instead of just the business twice. */
   contactName: string | null;
   contactTitle: string | null;
+  /** nb_accounts.area, so a row added straight from this search lands in the
+   *  right area group on the queue without waiting for a server render. Null
+   *  on a contact-only hit whose account row was not read. */
+  area: string | null;
 };
 
 /**
@@ -48,7 +54,7 @@ export async function searchSdrClients(q: string): Promise<SdrSearchHit[]> {
   const [accounts, contacts] = await Promise.all([searchOwnedAccounts(query, 6), searchOwnedContacts(query, 6)]);
   const byAccount = new Map<string, SdrSearchHit>();
   for (const a of accounts.data) {
-    byAccount.set(a.id, { accountId: a.id, accountName: a.name, city: a.city, phone: a.phone, contactName: null, contactTitle: null });
+    byAccount.set(a.id, { accountId: a.id, accountName: a.name, city: a.city, phone: a.phone, area: a.area, contactName: null, contactTitle: null });
   }
   for (const c of contacts.data) {
     const existing = byAccount.get(c.account_id);
@@ -60,6 +66,7 @@ export async function searchSdrClients(q: string): Promise<SdrSearchHit[]> {
         accountName: c.account_name,
         city: c.city,
         phone: c.phone,
+        area: null,
         contactName: c.name,
         contactTitle: c.title,
       });
@@ -151,6 +158,63 @@ export async function addSdrScheduleItem(input: NewSdrScheduleItem): Promise<Sdr
   const row = await insertSdrScheduleItem(input);
   revalidatePath("/nutribiotic/sdr");
   return row;
+}
+
+/**
+ * "Add to SDR" from a map pin (Juan, 2026-09-08). The map is where he decides
+ * an account is worth working; the SDR queue is where the work gets done. The
+ * gap between the two used to be retyping the name into the queue's own search.
+ *
+ * DATED TODAY, deliberately. The map card has no room for a date picker beside
+ * a three-way priority, and the queue is a rail of days a row can be dragged
+ * across in one tap (0063's reschedule). Landing it on today and letting him
+ * move it is fewer decisions at the moment of tapping than asking for a day he
+ * has not thought about yet.
+ *
+ * A CALL, not a visit: this is the desk queue. A stop he wants to drive to is
+ * the button directly above it on the same card, which writes route_draft.
+ *
+ * Scope (HARD RULE 2) is asserted inside insertSdrScheduleItem, against the
+ * live row, not here against what the client sent.
+ */
+export async function addAccountToSdr(
+  accountId: string,
+  priority: SdrPriority,
+  scheduledDate: string,
+): Promise<SdrScheduleItem> {
+  const row = await insertSdrScheduleItem({
+    account_id: accountId,
+    kind: "call",
+    scheduled_date: scheduledDate,
+    priority,
+  });
+  revalidatePath("/nutribiotic/sdr");
+  return row;
+}
+
+/**
+ * "Add to route" from an SDR row (Juan, 2026-09-08): pick a day, optionally
+ * state a time, and the stop lands on the map's own hand-built route.
+ *
+ * THE SAME WRITE PATH THE MAP USES, on purpose: nb_ui_prefs.route_draft, the
+ * column RouteProvider reads and route_draft_write.py writes (memory
+ * reference_nutribiotic-route-map-write). Nothing here invents a second list of
+ * planned stops. The optional time goes to route_stop_times (0065), where
+ * RoutePanel reads it as an anchor rather than as a label.
+ *
+ * THE SDR ROW IS NOT CLOSED BY THIS. Scheduling a drive is not having made the
+ * call, and marking it done here would silently record a touchpoint that never
+ * happened. It stays pending until Juan closes it himself or logs through the
+ * capture box (HARD RULE 1).
+ */
+export async function addSdrItemToRoute(
+  accountId: string,
+  date: string,
+  at?: string | null,
+): Promise<{ added: boolean; alreadyThere: boolean }> {
+  const res = await addOwnedAccountToRouteDraft(accountId, date, at ?? null);
+  revalidatePath("/nutribiotic/map");
+  return res;
 }
 
 /**

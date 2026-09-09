@@ -10,6 +10,7 @@ import {
   setRouteEndByDay,
   setRouteSchedulePrefs,
   setRouteStartByDay,
+  setRouteStopTimes,
   setShowChainAccounts,
   setShowPracticeAccounts,
   type RouteCallsByDay,
@@ -17,6 +18,7 @@ import {
   type RouteDraftByDay,
   type RouteEndpointsByDay,
   type RouteSchedulePrefs,
+  type RouteStopTimesByDay,
 } from "./dal";
 
 /** The map's "chains" button. Persists to nb_ui_prefs (see migration 0024)
@@ -57,6 +59,16 @@ export async function saveRouteDraft(byDay: RouteDraftByDay): Promise<void> {
  */
 export async function saveRouteCalls(byDay: RouteCallsByDay): Promise<void> {
   await setRouteCalls(byDay);
+}
+
+/**
+ * Stated arrival times for route stops (migration 0065), day-partitioned like
+ * the draft itself and saved with the same optimistic contract: the panel has
+ * already redrawn, this makes it durable. No revalidatePath, same reason as
+ * saveRouteDraft.
+ */
+export async function saveRouteStopTimes(byDay: RouteStopTimesByDay): Promise<void> {
+  await setRouteStopTimes(byDay);
 }
 
 /**

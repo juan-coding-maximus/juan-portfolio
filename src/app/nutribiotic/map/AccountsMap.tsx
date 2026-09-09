@@ -11,11 +11,13 @@
  * secrecy. See SETUP.md for how it was created.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { GoogleMap, MarkerF, InfoWindowF, PolygonF, PolylineF, useLoadScript } from "@react-google-maps/api";
-import type { CustomStop, MapAccount, TerritoryArea, Tier } from "../lib/dal";
+import type { CustomStop, MapAccount, SdrPriority, TerritoryArea, Tier } from "../lib/dal";
 import { listAreaBoundaries } from "../lib/area-actions";
+import { laTodayIso } from "../lib/field-week";
 import { AccountLink } from "../lib/modal";
+import { addAccountToSdr } from "../lib/sdr-actions";
 import { appleMapsUrl, CUSTOM_STOP_LABEL, Ico, ReachLinks, realChannel } from "../lib/ui";
 import type { DriveLeg } from "./drive-actions";
 import type { FocusRequest, RouteStopView } from "./MapScreen";
@@ -33,6 +35,87 @@ import { BAND_STYLE, driveBand } from "./traffic";
  * White ring around the disc so it stays separable from a red area polygon or
  * a cluster of pins underneath it.
  */
+/**
+ * "Add to SDR" on a pin card (Juan, 2026-09-08). Two taps: the control, then
+ * Low / Mid / High. The priority IS the second tap, so nothing lands in the
+ * queue without Juan having said what it is worth (migration 0064's own
+ * reasoning: a defaulted priority is a judgement put in his mouth).
+ *
+ * ONE-WAY, and it says so once it has fired. The queue's own screen is where a
+ * row is moved, closed or re-prioritised; a map card that tried to be an editor
+ * for a row it cannot see the rest of would be two sources of truth for one
+ * decision. Tapping again after it lands can only be a mis-tap, so the control
+ * becomes a statement, exactly like "On the route" above it.
+ */
+const SDR_PRIORITIES: { value: SdrPriority; label: string; tone: string }[] = [
+  { value: "low", label: "Low", tone: "bg-[#ECEAE1] text-[#5B6560] hover:bg-[#E2DFD5]" },
+  { value: "mid", label: "Mid", tone: "bg-[#E7EDE4] text-[#3D6B4A] hover:bg-[#DCE6D8]" },
+  { value: "high", label: "High", tone: "bg-[#F3E3C6] text-[#8A6D2F] hover:bg-[#EDD8AD]" },
+];
+
+function AddToSdr({ accountId }: { accountId: string }) {
+  const [open, setOpen] = useState(false);
+  const [queued, setQueued] = useState<SdrPriority | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  function queue(priority: SdrPriority) {
+    setFailed(false);
+    startTransition(async () => {
+      try {
+        await addAccountToSdr(accountId, priority, laTodayIso());
+        setQueued(priority);
+        setOpen(false);
+      } catch {
+        // Never a silent success. The row either exists or it does not, and a
+        // card that closed itself would say it does.
+        setFailed(true);
+      }
+    });
+  }
+
+  if (queued) {
+    return (
+      <div className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-md bg-[#EEECE3] px-3 py-2 text-[12.5px] font-semibold text-[#5B6560]">
+        <Ico name="check" size={13} />
+        In the SDR queue · {queued}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-1.5">
+      {open ? (
+        <div className="flex items-center gap-1">
+          {SDR_PRIORITIES.map((p) => (
+            <button
+              key={p.value}
+              type="button"
+              onClick={() => queue(p.value)}
+              disabled={pending}
+              className={`flex-1 rounded-md px-2 py-2 text-[12px] font-semibold transition-colors disabled:opacity-40 ${p.tone}`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white px-3 py-2 text-[12.5px] font-semibold text-[#3D4A44] transition-colors hover:bg-[#FAF9F5]"
+        >
+          <Ico name="phone" size={13} />
+          Add to SDR
+        </button>
+      )}
+      {failed && (
+        <div className="mt-1 text-[11.5px] text-[#8A2E2E]">Could not queue it. Nothing was scheduled.</div>
+      )}
+    </div>
+  );
+}
+
 const HOME_PIN_SVG =
   "data:image/svg+xml;charset=UTF-8," +
   encodeURIComponent(
@@ -1346,6 +1429,18 @@ export function AccountsMap({
                   <Ico name={inRoute.has(selected.id) ? "check" : "route"} size={13} />
                   {inRoute.has(selected.id) ? "On the route" : "Add to route"}
                 </button>
+                {/* The desk half of the same decision. A pin answers "is this
+                    worth my time"; yes can mean a drive (above) or a call from
+                    the desk (here), and until now only the drive had a button.
+                    Below Add to route rather than beside it: the map is a
+                    driving surface first. */}
+                {/* Keyed per account: the card is one component reused for
+                    every pin, and a "In the SDR queue" left over from the last
+                    pin would be a claim about this one. A key remounts it
+                    clean, which is the React way to say "this is a different
+                    thing now" rather than resetting three pieces of state in
+                    an effect. */}
+                <AddToSdr key={selected.id} accountId={selected.id} />
                 <div className="mt-2">
                   <AccountLink
                     id={selected.id}

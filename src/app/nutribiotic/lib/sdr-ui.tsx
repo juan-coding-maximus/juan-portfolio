@@ -16,6 +16,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import {
+  addSdrItemToRoute,
   addSdrScheduleItem,
   getSdrAccountPanel,
   rescheduleSdrItem,
@@ -25,16 +26,36 @@ import {
   type SdrAccountPanel,
   type SdrSearchHit,
 } from "./sdr-actions";
-import type { PriorityBook } from "./dal";
-import type { SdrScheduleItem } from "./dal";
+import type { PriorityBook, SdrPriority, SdrScheduleItem } from "./dal";
+import { planningHorizonDates } from "./field-week";
 import { TopOpportunities } from "./priority-ui";
 import { TouchpointCapture } from "./touchpoint-ui";
 import type { FiledTouchpoint } from "./touchpoint-ui";
 import { Ico, HUBSPOT_COMPANY_URL, daysAgo, fullAddress, googleMapsUrl } from "./ui";
 
+/** One territory area, in the order the SDR queue and the map legend both use:
+ *  most 80+ prospects first (see sdr/page.tsx and lib/priority.ts). `prospects`
+ *  is that count, carried so the section header can show the reason it is
+ *  where it is rather than asking Juan to take the order on faith. */
+export type SdrAreaGroup = { id: string; label: string; color: string; prospects: number };
+
+/** High first, then Mid, then Low, then null (nobody stated one) last. A stated
+ *  Low still sorts above an unstated row, because "Juan looked at this and said
+ *  not yet" is more information than silence.
+ *
+ *  Declared here rather than in dal.ts even though the column lives there:
+ *  dal.ts is server-only, and a VALUE import of it from this client component
+ *  drags the whole module (and googleapis with it) into the browser bundle,
+ *  which Next refuses to build. Type imports are erased and stay in dal. */
+const SDR_PRIORITY_RANK: Record<SdrPriority, number> = { high: 3, mid: 2, low: 1 };
+
 export type SdrDayItem = SdrScheduleItem & {
   displayName: string;
   displayPhone: string | null;
+  /** nb_accounts.area for the account behind this row, null for a prospect
+   *  that is not an account yet. Null groups under "No area", never into a
+   *  territory nobody assigned it to. */
+  area: string | null;
   /** From lib/priority.ts, computed server-side in sdr/page.tsx. Null on a
    *  prospect with no account behind it, and on an account none of whose
    *  inputs are known: not scored is never rendered as a zero. */
@@ -67,7 +88,7 @@ function dayLabel(iso: string, todayIso: string): string {
   return `${weekday} · ${md}`;
 }
 
-type AccountHit = { id: string; name: string; city: string | null; phone: string | null };
+type AccountHit = { id: string; name: string; city: string | null; phone: string | null; area: string | null };
 
 function AddToDayForm({ date, onAdded }: { date: string; onAdded: (item: SdrDayItem) => void }) {
   const [mode, setMode] = useState<"account" | "prospect">("account");
@@ -125,6 +146,9 @@ function AddToDayForm({ date, onAdded }: { date: string; onAdded: (item: SdrDayI
         ...row,
         displayName: mode === "account" ? picked!.name : prospectName.trim(),
         displayPhone: mode === "account" ? picked!.phone : prospectPhone.trim() || null,
+        // From the picker, so the new row appears under the right area header
+        // straight away. A typed prospect has none, and says so.
+        area: mode === "account" ? picked!.area : null,
         // Unscored until the next server render, deliberately: scoring needs
         // the whole book's revenue distribution (see priority.ts), and pulling
         // 437 accounts into this form to rank one freshly typed row would cost
@@ -313,6 +337,7 @@ function GlobalSearch({
         ...row,
         displayName: hit.accountName,
         displayPhone: hit.phone,
+        area: hit.area,
         priorityScore: null,
         priorityReason: null,
         priorityBand: null,
@@ -404,6 +429,102 @@ function GlobalSearch({
  * exactly the "crowded" Juan pointed at. Both moved into AccountPanel below,
  * which only ever shows one account at a time and has the room for them.
  */
+/** Juan's own Low/Mid/High on the row (migration 0064), not the computed score
+ *  next to it. Muted on purpose: it is a label, and the loud thing on a queue
+ *  row should stay the business name. Null prints nothing, because nobody said. */
+const PRIORITY_CHIP: Record<"low" | "mid" | "high", string> = {
+  low: "bg-[#ECEAE1] text-[#8A928C]",
+  mid: "bg-[#E7EDE4] text-[#3D6B4A]",
+  high: "bg-[#F3E3C6] text-[#8A6D2F]",
+};
+
+/**
+ * "Add to route" on an SDR row (Juan, 2026-09-08): pick a day from the same
+ * rolling horizon the map plans over, optionally state a time, and the stop
+ * lands on nb_ui_prefs.route_draft, the one hand-built route.
+ *
+ * THE TIME IS OPTIONAL AND IT IS AN ANCHOR, not a label. A stop with a stated
+ * time holds its arrival in RoutePanel's schedule and the next leg starts from
+ * it (migration 0065), which is Juan's routing rule of 2026-09-03 rather than a
+ * new idea. Left blank, the stop is placed by order like every other one and
+ * claims no time at all.
+ *
+ * THE ROW STAYS PENDING. Putting a visit on Thursday's route is not having made
+ * the call, and closing the row here would log a touch that never happened.
+ */
+function AddToRoute({ accountId, onClose }: { accountId: string; onClose: () => void }) {
+  const days = useMemo(() => planningHorizonDates(), []);
+  const [day, setDay] = useState(days[0]);
+  const [at, setAt] = useState("");
+  const [placed, setPlaced] = useState<{ day: string; at: string | null } | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  function submit() {
+    setFailed(false);
+    startTransition(async () => {
+      try {
+        await addSdrItemToRoute(accountId, day, at || null);
+        setPlaced({ day, at: at || null });
+      } catch {
+        setFailed(true);
+      }
+    });
+  }
+
+  if (placed) {
+    return (
+      <div className="flex w-full items-center gap-1.5 border-t border-[#EFEDE5] pt-2 text-[11.5px] text-[#3D6B4A]">
+        <Ico name="check" size={11} />
+        On the route {dayLabelShort(placed.day)}
+        {placed.at ? ` at ${placed.at}` : ""}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex w-full flex-wrap items-center gap-1.5 border-t border-[#EFEDE5] pt-2">
+      <label className="text-[11px] uppercase tracking-[0.08em] text-[#8A928C]">Route</label>
+      <select
+        value={day}
+        onChange={(e) => setDay(e.target.value)}
+        className="rounded-md border border-[#E2DFD5] bg-white px-1.5 py-1 text-[12px] text-[#3D4A44] outline-none focus:border-[#14201B]"
+      >
+        {days.map((d) => (
+          <option key={d} value={d}>
+            {dayLabelShort(d)}
+          </option>
+        ))}
+      </select>
+      {/* Optional, and left blank it stays blank: an empty time is "no time was
+          stated", never midnight. */}
+      <input
+        type="time"
+        value={at}
+        onChange={(e) => setAt(e.target.value)}
+        className="rounded-md border border-[#E2DFD5] bg-white px-1.5 py-1 text-[12px] text-[#3D4A44] outline-none focus:border-[#14201B]"
+      />
+      <button
+        onClick={submit}
+        disabled={pending}
+        className="rounded-md bg-[#2C6A46] px-2.5 py-1 text-[11.5px] font-medium text-white disabled:opacity-30"
+      >
+        {pending ? "Adding…" : "Add"}
+      </button>
+      <button onClick={onClose} className="px-1 text-[11.5px] text-[#8A928C]">
+        Cancel
+      </button>
+      {failed && <div className="w-full text-[11.5px] text-[#8A2E2E]">Could not add it. Nothing was scheduled.</div>}
+    </div>
+  );
+}
+
+/** "Thu Sep 11", the short form the route day picker reads at a glance. */
+function dayLabelShort(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+
 function ScheduleRow({
   item,
   active,
@@ -420,6 +541,7 @@ function ScheduleRow({
   const done = item.status === "done";
   const skipped = item.status === "skipped";
   const [moving, setMoving] = useState(false);
+  const [routing, setRouting] = useState(false);
 
   return (
     <li
@@ -442,6 +564,13 @@ function ScheduleRow({
         </div>
         <div className="mt-0.5 flex items-center gap-1.5 text-[11px] uppercase tracking-[0.08em] text-[#8A928C]">
           <span>{item.kind}</span>
+          {/* Juan's own call, when he made one. A row nobody prioritised shows
+              nothing here rather than a default that would speak for him. */}
+          {item.priority && (
+            <span className={`rounded px-1 py-0.5 text-[10px] font-medium ${PRIORITY_CHIP[item.priority]}`}>
+              {item.priority}
+            </span>
+          )}
           {item.status !== "pending" && <span>· {item.status}</span>}
         </div>
         {/* Why it is ranked here, in words. The rail is narrow, so it clamps
@@ -463,6 +592,20 @@ function ScheduleRow({
             <Ico name="phone" size={11} />
             Call
           </a>
+        )}
+        {!done && !skipped && item.account_id && (
+          /* Only for a row that IS an account. A cold prospect has no
+             nb_accounts row to put on a route, and 0061 made that column
+             nullable precisely so the OS would not invent one. */
+          <button
+            onClick={() => setRouting((v) => !v)}
+            title="Put this account on a day's route"
+            className={`flex h-6 w-6 items-center justify-center rounded-md border text-[#5B6560] hover:bg-[#F7F6F1] ${
+              routing ? "border-[#14201B]" : "border-[#E2DFD5]"
+            }`}
+          >
+            <Ico name="route" size={12} />
+          </button>
         )}
         {!done && !skipped && (
           <>
@@ -498,6 +641,8 @@ function ScheduleRow({
           </>
         )}
       </div>
+
+      {routing && item.account_id && <AddToRoute accountId={item.account_id} onClose={() => setRouting(false)} />}
 
       {moving && (
         <div className="flex w-full items-center gap-2 border-t border-[#EFEDE5] pt-2">
@@ -704,10 +849,60 @@ function AccountPanel({ item, onFiled }: { item: SdrDayItem; onFiled: (r: FiledT
   );
 }
 
+/**
+ * One day's rows, grouped by the territory area each account sits in, areas in
+ * the order sdr/page.tsx handed down: most 80+ prospects first (Juan,
+ * 2026-09-08). Returns only the groups that actually have rows on this day, so
+ * a day with four calls shows the two or three areas they are in, never fifteen
+ * empty headers.
+ *
+ * INSIDE a group the existing order stands unchanged: pending before closed,
+ * then by computed priority, then creation order. Area is a new outer level,
+ * not a replacement for how a call gets picked out of a group.
+ *
+ * A row whose account has no area (a cold prospect, or an account
+ * assign_areas.py could not place) lands in a group of its own at the bottom,
+ * named for what it is. It is never filed into a territory nobody assigned it
+ * to, and never dropped, which is the failure that would actually cost a call.
+ */
+function groupByArea(
+  dayItems: SdrDayItem[],
+  areas: SdrAreaGroup[],
+): { area: SdrAreaGroup | null; items: SdrDayItem[] }[] {
+  const byArea = new Map<string, SdrDayItem[]>();
+  const noArea: SdrDayItem[] = [];
+  for (const it of dayItems) {
+    if (!it.area) {
+      noArea.push(it);
+      continue;
+    }
+    const bucket = byArea.get(it.area);
+    if (bucket) bucket.push(it);
+    else byArea.set(it.area, [it]);
+  }
+
+  const groups: { area: SdrAreaGroup | null; items: SdrDayItem[] }[] = [];
+  for (const area of areas) {
+    const items = byArea.get(area.id);
+    if (items) {
+      groups.push({ area, items });
+      byArea.delete(area.id);
+    }
+  }
+  // An area id on a row that the areas list does not carry (a re-cut mid-render,
+  // or an account still pointing at a retired area). Shown, not swallowed.
+  for (const [id, items] of byArea) {
+    groups.push({ area: { id, label: id, color: "#8A928C", prospects: 0 }, items });
+  }
+  if (noArea.length > 0) groups.push({ area: null, items: noArea });
+  return groups;
+}
+
 export function SdrScreen({
   initialItems,
   todayIso,
   days,
+  areas,
   focusAccountId,
   focusAccountName,
   focusAccountPhone,
@@ -716,6 +911,10 @@ export function SdrScreen({
   initialItems: SdrDayItem[];
   todayIso: string;
   days: number;
+  /** Every territory area, already ordered by 80+ prospect count desc (see
+   *  sdr/page.tsx). The queue groups each day's rows under these headers in
+   *  exactly this order, the same order the map legend uses. */
+  areas: SdrAreaGroup[];
   /** From /nutribiotic/sdr?account=<id>, which the priority panel's "Call ..."
    *  action links to. The panel opens on that account whether or not it has a
    *  row scheduled: a prescriptive list has to be able to hand off to the
@@ -759,6 +958,10 @@ export function SdrScreen({
       completed_activity_id: null,
       created_at: new Date().toISOString(),
       rescheduled_at: null,
+      // A stand-in is not a row, so it carries no stated priority and no area
+      // of its own: both come from the real row or the account behind it.
+      priority: null,
+      area: null,
       origin: "manual",
       displayName: focusAccountName,
       displayPhone: focusAccountPhone ?? null,
@@ -835,6 +1038,10 @@ export function SdrScreen({
       completed_activity_id: null,
       created_at: new Date().toISOString(),
       rescheduled_at: null,
+      // A stand-in is not a row, so it carries no stated priority and no area
+      // of its own: both come from the real row or the account behind it.
+      priority: null,
+      area: null,
       origin: "manual",
       displayName: hit.accountName,
       displayPhone: hit.phone,
@@ -864,27 +1071,54 @@ export function SdrScreen({
             // fallback was creation order, which only recorded which row was
             // typed first. Null sorts last, never as zero, and Array.sort's
             // stability keeps creation order as the final tiebreak.
+            // Juan's stated priority outranks the computed score inside a day
+            // (0064): a High he typed is him overriding the arithmetic, and a
+            // ranking that quietly ignored that would make the control a
+            // decoration. Null (nobody said) sorts after every stated one,
+            // then the computed score breaks the tie, then creation order.
             .sort((a, b) => {
               if (a.status !== b.status) return a.status === "pending" ? -1 : 1;
+              const pd =
+                (b.priority ? SDR_PRIORITY_RANK[b.priority] : 0) - (a.priority ? SDR_PRIORITY_RANK[a.priority] : 0);
+              if (pd !== 0) return pd;
               return (b.priorityScore ?? -1) - (a.priorityScore ?? -1);
             });
+          const groups = groupByArea(dayItems, areas);
           return (
             <div key={iso} className="rounded-lg border border-[#E2DFD5] bg-white p-3">
               <div className="mb-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#5B6560]">
                 {dayLabel(iso, todayIso)}
               </div>
-              <ul className="flex flex-col gap-1.5">
-                {dayItems.map((it) => (
-                  <ScheduleRow
-                    key={it.id}
-                    item={it}
-                    active={active?.id === it.id}
-                    onSelect={() => setActive(it)}
-                    onStatus={(status) => setStatus(it.id, status)}
-                    onReschedule={(date) => reschedule(it.id, date)}
-                  />
-                ))}
-              </ul>
+              {groups.map(({ area, items: areaItems }) => (
+                <div key={area?.id ?? "no-area"} className="mb-2 last:mb-0">
+                  {/* The area's own colour, the same swatch the map paints its
+                      frontier and its filter chip with, so a section header and
+                      the region it names are visibly one thing. The count is
+                      how many of that area's accounts score 80+ right now: the
+                      reason this section sits where it does. */}
+                  <div className="mb-1 flex items-center gap-1.5 text-[11px] uppercase tracking-[0.08em] text-[#8A928C]">
+                    <span
+                      aria-hidden
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ background: area?.color ?? "#C9CCC6" }}
+                    />
+                    <span className="truncate">{area?.label ?? "No area"}</span>
+                    {area && <span className="tabular-nums text-[#B4B9B3]">{area.prospects}</span>}
+                  </div>
+                  <ul className="flex flex-col gap-1.5">
+                    {areaItems.map((it) => (
+                      <ScheduleRow
+                        key={it.id}
+                        item={it}
+                        active={active?.id === it.id}
+                        onSelect={() => setActive(it)}
+                        onStatus={(status) => setStatus(it.id, status)}
+                        onReschedule={(date) => reschedule(it.id, date)}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              ))}
               <div className="mt-2">
                 <AddToDayForm date={iso} onAdded={addItem} />
               </div>

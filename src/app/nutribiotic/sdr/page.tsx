@@ -5,7 +5,8 @@
  * of the nav; Expenses moved into More (see ../layout.tsx for why).
  */
 
-import { getAccountCallCards, getPriorityBook, isConfigured, listSdrSchedule, todayStartLA } from "../lib/dal";
+import { getAccountCallCards, getPriorityBook, isConfigured, listAreas, listSdrSchedule, todayStartLA } from "../lib/dal";
+import { sortAreasByProspects } from "../lib/priority";
 import { PageHead, Empty } from "../lib/ui";
 import { SdrScreen, type SdrDayItem } from "../lib/sdr-ui";
 
@@ -40,7 +41,11 @@ export default async function SdrPage({
       ...(focusAccountId ? [focusAccountId] : []),
     ]),
   ];
-  const [cards, priority] = await Promise.all([getAccountCallCards(accountIds), getPriorityBook()]);
+  const [cards, priority, areas] = await Promise.all([
+    getAccountCallCards(accountIds),
+    getPriorityBook(),
+    listAreas(),
+  ]);
 
   /*
    * THE DAY IS STILL THE DAY. Priority orders the calls INSIDE each scheduled
@@ -61,6 +66,9 @@ export default async function SdrPage({
       ...r,
       displayName: card?.name ?? r.prospect_name ?? "Unnamed",
       displayPhone: card?.phone ?? r.prospect_phone ?? null,
+      /* A prospect with no account has no area, and gets its own group at the
+         bottom rather than being filed into a territory nobody put it in. */
+      area: card?.area ?? null,
       priorityScore: p?.score ?? null,
       priorityReason: p?.reason ?? null,
       priorityBand: p?.band ?? null,
@@ -69,6 +77,21 @@ export default async function SdrPage({
 
   const todayIso = todayStartLA().slice(0, 10);
 
+  /*
+   * AREA ORDER, SAME RULE AS THE MAP LEGEND (Juan, 2026-09-08): most 80+
+   * prospects first. Computed from the one priority book, by the one function
+   * both screens call (lib/priority.ts's sortAreasByProspects), so the queue's
+   * sections and the map's chips can never end up in different orders. The
+   * count travels with the label, since an ordering nobody can see the reason
+   * for is just a shuffle.
+   */
+  const orderedAreas = sortAreasByProspects(areas, priority.areaProspects).map((a) => ({
+    id: a.id,
+    label: a.label,
+    color: a.color,
+    prospects: priority.areaProspects.get(a.id) ?? 0,
+  }));
+
   return (
     <>
       <PageHead title="SDR" />
@@ -76,6 +99,7 @@ export default async function SdrPage({
         initialItems={items}
         todayIso={todayIso}
         days={DAYS_AHEAD}
+        areas={orderedAreas}
         focusAccountId={focusAccountId}
         focusAccountName={focusAccountId ? (cards[focusAccountId]?.name ?? null) : null}
         focusAccountPhone={focusAccountId ? (cards[focusAccountId]?.phone ?? null) : null}

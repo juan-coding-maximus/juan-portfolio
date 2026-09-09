@@ -122,6 +122,8 @@ export function MapScreen({
     moveCallToDay,
     done,
     toggleDone,
+    stopTimes,
+    setStopTime,
   } = useRoute();
 
   /* An account entry that no longer resolves drops out here (see getRouteDraft);
@@ -534,6 +536,8 @@ export function MapScreen({
         onMoveCallDay={moveCallToDay}
         done={done}
         onToggleDone={toggleDone}
+        stopTimes={stopTimes}
+        onSetStopTime={setStopTime}
         days={days}
         activeDay={activeDay}
         onSelectDay={setActiveDay}

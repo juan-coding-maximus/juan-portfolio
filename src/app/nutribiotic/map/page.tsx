@@ -18,6 +18,7 @@ import {
   listOwnerAccounts,
 } from "../lib/dal";
 import type { AccountPriority } from "./AccountsMap";
+import { sortAreasByProspects } from "../lib/priority";
 import { Empty, PageHead } from "../lib/ui";
 import { MapScreen } from "./MapScreen";
 
@@ -49,6 +50,21 @@ export default async function MapPage({
     if (r.score !== null) priorityById[id] = { score: r.score, reason: r.reason, band: r.band };
   }
 
+  /*
+   * THE LEGEND READS BUSIEST FIRST (Juan, 2026-09-08), not in the config's file
+   * order. "Busiest" is how many of that area's accounts currently score 80+
+   * (lib/priority.ts's PROSPECT_SCORE_MIN and the note there on why that score
+   * and not one of the other three the department stores). Sorted here on the
+   * server, off the priority book the page already computes for the pin cards,
+   * so the map costs no extra read for it and the chip row and the SDR queue
+   * cannot end up in different orders.
+   *
+   * display_order stays exactly as assign_areas.py wrote it. It is the config's
+   * declared order and other surfaces still read it; this is a view of the same
+   * list, not a rewrite of the column.
+   */
+  const orderedAreas = sortAreasByProspects(areas, priority.areaProspects);
+
   return (
     <>
       {/* Subtitle removed on Juan's ask 2026-08-05. It explained the two
@@ -75,7 +91,7 @@ export default async function MapPage({
             accounts={accounts.data}
             priorityById={priorityById}
             initialFocusId={focusId}
-            areas={areas}
+            areas={orderedAreas}
             initialShowChains={displayPrefs.showChains}
             initialShowPractices={displayPrefs.showPractices}
             schedulePrefs={schedulePrefs}

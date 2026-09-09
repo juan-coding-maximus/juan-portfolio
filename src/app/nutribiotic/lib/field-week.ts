@@ -30,6 +30,14 @@ function laToday(): { iso: string; weekdayIso: number } {
   return { iso: `${get("year")}-${get("month")}-${get("day")}`, weekdayIso: WEEKDAY[get("weekday")] ?? 1 };
 }
 
+/** Today in Los Angeles as "YYYY-MM-DD", callable from a client component.
+ *  dal.ts's todayStartLA answers the same question on the server; this exists
+ *  because a client file cannot import dal.ts without dragging the whole
+ *  server-only module into the browser bundle (see this file's header). */
+export function laTodayIso(): string {
+  return laToday().iso;
+}
+
 /** "2026-08-25" -> 2 (Tuesday). Anchored at UTC noon so parsing the bare date
     never rolls the weekday back a day west of Greenwich. */
 function weekdayIsoOf(iso: string): number {

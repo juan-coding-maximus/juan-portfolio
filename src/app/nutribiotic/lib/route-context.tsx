@@ -38,9 +38,10 @@ import type {
   RouteDraftByDay,
   RouteDraftEntry,
   RouteState,
+  RouteStopTimesByDay,
 } from "./dal";
 import { defaultActiveDay, planningHorizonDates } from "./field-week";
-import { saveRouteCalls, saveRouteDone, saveRouteDraft } from "./prefs-actions";
+import { saveRouteCalls, saveRouteDone, saveRouteDraft, saveRouteStopTimes } from "./prefs-actions";
 
 type RouteCtx = {
   routeDraft: RouteDraftEntry[];
@@ -75,6 +76,14 @@ type RouteCtx = {
    *  below never changes when Juan crosses a stop off. */
   done: Set<string>;
   toggleDone: (id: string) => void;
+  /** Stated arrival times for the ACTIVE day's stops, stop id -> "HH:MM"
+   *  (migration 0065). A stop in here is an anchor: RoutePanel holds its
+   *  arrival at that clock and starts the next leg from it, rather than
+   *  letting the derived schedule walk over it. Absent means no time was
+   *  stated, never midnight. */
+  stopTimes: Record<string, string>;
+  /** Set or (with null) clear one stop's stated time on the active day. */
+  setStopTime: (id: string, at: string | null) => void;
 };
 
 const Ctx = createContext<RouteCtx | null>(null);
@@ -108,6 +117,7 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   const [activeDay, setActiveDay] = useState<string>(() => defaultActiveDay({}, days));
   const [callsByDay, setCallsByDay] = useState<RouteCallsByDay>({});
   const [doneByDay, setDoneByDay] = useState<RouteDoneByDay>({});
+  const [timesByDay, setTimesByDay] = useState<RouteStopTimesByDay>({});
   const [hydrated, setHydrated] = useState(false);
   const dayTouchedRef = useRef(false);
   const hydratedRef = useRef(false);
@@ -141,6 +151,7 @@ export function RouteProvider({ children }: { children: ReactNode }) {
         setDraftByDay(state.draft);
         setCallsByDay(state.calls);
         setDoneByDay(state.done);
+        setTimesByDay(state.times ?? {});
         if (!dayTouchedRef.current) setActiveDay(defaultActiveDay(state.draft, days));
         setHydrated(true);
       })
@@ -159,6 +170,7 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   const routeDraft = useMemo(() => draftByDay[activeDay] ?? [], [draftByDay, activeDay]);
   const calls = useMemo(() => callsByDay[activeDay] ?? [], [callsByDay, activeDay]);
   const done = useMemo(() => new Set(doneByDay[activeDay] ?? []), [doneByDay, activeDay]);
+  const stopTimes = useMemo(() => timesByDay[activeDay] ?? {}, [timesByDay, activeDay]);
 
   // Optimistic, same as every other prefs write on this OS: the list moves
   // now and the row catches up, reverted if the write fails. Always the whole
@@ -310,6 +322,21 @@ export function RouteProvider({ children }: { children: ReactNode }) {
     saveRouteDone(nextByDay).catch(() => setDoneByDay(prev));
   }
 
+  /* Same optimistic write as every other column on this row. Clearing the last
+     time on a day drops the day's key entirely rather than leaving an empty
+     object behind, so "this day has no stated times" is one shape, not two. */
+  function setStopTime(id: string, at: string | null) {
+    const prev = timesByDay;
+    const dayTimes = { ...(timesByDay[activeDay] ?? {}) };
+    if (at) dayTimes[id] = at;
+    else delete dayTimes[id];
+    const nextByDay = { ...timesByDay };
+    if (Object.keys(dayTimes).length > 0) nextByDay[activeDay] = dayTimes;
+    else delete nextByDay[activeDay];
+    setTimesByDay(nextByDay);
+    saveRouteStopTimes(nextByDay).catch(() => setTimesByDay(prev));
+  }
+
   function toggleDone(id: string) {
     const next = done.has(id) ? [...done].filter((d) => d !== id) : [...done, id];
     commitDone(activeDay, next);
@@ -341,6 +368,8 @@ export function RouteProvider({ children }: { children: ReactNode }) {
         moveCallToDay,
         done,
         toggleDone,
+        stopTimes,
+        setStopTime,
       }}
     >
       {children}

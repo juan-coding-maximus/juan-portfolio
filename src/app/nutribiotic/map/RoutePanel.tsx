@@ -133,8 +133,28 @@ function buildSchedule(
   hasEnd: boolean,
   prefs: RouteSchedulePrefs,
   dayISO: string,
+  /**
+   * Stop id -> "HH:MM", the times a human STATED for particular stops
+   * (migration 0065). Juan's routing rule, 2026-09-03: "a stop with a stated
+   * time is an anchor. The day is built around it... the next leg starts when
+   * it ends." So an anchored stop's arrival is held AT its clock rather than
+   * wherever the drive-time walk happened to land, and everything after it is
+   * measured from there.
+   *
+   * IT ONLY EVER PUSHES THE CLOCK FORWARD. Arriving early at a 12:30
+   * appointment means waiting until 12:30, which is what the anchor asserts.
+   * Arriving LATE is a real conflict and the schedule says so plainly by
+   * keeping the honest later time rather than rewinding to a clock the drive
+   * cannot make: a route that quietly prints 12:30 for a stop it reaches at
+   * 13:10 is exactly the fabricated number principle 2 exists to stop. The
+   * panel flags that stop instead.
+   */
+  anchors: Record<string, string> = {},
 ): {
   rows: ScheduleRow[];
+  /** Stop ids whose stated time the day cannot make: the drive gets there
+   *  after the clock Juan wrote down. Named, never silently corrected. */
+  missedAnchors: string[];
   finish: number;
   toFirst: DriveLeg | null;
   end: DriveLeg | null;
@@ -172,6 +192,7 @@ function buildSchedule(
   const between = legs.slice(betweenOffset, legs.length - (hasEnd ? 1 : 0));
 
   const rows: ScheduleRow[] = [];
+  const missedAnchors: string[] = [];
   let t = depart + (toFirst?.minutes ?? 0);
   stops.forEach((s, i) => {
     if (i > 0) {
@@ -179,6 +200,14 @@ function buildSchedule(
       const hop = price(between[i - 1], t);
       if (hop) priced[betweenOffset + i - 1] = hop;
       t += hop?.minutes ?? 0;
+    }
+    // The anchor, applied before the dwell so the whole rest of the day is
+    // measured from the stated time rather than from the drive's own guess.
+    const anchor = anchors[s.id];
+    if (anchor) {
+      const at = minutesOfDay(anchor);
+      if (at >= t) t = at;
+      else missedAnchors.push(s.id);
     }
     const kind = s.type === "custom" ? s.custom.kind : null;
     const stay =
@@ -194,7 +223,7 @@ function buildSchedule(
   // its flat-factor value rather than becoming undefined. Never a blank.
   for (let i = 0; i < legs.length; i++) if (!priced[i]) priced[i] = legs[i];
 
-  return { rows, finish: t + (endLeg?.minutes ?? 0), toFirst, end: endLeg, priced };
+  return { rows, missedAnchors, finish: t + (endLeg?.minutes ?? 0), toFirst, end: endLeg, priced };
 }
 
 /**
@@ -752,6 +781,8 @@ export function RoutePanel({
   onMoveCallDay,
   done,
   onToggleDone,
+  stopTimes,
+  onSetStopTime,
   days,
   activeDay,
   onSelectDay,
@@ -797,6 +828,13 @@ export function RoutePanel({
   /** Stop ids marked done today (0042). Crossed off, never removed. */
   done: Set<string>;
   onToggleDone: (id: string) => void;
+  /** Stated arrival times for THIS day's stops, stop id -> "HH:MM" (0065).
+      A stop with one is an anchor: the schedule below holds its arrival at
+      that clock and measures the rest of the day from it. Absent means no
+      time was stated, which is the normal case. */
+  stopTimes: Record<string, string>;
+  /** Set a stop's stated time, or clear it with null. */
+  onSetStopTime: (id: string, at: string | null) => void;
   /** The rolling ten-weekday horizon (Mon-Fri), the one Juan's on, and the switch. */
   days: string[];
   activeDay: string;
@@ -926,8 +964,8 @@ export function RoutePanel({
   }, [pathKey]);
 
   const schedule = useMemo(
-    () => (legs ? buildSchedule(stops, legs, start !== null, end !== null, prefs, activeDay) : null),
-    [legs, stops, start, end, prefs, activeDay],
+    () => (legs ? buildSchedule(stops, legs, start !== null, end !== null, prefs, activeDay, stopTimes) : null),
+    [legs, stops, start, end, prefs, activeDay, stopTimes],
   );
 
   /**
@@ -1150,6 +1188,41 @@ export function RoutePanel({
                     <span className="whitespace-nowrap text-[10.5px] leading-tight tabular-nums text-[#8A928C]">
                       {clock(schedule.rows[i].arrive)}
                     </span>
+                  )}
+                  {/* A STATED TIME, and it is a control, not a caption (0065).
+                      The day is built around it: the schedule above holds this
+                      stop at this clock and starts the next leg from it. Tap it
+                      to change it, clear it to hand the stop back to the
+                      ordering. Amber when the drive cannot make it, because a
+                      route that quietly printed the stated time for a stop it
+                      reaches forty minutes later would be inventing the one
+                      number Juan plans around. */}
+                  {stopTimes[s.id] && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = window.prompt(
+                          "Stated time for this stop (HH:MM). Leave empty to clear it.",
+                          stopTimes[s.id],
+                        );
+                        if (next === null) return;
+                        const trimmed = next.trim();
+                        if (!trimmed) return onSetStopTime(s.id, null);
+                        if (/^([01]\d|2[0-3]):[0-5]\d$/.test(trimmed)) onSetStopTime(s.id, trimmed);
+                      }}
+                      title={
+                        schedule?.missedAnchors.includes(s.id)
+                          ? `Asked for ${stopTimes[s.id]}, but this order gets there at ${clock(schedule.rows[i].arrive)}`
+                          : `Anchored at ${stopTimes[s.id]}. Tap to change or clear.`
+                      }
+                      className={`whitespace-nowrap rounded px-1 py-0.5 text-[10px] font-medium tabular-nums ${
+                        schedule?.missedAnchors.includes(s.id)
+                          ? "bg-[#F6E4DF] text-[#8A3B2E]"
+                          : "bg-[#F3E3C6] text-[#8A6D2F]"
+                      }`}
+                    >
+                      {stopTimes[s.id]}
+                    </button>
                   )}
                 </div>
 

@@ -23,7 +23,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const empty = { draft: {}, calls: {}, done: {} };
+  const empty = { draft: {}, calls: {}, done: {}, times: {} };
   if (!isConfigured()) {
     return Response.json({ ok: true, ...empty }, { headers: { "cache-control": "no-store" } });
   }

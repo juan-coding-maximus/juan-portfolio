@@ -38,7 +38,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { hasAccess } from "./devices";
 import { hasWidgetToken } from "./session";
-import { byPriority, computePriority, type PriorityInput, type PriorityResult } from "./priority";
+import { areaProspectCounts, byPriority, computePriority, type PriorityInput, type PriorityResult } from "./priority";
 
 const SB_URL = process.env.NB_SUPABASE_URL ?? "";
 const SB_KEY = process.env.NB_SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -1148,13 +1148,19 @@ export async function getAccountNames(ids: string[]): Promise<Record<string, str
  * to an existing account carries no phone of its own (the account's phone can
  * change; a copy on the schedule row would go stale and disagree with it),
  * so the day view joins this in at read time instead. */
-export async function getAccountCallCards(ids: string[]): Promise<Record<string, { name: string; phone: string | null }>> {
+export async function getAccountCallCards(
+  ids: string[],
+): Promise<Record<string, { name: string; phone: string | null; area: string | null }>> {
   if (ids.length === 0) return {};
-  const res = await query<{ id: string; name: string; phone: string | null; origin?: Origin }>("nb_accounts", {
-    select: "id,name,phone",
+  const res = await query<{ id: string; name: string; phone: string | null; area: string | null; origin?: Origin }>("nb_accounts", {
+    // `area` rides along for the SDR queue's area grouping (Juan, 2026-09-08).
+    // Read here rather than in a second query for the same rows: this is the
+    // one join the day view already makes, and the department has a live
+    // egress ceiling it was suspended over once (2026-09-02).
+    select: "id,name,phone,area",
     id: `in.(${ids.join(",")})`,
   });
-  return Object.fromEntries(res.data.map((a) => [a.id, { name: a.name, phone: a.phone }]));
+  return Object.fromEntries(res.data.map((a) => [a.id, { name: a.name, phone: a.phone, area: a.area }]));
 }
 
 // ---------------------------------------------------------------------------
@@ -1177,8 +1183,15 @@ export type SdrScheduleItem = {
   /** When a human last moved this row to another day (0063). Null means
    *  nobody has, and follow_through.py may still propose a date for it. */
   rescheduled_at: string | null;
+  /** What JUAN said this row is worth when he queued it (0064). Null means
+   *  nobody stated one, which is not the same as low: the 56 rows that
+   *  predate the column were never asked. Never computed here; the
+   *  arithmetic ranking is lib/priority.ts and it does not write this. */
+  priority: SdrPriority | null;
   origin: Origin;
 };
+
+export type SdrPriority = "low" | "mid" | "high";
 
 /** A light, single-account-name-search picker for the SDR schedule's "add"
  * form. Deliberately not listAccountsForMatching()'s full 1000-row book: this
@@ -1189,12 +1202,16 @@ export async function searchOwnedAccounts(nameQuery: string, limit = 8): Promise
   name: string;
   city: string | null;
   phone: string | null;
+  /** So a row added from this picker lands in the right area group on the SDR
+   *  queue immediately, instead of sitting under "No area" until the next
+   *  server render corrects it. */
+  area: string | null;
   origin?: Origin;
 }>> {
   const q = nameQuery.trim();
   if (!q) return { mode: "empty", data: [], origins: [] };
-  return query<{ id: string; name: string; city: string | null; phone: string | null; origin?: Origin }>("nb_accounts", {
-    select: "id,name,city,phone",
+  return query<{ id: string; name: string; city: string | null; phone: string | null; area: string | null; origin?: Origin }>("nb_accounts", {
+    select: "id,name,city,phone,area",
     hubspot_owner_id: `eq.${JUAN_OWNER_ID}`,
     closed_at: "is.null",
     name: `ilike.*${q.replace(/[%,]/g, "")}*`,
@@ -1293,9 +1310,26 @@ export type NewSdrScheduleItem = {
   kind: "call" | "visit";
   scheduled_date: string;
   notes?: string | null;
+  /** Omitted means nobody stated one, and it is stored as null rather than
+   *  defaulted to 'mid' (0064). The map card's button always sends one. */
+  priority?: SdrPriority | null;
 };
 
+/**
+ * SCOPE IS ASSERTED HERE, not at each door (HARD RULE 2). This table is reached
+ * from four places now -- the day form, the global search, the map pin card and
+ * follow_through.py -- and "the caller already filtered to Juan's book" is
+ * exactly the assumption that put a push into the other rep's 118 companies on
+ * 2026-08-01. A prospect row (account_id null) is unaffected: it belongs to
+ * nobody's book yet, which is the whole reason 0061 made the column nullable.
+ */
 export async function insertSdrScheduleItem(input: NewSdrScheduleItem): Promise<SdrScheduleItem> {
+  if (input.account_id) {
+    const owned = await raw<{ id: string }>(
+      `nb_accounts?select=id&id=eq.${encodeURIComponent(input.account_id)}&hubspot_owner_id=eq.${JUAN_OWNER_ID}&limit=1`,
+    );
+    if (!owned[0]) throw new Error(`${input.account_id} is not an account in Juan's book; not scheduled`);
+  }
   const [row] = await mutate<SdrScheduleItem>("nb_sdr_schedule", "POST", {
     id: randId("sdr"),
     account_id: input.account_id ?? null,
@@ -1304,6 +1338,7 @@ export async function insertSdrScheduleItem(input: NewSdrScheduleItem): Promise<
     kind: input.kind,
     scheduled_date: input.scheduled_date,
     notes: input.notes ?? null,
+    priority: input.priority ?? null,
     status: "pending",
     origin: "manual",
   });
@@ -1776,6 +1811,12 @@ export type PriorityBook = {
   ranked: { account: PriorityInput; result: PriorityResult }[];
   /** Honest reporting of what the book could NOT be scored on. */
   coverage: { accounts: number; scored: number; withRevenue: number; withCadence: number; withUrgency: number };
+  /** Area id -> how many of its accounts score PROSPECT_SCORE_MIN or better
+   *  right now (Juan, 2026-09-08). The map legend and the SDR queue both order
+   *  areas by this, from the same book, so the two screens cannot disagree
+   *  about which area is busiest. Computed here rather than stored: it is a
+   *  pure function of a score that is itself derived (see priority.ts). */
+  areaProspects: Map<string, number>;
 };
 
 export async function getPriorityBook(): Promise<PriorityBook> {
@@ -1783,6 +1824,7 @@ export async function getPriorityBook(): Promise<PriorityBook> {
     byId: new Map(),
     ranked: [],
     coverage: { accounts: 0, scored: 0, withRevenue: 0, withCadence: 0, withUrgency: 0 },
+    areaProspects: new Map(),
   };
   if (!isConfigured()) return empty;
 
@@ -1800,8 +1842,9 @@ export async function getPriorityBook(): Promise<PriorityBook> {
       places_status: string | null;
       closed_at: string | null;
       do_not_visit: boolean | null;
+      area: string | null;
     }>(
-      "nb_accounts?select=id,name,lifecycle,phone,trailing_12m_revenue,lifetime_revenue,first_order_at,last_order_at," +
+      "nb_accounts?select=id,name,lifecycle,phone,area,trailing_12m_revenue,lifetime_revenue,first_order_at,last_order_at," +
         `expected_reorder_days,places_status,closed_at,do_not_visit&hubspot_owner_id=eq.${JUAN_OWNER_ID}` +
         // Same scope every other surface uses: not the waypoint (Juan's own
         // apartment is not an account), and not a closed one. A closed store
@@ -1864,6 +1907,7 @@ export async function getPriorityBook(): Promise<PriorityBook> {
   return {
     byId,
     ranked,
+    areaProspects: areaProspectCounts(inputs, byId),
     coverage: {
       accounts: inputs.length,
       scored: ranked.length,
@@ -2494,6 +2538,7 @@ export type RouteState = {
   draft: RouteDraftByDay;
   calls: RouteCallsByDay;
   done: RouteDoneByDay;
+  times: RouteStopTimesByDay;
 };
 
 /**
@@ -2507,15 +2552,102 @@ export type RouteState = {
  * exactly one; nothing that loads a page should use them.
  */
 export async function getRouteStateByDay(): Promise<RouteState> {
-  const rows = await raw<{ route_draft: unknown; route_calls: unknown; route_done: unknown }>(
-    "nb_ui_prefs?select=route_draft,route_calls,route_done&id=eq.1",
+  const rows = await raw<{ route_draft: unknown; route_calls: unknown; route_done: unknown; route_stop_times: unknown }>(
+    "nb_ui_prefs?select=route_draft,route_calls,route_done,route_stop_times&id=eq.1",
   );
   const row = rows[0];
   return {
     draft: parseRouteDraft(row?.route_draft),
     calls: parseRouteCalls(row?.route_calls),
     done: parseRouteDone(row?.route_done),
+    times: parseRouteStopTimes(row?.route_stop_times),
   };
+}
+
+/**
+ * Stated arrival times for route stops (migration 0065), day -> stop id ->
+ * "HH:MM". A stop with a time here is an ANCHOR: RoutePanel holds its arrival
+ * at that clock instead of letting the derived schedule walk over it, which is
+ * Juan's own routing rule of 2026-09-03 finally given a column to live in.
+ *
+ * Same trust posture as route_draft's custom stops: this is jsonb a browser
+ * writes, so anything that is not a plain "HH:MM" against a plain string key on
+ * an ISO date is DROPPED rather than repaired. A malformed clock would become
+ * a stop the panel schedules at NaN, and a route that reads 12:30 in one place
+ * and blank in another is worse than one that never claimed a time.
+ */
+export type RouteStopTimesByDay = Record<string, Record<string, string>>;
+
+const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+function parseRouteStopTimes(stored: unknown): RouteStopTimesByDay {
+  if (!stored || typeof stored !== "object" || Array.isArray(stored)) return {};
+  const out: RouteStopTimesByDay = {};
+  for (const [day, entries] of Object.entries(stored as Record<string, unknown>)) {
+    if (!ISO_DATE_RE.test(day) || !entries || typeof entries !== "object" || Array.isArray(entries)) continue;
+    const times: Record<string, string> = {};
+    for (const [stopId, at] of Object.entries(entries as Record<string, unknown>)) {
+      if (typeof stopId === "string" && stopId && typeof at === "string" && HHMM_RE.test(at)) times[stopId] = at;
+    }
+    if (Object.keys(times).length > 0) out[day] = times;
+  }
+  return out;
+}
+
+export async function getRouteStopTimes(): Promise<RouteStopTimesByDay> {
+  const rows = await raw<{ route_stop_times: unknown }>("nb_ui_prefs?select=route_stop_times&id=eq.1");
+  return parseRouteStopTimes(rows[0]?.route_stop_times);
+}
+
+export async function setRouteStopTimes(byDay: RouteStopTimesByDay): Promise<void> {
+  await mutate("nb_ui_prefs", "PATCH", { route_stop_times: byDay, updated_at: new Date().toISOString() }, {
+    id: "eq.1",
+  });
+}
+
+/**
+ * Put one account on a day's route, optionally at a stated time. The one write
+ * path the SDR row's "Add to route" uses, and deliberately the SAME
+ * nb_ui_prefs.route_draft the map's own button and route_draft_write.py write
+ * (see memory reference_nutribiotic-route-map-write): a second store for
+ * "planned stops" is how the map and the queue start disagreeing about what
+ * Juan is driving tomorrow.
+ *
+ * FETCH-MERGE-WRITE, never blind overwrite, same as route_draft_write.py: a
+ * PATCH replaces the whole jsonb column, so both columns are read first and
+ * only the target day's key is replaced.
+ *
+ * SCOPE ASSERTED, like every other write that changes what Juan does on the
+ * ground: the account has to be in Juan's book (HARD RULE 2). A row that is
+ * not is rejected with a reason rather than quietly skipped, so a caller
+ * cannot think it scheduled something it did not.
+ */
+export async function addOwnedAccountToRouteDraft(
+  accountId: string,
+  date: string,
+  at?: string | null,
+): Promise<{ added: boolean; alreadyThere: boolean }> {
+  if (!ISO_DATE_RE.test(date)) throw new Error(`Not a date: ${date}`);
+  if (at && !HHMM_RE.test(at)) throw new Error(`Not a time: ${at}`);
+
+  const owned = await raw<{ id: string }>(
+    `nb_accounts?select=id&id=eq.${encodeURIComponent(accountId)}&hubspot_owner_id=eq.${JUAN_OWNER_ID}&limit=1`,
+  );
+  if (!owned[0]) throw new Error(`${accountId} is not an account in Juan's book; not added to the route`);
+
+  const byDay = await getRouteDraftByDay();
+  const day = byDay[date] ?? [];
+  const alreadyThere = day.some((e) => e === accountId);
+  if (!alreadyThere) await setRouteDraft({ ...byDay, [date]: [...day, accountId] });
+
+  // The time is written whether or not the stop was already on the day: Juan
+  // re-adding a stop WITH a time is him stating the time, and refusing it
+  // because the stop was already there would drop the one new fact.
+  if (at) {
+    const times = await getRouteStopTimes();
+    await setRouteStopTimes({ ...times, [date]: { ...(times[date] ?? {}), [accountId]: at } });
+  }
+  return { added: !alreadyThere, alreadyThere };
 }
 
 export async function setRouteDone(byDay: RouteDoneByDay): Promise<void> {

@@ -86,10 +86,36 @@ const RECENCY_COLD_DAYS = 180;
  */
 const GRADE_SCALE: Record<string, number> = { A: 1, B: 0.83, C: 0.67, D: 0.5, E: 0.33, F: 0.17, G: 0 };
 
+/**
+ * WHAT COUNTS AS A PROSPECT WORTH ORDERING AN AREA BY (Juan, 2026-09-08: sort the
+ * areas by "how many accounts in that area currently score 80+ as prospects").
+ *
+ * THE SCORE IS THIS FILE'S. Four numbers in this department could answer to
+ * "prospect score" and they do not agree: nb_account_scores kind='fit' (334 of
+ * 613 accounts carry one, last computed 2026-08-14, 24 at 80+), kind='potential'
+ * (333 rows, 29 at 80+), kind='engagement' (nothing above 58), and HQ's A-G
+ * letter grade, which is not a number at all. The one used here is
+ * computePriority's, for three reasons that are checkable rather than
+ * preferential: it is the only one of the four that is CURRENT on every render
+ * (the stored kinds are a month-old batch), it covers the whole open book rather
+ * than half of it, and it is the number already printed on the two surfaces this
+ * ordering drives, the map pin card and the SDR row. Ordering a screen by a
+ * number that screen does not show is how a ranking becomes unarguable.
+ *
+ * 80, not the "now" band's 78. The band is this file's own tuning knob and moves
+ * when the book does; 80 is the figure Juan stated. They are kept separate on
+ * purpose so re-tuning a band never silently re-sorts his areas.
+ */
+export const PROSPECT_SCORE_MIN = 80;
+
 export type PriorityInput = {
   id: string;
   name: string;
   lifecycle: string | null;
+  /** nb_accounts.area, the territory area this account was assigned to
+   *  (assign_areas.py). Carried, never scored on: it is what lets a caller
+   *  group or order the SAME book by area without a second read of it. */
+  area?: string | null;
   /** nb_v_account_potential.potential_grade, the bare letter. */
   tier: string | null;
   trailing_12m_revenue: number | null;
@@ -434,6 +460,41 @@ export function byPriority(a: PriorityResult | undefined, b: PriorityResult | un
   // screens already sort on (tier, confidence desc) for exactly this reason:
   // between two equal numbers, prefer the one built on more real inputs.
   return (b?.confidence ?? 0) - (a?.confidence ?? 0);
+}
+
+/**
+ * How many accounts in each area currently score PROSPECT_SCORE_MIN or better,
+ * and the area ids in that order, most first.
+ *
+ * ONE FUNCTION, TWO SCREENS, for the same reason byPriority is one comparator:
+ * the map legend and the SDR queue are meant to read in the same order, and two
+ * implementations of "most prospects first" would drift the first time one of
+ * them was tweaked. An account with no area is counted nowhere, never into a
+ * bucket called "unknown" that would then sort as if it were a place.
+ *
+ * Ties break on the area's own id, so the order is stable rather than dependent
+ * on whatever order the rows arrived in.
+ */
+export function areaProspectCounts(
+  rows: { id: string; area?: string | null }[],
+  byId: Map<string, PriorityResult>,
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    if (!r.area) continue;
+    const score = byId.get(r.id)?.score;
+    if (typeof score !== "number" || score < PROSPECT_SCORE_MIN) continue;
+    counts.set(r.area, (counts.get(r.area) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** Sort any list of areas by prospect count desc, then id, in place-safe copy. */
+export function sortAreasByProspects<T extends { id: string }>(areas: T[], counts: Map<string, number>): T[] {
+  return [...areas].sort((a, b) => {
+    const d = (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0);
+    return d !== 0 ? d : a.id.localeCompare(b.id);
+  });
 }
 
 export function bandLabel(band: PriorityResult["band"]): string {
