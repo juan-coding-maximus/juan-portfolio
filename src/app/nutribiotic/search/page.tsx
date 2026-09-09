@@ -30,10 +30,7 @@ export const metadata = { title: "Search · NutriBiotic OS" };
 export default function SearchPage() {
   return (
     <>
-      <PageHead
-        title="Search"
-        sub="Drop pins around the area you want to work, search one category inside it, look further into the ones worth it, and add the best to the SDR queue. Nothing reaches HubSpot: a prospect earns a portal record the day someone actually talks to it."
-      />
+      <PageHead title="Search" />
       <SearchClient />
     </>
   );

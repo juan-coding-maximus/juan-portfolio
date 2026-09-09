@@ -26,7 +26,7 @@
  * editable copies of one rule.
  */
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { GoogleMap, MarkerF, PolygonF, PolylineF, useLoadScript } from "@react-google-maps/api";
 import { Ico } from "../lib/ui";
 
@@ -85,8 +85,6 @@ export function AreaPicker({
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const { isLoaded, loadError } = useLoadScript({ googleMapsApiKey: apiKey ?? "" });
   const mapRef = useRef<google.maps.Map | null>(null);
-  const [jump, setJump] = useState("");
-  const [jumpError, setJumpError] = useState<string | null>(null);
   const centred = useRef(false);
 
   const path = useMemo(() => pins.map((p) => ({ lat: p.lat, lng: p.lng })), [pins]);
@@ -133,30 +131,6 @@ export function AreaPicker({
     [disabled, onChange, pins],
   );
 
-  /* Jump-to is NAVIGATION, NOT SCOPE. It moves the camera and nothing else: no
-     pin is dropped, no radius is implied, and a place Google cannot find says
-     so rather than silently leaving the map where it was. */
-  function goTo(e: React.FormEvent) {
-    e.preventDefault();
-    const q = jump.trim();
-    const map = mapRef.current;
-    if (!q || !map || typeof google === "undefined") return;
-    setJumpError(null);
-    new google.maps.Geocoder().geocode({ address: q }, (res, status) => {
-      if (status !== "OK" || !res || res.length === 0) {
-        setJumpError(`Google could not place "${q}". Pan the map instead.`);
-        return;
-      }
-      centred.current = true;
-      const g = res[0].geometry;
-      if (g.viewport) map.fitBounds(g.viewport, 24);
-      else {
-        map.setCenter(g.location);
-        map.setZoom(14);
-      }
-    });
-  }
-
   if (!apiKey) {
     return (
       <Frame>
@@ -186,28 +160,7 @@ export function AreaPicker({
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
-      <div className="flex flex-wrap items-center gap-2 border-b border-[#E2DFD5] px-3 py-2">
-        <form onSubmit={goTo} className="flex min-w-0 flex-1 items-center gap-1.5">
-          <div className="relative min-w-0 flex-1">
-            <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[#A9AFA9]">
-              <Ico name="pin" size={13} />
-            </span>
-            <input
-              value={jump}
-              onChange={(e) => {
-                setJump(e.target.value);
-                setJumpError(null);
-              }}
-              placeholder="Jump to a city, street or landmark"
-              aria-label="Move the map to a place"
-              className="w-full rounded-md border border-[#E2DFD5] bg-[#FAF9F5] py-1.5 pl-8 pr-2.5 text-[12.5px] text-[#14201B] placeholder:text-[#A9AFA9] focus:border-[#14201B] focus:outline-none"
-            />
-          </div>
-          <button type="submit" disabled={!jump.trim()} className={toolBtn}>
-            Go
-          </button>
-        </form>
-
+      <div className="flex flex-wrap items-center justify-end gap-2 border-b border-[#E2DFD5] px-3 py-2">
         <div className="flex items-center gap-1.5">
           <button
             type="button"
@@ -337,11 +290,6 @@ export function AreaPicker({
           )
         )}
       </div>
-      {jumpError && (
-        <div className="border-t border-[#E2DFD5] px-3 py-2 text-[12px] text-[#A0762C]">
-          {jumpError}
-        </div>
-      )}
     </div>
   );
 }
