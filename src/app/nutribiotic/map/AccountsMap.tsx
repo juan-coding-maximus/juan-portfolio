@@ -18,13 +18,14 @@ import { listAreaBoundaries } from "../lib/area-actions";
 import { laTodayIso } from "../lib/field-week";
 import { AccountLink } from "../lib/modal";
 import { addAccountToSdr } from "../lib/sdr-actions";
-import { appleMapsUrl, CUSTOM_STOP_LABEL, Ico, ReachLinks, realChannel } from "../lib/ui";
+import { appleMapsUrl, CUSTOM_STOP_LABEL, Ico, ReachLinks, realChannel, money } from "../lib/ui";
 import { AccountFilterBar } from "../lib/filter-bar";
 import {
   countSubjects,
   emptyFilters,
   isSmallPractice,
   LEAD_STAGE_COLOR,
+  LEAD_STAGE_LABEL,
   matchesFilters,
   type AccountFilterState,
   type FilterSubject,
@@ -192,6 +193,24 @@ const POTENTIAL_COLOR: Partial<Record<Tier, string>> = {
   D: "#C79A1E",
   E: "#8A928C",
 };
+
+/**
+ * "487d ago" while a purchase is recent enough that the exact day count
+ * means something, "3y ago" once it isn't. 548 days is the same 18-month
+ * active/dormant cutoff nb_v_account_lead_stage draws (account-filters.ts
+ * LEAD_STAGE_TITLE): a purchase this side of it is still legible as days,
+ * the other side only the year count is worth reading. Juan, 2026-09-09,
+ * on the pin card specifically: days inside 18 months, years past it, no
+ * "8mo ago" middle bucket the way ui.tsx's daysAgo() renders elsewhere.
+ */
+const EIGHTEEN_MONTHS_DAYS = 548;
+function lastOrderAge(iso: string | null): string {
+  if (!iso) return "never";
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (days <= 0) return "today";
+  if (days <= EIGHTEEN_MONTHS_DAYS) return `${days}d ago`;
+  return `${Math.round(days / 365)}y ago`;
+}
 
 /* THE PROSPECTS LAYER, hidden by default. Second cut, 2026-09-09: the first
    gated on nb_accounts.lead_status = 'NEW' ("New to open"), which turned out
@@ -1329,44 +1348,80 @@ export function AccountsMap({
               position={{ lat: selected.lat, lng: selected.lng }}
               onCloseClick={() => setSelected(null)}
             >
-              <div className="min-w-[180px] max-w-[240px] p-1 text-[13px] text-[#14201B]">
-                <div className="font-semibold">{selected.name}</div>
-                {selected.street && (
-                  <div className="mt-0.5 text-[12px] text-[#5B6560]">
-                    {selected.street}
-                    {selected.city ? `, ${selected.city}` : ""}
-                  </div>
-                )}
-                {/* Priority, on the card that answers "should I go here". The
-                    score alone would be a grade nobody can argue with, so the
-                    evidence sentence prints under it rather than hiding in a
-                    tooltip a thumb cannot reach. */}
-                {priorityById[selected.id] && (
-                  <div className="mt-1.5 rounded-md bg-[#FAF9F5] px-2 py-1.5">
-                    <div className="flex items-baseline gap-1.5">
+              <div className="min-w-[190px] max-w-[240px] p-1 text-[13px] text-[#14201B]">
+                {/* Name plus the two scores that decide "should I go here",
+                    each a bare coloured mark rather than a labelled row: the
+                    letter is HQ's own scale (POTENTIAL_COLOR, same colour the
+                    pin itself wears) and the number is route priority
+                    (band colour from priority.ts). Neither needs a caption on
+                    a card this small, the colour and the shape already say
+                    which is which; the audit sentence that used to print
+                    under the score lives in its title (hover/hold) instead,
+                    same convention TierChip (ui.tsx) already uses for its
+                    scale. Juan, 2026-09-09: the old card repeated lifetime/
+                    last-touch/last-order/lifecycle text three times over (the
+                    reason sentence, then the tag row, then nothing new
+                    below), plus a street address that Add to route already
+                    covers. */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 font-semibold">{selected.name}</div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {selected.tier && (
                       <span
-                        className={`rounded px-1.5 py-0.5 text-[11px] font-medium tabular-nums ${
+                        className="inline-flex h-[19px] w-[19px] items-center justify-center rounded text-[11px] font-bold text-white"
+                        style={{ background: POTENTIAL_COLOR[selected.tier] ?? "#8A928C" }}
+                        title={`HQ potential ${selected.tier}`}
+                      >
+                        {selected.tier}
+                      </span>
+                    )}
+                    {priorityById[selected.id] && (
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${
                           priorityById[selected.id].band === "now"
                             ? "bg-[#F3E3C6] text-[#8A6D2F]"
                             : "bg-[#ECEAE1] text-[#5B6560]"
                         }`}
+                        title={priorityById[selected.id].reason}
                       >
                         {priorityById[selected.id].score}
                       </span>
-                      <span className="text-[11px] uppercase tracking-[0.1em] text-[#8A928C]">priority</span>
-                    </div>
-                    <div className="mt-1 text-[11.5px] leading-snug text-[#5B6560]">
-                      {priorityById[selected.id].reason}
-                    </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Type + funnel stage, the "what kind of client, and where in
+                    the funnel" a rep reads before dialing. Stage keeps its own
+                    colour (LEAD_STAGE_COLOR, account-filters.ts) so "active"
+                    reads the same green everywhere it appears. */}
+                <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11.5px]">
+                  {realChannel(selected.channel) && (
+                    <span className="text-[#5B6560]">{realChannel(selected.channel)}</span>
+                  )}
+                  {selected.lead_stage && (
+                    <span
+                      className="rounded-full px-1.5 py-0.5 text-[10.5px] font-semibold tracking-wide text-white"
+                      style={{ background: LEAD_STAGE_COLOR[selected.lead_stage] }}
+                    >
+                      {LEAD_STAGE_LABEL[selected.lead_stage]}
+                    </span>
+                  )}
+                </div>
+
+                {/* The two facts that answer "have they bought, and what": no
+                    orders on file renders as absence (HARD RULE 1), never a
+                    $0 or an invented item. */}
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-[#5B6560]">
+                  <span className="font-medium text-[#14201B]">{money(selected.lifetime_revenue)} lifetime</span>
+                  <span>·</span>
+                  <span>last order {lastOrderAge(selected.last_order_at)}</span>
+                </div>
+                {(selected.top_category_12m || selected.top_category_lifetime) && (
+                  <div className="mt-0.5 text-[12px] text-[#5B6560]">
+                    buys {selected.top_category_12m ?? selected.top_category_lifetime}
                   </div>
                 )}
-                <div className="mt-1 flex items-center gap-2 text-[11.5px] uppercase tracking-[0.1em] text-[#8A928C]">
-                  {selected.tier && <span>HQ potential {selected.tier}</span>}
-                  {selected.area && <span>{areaById.get(selected.area)?.label ?? selected.area}</span>}
-                  {realChannel(selected.channel) && <span>{realChannel(selected.channel)}</span>}
-                  <span>·</span>
-                  <span>{selected.lifecycle || "unknown"}</span>
-                </div>
+
                 {selected.do_not_visit && (
                   <div className="mt-1 text-[11.5px] text-[#A0762C]">do not visit</div>
                 )}
