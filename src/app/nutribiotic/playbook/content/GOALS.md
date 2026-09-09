@@ -82,10 +82,10 @@ The legacy goal. Infrastructure over immediacy, stated as a deliverable.
 
 ### G7 · Double the territory
 - **S** Grow the number of SoCal accounts owned, new-door prospecting, not reactivation (that's G1's job).
-- **M** `proposed` 398 -> 796 owned accounts (baseline 2026-09-09) by 2026-12-31. Juan, verbatim, 2026-09-09: "grow the book to double by the end of 2026."
+- **M** `proposed` 275 -> 550 owned accounts (baseline: Juan's approximate starting count when he took the territory) by 2026-12-31. Juan, verbatim, 2026-09-09: "grow the book to double by the end of 2026... G7 in goals is not 800 accounts but 550 since we started with 275 approx." Live count is already 398 (123 of the 275 climb done, 45%).
 - **A** The daily protected prospecting block (`score_weights.json`'s `capacity.prospect_block`, 09:00-09:30) is the mechanism; `lifecycle='prospect'` accounts (104 as of 2026-09-09) are the leading indicator to watch, not lagging revenue.
 - **R** A bigger book is the base every other goal compounds on: more accounts to revive (G1), more territory for the playbook (G2) to prove itself against.
-- **T** Tracked live: `bridges/nutribiotic/check_config_drift.py`'s book-growth check. 796 by 2026-12-31 is roughly 4 new accounts/week from today.
+- **T** Tracked live: `bridges/nutribiotic/check_config_drift.py`'s book-growth check.
 
 ## Year 2 to 4 arc (to VP of Commercialization / CCO)
 
