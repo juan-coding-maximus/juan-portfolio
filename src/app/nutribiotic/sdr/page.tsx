@@ -5,7 +5,15 @@
  * of the nav; Expenses moved into More (see ../layout.tsx for why).
  */
 
-import { getAccountCallCards, getPriorityBook, isConfigured, listAreas, listSdrSchedule, todayStartLA } from "../lib/dal";
+import {
+  getAccountCallCards,
+  getMapDisplayPrefs,
+  getPriorityBook,
+  isConfigured,
+  listAreas,
+  listSdrSchedule,
+  todayStartLA,
+} from "../lib/dal";
 import { sortAreasByProspects } from "../lib/priority";
 import { PageHead, Empty } from "../lib/ui";
 import { SdrScreen, type SdrDayItem } from "../lib/sdr-ui";
@@ -41,10 +49,11 @@ export default async function SdrPage({
       ...(focusAccountId ? [focusAccountId] : []),
     ]),
   ];
-  const [cards, priority, areas] = await Promise.all([
+  const [cards, priority, areas, displayPrefs] = await Promise.all([
     getAccountCallCards(accountIds),
     getPriorityBook(),
     listAreas(),
+    getMapDisplayPrefs(),
   ]);
 
   /*
@@ -83,6 +92,9 @@ export default async function SdrPage({
       channel: card?.channel ?? null,
       readiness: card?.readiness ?? null,
       leadStage: card?.leadStage ?? null,
+      // The Chains hide toggle (2026-09-09), same reasoning as the four
+      // above: false on a prospect with no account behind it.
+      chainExcluded: card?.chainExcluded ?? false,
     };
   });
 
@@ -120,6 +132,9 @@ export default async function SdrPage({
         // TopOpportunities for where this lands, the SDR page's own right
         // rail (Juan, 2026-09-08: "right is all time best").
         topRanked={priority.ranked}
+        initialShowChains={displayPrefs.showChains}
+        initialShowPractices={displayPrefs.showPractices}
+        initialShowProspects={displayPrefs.showProspects}
       />
     </>
   );

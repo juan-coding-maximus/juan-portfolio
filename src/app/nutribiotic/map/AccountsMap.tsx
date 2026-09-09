@@ -23,6 +23,8 @@ import { AccountFilterBar } from "../lib/filter-bar";
 import {
   countSubjects,
   emptyFilters,
+  isSmallPractice,
+  LEAD_STAGE_COLOR,
   matchesFilters,
   type AccountFilterState,
   type FilterSubject,
@@ -180,8 +182,8 @@ const MAP_STYLE: google.maps.MapTypeStyle[] = [
    five words. The only one still sourced from HubSpot is Closed, which the
    view mirrors rather than computes.
 
-   `lead_status` itself is still read on this screen, twice and only twice: to
-   keep Closed accounts off a field map at all, and for isProspect below. */
+   `lead_status` itself is still read on this screen for exactly one thing
+   now: keeping Closed accounts off a field map at all. */
 
 const POTENTIAL_COLOR: Partial<Record<Tier, string>> = {
   A: "#B5372A",
@@ -191,24 +193,19 @@ const POTENTIAL_COLOR: Partial<Record<Tier, string>> = {
   E: "#8A928C",
 };
 
-/* THE PROSPECTS LAYER (0072, Juan's ask 2026-09-09). A lead_status = 'NEW'
-   account ("Prospects", was labelled "New to open") is a raw HubSpot lead
-   status with no CRM weight behind it yet, so it wears a flat blue dot
-   instead of the potential ramp above and is hidden by default, same shape
-   as the chains/practices toggle.
-
-   PURELY lead_status, NOT ALSO GATED ON hubspot_company_id/tier. That was
-   the first cut (2026-09-09) and it was wrong: potential_hq (HubSpot's own
-   potential__cloned_ mirror) is set independently of lead status, so 34 of
-   Juan's 35 "New to open" accounts already had a real tier the moment this
-   shipped, which "graduated" them out of the blue bucket immediately and
-   left the toggle with nothing to show (Juan: "the prospects showed
-   immediately... I don't see the new filter classifiers"). lead_status is
-   the actual signal for "unworked lead", so that is the only gate now. */
-const PROSPECT_COLOR = "#3D6E99";
-
-function isProspect(a: Pick<MapAccount, "lead_status">): boolean {
-  return a.lead_status === "NEW";
+/* THE PROSPECTS LAYER, hidden by default. Second cut, 2026-09-09: the first
+   gated on nb_accounts.lead_status = 'NEW' ("New to open"), which turned out
+   to mean almost nothing on this book -- HubSpot's own potential mirror is
+   set independently of lead status, so 34 of 35 "New to open" accounts
+   already carried a real tier and never actually hid. It also lived in the
+   Type row under the name "New leads", which Juan then called out directly:
+   "that's just prospects, it's not a type of client it's a lead status."
+   Both problems share one fix -- lead_stage === 'prospect' (migration 0073's
+   derived "no touchpoint logged yet", the same fact the Lead status chip
+   already states), and the toggle now sits in the Lead status section,
+   wearing that stage's own colour rather than a colour invented for it. */
+function isProspect(a: Pick<MapAccount, "lead_stage">): boolean {
+  return a.lead_stage === "prospect";
 }
 
 /**
@@ -505,13 +502,16 @@ export function AccountsMap({
       accounts.filter(
         (a) =>
           (showChains || !a.chain_excluded) &&
-          (showPractices || !a.practice_excluded) &&
+          // SIZED LIVE, not read off the stored flag (Juan, 2026-09-09): "hide
+          // the small practices under the E-tier rules, any practice that is
+          // bigger is a Clinic." See isSmallPractice for why a size call needs
+          // a size rather than the name-matched practice_excluded flag.
+          (showPractices || !isSmallPractice(a.channel, a.tier)) &&
           // Closed is a HQ lead-status bucket, not a place Juan drives: it never
           // belongs on a field map, filterable or not (Juan, 2026-08-28).
           a.lead_status !== "Closed" &&
-          // THE PROSPECTS LAYER (0072): unqualified lead_status='NEW' accounts
-          // are hidden by default same as chains/practices. An account leaves
-          // this bucket the moment it earns a real HubSpot company + tier.
+          // THE PROSPECTS LAYER: lead_stage='prospect' accounts (no touchpoint
+          // logged) are hidden by default same as chains/practices.
           (showProspects || !isProspect(a)),
       ),
     [accounts, showChains, showPractices, showProspects],
@@ -565,29 +565,23 @@ export function AccountsMap({
   );
 
   // How many each hide-toggle is currently hiding, for its own label. Not a
-  // filter chip because neither is exploratory the way those are: they are
-  // the semi-permanent classifications from exclude_chains.py (0024) and
-  // exclude_practices.py (0025), and these buttons are only the show/hide
-  // half of it, not the tag itself.
+  // filter chip because neither is exploratory the way those are: these
+  // buttons are only the show/hide half of a fact, not the fact itself.
   const chainExcludedCount = useMemo(
     () => accounts.filter((a) => a.chain_excluded).length,
     [accounts],
   );
+  // Computed from channel + tier (isSmallPractice), not the stored
+  // practice_excluded flag -- see that function for why a size call needs a
+  // size. A clinic that grades B, C or D is no longer counted here; it
+  // counts under the Type row's Clinics chip instead, same account, correct
+  // bucket.
   const practiceExcludedCount = useMemo(
-    () => accounts.filter((a) => a.practice_excluded).length,
+    () => accounts.filter((a) => isSmallPractice(a.channel, a.tier)).length,
     [accounts],
   );
-  // Same shape, for the Prospects button (0072): isProspect is computed, not
-  // a stored classification, so it is not "semi-permanent" the way
-  // chain_excluded/practice_excluded are, but the count-and-toggle pattern
-  // is identical.
-  //
-  // NOT THE SAME THING as the Lead status "Prospect" chip, and the two are
-  // kept apart on purpose. This one is HubSpot's 'NEW' lead status with no
-  // company/tier behind it yet (0072); that one is "nobody has logged a
-  // touchpoint" (0073). An account can be either without being the other, so
-  // one lives in the Hidden group and the other in Lead status, each saying
-  // exactly what it is in its own tooltip.
+  // The Prospect hide toggle's count, same lead_stage predicate the Lead
+  // status chip counts, because as of today they are the same fact, not two.
   const prospectExcludedCount = useMemo(
     () => accounts.filter((a) => isProspect(a)).length,
     [accounts],
@@ -915,22 +909,24 @@ export function AccountsMap({
                 hiddenLabel: "Practices",
                 icon: "review",
                 title: showPractices
-                  ? "Hide single-practitioner offices again"
-                  : `${practiceExcludedCount} private-practice account(s) hidden (chiropractors, MDs, NDs, L.Ac.s, ...)`,
+                  ? "Hide small practices again"
+                  : `${practiceExcludedCount} small practice(s) hidden: channel is a clinic/practice and HQ potential grades E (migration 0068's small/personal-use rule). A bigger clinic counts under Type's Clinics chip instead.`,
               }]
             : []),
+        ]}
+        leadStatusHideToggles={[
           ...(prospectExcludedCount > 0
             ? [{
                 key: "prospects",
                 count: prospectExcludedCount,
                 shown: showProspects,
                 onToggle: onToggleShowProspects,
-                shownLabel: "New leads shown",
-                hiddenLabel: "New leads",
-                dot: PROSPECT_COLOR,
+                shownLabel: "Prospect shown",
+                hiddenLabel: "Prospect hidden",
+                dot: LEAD_STAGE_COLOR.prospect,
                 title: showProspects
-                  ? "Hide unworked 'New to open' leads again"
-                  : `${prospectExcludedCount} account(s) hidden: HubSpot lead status 'NEW' with no company or grade behind them yet (migration 0072). Not the same as the Lead status 'Prospect' chip, which means no touchpoint has been logged.`,
+                  ? "Hide unworked Prospect-stage accounts again"
+                  : `${prospectExcludedCount} account(s) hidden: Lead status Prospect, no touchpoint logged yet (migration 0073).`,
               }]
             : []),
         ]}
@@ -1052,12 +1048,10 @@ export function AccountsMap({
 
           {filtered.map((a) => {
             const prospect = isProspect(a);
-            // A prospect wears its flat blue regardless of what tier logic
-            // would otherwise say (see isProspect: it has neither a real
-            // HubSpot company nor a tier while it holds this state, so
-            // `potential` is always undefined here anyway; the explicit
-            // check just makes the priority order readable rather than
-            // relying on that fact staying true).
+            // A prospect wears its flat blue regardless of tier: no touchpoint
+            // logged is the fact this colour states, and an account can carry
+            // that AND a real HQ grade at the same time (the grade is HubSpot's
+            // own mirror, set independently of whether anyone has called).
             const potential = !prospect && a.tier ? POTENTIAL_COLOR[a.tier] : undefined;
             const routeNum = showRouteChain ? routeNumberById.get(a.id) : undefined;
             return (
@@ -1076,7 +1070,7 @@ export function AccountsMap({
                   fillColor: routeNum
                     ? "#14201B"
                     : prospect
-                      ? PROSPECT_COLOR
+                      ? LEAD_STAGE_COLOR.prospect
                       : potential ?? ((a.area && areaById.get(a.area)?.color) || "#5B6560"),
                   fillOpacity: 1,
                   strokeColor: "#F7F6F1",

@@ -31,6 +31,8 @@ import { AccountFilterBar } from "./filter-bar";
 import {
   countSubjects,
   emptyFilters,
+  isSmallPractice,
+  LEAD_STAGE_COLOR,
   matchesFilters,
   type AccountFilterState,
   type FilterSubject,
@@ -38,6 +40,11 @@ import {
 } from "./account-filters";
 import { planningHorizonDates } from "./field-week";
 import { laTodayKey, type BusinessHours } from "./hours";
+import {
+  toggleShowChainAccounts,
+  toggleShowPracticeAccounts,
+  toggleShowProspectAccounts,
+} from "./prefs-actions";
 import type { Readiness } from "./priority";
 import { TopOpportunities } from "./priority-ui";
 import { TouchpointCapture } from "./touchpoint-ui";
@@ -91,6 +98,10 @@ export type SdrDayItem = SdrScheduleItem & {
   channel: string | null;
   readiness: Readiness | null;
   leadStage: LeadStage | null;
+  /** nb_accounts.chain_excluded, for the Chains hide toggle (2026-09-09, Juan:
+   *  "the chains practices etc needs to show on SDR as well"). False on a
+   *  prospect with no account behind it: nothing to hide it as. */
+  chainExcluded: boolean;
 };
 
 /** Adds `n` calendar days to a YYYY-MM-DD string, anchored to the date the
@@ -189,11 +200,14 @@ function AddToDayForm({ date, onAdded }: { date: string; onAdded: (item: SdrDayI
         priorityBand: null,
         /* Not loaded on a row this component just built or stood in for.
            Null, never a guess: the next server render fills all four from
-           the account, and until then this row simply matches no chip. */
+           the account, and until then this row simply matches no chip.
+           chainExcluded defaults false for the same reason: a freshly typed
+           or picked row hasn't hidden itself from anything yet. */
         tier: null,
         channel: null,
         readiness: null,
         leadStage: null,
+        chainExcluded: false,
       });
       reset();
     });
@@ -381,11 +395,14 @@ function GlobalSearch({
         priorityBand: null,
         /* Not loaded on a row this component just built or stood in for.
            Null, never a guess: the next server render fills all four from
-           the account, and until then this row simply matches no chip. */
+           the account, and until then this row simply matches no chip.
+           chainExcluded defaults false for the same reason: a freshly typed
+           or picked row hasn't hidden itself from anything yet. */
         tier: null,
         channel: null,
         readiness: null,
         leadStage: null,
+        chainExcluded: false,
       });
       setAddingFor(null);
       setQuery("");
@@ -1009,6 +1026,9 @@ export function SdrScreen({
   focusAccountPhone,
   focusAccountBusinessHours,
   topRanked,
+  initialShowChains,
+  initialShowPractices,
+  initialShowProspects,
 }: {
   initialItems: SdrDayItem[];
   todayIso: string;
@@ -1031,9 +1051,35 @@ export function SdrScreen({
    *  component doesn't hard-fail if a caller ever renders it without a
    *  priority book computed; the SDR page always passes it. */
   topRanked?: PriorityBook["ranked"];
+  /** nb_ui_prefs (see sdr/page.tsx's getMapDisplayPrefs), the SAME row /map
+   *  reads and writes: Juan, 2026-09-09, "the chains practices etc needs to
+   *  show on SDR as well." One preference, followed between the two screens
+   *  and his other device, not a second copy that can disagree with it. */
+  initialShowChains: boolean;
+  initialShowPractices: boolean;
+  initialShowProspects: boolean;
 }) {
   const [items, setItems] = useState(initialItems);
   const [active, setActive] = useState<SdrDayItem | null>(null);
+
+  const [showChains, setShowChains] = useState(initialShowChains);
+  function toggleChains() {
+    const next = !showChains;
+    setShowChains(next);
+    toggleShowChainAccounts(next).catch(() => setShowChains(!next));
+  }
+  const [showPractices, setShowPractices] = useState(initialShowPractices);
+  function togglePractices() {
+    const next = !showPractices;
+    setShowPractices(next);
+    toggleShowPracticeAccounts(next).catch(() => setShowPractices(!next));
+  }
+  const [showProspects, setShowProspects] = useState(initialShowProspects);
+  function toggleProspects() {
+    const next = !showProspects;
+    setShowProspects(next);
+    toggleShowProspectAccounts(next).catch(() => setShowProspects(!next));
+  }
 
   /* THE SAME FILTER BAR THE MAP RENDERS, not a second one that happens to
      look like it (Juan, 2026-09-09: "map filters (for map and SDR, they should
@@ -1049,13 +1095,48 @@ export function SdrScreen({
   const [filters, setFilters] = useState<AccountFilterState>(emptyFilters);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
+  /* THE THREE HIDE TOGGLES, now shared with /map (Juan, 2026-09-09: "the
+     chains, practices etc needs to show on SDR as well"). Same predicates as
+     the map: Practices sized live off channel + tier (isSmallPractice), not
+     the stored practice_excluded flag; Prospect is lead_stage === 'prospect'.
+     A row Juan scheduled at a chain, a small practice, or an untouched lead
+     drops out of the queue exactly as its pin drops off the map, until the
+     matching toggle is switched on. */
+  const visibleItems = useMemo(
+    () =>
+      items.filter(
+        (it) =>
+          (showChains || !it.chainExcluded) &&
+          (showPractices || !isSmallPractice(it.channel, it.tier)) &&
+          (showProspects || it.leadStage !== "prospect"),
+      ),
+    [items, showChains, showPractices, showProspects],
+  );
+
+  // Hide-toggle counts, over the WHOLE queue (not visibleItems), same rule as
+  // the map's chainExcludedCount/practiceExcludedCount/prospectExcludedCount:
+  // a toggle has to state how many rows it is hiding, not how many are left.
+  const chainExcludedCount = useMemo(() => items.filter((it) => it.chainExcluded).length, [items]);
+  const practiceExcludedCount = useMemo(
+    () => items.filter((it) => isSmallPractice(it.channel, it.tier)).length,
+    [items],
+  );
+  const prospectExcludedCount = useMemo(
+    () => items.filter((it) => it.leadStage === "prospect").length,
+    [items],
+  );
+
   /* One subject per SCHEDULED ROW, not per account, because that is what this
      screen filters: two calls booked on the same store are two rows here and
      the counts have to say two. Built with the same shape the map builds, so
-     lib/account-filters.ts counts and matches both screens identically. */
+     lib/account-filters.ts counts and matches both screens identically.
+     Built from visibleItems, same reason the map counts off visibleAccounts:
+     a badge counting the whole queue while a hide toggle is hiding rows from
+     it would read as a lie the moment one of Juan's own chip counts didn't
+     add up to what's on screen. */
   const subjects = useMemo<FilterSubject[]>(
     () =>
-      items.map((it) => ({
+      visibleItems.map((it) => ({
         id: it.id,
         area: it.area,
         tier: it.tier,
@@ -1064,7 +1145,7 @@ export function SdrScreen({
         channel: it.channel,
         leadStage: it.leadStage,
       })),
-    [items],
+    [visibleItems],
   );
 
   const filterCounts = useMemo(() => countSubjects(subjects), [subjects]);
@@ -1120,11 +1201,13 @@ export function SdrScreen({
       priorityBand: null,
       /* Not loaded on a row this component just built or stood in for.
          Null, never a guess: the next server render fills all four from
-         the account, and until then this row simply matches no chip. */
+         the account, and until then this row simply matches no chip.
+         chainExcluded defaults false, same reason. */
       tier: null,
       channel: null,
       readiness: null,
       leadStage: null,
+      chainExcluded: false,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusAccountId]);
@@ -1208,11 +1291,13 @@ export function SdrScreen({
       priorityBand: null,
       /* Not loaded on a row this component just built or stood in for.
          Null, never a guess: the next server render fills all four from
-         the account, and until then this row simply matches no chip. */
+         the account, and until then this row simply matches no chip.
+         chainExcluded defaults false, same reason. */
       tier: null,
       channel: null,
       readiness: null,
       leadStage: null,
+      chainExcluded: false,
     });
   }
 
@@ -1220,19 +1305,65 @@ export function SdrScreen({
     <div className="flex flex-col gap-4">
       <GlobalSearch todayIso={todayIso} onView={viewHit} onAdded={addItem} />
 
-      {/* THE FILTER BAR, the same component /map renders (lib/filter-bar.tsx).
-          No hide toggles: chains, practices and the 0072 prospect layer hide
-          PINS on a map, and a call Juan deliberately scheduled is not noise to
-          be swept off his own queue. */}
+      {/* THE FILTER BAR, the same component /map renders (lib/filter-bar.tsx),
+          now with the same three hide toggles too (Juan, 2026-09-09: "the
+          chains practices etc needs to show on SDR as well" -- overriding
+          the day-one call that a scheduled call should never disappear). */}
       <div className="overflow-hidden rounded-lg border border-[#E2DFD5] [&>*:last-child]:border-b-0">
         <AccountFilterBar
           value={filters}
           onChange={setFilters}
           counts={filterCounts}
           areas={areas}
-          summary={`${items.filter(itemMatchesFilters).length} of ${items.length}`}
+          summary={`${visibleItems.filter(itemMatchesFilters).length} of ${items.length}`}
           open={filtersOpen}
           onToggleOpen={() => setFiltersOpen((v) => !v)}
+          hideToggles={[
+            ...(chainExcludedCount > 0
+              ? [{
+                  key: "chains",
+                  count: chainExcludedCount,
+                  shown: showChains,
+                  onToggle: toggleChains,
+                  shownLabel: "Chains shown",
+                  hiddenLabel: "Chains",
+                  icon: "accounts",
+                  title: showChains
+                    ? "Hide the big national chains again"
+                    : `${chainExcludedCount} big-chain row(s) hidden (Whole Foods, Sprouts, Trader Joe's, CVS/Walgreens, Target)`,
+                }]
+              : []),
+            ...(practiceExcludedCount > 0
+              ? [{
+                  key: "practices",
+                  count: practiceExcludedCount,
+                  shown: showPractices,
+                  onToggle: togglePractices,
+                  shownLabel: "Practices shown",
+                  hiddenLabel: "Practices",
+                  icon: "review",
+                  title: showPractices
+                    ? "Hide small practices again"
+                    : `${practiceExcludedCount} small practice row(s) hidden: a clinic/practice grading E. A bigger clinic counts under Type's Clinics chip instead.`,
+                }]
+              : []),
+          ]}
+          leadStatusHideToggles={[
+            ...(prospectExcludedCount > 0
+              ? [{
+                  key: "prospects",
+                  count: prospectExcludedCount,
+                  shown: showProspects,
+                  onToggle: toggleProspects,
+                  shownLabel: "Prospect shown",
+                  hiddenLabel: "Prospect hidden",
+                  dot: LEAD_STAGE_COLOR.prospect,
+                  title: showProspects
+                    ? "Hide unworked Prospect-stage rows again"
+                    : `${prospectExcludedCount} row(s) hidden: Lead status Prospect, no touchpoint logged yet.`,
+                }]
+              : []),
+          ]}
         />
       </div>
 
@@ -1244,7 +1375,7 @@ export function SdrScreen({
           rail rather than the dominant surface. */}
       <div className="flex w-full flex-col gap-4 lg:w-[300px] lg:shrink-0">
         {dayIsos.map((iso) => {
-          const dayItems = items
+          const dayItems = visibleItems
             .filter((it) => it.scheduled_date === iso)
             // The same predicate the map applies, from lib/account-filters.ts.
             // Empty selection is unfiltered; a picked chip hides everything

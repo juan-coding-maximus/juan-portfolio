@@ -126,12 +126,43 @@ export type HideToggle = {
   dot?: string;
 };
 
+/** Shared render for a row of hide toggles, used at the end of both the Type
+ *  and Lead status sections. Renders nothing when the list is empty, so a
+ *  section with no toggle to offer never shows a bare "Hidden" label. */
+function HideToggleRow({ toggles }: { toggles: HideToggle[] }) {
+  if (toggles.length === 0) return null;
+  return (
+    <>
+      <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-[#E2DFD5]" />
+      <span className="mr-0.5 text-[11.5px] text-[#8A928C]">Hidden</span>
+      {toggles.map((t) => (
+        <button
+          key={t.key}
+          type="button"
+          onClick={t.onToggle}
+          aria-pressed={t.shown}
+          title={t.title}
+          className={`${CHIP} ${t.shown ? ON : OFF}`}
+        >
+          {t.dot ? (
+            <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: t.dot }} />
+          ) : t.icon ? (
+            <Ico name={t.icon} size={12} />
+          ) : null}
+          {t.shown ? t.shownLabel : t.hiddenLabel} <span className="tabular-nums opacity-70">{t.count}</span>
+        </button>
+      ))}
+    </>
+  );
+}
+
 export function AccountFilterBar({
   value,
   onChange,
   counts,
   areas,
   hideToggles = [],
+  leadStatusHideToggles = [],
   trailing,
   summary,
   open,
@@ -141,7 +172,14 @@ export function AccountFilterBar({
   onChange: (next: AccountFilterState) => void;
   counts: FilterCounts;
   areas: { id: string; label: string; color: string; brief?: string | null }[];
+  /** Rendered at the end of the Type row: statements about what KIND of
+   *  business this is (chains, practices). */
   hideToggles?: HideToggle[];
+  /** Rendered at the end of the Lead status row instead (Juan, 2026-09-09):
+   *  a lead-status fact (unworked, no touchpoints), not a type of client, so
+   *  it does not belong among hideToggles above. Same HideToggle shape, same
+   *  nb_ui_prefs persistence, different row. */
+  leadStatusHideToggles?: HideToggle[];
   /** Screen-specific controls that are NOT filters (the map's route line and
    *  areas overlay). Rendered in their own row so nothing in the five sections
    *  above has to be explained twice. */
@@ -153,7 +191,10 @@ export function AccountFilterBar({
   open: boolean;
   onToggleOpen: () => void;
 }) {
-  const n = activeFilterCount(value) + hideToggles.filter((t) => t.shown).length;
+  const n =
+    activeFilterCount(value) +
+    hideToggles.filter((t) => t.shown).length +
+    leadStatusHideToggles.filter((t) => t.shown).length;
 
   return (
     <>
@@ -323,30 +364,7 @@ export function AccountFilterBar({
           {/* The hide toggles, set apart. These persist to nb_ui_prefs and
               their resting state REMOVES rows, so they are not the same kind
               of control as a chip that narrows and widens on a click. */}
-          {hideToggles.length > 0 && (
-            <>
-              <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-[#E2DFD5]" />
-              <span className="mr-0.5 text-[11.5px] text-[#8A928C]">Hidden</span>
-              {hideToggles.map((t) => (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={t.onToggle}
-                  aria-pressed={t.shown}
-                  title={t.title}
-                  className={`${CHIP} ${t.shown ? ON : OFF}`}
-                >
-                  {t.dot ? (
-                    <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: t.dot }} />
-                  ) : t.icon ? (
-                    <Ico name={t.icon} size={12} />
-                  ) : null}
-                  {t.shown ? t.shownLabel : t.hiddenLabel}{" "}
-                  <span className="tabular-nums opacity-70">{t.count}</span>
-                </button>
-              ))}
-            </>
-          )}
+          <HideToggleRow toggles={hideToggles} />
         </Section>
 
         {/* 5 · LEAD STATUS. The five stages of migration 0073, replacing the
@@ -380,6 +398,12 @@ export function AccountFilterBar({
               </button>
             );
           })}
+
+          {/* The Prospect hide toggle lives here, not in Type (Juan,
+              2026-09-09): it is a lead-status fact, not a statement about
+              what kind of business this is. Same control, same
+              nb_ui_prefs persistence as Chains/Practices above. */}
+          <HideToggleRow toggles={leadStatusHideToggles} />
         </Section>
 
         {trailing}

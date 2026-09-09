@@ -1280,6 +1280,10 @@ export async function getAccountCallCards(
       readiness: Readiness | null;
       tier: Tier | null;
       leadStage: LeadStage | null;
+      /* The map's Chains hide toggle (migration 0024), added 2026-09-09 so
+         /sdr can carry the same toggle. Same egress reasoning as the three
+         above: rides this one join rather than a second query. */
+      chainExcluded: boolean;
     }
   >
 > {
@@ -1293,13 +1297,14 @@ export async function getAccountCallCards(
       business_hours: Record<string, string[][]> | null;
       channel: string | null;
       readiness: Readiness | null;
+      chain_excluded: boolean;
       origin?: Origin;
     }>("nb_accounts", {
       // `area` rides along for the SDR queue's area grouping (Juan, 2026-09-08).
       // `business_hours` rides along too (2026-09-09, Juan: "informs when I
       // bring up a potential meeting and when I plan on calling them next"),
       // same reasoning.
-      select: "id,name,phone,area,business_hours,channel,readiness",
+      select: "id,name,phone,area,business_hours,channel,readiness,chain_excluded",
       id: `in.(${ids.join(",")})`,
     }),
     raw<{ account_id: string; potential_grade: Tier }>(
@@ -1323,6 +1328,7 @@ export async function getAccountCallCards(
         readiness: a.readiness,
         tier: tierById.get(a.id) ?? null,
         leadStage: stageById.get(a.id) ?? null,
+        chainExcluded: a.chain_excluded,
       },
     ]),
   );

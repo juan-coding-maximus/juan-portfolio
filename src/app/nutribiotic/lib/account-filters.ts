@@ -15,8 +15,14 @@
  *   1. Areas          territory_areas.json, 18 areas (unchanged)
  *   2. HQ potential   nb_accounts.potential_hq, A-G (unchanged)
  *   3. Readiness      nb_accounts.readiness (migration 0069) + a 75+ score chip
- *   4. Type           derived from nb_accounts.channel, + the three hide toggles
- *   5. Lead status    nb_v_account_lead_stage (migration 0073)
+ *   4. Type           derived from nb_accounts.channel, + the Chains/Practices
+ *                     hide toggles (both statements about what kind of
+ *                     business this is)
+ *   5. Lead status    nb_v_account_lead_stage (migration 0073) + the
+ *                     Prospect hide toggle (Juan, 2026-09-09: "New leads...
+ *                     that's just prospects, it's not a type of client it's
+ *                     a lead status" -- it lived in Type for one day and was
+ *                     wrong there)
  *
  * NOTHING HERE INVENTS A CLASSIFICATION. Every chip reads a column that
  * already exists, and an account whose channel matches none of Juan's five
@@ -147,6 +153,29 @@ export const UNTYPED_CHANNELS = [
 export function accountType(channel: string | null | undefined): AccountType {
   if (!channel) return "other";
   return CHANNEL_TYPE[channel] ?? "other";
+}
+
+/**
+ * THE PRACTICES HIDE TOGGLE'S real predicate (Juan, 2026-09-09): "Practices
+ * should hide the small practices under the E-tier rules. Any practice that
+ * is bigger is a Clinic."
+ *
+ * Was nb_accounts.practice_excluded, a static flag exclude_practices.py set
+ * once off a name match (migration 0025) -- fine for "is this a clinic",
+ * wrong for "is this worth hiding", since a size call needs a size, and 81
+ * of Juan's clinics were flagged that way regardless of grade: 3 B's, 6 C's
+ * and 19 D's were sitting hidden next to the 41 real E's. A clinic's tier
+ * already answers "how small" (the E-rule, migration 0068's lifetime-value
+ * floor tree), so hiding is now computed from channel + tier, live, rather
+ * than frozen at whatever a script decided once. A clinic with no grade yet
+ * is shown, not hidden: "small" is E's claim to make, not silence's.
+ *
+ * practice_excluded itself is untouched (nb_v_cadence_due still reads it for
+ * a different question, see migration 0025) -- this is only what the map
+ * and SDR filter bars mean by "Practices".
+ */
+export function isSmallPractice(channel: string | null | undefined, tier: Tier | null | undefined): boolean {
+  return accountType(channel) === "clinics" && tier === "E";
 }
 
 // ---------------------------------------------------------------------------
