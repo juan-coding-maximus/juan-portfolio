@@ -1166,17 +1166,30 @@ export async function getAccountNames(ids: string[]): Promise<Record<string, str
  * so the day view joins this in at read time instead. */
 export async function getAccountCallCards(
   ids: string[],
-): Promise<Record<string, { name: string; phone: string | null; area: string | null }>> {
+): Promise<
+  Record<string, { name: string; phone: string | null; area: string | null; businessHours: Record<string, string[][]> | null }>
+> {
   if (ids.length === 0) return {};
-  const res = await query<{ id: string; name: string; phone: string | null; area: string | null; origin?: Origin }>("nb_accounts", {
+  const res = await query<{
+    id: string;
+    name: string;
+    phone: string | null;
+    area: string | null;
+    business_hours: Record<string, string[][]> | null;
+    origin?: Origin;
+  }>("nb_accounts", {
     // `area` rides along for the SDR queue's area grouping (Juan, 2026-09-08).
-    // Read here rather than in a second query for the same rows: this is the
-    // one join the day view already makes, and the department has a live
-    // egress ceiling it was suspended over once (2026-09-02).
-    select: "id,name,phone,area",
+    // `business_hours` rides along too (2026-09-09, Juan: "informs when I
+    // bring up a potential meeting and when I plan on calling them next"),
+    // same reasoning: this is the one join the day view already makes, and
+    // the department has a live egress ceiling it was suspended over once
+    // (2026-09-02).
+    select: "id,name,phone,area,business_hours",
     id: `in.(${ids.join(",")})`,
   });
-  return Object.fromEntries(res.data.map((a) => [a.id, { name: a.name, phone: a.phone, area: a.area }]));
+  return Object.fromEntries(
+    res.data.map((a) => [a.id, { name: a.name, phone: a.phone, area: a.area, businessHours: a.business_hours }]),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -2075,12 +2088,18 @@ export type MapAccount = {
  * here rather than embedded in the query() call above, which only ever reads
  * one table.
  */
-export async function listOwnerAccounts(ownerName = "Juan Arenas Martin"): Promise<Result<MapAccount>> {
+export async function listOwnerAccounts(): Promise<Result<MapAccount>> {
   const [result, grades, mix] = await Promise.all([
     query<Omit<MapAccount, "tier" | "top_category_12m" | "top_category_lifetime">>("nb_accounts", {
       select:
         "id,name,street,city,state,postal,lat,lng,phone,website,channel,lifecycle,do_not_visit,chain_excluded,practice_excluded,hubspot_company_id,origin,area,lead_status,last_order_at,trailing_12m_revenue,lifetime_revenue,expected_reorder_at,expected_reorder_days",
-      owner_name: `eq.${ownerName}`,
+      // hubspot_owner_id, not owner_name: owner_name is free text mirrored from
+      // HubSpot and carries two different spellings for Juan on real rows
+      // ("Juan Arenas" on 49, "Juan Arenas Martin" on 349, 2026-09-09), so
+      // filtering on it silently dropped 49 of his own accounts off the map
+      // with no toggle able to bring them back. hubspot_owner_id is the
+      // numeric id every other query in this department already trusts.
+      hubspot_owner_id: `eq.${JUAN_OWNER_ID}`,
       lat: "not.is.null",
       /* CLOSED ACCOUNTS ARE NOT PINS. No toggle, unlike chains and practices:
          those hide a business Juan could still walk into, this one is gone.
@@ -2128,10 +2147,10 @@ export async function listTerritoryAccountIds(): Promise<Set<string>> {
   return new Set(rows.map((r) => r.id));
 }
 
-/** How many of ownerName's accounts exist locally but have no verified pin yet. */
-export async function countOwnerWithoutCoordinates(ownerName = "Juan Arenas Martin"): Promise<number> {
+/** How many of Juan's accounts exist locally but have no verified pin yet. */
+export async function countOwnerWithoutCoordinates(): Promise<number> {
   const rows = await raw<{ id: string }>(
-    `nb_accounts?select=id&owner_name=eq.${encodeURIComponent(ownerName)}&lat=is.null&limit=5000`,
+    `nb_accounts?select=id&hubspot_owner_id=eq.${JUAN_OWNER_ID}&lat=is.null&limit=5000`,
   );
   return rows.length;
 }
@@ -3628,11 +3647,11 @@ export type OutreachContact = {
 /** Every named contact with a phone on file, across Juan's whole book, for the
  *  Outreach recipient picker. One query rather than one per account: the
  *  picker needs all of them up front to search across accounts. */
-export async function listOwnerContactPhones(ownerName = "Juan Arenas Martin"): Promise<OutreachContact[]> {
+export async function listOwnerContactPhones(): Promise<OutreachContact[]> {
   await verifySession();
   if (!isConfigured()) return [];
   const accounts = await raw<{ id: string }>(
-    `nb_accounts?select=id&owner_name=eq.${encodeURIComponent(ownerName)}&closed_at=is.null`,
+    `nb_accounts?select=id&hubspot_owner_id=eq.${JUAN_OWNER_ID}&closed_at=is.null`,
   );
   if (!accounts.length) return [];
   const ids = accounts.map((a) => a.id).join(",");
