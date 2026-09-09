@@ -28,6 +28,20 @@
  * candidate nobody lands is a row nobody wants, and the cost of the choice is
  * that a reload means one re-search (page 0 is cached, so usually not a billed
  * one).
+ *
+ * EVERY ACTION IS A QUEUED JOB NOW, NOT A REQUEST THAT WAITS (2026-09-09). The
+ * pipeline is Python on Juan's Mac and this screen is served from Vercel, which
+ * has no Python and no bridges/ directory, so a synchronous call could never
+ * work off the Mac and did not: "The search bridge is not reachable from this
+ * deployment." Each button now POSTs a job, gets an id back immediately, and
+ * polls it. See the route's docstring for the whole shape.
+ *
+ * WHICH MAKES "PENDING" A REAL STATE ON SCREEN, and it is not a failure. A job
+ * sitting queued means the Mac has not picked it up yet, and it will, as soon
+ * as the Mac is awake with the worker up. Past a short grace period this says
+ * "waiting on your Mac", plainly, in the same muted line the run's progress
+ * uses. The only hard stop is the ceiling below, and it says what did not
+ * happen rather than dressing itself up as an alert.
  */
 
 import { Fragment, useCallback, useMemo, useState } from "react";
@@ -51,21 +65,6 @@ const secondaryBtn =
 const panel = "rounded-lg border border-[#E2DFD5] bg-white";
 const th = "whitespace-nowrap px-3 py-2 text-left font-medium";
 const td = "px-3 py-2 align-top";
-
-/* Categories Juan actually sweeps for, and the ones whose Places type mapping
-   exists in CATEGORY_TYPES (places_search_ingest.py) so Google's own type
-   filter does its work before a result is ever billed. A category with no
-   mapping still runs, it just is not narrowed at Google's end. */
-const PRESETS = [
-  "medical spa",
-  "chiropractor",
-  "health food store",
-  "gym",
-  "juice bar",
-  "wellness center",
-  "pharmacy",
-  "yoga studio",
-];
 
 export type Candidate = {
   key: string;
@@ -101,10 +100,13 @@ export type Candidate = {
 type StageReply = {
   ok: boolean;
   stage?: string;
+  /** The queued job's id (POST) and where it is (GET). The rest of this shape
+   *  is the script's own summary, unchanged: the queue carries it verbatim. */
+  job?: string;
+  status?: string;
   errors?: string[];
   error?: string;
   detail?: string;
-  unavailable?: boolean;
   written?: boolean;
   candidates?: Candidate[];
   scope?: { kind?: string; pins?: number; diagonal_km?: number; label?: string };
@@ -138,6 +140,36 @@ type StageReply = {
 type Busy = null | "search" | "enrich" | "land";
 type SortKey = "triage" | "name" | "rating" | "reviews";
 
+/** What the poll is watching. `elapsedMs` is measured in the polling loop and
+ *  carried in, rather than read off the clock while rendering: a component that
+ *  calls Date.now() during render is not idempotent (react-hooks/purity), and
+ *  the poll is the only thing that should be moving this line anyway. It is
+ *  what turns "queued" into "waiting on your Mac" once it has been long
+ *  enough. */
+type Progress = { stage: Exclude<Busy, null>; status: "pending" | "running"; elapsedMs: number };
+
+/** How often the browser asks. The work is 30-60 seconds; a poll a second and a
+ *  half is responsive without being a load, and each one reads status only, not
+ *  the result payload. */
+const POLL_MS = 1500;
+
+/** Queued longer than this and the honest word is not "queued", it is "waiting
+ *  on your Mac". The worker polls every 2 seconds when it is up, so anything
+ *  past this is the Mac being asleep or the worker being down. */
+const WAITING_AFTER_MS = 20_000;
+
+/** The ceiling. A search is a minute, an enrich of 25 sites is a few. Past this
+ *  the screen stops waiting and says so; the job itself stays in the queue. */
+const GIVE_UP_MS = 180_000;
+
+const RUNNING_LINE: Record<Exclude<Busy, null>, string> = {
+  search: "Searching Google from your Mac",
+  enrich: "Reading their websites from your Mac",
+  land: "Adding them from your Mac",
+};
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 export function SearchClient() {
   const [pins, setPins] = useState<Pin[]>([]);
   const [query, setQuery] = useState("medical spa");
@@ -159,40 +191,96 @@ export function SearchClient() {
   const [enrichMeta, setEnrichMeta] = useState<StageReply["stages"] | null>(null);
   const [landMeta, setLandMeta] = useState<StageReply | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
+  const [progress, setProgress] = useState<Progress | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
   const canSearch = pins.length >= 3 && query.trim().length > 0 && busy === null;
 
-  const post = useCallback(async (payload: Record<string, unknown>): Promise<StageReply | null> => {
-    try {
-      const res = await fetch("/nutribiotic/api/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const json = (await res.json()) as StageReply;
-      if (!res.ok && !json.stages) {
-        setFailure([json.error, json.detail].filter(Boolean).join("\n"));
+  /**
+   * Queue one stage and wait for the Mac to answer it.
+   *
+   * POST is an insert and always succeeds from anywhere. Everything after it is
+   * polling one row. A poll that fails is NOT a failure of the run: the run is
+   * on the Mac and unaffected by a dropped request from this tab, so a bad poll
+   * is skipped and the next one asks again. Only the ceiling stops the wait.
+   */
+  const post = useCallback(
+    async (stage: Exclude<Busy, null>, payload: Record<string, unknown>): Promise<StageReply | null> => {
+      let job: string;
+      try {
+        const res = await fetch("/nutribiotic/api/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, stage }),
+        });
+        const json = (await res.json()) as StageReply & { job?: string };
+        if (!res.ok || !json.ok || !json.job) {
+          setFailure([json.error, json.detail].filter(Boolean).join("\n") || "The run was not queued.");
+          return null;
+        }
+        job = json.job;
+      } catch {
+        setFailure("Could not reach the OS to queue this. Nothing ran.");
         return null;
       }
-      if (!json.ok && (json.errors ?? []).length > 0) {
-        setFailure(json.errors!.join("\n"));
-        return null;
+
+      const since = Date.now();
+      setProgress({ stage, status: "pending", elapsedMs: 0 });
+      let last: "pending" | "running" = "pending";
+
+      for (;;) {
+        await sleep(POLL_MS);
+
+        let json: (StageReply & { status?: string }) | null = null;
+        try {
+          const res = await fetch(`/nutribiotic/api/search?job=${encodeURIComponent(job)}`, {
+            cache: "no-store",
+          });
+          json = (await res.json()) as StageReply & { status?: string };
+        } catch {
+          json = null; // a dropped poll, not a dropped run
+        }
+
+        if (json && (json.status === "pending" || json.status === "running")) {
+          last = json.status;
+        }
+        // The counter keeps moving even through a poll that did not come back,
+        // because the wait is real whether or not this tab heard about it.
+        setProgress({ stage, status: last, elapsedMs: Date.now() - since });
+
+        if (json && json.status && json.status !== "pending" && json.status !== "running") {
+          setProgress(null);
+          if (!json.ok && (json.errors ?? []).length > 0) {
+            setFailure(json.errors!.join("\n"));
+            return null;
+          }
+          if (!json.ok) {
+            setFailure([json.error, json.detail].filter(Boolean).join("\n"));
+            return null;
+          }
+          return json;
+        }
+
+        if (Date.now() - since > GIVE_UP_MS) {
+          setProgress(null);
+          setFailure(
+            last === "running"
+              ? "This started on your Mac and has not finished in three minutes. It is still running there. Nothing has been lost."
+              : "Your Mac has not picked this up in three minutes, so nothing has run yet. It stays queued and will start once the Mac is awake.",
+          );
+          return null;
+        }
       }
-      return json;
-    } catch {
-      setFailure("Could not reach the search bridge. Nothing ran.");
-      return null;
-    }
-  }, []);
+    },
+    [],
+  );
 
   async function runSearch() {
     setBusy("search");
     setFailure(null);
     setLandMeta(null);
     setEnrichMeta(null);
-    const reply = await post({
-      stage: "search",
+    const reply = await post("search", {
       category: query.trim(),
       polygon: pins,
       min_review_count: Number.parseInt(minReviews, 10),
@@ -218,7 +306,7 @@ export function SearchClient() {
     setBusy("enrich");
     setFailure(null);
     const picked = rows.filter((r) => selected.has(r.key));
-    const reply = await post({ stage: "enrich", candidates: picked });
+    const reply = await post("enrich", { candidates: picked });
     if (reply) {
       const byKey = new Map((reply.candidates ?? []).map((c) => [c.key, c]));
       // Merged in place, so the table does not reorder or reset under him and
@@ -234,8 +322,7 @@ export function SearchClient() {
     setBusy("land");
     setFailure(null);
     const picked = rows.filter((r) => selected.has(r.key) && !r.id);
-    const reply = await post({
-      stage: "land",
+    const reply = await post("land", {
       category: query.trim(),
       candidates: picked,
       write: true,
@@ -313,28 +400,6 @@ export function SearchClient() {
             {busy === "search" ? "Searching..." : "Search this area"}
           </button>
         </div>
-
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          {PRESETS.map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => setQuery(p)}
-              className={`rounded-full border px-2.5 py-1 text-[12px] transition-colors ${
-                query === p
-                  ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
-                  : "border-[#E2DFD5] text-[#5B6560] hover:bg-[#FAF9F5]"
-              }`}
-            >
-              {p}
-            </button>
-          ))}
-          {pins.length < 3 && (
-            <span className="ml-1 text-[12px] text-[#8A928C]">
-              Drop at least three pins on the map to define where to search.
-            </span>
-          )}
-        </div>
       </div>
 
       {/* THE AREA AND THE FILTERS, SIDE BY SIDE. The area is the bigger of the
@@ -394,10 +459,6 @@ export function SearchClient() {
                 value={minTriage}
                 onChange={(e) => setMinTriage(e.target.value)}
               />
-              <p className="mt-1 text-[11.5px] leading-snug text-[#8A928C]">
-                A rank from the phone, the review volume and the rating. At the default floors it
-                orders the list rather than cutting it.
-              </p>
             </div>
 
             <div className="flex flex-col gap-2 border-t border-[#EFEDE5] pt-3">
@@ -424,12 +485,14 @@ export function SearchClient() {
         </div>
       </div>
 
+      {progress && <ProgressLine progress={progress} />}
+
+      {/* A stop, stated plainly. No icon, no tinted box: this screen already
+          distinguishes "waiting" from "failed" above, so what is left here is
+          one sentence about what did not happen. */}
       {failure && (
-        <div className={`${panel} p-3`}>
-          <div className="flex items-start gap-1.5 text-[13px] text-[#8A2E2E]">
-            <Ico name="alert" size={14} />
-            <span className="whitespace-pre-wrap">{failure}</span>
-          </div>
+        <div className={`${panel} px-3.5 py-2.5`}>
+          <span className="whitespace-pre-wrap text-[13px] text-[#3D4A44]">{failure}</span>
         </div>
       )}
 
@@ -512,6 +575,34 @@ export function SearchClient() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Where the run is, in one muted line.
+ *
+ * Three states, and the middle one is the one that used to be a 503 with the
+ * word "unreachable" in it: a job the Mac has not claimed yet is QUEUED, which
+ * is recoverable and normal, not an error. Past WAITING_AFTER_MS it says so in
+ * Juan's terms, "waiting on your Mac", because that names both the cause and
+ * the fix. The elapsed counter is there so a stall is visible without anyone
+ * having to describe one.
+ */
+function ProgressLine({ progress }: { progress: Progress }) {
+  const elapsed = Math.max(0, Math.round(progress.elapsedMs / 1000));
+  const waiting = progress.status === "pending" && progress.elapsedMs > WAITING_AFTER_MS;
+  const label =
+    progress.status === "running"
+      ? RUNNING_LINE[progress.stage]
+      : waiting
+        ? "Waiting on your Mac. This starts as soon as it is awake."
+        : "Queued";
+
+  return (
+    <div className={`${panel} flex items-center justify-between gap-3 px-3.5 py-2.5`}>
+      <span className="text-[12.5px] text-[#8A928C]">{label}</span>
+      <span className="text-[12.5px] tabular-nums text-[#A9AFA9]">{elapsed}s</span>
     </div>
   );
 }

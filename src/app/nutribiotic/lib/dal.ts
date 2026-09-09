@@ -4059,3 +4059,64 @@ export async function signReportPreview(name: string): Promise<string | null> {
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// nb_search_jobs · the Search screen's queue across the Mac boundary (0074)
+// ---------------------------------------------------------------------------
+//
+// Same split as nb_report_drafts above, for the same reason: the prospecting
+// pipeline is Python in the agency repo (places_search_ingest.py) and Vercel
+// has neither Python nor bridges/. This app therefore never runs a search. It
+// writes a pending row here, and bridges/nutribiotic/search_worker.py, running
+// on Juan's Mac under launchd, claims it, runs it locally and writes the answer
+// back onto the same row.
+//
+// THE POLL IS TWO CALLS ON PURPOSE. `getSearchJobStatus` selects everything
+// EXCEPT `result`, because a finished search result is ~60 candidate records
+// and re-shipping it on every 1.5-second poll is exactly the kind of egress
+// that suspended this org on 2026-09-02. `getSearchJobResult` fetches the
+// payload once, when the status says there is one.
+
+export type SearchJobStage = "search" | "enrich" | "land";
+export type SearchJobStatus = "pending" | "running" | "done" | "error";
+
+export type SearchJob = {
+  id: string;
+  stage: SearchJobStage;
+  status: SearchJobStatus;
+  /** Set only when the WORKER failed (a crash, or a run the Mac slept through).
+   *  A stage that ran and could not reach a source reports that inside its own
+   *  result, as `ok:false` with `errors`. */
+  error: string | null;
+  created_at: string;
+  started_at: string | null;
+  updated_at: string;
+};
+
+/** Queue one stage. Returns the id the browser polls. Fast and unconditional:
+ *  one INSERT, no Python, no Mac, so it works identically from Vercel and from
+ *  `pnpm dev`. */
+export async function createSearchJob(
+  stage: SearchJobStage,
+  params: Record<string, unknown>,
+): Promise<string> {
+  const id = randId("sj");
+  await mutate("nb_search_jobs", "POST", { id, stage, params, status: "pending" }, {}, "return=minimal");
+  return id;
+}
+
+/** Everything about a job except its result. The poll. */
+export async function getSearchJobStatus(id: string): Promise<SearchJob | null> {
+  const rows = await raw<SearchJob>(
+    `nb_search_jobs?select=id,stage,status,error,created_at,started_at,updated_at&id=eq.${encodeURIComponent(id)}&limit=1`,
+  );
+  return rows[0] ?? null;
+}
+
+/** The stage's own summary, verbatim, fetched once the status says it exists. */
+export async function getSearchJobResult(id: string): Promise<Record<string, unknown> | null> {
+  const rows = await raw<{ result: Record<string, unknown> | null }>(
+    `nb_search_jobs?select=result&id=eq.${encodeURIComponent(id)}&limit=1`,
+  );
+  return rows[0]?.result ?? null;
+}

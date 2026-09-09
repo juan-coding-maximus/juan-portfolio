@@ -1,17 +1,73 @@
 /**
- * The Search screen's three actions, each its own POST to this one route.
+ * The Search screen's three actions. This route validates one and queues it.
  *
- * THIS ROUTE OWNS NO LOGIC. Every filter, every drop reason, the triage
- * weights, the point-in-polygon test, the territory test, the book de-dup and
- * the landing all live in bridges/nutribiotic/places_search_ingest.py, which is
- * the department's source of truth for this pipeline and is exercised from the
- * CLI as well. Re-implementing any of it in TypeScript would give the OS and
- * the CLI two editable copies of the same rule (root AGENTS.md P4), and the
- * first time they disagreed, Juan would be looking at a number no file
- * produced. So this pipes a JSON request into that script's `--stage` door and
- * hands back what it prints.
+ * THIS ROUTE OWNS NO LOGIC AND, SINCE 2026-09-09, RUNS NO PYTHON. Every filter,
+ * every drop reason, the triage weights, the point-in-polygon test, the
+ * territory test, the book de-dup and the landing all live in
+ * bridges/nutribiotic/places_search_ingest.py, which is the department's source
+ * of truth for this pipeline and is exercised from the CLI as well.
+ * Re-implementing any of it in TypeScript would give the OS and the CLI two
+ * editable copies of the same rule (root AGENTS.md P4), and the first time they
+ * disagreed, Juan would be looking at a number no file produced.
  *
- * THREE STAGES, THREE CLICKS, ONE AT A TIME (rebuilt 2026-09-09, Juan's ask):
+ * WHERE IT RUNS, HONESTLY, AND WHY THAT CHANGED
+ * ---------------------------------------------
+ * bridges/ lives in the agency repo. This app is its own repo, deployed to
+ * Vercel, where there is no Python and no bridges/ directory, and no
+ * environment variable can conjure one. This route used to shell out to the
+ * script synchronously and return 503 when the file was not on disk, which is
+ * correct on `pnpm dev` and is a dead screen on the site Juan uses every day.
+ * He hit exactly that: "The search bridge is not reachable from this
+ * deployment." (Vercel's function ceiling would have killed a 300-second sweep
+ * regardless.)
+ *
+ * So the two halves stop trying to reach each other. Both reach Supabase, which
+ * is reachable from everywhere:
+ *
+ *   POST /nutribiotic/api/search        validates the request, inserts one
+ *                                       pending row in nb_search_jobs (migration
+ *                                       0074), returns { job } immediately.
+ *   bridges/nutribiotic/search_worker.py  on Juan's Mac under launchd
+ *                                       (com.agency.nutribiotic-search-worker),
+ *                                       claims the row, calls the script's
+ *                                       stage function locally, writes the
+ *                                       answer back onto the row.
+ *   GET  /nutribiotic/api/search?job=id the browser polls this until the row
+ *                                       says done or error.
+ *
+ * ONE PATH, NOT TWO. There is deliberately no "shell out directly if bridges/
+ * happens to exist" fast path any more. A second mechanism would mean the path
+ * Juan depends on is the one exercised least, and the local worker is running
+ * on this Mac anyway, so `pnpm dev` and production now go through the identical
+ * queue. A dev with no worker loaded sees exactly the state Juan would, which
+ * is the point.
+ *
+ * THIS IS THE REPORTS SCREEN'S PATTERN. nb_report_drafts + field_report.py
+ * --serve has been carrying builds and renders across the same boundary since
+ * August (com.agency.nutribiotic-report-serve.plist). Only the cadence differs:
+ * that poller runs every 3 minutes because nobody is watching a report render,
+ * and this one polls every 2 seconds because Juan is watching a search.
+ *
+ * WHAT "NOT REACHABLE" MEANS NOW. A job that sits `pending` is not a failure:
+ * it is queued, and the Mac will take it as soon as it is awake and the worker
+ * is up. The screen says "waiting on your Mac", which is the recoverable truth,
+ * and only calls it a stop when the wait runs past the client's ceiling. A
+ * stage that RAN and could not reach Google still reports that as ok:false with
+ * its own `errors`, printed verbatim, never as an empty list that would read
+ * like "the sweep found nothing" (NutriBiotic AGENTS.md, HARD RULE 8).
+ *
+ * THE CANDIDATE LIST TRAVELS IN THE JOB ROW, NOT ON A COMMAND LINE. Stages 2
+ * and 3 take the list stage 1 produced, and that list has been sitting in the
+ * browser while Juan picked from it. It goes into `params` as jsonb and comes
+ * back out on the Mac, which is the same shape it had on stdin before.
+ *
+ * WHAT COMES BACK FROM THE BROWSER IS FACTS, NOT POLICY. The script's
+ * candidate_row() writes owner, source, lifecycle and hubspot_sync_eligible
+ * from its own constants and reads only the Places/site fields off the record,
+ * so a tampered payload cannot change who a prospect belongs to or whether it
+ * is allowed near the portal.
+ *
+ * THREE STAGES, THREE CLICKS, ONE AT A TIME:
  *
  *   stage:"search"  polygon + filters -> a list of candidates. Google and
  *                   nb_accounts are read. No site is fetched. NOTHING WRITTEN.
@@ -22,41 +78,20 @@
  *                   nb_sdr_schedule. THE ONLY STAGE THAT WRITES, and only with
  *                   write:true, which only the button that says so sends.
  *
- * THE CANDIDATE LIST TRAVELS ON STDIN, NOT ARGV. Stages 2 and 3 take the list
- * stage 1 produced, and that list has been sitting in the browser while Juan
- * picked from it. argv would truncate it; rebuilding it here would be the
- * second copy of the rules this file exists to avoid.
- *
- * WHAT COMES BACK FROM THE BROWSER IS FACTS, NOT POLICY. The script's
- * candidate_row() writes owner, source, lifecycle and hubspot_sync_eligible
- * from its own constants and reads only the Places/site fields off the record,
- * so a tampered payload cannot change who a prospect belongs to or whether it
- * is allowed near the portal.
- *
- * WHERE IT RUNS, HONESTLY. bridges/ lives in the agency repo; this app is its
- * own repo deployed to Vercel, where there is no Python and no bridges/
- * directory. So this route works when the OS is served from the Mac (pnpm dev
- * / a local build) and returns 503 everywhere else. That is the whole
- * requirement: Juan asked for this screen on his Mac only. It never pretends:
- * an unreachable bridge is a stop, not an empty result that reads like "the
- * sweep found nothing" (NutriBiotic AGENTS.md, HARD RULE 8's shape).
- *
- * NOTHING HERE TOUCHES HUBSPOT, because the script it calls does not import
- * the hubspot module at all. Rows land with hubspot_sync_eligible = false and
- * earn a portal record by being talked to (HARD RULE 20).
+ * NOTHING HERE TOUCHES HUBSPOT, because the script the worker calls does not
+ * import the hubspot module at all. Rows land with hubspot_sync_eligible =
+ * false and earn a portal record by being talked to (HARD RULE 20).
  */
-import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
-import path from "node:path";
 import { hasAccess } from "../../lib/devices";
+import {
+  createSearchJob,
+  getSearchJobResult,
+  getSearchJobStatus,
+  type SearchJobStage,
+} from "../../lib/dal";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-/* The enrich stage fetches up to four pages per picked candidate. A handful of
-   picks is the expectation; this is the ceiling. */
-export const maxDuration = 300;
-
-const SCRIPT_REL = path.join("bridges", "nutribiotic", "places_search_ingest.py");
 
 /** A bound on one search. The script reports `capped_off` when it bites, so a
  *  truncated list says so on screen rather than looking like the whole answer. */
@@ -72,10 +107,6 @@ const MAX_LAND = 25;
  *  draws by accident, and the ray-cast is linear in them. */
 const MAX_PINS = 200;
 
-const CHILD_TIMEOUT_MS = 280_000;
-
-type Stage = "search" | "enrich" | "land";
-
 function num(v: unknown, fallback: number, lo: number, hi: number): number {
   const n = typeof v === "number" ? v : Number.parseFloat(String(v ?? ""));
   if (!Number.isFinite(n)) return fallback;
@@ -84,61 +115,6 @@ function num(v: unknown, fallback: number, lo: number, hi: number): number {
 
 function bool(v: unknown, fallback: boolean): boolean {
   return typeof v === "boolean" ? v : fallback;
-}
-
-/** The agency checkout that holds bridges/. `pnpm dev` runs with cwd at the
- *  app root, whose parent is the agency repo; NB_AGENCY_DIR overrides for any
- *  other layout. */
-function agencyRoot(): string | null {
-  const candidates = [
-    process.env.NB_AGENCY_DIR,
-    path.resolve(process.cwd(), ".."),
-    process.cwd(),
-  ].filter((p): p is string => !!p);
-  for (const root of candidates) {
-    if (existsSync(path.join(root, SCRIPT_REL))) return root;
-  }
-  return null;
-}
-
-function python(): string {
-  return process.env.NB_PYTHON ?? (existsSync("/usr/bin/python3") ? "/usr/bin/python3" : "python3");
-}
-
-/** The script prints its summary as one JSON object. Anything a stray import
- *  wrote before it is skipped rather than allowed to break the parse. */
-function parseSummary(stdout: string): Record<string, unknown> | null {
-  const start = stdout.indexOf("{");
-  if (start < 0) return null;
-  try {
-    return JSON.parse(stdout.slice(start)) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
-function runStage(
-  root: string,
-  stage: Stage,
-  request: unknown,
-): Promise<{ code: number; stdout: string; stderr: string }> {
-  return new Promise((resolve) => {
-    const child = execFile(
-      python(),
-      [path.join(root, SCRIPT_REL), "--stage", stage],
-      { cwd: root, timeout: CHILD_TIMEOUT_MS, maxBuffer: 32 * 1024 * 1024 },
-      (err, stdout, stderr) => {
-        const code =
-          err && typeof (err as NodeJS.ErrnoException & { code?: number }).code === "number"
-            ? (err as unknown as { code: number }).code
-            : err
-              ? 1
-              : 0;
-        resolve({ code, stdout: stdout ?? "", stderr: stderr ?? "" });
-      },
-    );
-    child.stdin?.end(JSON.stringify(request));
-  });
 }
 
 /** The candidate records, passed straight back through. They came from the
@@ -158,22 +134,13 @@ function candidates(v: unknown, cap: number): Record<string, unknown>[] | null {
   return out;
 }
 
-function unavailable(stage: Stage) {
-  return Response.json(
-    {
-      ok: false,
-      stage,
-      unavailable: true,
-      error:
-        "The search bridge is not reachable from this deployment. The pipeline is a Python " +
-        "script in the agency repo, so it runs when the OS is served from the Mac.",
-      errors: [],
-      candidates: [],
-    },
-    { status: 503 },
-  );
-}
-
+/**
+ * POST · queue one stage.
+ *
+ * Validation is unchanged and still happens here, at the door, before anything
+ * is written: a request that cannot be run should never become a row the worker
+ * has to fail.
+ */
 export async function POST(req: Request) {
   if (!(await hasAccess())) {
     return Response.json({ ok: false, error: "Unauthorized." }, { status: 401 });
@@ -186,12 +153,12 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: "Expected a JSON body." }, { status: 400 });
   }
 
-  const stage = String(body.stage ?? "search") as Stage;
+  const stage = String(body.stage ?? "search") as SearchJobStage;
   if (stage !== "search" && stage !== "enrich" && stage !== "land") {
     return Response.json({ ok: false, error: `Unknown stage ${stage}.` }, { status: 400 });
   }
 
-  let request: Record<string, unknown>;
+  let params: Record<string, unknown>;
 
   if (stage === "search") {
     const category = String(body.category ?? "").trim().slice(0, 120);
@@ -218,7 +185,7 @@ export async function POST(req: Request) {
       );
     }
 
-    request = {
+    params = {
       category,
       polygon,
       min_review_count: Math.round(num(body.min_review_count, 30, 0, 5000)),
@@ -240,7 +207,7 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    request = { candidates: picked, site_pages: Math.round(num(body.site_pages, 4, 1, 8)) };
+    params = { candidates: picked, site_pages: Math.round(num(body.site_pages, 4, 1, 8)) };
   } else {
     const category = String(body.category ?? "").trim().slice(0, 120);
     const picked = candidates(body.candidates, MAX_LAND);
@@ -250,7 +217,7 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    request = {
+    params = {
       category,
       candidates: picked,
       calls_per_day: Math.round(num(body.calls_per_day, 15, 1, 50)),
@@ -260,29 +227,100 @@ export async function POST(req: Request) {
     };
   }
 
-  const root = agencyRoot();
-  if (!root) return unavailable(stage);
-
-  const { code, stdout, stderr } = await runStage(root, stage, request);
-  const summary = parseSummary(stdout);
-  if (!summary) {
+  let job: string;
+  try {
+    job = await createSearchJob(stage, params);
+  } catch (e) {
+    /* The queue itself is unreachable, which is the one honest hard failure
+       left on this path: without it there is nothing to hand the Mac. */
     return Response.json(
       {
         ok: false,
         stage,
-        error: "The search bridge produced no summary.",
-        detail: (stderr || stdout).slice(-1200),
-        errors: [],
-        candidates: [],
+        error: "Could not queue the run: the OS database did not accept it. Nothing ran.",
+        detail: String(e).slice(-400),
       },
       { status: 502 },
     );
   }
-  /* A stage that reached its sources and found nothing is ok:true with zeroes,
-     and is shown as such. A stage that could not reach a source is ok:false
-     carrying its own `errors`, and the client prints them verbatim. */
+
   return Response.json(
-    { ...summary, exit_code: code, limits: { MAX_CANDIDATES, MAX_ENRICH, MAX_LAND } },
+    { ok: true, stage, job, status: "pending", limits: { MAX_CANDIDATES, MAX_ENRICH, MAX_LAND } },
+    { headers: { "cache-control": "no-store" } },
+  );
+}
+
+/**
+ * GET · what has happened to a queued job.
+ *
+ * `?job=<id>`. Answers with the row's status and, once there is one, the
+ * stage's own summary verbatim, which is exactly the object the POST used to
+ * return synchronously. The client's rendering did not have to change.
+ *
+ * The result is fetched only when the status says it exists, in a second query.
+ * A finished search summary carries ~60 candidate records; re-shipping it on
+ * every 1.5-second poll is the kind of egress that suspended this org on
+ * 2026-09-02.
+ */
+export async function GET(req: Request) {
+  if (!(await hasAccess())) {
+    return Response.json({ ok: false, error: "Unauthorized." }, { status: 401 });
+  }
+
+  const id = new URL(req.url).searchParams.get("job") ?? "";
+  if (!id) {
+    return Response.json({ ok: false, error: "Which job?" }, { status: 400 });
+  }
+
+  let row;
+  try {
+    row = await getSearchJobStatus(id);
+  } catch (e) {
+    return Response.json(
+      { ok: false, error: "Could not read the run's status.", detail: String(e).slice(-400) },
+      { status: 502 },
+    );
+  }
+  if (!row) {
+    return Response.json({ ok: false, error: "No such run." }, { status: 404 });
+  }
+
+  const base = {
+    job: row.id,
+    stage: row.stage,
+    status: row.status,
+    created_at: row.created_at,
+    started_at: row.started_at,
+    updated_at: row.updated_at,
+  };
+
+  if (row.status === "pending" || row.status === "running") {
+    return Response.json({ ok: true, ...base }, { headers: { "cache-control": "no-store" } });
+  }
+
+  if (row.status === "error") {
+    return Response.json(
+      { ok: false, ...base, error: row.error ?? "The run failed on the Mac.", errors: [], candidates: [] },
+      { headers: { "cache-control": "no-store" } },
+    );
+  }
+
+  const result = await getSearchJobResult(id);
+  if (!result) {
+    /* done with no payload is not a state the worker writes; treat it as the
+       stop it is rather than as an empty result set. */
+    return Response.json(
+      { ok: false, ...base, error: "The run finished without recording a summary.", errors: [], candidates: [] },
+      { headers: { "cache-control": "no-store" } },
+    );
+  }
+
+  /* The stage's summary, unchanged. `ok` inside it is the script's own verdict:
+     a stage that reached its sources and found nothing is ok:true with zeroes;
+     a stage that could not reach one is ok:false carrying its own `errors`, and
+     the client prints them verbatim. */
+  return Response.json(
+    { ...result, ...base, limits: { MAX_CANDIDATES, MAX_ENRICH, MAX_LAND } },
     { headers: { "cache-control": "no-store" } },
   );
 }
