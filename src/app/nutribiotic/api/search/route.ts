@@ -121,6 +121,24 @@ function bool(v: unknown, fallback: boolean): boolean {
  *  script and go back to it; the only thing checked here is that they are
  *  objects carrying the `key` the script assigns, so a malformed page state
  *  fails at the door instead of halfway through a landing. */
+/** A list of short, human-typed phrases (excluded categories, chain names).
+ *  Trimmed, deduped, blanks dropped, capped so a pasted blob can't blow up the
+ *  params payload or the script's per-place string scan. */
+function phrases(v: unknown, cap: number, maxLen: number): string[] {
+  if (!Array.isArray(v)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of v) {
+    const s = String(raw ?? "").trim().slice(0, maxLen);
+    const key = s.toLowerCase();
+    if (!s || seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+    if (out.length >= cap) break;
+  }
+  return out;
+}
+
 function candidates(v: unknown, cap: number): Record<string, unknown>[] | null {
   if (!Array.isArray(v)) return null;
   if (v.length === 0 || v.length > cap) return null;
@@ -197,6 +215,17 @@ export async function POST(req: Request) {
          An explicit "" is Juan switching Google's own type filter off. */
       included_type:
         typeof body.included_type === "string" ? body.included_type.slice(0, 60) : "auto",
+      /* Category exclude is always live once Juan lists something; chain
+         exclude and min_photos are capabilities he switches on, not defaults
+         (his call, 2026-09-09). "not permanently closed" has no flag here at
+         all: the script drops it unconditionally. */
+      exclude_categories: phrases(body.exclude_categories, 40, 60),
+      chain_exclude: bool(body.chain_exclude, false),
+      chain_names: phrases(body.chain_names, 40, 80),
+      min_photos: Math.round(num(body.min_photos, 0, 0, 200)),
+      /* A density cap, not a location filter: keeps the top N by triage score
+         per 1mi x 1mi cell rather than dropping anything for where it sits. */
+      max_per_sq_mile: Math.round(num(body.max_per_sq_mile, 0, 0, 100)),
       max_candidates: MAX_CANDIDATES,
     };
   } else if (stage === "enrich") {

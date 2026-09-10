@@ -182,6 +182,23 @@ export function SearchClient() {
   const [narrowType, setNarrowType] = useState(true);
   const [filtersOpen, setFiltersOpen] = useState(true);
 
+  /* Category exclude is live the moment Juan lists one. AI-suggest only ever
+     proposes phrases into `suggestions`; a phrase becomes a real filter only
+     once he taps it into `excludeCategories`. */
+  const [excludeCategories, setExcludeCategories] = useState<string[]>([]);
+  const [excludeInput, setExcludeInput] = useState("");
+  const [suggestions, setSuggestions] = useState<{ category: string; why: string }[]>([]);
+  const [suggestBusy, setSuggestBusy] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+
+  /* Chain exclude and min photos are capabilities, off unless Juan turns them
+     on (his call, 2026-09-09), not defaults like the filters above. */
+  const [chainExclude, setChainExclude] = useState(false);
+  const [chainNames, setChainNames] = useState<string[]>([]);
+  const [chainInput, setChainInput] = useState("");
+  const [minPhotos, setMinPhotos] = useState("");
+  const [maxPerSqMile, setMaxPerSqMile] = useState("");
+
   const [rows, setRows] = useState<Candidate[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -275,6 +292,53 @@ export function SearchClient() {
     [],
   );
 
+  function addExclude(raw: string) {
+    const v = raw.trim();
+    if (!v) return;
+    setExcludeCategories((cur) => (cur.some((c) => c.toLowerCase() === v.toLowerCase()) ? cur : [...cur, v]));
+    setSuggestions((cur) => cur.filter((s) => s.category.toLowerCase() !== v.toLowerCase()));
+  }
+  function removeExclude(v: string) {
+    setExcludeCategories((cur) => cur.filter((c) => c !== v));
+  }
+  function addChain(raw: string) {
+    const v = raw.trim();
+    if (!v) return;
+    setChainNames((cur) => (cur.some((c) => c.toLowerCase() === v.toLowerCase()) ? cur : [...cur, v]));
+  }
+  function removeChain(v: string) {
+    setChainNames((cur) => cur.filter((c) => c !== v));
+  }
+
+  /** Ask Claude for near-miss categories worth excluding from this sweep.
+   *  Proposals only: nothing here becomes a filter until Juan taps one in. */
+  async function suggestCategories() {
+    const category = query.trim();
+    if (!category || suggestBusy) return;
+    setSuggestBusy(true);
+    setSuggestError(null);
+    try {
+      const res = await fetch("/nutribiotic/api/search/suggest-categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category, exclude_categories: excludeCategories }),
+      });
+      const json = (await res.json()) as {
+        ok: boolean;
+        error?: string;
+        suggestions?: { category: string; why: string }[];
+      };
+      if (!res.ok || !json.ok) {
+        setSuggestError(json.error || "Could not suggest categories.");
+      } else {
+        setSuggestions(json.suggestions ?? []);
+      }
+    } catch {
+      setSuggestError("Could not reach the suggestion service.");
+    }
+    setSuggestBusy(false);
+  }
+
   async function runSearch() {
     setBusy("search");
     setFailure(null);
@@ -289,6 +353,11 @@ export function SearchClient() {
       require_phone: requirePhone,
       require_website: requireWebsite,
       included_type: narrowType ? "auto" : "",
+      exclude_categories: excludeCategories,
+      chain_exclude: chainExclude,
+      chain_names: chainNames,
+      min_photos: minPhotos.trim() ? Number.parseInt(minPhotos, 10) : 0,
+      max_per_sq_mile: maxPerSqMile.trim() ? Number.parseInt(maxPerSqMile, 10) : 0,
     });
     if (reply) {
       setMeta(reply);
@@ -480,6 +549,167 @@ export function SearchClient() {
                 label="Let Google filter the category"
                 hint="Sends the mapped Places type on the search itself, so a nail salon never comes back from a medical-spa sweep."
               />
+            </div>
+
+            <div className="flex flex-col gap-2 border-t border-[#EFEDE5] pt-3">
+              <label className={labelCls}>Exclude categories</label>
+              {excludeCategories.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {excludeCategories.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => removeExclude(c)}
+                      className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-[#E2DFD5] bg-[#F2F0E8] px-1.5 py-0.5 text-[11px] text-[#3D4A44] hover:bg-[#EFEDE5]"
+                    >
+                      {c}
+                      <Ico name="close" size={9} />
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-1.5">
+                <input
+                  className={inputCls}
+                  placeholder="e.g. nail salon"
+                  value={excludeInput}
+                  onChange={(e) => setExcludeInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addExclude(excludeInput);
+                      setExcludeInput("");
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    addExclude(excludeInput);
+                    setExcludeInput("");
+                  }}
+                  className={secondaryBtn}
+                  aria-label="Add excluded category"
+                >
+                  <Ico name="plus" size={13} />
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={suggestCategories}
+                disabled={suggestBusy || !query.trim()}
+                className="inline-flex items-center gap-1.5 self-start text-[11.5px] font-medium text-[#3D6B4A] disabled:cursor-not-allowed disabled:text-[#A9AFA9]"
+              >
+                <Ico name="wand" size={12} />
+                {suggestBusy ? "Thinking..." : "Suggest similar categories to exclude"}
+              </button>
+              {suggestError && <span className="text-[11.5px] text-[#8A928C]">{suggestError}</span>}
+              {suggestions.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  {suggestions.map((s) => (
+                    <button
+                      key={s.category}
+                      type="button"
+                      onClick={() => addExclude(s.category)}
+                      title={s.why}
+                      className="flex items-center justify-between gap-2 rounded-md border border-dashed border-[#B9C7BC] bg-white px-2 py-1 text-left text-[11.5px] text-[#3D4A44] hover:bg-[#F2F0E8]"
+                    >
+                      <span>
+                        <span className="font-medium">{s.category}</span>
+                        <span className="ml-1 text-[#8A928C]">{s.why}</span>
+                      </span>
+                      <Ico name="plus" size={11} />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2 border-t border-[#EFEDE5] pt-3">
+              <Check
+                checked={chainExclude}
+                onChange={setChainExclude}
+                label="Exclude known chains"
+                hint="Off by default. Drops a place whose name matches one listed below."
+              />
+              {chainExclude && (
+                <>
+                  {chainNames.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {chainNames.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => removeChain(c)}
+                          className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-[#E2DFD5] bg-[#F2F0E8] px-1.5 py-0.5 text-[11px] text-[#3D4A44] hover:bg-[#EFEDE5]"
+                        >
+                          {c}
+                          <Ico name="close" size={9} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-1.5">
+                    <input
+                      className={inputCls}
+                      placeholder="e.g. Massage Envy"
+                      value={chainInput}
+                      onChange={(e) => setChainInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addChain(chainInput);
+                          setChainInput("");
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        addChain(chainInput);
+                        setChainInput("");
+                      }}
+                      className={secondaryBtn}
+                      aria-label="Add chain name"
+                    >
+                      <Ico name="plus" size={13} />
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 border-t border-[#EFEDE5] pt-3">
+              <div>
+                <label className={labelCls} htmlFor="min-photos">
+                  Min photos
+                </label>
+                <input
+                  id="min-photos"
+                  className={inputCls}
+                  inputMode="numeric"
+                  placeholder="Off"
+                  value={minPhotos}
+                  onChange={(e) => setMinPhotos(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className={labelCls} htmlFor="max-per-sq-mile">
+                  Max per sq mi
+                </label>
+                <input
+                  id="max-per-sq-mile"
+                  className={inputCls}
+                  inputMode="numeric"
+                  placeholder="Off"
+                  value={maxPerSqMile}
+                  onChange={(e) => setMaxPerSqMile(e.target.value)}
+                />
+              </div>
+              <span className="col-span-2 text-[11.5px] leading-snug text-[#8A928C]">
+                Off by default. When set, keeps only the top-triage businesses per square mile so a
+                dense block does not crowd out the rest of the area.
+              </span>
             </div>
           </div>
         </div>
@@ -681,17 +911,15 @@ function RunBar({
       </div>
 
       {ceiling && (
-        <div className="flex items-start gap-1.5 border-t border-[#EFEDE5] px-3.5 py-2 text-[12.5px] text-[#A0762C]">
-          <Ico name="alert" size={14} />
-          <span>
-            This search came back at Google{"'"}s 60-result ceiling, so it is whichever 60 it picked
-            and not everything in the area. Draw a smaller area and search again.
-          </span>
+        <div className="border-t border-[#EFEDE5] px-3.5 py-2 text-[12.5px] text-[#8A928C]">
+          Google was still at its own limit in part of this area even after the search split it into
+          smaller boxes, so a few businesses there were not returned. A tighter drawn area covers it
+          exactly.
         </div>
       )}
 
       {(triage.capped_off ?? 0) > 0 && (
-        <div className="border-t border-[#EFEDE5] px-3.5 py-2 text-[12.5px] text-[#A0762C]">
+        <div className="border-t border-[#EFEDE5] px-3.5 py-2 text-[12.5px] text-[#8A928C]">
           {triage.capped_off} more passed the filters than one list shows. The highest triage scores
           are kept.
         </div>

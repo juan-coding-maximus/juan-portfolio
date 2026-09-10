@@ -278,17 +278,7 @@ export function AreaPicker({
           {pins.length === 1 ? "" : "s"}
           {span != null && <> · {span.toFixed(1)} km across</>}
         </span>
-        {pins.length > 0 && pins.length < 3 ? (
-          <span>{3 - pins.length} more to close the area.</span>
-        ) : (
-          span != null &&
-          span > 6 && (
-            <span className="text-[#A0762C]">
-              Google returns at most 60 results per search. An area this wide comes back as
-              whichever 60 it picked, not everything inside it.
-            </span>
-          )
-        )}
+        {pins.length > 0 && pins.length < 3 && <span>{3 - pins.length} more to close the area.</span>}
       </div>
     </div>
   );
