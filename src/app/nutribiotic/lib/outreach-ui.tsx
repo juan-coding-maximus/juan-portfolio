@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { AttachmentButton, attachmentNote } from "./attachments-ui";
 import type { MarketingFile } from "./dal";
 import type { RecordTouchpointResult } from "./touchpoint";
+import { NextStepResolver } from "./next-step-ui";
 import { recordOutreachSent } from "./outreach-actions";
 import { draftOutreachMessage, type LastDraftLite } from "./outreach-draft";
 import {
@@ -522,7 +523,15 @@ export function OutreachComposer({
             </div>
           )}
 
-          {result && (
+          {result?.ok && !result.needsAccount && result.needsNextStep && (
+            <NextStepResolver
+              touchpointId={result.touchpoint_id}
+              accountName={result.accountName}
+              onResolved={() => setResult(null)}
+            />
+          )}
+
+          {result && !(result.ok && !result.needsAccount && result.needsNextStep) && (
             <div
               className={`mt-3 rounded-md border px-3 py-2.5 text-[13px] leading-relaxed ${
                 result.ok

@@ -7,6 +7,7 @@ import { decideCalendarProposal } from "./calendar-actions";
 import type { Tier } from "./dal";
 import type { Readiness } from "./priority";
 import { AccountMatchResolver } from "./new-account-ui";
+import { NextStepResolver } from "./next-step-ui";
 import { recordTouchpoint, type RecordTouchpointResult } from "./touchpoint";
 import { Ico, SuccessNote } from "./ui";
 
@@ -74,7 +75,7 @@ function mtMimeType(): string {
   return "";
 }
 
-export type FiledTouchpoint = Extract<RecordTouchpointResult, { ok: true; needsAccount: false }>;
+export type FiledTouchpoint = Extract<RecordTouchpointResult, { ok: true; needsAccount: false; needsNextStep: false }>;
 
 function fmtTimer(ms: number): string {
   const s = Math.floor(ms / 1000);
@@ -266,7 +267,7 @@ export function TouchpointCapture({
         kindOverride: kindTouched ? kind : undefined,
         forceNewAccount: newCompany,
       });
-      if (res.ok && !res.needsAccount) {
+      if (res.ok && !res.needsAccount && !res.needsNextStep) {
         // The grade goes on only once the note has landed and named its
         // account, so a failed file never leaves a grade on the wrong record.
         // Not awaited: it reaches HubSpot on the sync worker's own 60-second
@@ -290,8 +291,16 @@ export function TouchpointCapture({
         setSuccess(res);
         onFiled?.(res);
       } else {
-        // Parked or failed: the text stays in the box AND in storage. This is
-        // the case where the rep still has work to do on this note.
+        // Parked (needs an account, or an account but no stated next step) or
+        // failed: the text stays in the box AND in storage. This is the case
+        // where the rep still has work to do on this note. The account is
+        // already known on a needsNextStep park, so the grade/readiness he
+        // picked at the door can go on right now rather than waiting on the
+        // popup below to resolve.
+        if (res.ok && res.needsNextStep) {
+          if (grade) void setPotentialJuan(res.accountId, grade);
+          if (readiness) void setReadiness(res.accountId, readiness);
+        }
         setResult(res);
       }
     });
@@ -632,6 +641,24 @@ export function TouchpointCapture({
             // `result` too, which unmounts the resolver and drops its note:
             // before 2026-09-02 this stayed forever and the only way back to
             // a loggable screen was reloading the page.
+            setText("");
+            writeDraft("");
+            setKind(lockKind ?? "meeting");
+            setGrade(null);
+            setReadiness_(null);
+            setNewCompany(false);
+            setResult(null);
+            requestAnimationFrame(() => textareaRef.current && autosize(textareaRef.current));
+          }}
+        />
+      )}
+
+      {result?.ok && !result.needsAccount && result.needsNextStep && (
+        <NextStepResolver
+          touchpointId={result.touchpoint_id}
+          accountName={result.accountName}
+          onResolved={() => {
+            // Same clear-and-reset as AccountMatchResolver's onResolved above.
             setText("");
             writeDraft("");
             setKind(lockKind ?? "meeting");

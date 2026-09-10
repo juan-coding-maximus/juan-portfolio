@@ -368,6 +368,7 @@ function noteLines(
   etype: EngagementType,
   otype: EngagementType,
   hubspotSummary: string | null,
+  nextStep: string | null,
 ): string[] {
   const kind = activity.kind || "note";
   const when = (activity.at || "").slice(0, 16).replace("T", " ");
@@ -400,6 +401,17 @@ function noteLines(
   if (names.length > 0) {
     lines.push("");
     lines.push(`Spoke with: ${names.join(", ")}`);
+  }
+
+  // Always its own line, last, so another rep or HQ reading this record sees
+  // what happens next without hunting for it in the paragraph above. The
+  // Visit tab's next-step gate (touchpoint.ts) means this is populated on
+  // every filing that gate covers; a blank here means an older activity
+  // parsed before the gate existed, never a value this function invented.
+  const step = (nextStep || "").trim();
+  if (step) {
+    lines.push("");
+    lines.push(`Next step: ${step}`);
   }
 
   return lines;
@@ -657,7 +669,9 @@ export async function runEngagement(activityId: number, opts: { write: boolean }
     listContacts(account.id),
     getTouchpointParsedForActivity(activityId),
   ]);
-  const parsed = (parsedRaw ?? null) as { people?: ParsedPerson[]; activity?: { hubspot_summary?: string } } | null;
+  const parsed = (parsedRaw ?? null) as
+    | { people?: ParsedPerson[]; activity?: { hubspot_summary?: string }; next_step?: string | null }
+    | null;
   const { matched, unmatched } = matchPeople(contactsRes.data, activity, parsed);
 
   // A person named with a phone or email but no live HubSpot contact yet:
@@ -732,7 +746,7 @@ export async function runEngagement(activityId: number, opts: { write: boolean }
   }
 
   const contactIds = matched.map((m) => m.contact.hubspot_contact_id).filter((v): v is string => Boolean(v));
-  const lines = noteLines(activity, matched, etype, otype, parsed?.activity?.hubspot_summary ?? null);
+  const lines = noteLines(activity, matched, etype, otype, parsed?.activity?.hubspot_summary ?? null, parsed?.next_step ?? null);
   const body = noteBody(lines, activityId);
   const matchedNames = matched
     .map((m) => [m.contact.first_name, m.contact.last_name].filter(Boolean).join(" ").trim())

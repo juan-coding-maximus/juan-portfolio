@@ -1233,6 +1233,23 @@ export async function listPendingAccountMatches(limit = 10): Promise<Result<Touc
   });
 }
 
+/**
+ * The same invisible-park problem listPendingAccountMatches exists for
+ * (2026-08-19, t_345d5c: a voice-recorded visit resolves async, after
+ * transcription, on nobody's screen), now for the next-step gate
+ * (touchpoint.ts, 2026-09-10). Unlike a needs_account row, account_id is
+ * always set here, since the gate only parks once the account is already
+ * known; there is no low-confidence guess to carry.
+ */
+export async function listPendingNextSteps(limit = 10): Promise<Result<Touchpoint>> {
+  return query<Touchpoint>("nb_touchpoints", {
+    select: "id,account_id,raw_text,status,account_match_confidence,activity_id,parsed,origin,created_at",
+    status: "eq.needs_next_step",
+    order: "created_at.asc",
+    limit,
+  });
+}
+
 /** id -> name for a handful of accounts, to label a "Client Match:" pill
  * without pulling the whole 500-row book the way recordTouchpoint() does. */
 export async function getAccountNames(ids: string[]): Promise<Record<string, string>> {
@@ -1695,6 +1712,26 @@ export async function finalizeTouchpointAccount(
     "PATCH",
     { account_id: accountId, status: "parsed", activity_id: activityId },
     { id: `eq.${id}`, status: "eq.needs_account" },
+  );
+  return rows[0] ?? null;
+}
+
+/** Once a needs_next_step touchpoint has Juan's stated next step (typed into
+ * the Visit tab's popup, or the explicit "none needed"), stamp it filed.
+ * `parsed` carries the next_step back in, since that is the only field the
+ * popup changed; the row's account_id was already set when it parked. Same
+ * guard shape as finalizeTouchpointAccount, so a double-submit race patches
+ * once and the second call comes back null rather than re-filing. */
+export async function finalizeTouchpointNextStep(
+  id: string,
+  activityId: number,
+  parsed: unknown,
+): Promise<Touchpoint | null> {
+  const rows = await mutate<Touchpoint>(
+    "nb_touchpoints",
+    "PATCH",
+    { status: "parsed", activity_id: activityId, parsed },
+    { id: `eq.${id}`, status: "eq.needs_next_step" },
   );
   return rows[0] ?? null;
 }

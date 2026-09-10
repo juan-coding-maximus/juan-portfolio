@@ -27,6 +27,7 @@ import {
   isConfigured,
   listCalendarProposals,
   listPendingAccountMatches,
+  listPendingNextSteps,
   listUnfiledActivities,
 } from "../../lib/dal";
 import type { ParsedTouchpoint } from "../../lib/touchpoint";
@@ -38,16 +39,17 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   if (!isConfigured()) {
     return Response.json(
-      { ok: true, proposals: [], unfiled: [], pending: [], accountNames: {} },
+      { ok: true, proposals: [], unfiled: [], pending: [], pendingNextSteps: [], accountNames: {} },
       { headers: { "cache-control": "no-store" } },
     );
   }
 
   try {
-    const [proposals, unfiled, pending] = await Promise.all([
+    const [proposals, unfiled, pending, pendingNextSteps] = await Promise.all([
       listCalendarProposals(),
       listUnfiledActivities(),
       listPendingAccountMatches(),
+      listPendingNextSteps(),
     ]);
 
     // Only for a spoken visit that parked as low-confidence, which is the
@@ -56,7 +58,11 @@ export async function GET() {
       .map((tp) => tp.parsed as ParsedTouchpoint | null)
       .filter((p): p is ParsedTouchpoint => p != null && p.account_confidence === "low" && !!p.account_id)
       .map((p) => p.account_id as string);
-    const accountNames = await getAccountNames([...new Set(lowConfidenceIds)]).catch(
+    // A needs_next_step row always has a resolved account_id (the gate only
+    // parks once one exists), so every row here needs its name, not just a
+    // low-confidence subset.
+    const nextStepAccountIds = pendingNextSteps.data.map((tp) => tp.account_id).filter((id): id is string => !!id);
+    const accountNames = await getAccountNames([...new Set([...lowConfidenceIds, ...nextStepAccountIds])]).catch(
       () => ({}) as Record<string, string>,
     );
 
@@ -66,6 +72,7 @@ export async function GET() {
         proposals: proposals.data,
         unfiled: unfiled.data,
         pending: pending.data,
+        pendingNextSteps: pendingNextSteps.data,
         accountNames,
       },
       { headers: { "cache-control": "no-store" } },

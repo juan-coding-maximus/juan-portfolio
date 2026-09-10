@@ -30,6 +30,7 @@ import {
   isConfigured,
 } from "../lib/dal";
 import { AccountLink } from "../lib/modal";
+import { PendingNextSteps } from "../lib/next-step-ui";
 import { Card, Confidence, Empty, Ico, OpenBadge, PageHead, TierChip } from "../lib/ui";
 import { UnmatchedTouchpoints } from "../lib/unmatched-ui";
 import { VisitQueues } from "../lib/visit-queues-ui";
@@ -121,6 +122,7 @@ export default async function Clients({
           2026-08-27: matching a note to a store is desk work, not doorway
           work. See lib/unmatched-ui.tsx. */}
       <UnmatchedTouchpoints />
+      <PendingNextSteps />
 
       {/* The ready-to-file HubSpot queue and the calendar follow-ups to confirm,
           moved here off Visit on 2026-08-28 for the same reason as the block
