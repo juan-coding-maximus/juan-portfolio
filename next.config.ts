@@ -30,6 +30,21 @@ const nextConfig: NextConfig = {
       { source: "/stack", destination: "/stack/index.html" },
     ];
   },
+  // Juan's vCard (public/p/ja.vcf) for the NutriBiotic business card QR code.
+  // Photo is base64-embedded (URI photos aren't supported by iOS/Android), so
+  // the file must be served as text/vcard or phones show it as plain text
+  // instead of offering "Add to Contacts".
+  async headers() {
+    return [
+      {
+        source: "/p/ja.vcf",
+        headers: [
+          { key: "Content-Type", value: "text/vcard; charset=utf-8" },
+          { key: "Content-Disposition", value: 'inline; filename="Juan Arenas.vcf"' },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
