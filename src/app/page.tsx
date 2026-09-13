@@ -93,7 +93,9 @@ export default function Page() {
     <main className="bg-[#13201A] text-[#F2EFE6] font-body antialiased overflow-x-hidden">
       {/* 1. Hero */}
       <Hero />
-      {/* 2. Proof bar */}
+      {/* 2. USC + investor readiness */}
+      <TwoThings />
+      {/* 3. Proof bar */}
       <MetricWall />
       <BrandStrip />
       {/* 3. Case studies */}
@@ -192,8 +194,11 @@ function Hero() {
         <h1 className="font-display font-light leading-[0.95] text-[clamp(2.5rem,8vw,6.5rem)] tracking-tight">
           JUAN ARENAS
         </h1>
-        <p className="mt-6 font-display italic text-[clamp(1rem,2.2vw,1.5rem)] text-[#C9A24B]">
-          Explain your science to the right audience. Get leads. Close deals.
+        <p className="mt-6 font-display italic text-[clamp(1rem,2.2vw,1.5rem)] text-[#C9A24B] text-balance">
+          Marketing and social strategy that gets science companies investor-ready.
+        </p>
+        <p className="mt-4 text-[11px] sm:text-xs uppercase tracking-[0.25em] text-[#F2EFE6]/70">
+          USC Pharmacology &amp; Drug Development · Magna Cum Laude
         </p>
         <div className="mt-12 flex justify-center">
           <a href="#portfolio" className="text-[#F2EFE6]/40 hover:text-[#F2EFE6]/70 transition-colors" aria-label="Scroll down">
@@ -218,7 +223,192 @@ function Hero() {
 }
 
 /* ====================================================
-   2. METRIC WALL
+   2. TWO THINGS: USC + INVESTOR READINESS
+==================================================== */
+type Check = "Story" | "Audience" | "Voices" | "Proof";
+const CHECKS: Check[] = ["Story", "Audience", "Voices", "Proof"];
+
+// Every line traces to jobhunt/memory/cv/master.tex. Add a role or a check only from that file.
+const READINESS: { org: string; role: string; built: string; checks: Check[] }[] = [
+  {
+    org: "Metaba Health",
+    role: "Founding Go-To-Market Operator",
+    built: "The v1 investor deck, the investor website, and the first paying clients.",
+    checks: ["Story", "Proof"],
+  },
+  {
+    org: "TrippBio",
+    role: "Associate Researcher",
+    built: "Investor pitch infographics on the commercial need for its assets, plus clinical trial analysis reported to the CEO.",
+    checks: ["Story"],
+  },
+  {
+    org: "USC Center for Personalized Brain Health",
+    role: "Revenue Ops & Marketing Lead",
+    built: "Social across YouTube, LinkedIn, Facebook, and Instagram, from short clips to a docu-series. Audience tripled in 8 months.",
+    checks: ["Story", "Audience"],
+  },
+  {
+    org: "Milieu Skin Microbiome",
+    role: "Growth Marketing & Creator Partnerships",
+    built: "A content engine of 400+ creators, doctors among them, running across Meta and TikTok.",
+    checks: ["Audience", "Voices"],
+  },
+  {
+    org: "Biotech Connection LA",
+    role: "Business Developer",
+    built: "20+ KOLs, 100-attendee industry events with the social content around them, and Amgen and USC Keck as sponsors.",
+    checks: ["Audience", "Voices", "Proof"],
+  },
+  {
+    org: "Your Aura Fragrance",
+    role: "Co-Founder",
+    built: "A brand built on my USC toxicology research: 200+ customers and a 30% repeat rate.",
+    checks: ["Story", "Proof"],
+  },
+  {
+    org: "NutriBiotic",
+    role: "Field Sales Manager",
+    built: "Science-first handouts that prove product validity, and 40 new accounts in 40 days.",
+    checks: ["Story", "Proof"],
+  },
+];
+
+function TwoThings() {
+  const usc: { k: string; v: string }[] = [
+    { k: "Degree", v: "B.S. Pharmacology & Drug Development, USC Alfred E. Mann School of Pharmaceutical Sciences, 2025" },
+    { k: "Honors", v: "Magna Cum Laude · GPA 3.79 · 8× Dean's List · Leadership Scholarship" },
+    { k: "Research", v: "Toxicology research on endocrine disruptors in perfume, the research that started Your Aura" },
+    { k: "Worked at", v: "USC Center for Personalized Brain Health, Revenue Ops & Marketing Lead · Keck Medicine of USC, Community Health Organizer" },
+    { k: "Led", v: "Wazo, USC's student wellness community, as president: membership grew 3×" },
+  ];
+  const checks: { k: Check; v: string }[] = [
+    { k: "Story", v: "The deck, the website, and the science in plain words" },
+    { k: "Audience", v: "People following the work before anyone asks them for anything" },
+    { k: "Voices", v: "Doctors, researchers, and KOLs who vouch for it" },
+    { k: "Proof", v: "Customers, sponsors, and numbers that hold up" },
+  ];
+
+  return (
+    <section id="portfolio" className="px-6 md:px-12 lg:px-20 py-20 md:py-28 border-t border-[#F2EFE6]/10">
+      <div className="max-w-7xl mx-auto">
+        <div className="grid lg:grid-cols-2 gap-6">
+          <Reveal className="h-full">
+            <article className="h-full rounded-3xl border border-[#284A3C] bg-[#0e1813] p-7 md:p-10">
+              <p className="text-xs uppercase tracking-[0.3em] text-[#C9A24B]">USC</p>
+              <h2 className="mt-4 font-display text-[clamp(1.9rem,3.4vw,2.75rem)] leading-[1.05] text-balance">
+                Trained at USC, then worked inside it.
+              </h2>
+              <p className="mt-4 font-display italic text-lg text-[#F2EFE6]/60">
+                I read the paper before I write the post.
+              </p>
+              <dl className="mt-8 divide-y divide-[#284A3C]">
+                {usc.map((row) => (
+                  <div key={row.k} className="grid grid-cols-1 sm:grid-cols-[6.5rem_1fr] gap-1 sm:gap-4 py-3">
+                    <dt className="text-xs uppercase tracking-widest text-[#F2EFE6]/50 sm:pt-1">{row.k}</dt>
+                    <dd className="text-[#F2EFE6]/85 leading-relaxed">{row.v}</dd>
+                  </div>
+                ))}
+              </dl>
+            </article>
+          </Reveal>
+
+          <Reveal delay={100} className="h-full">
+            <article className="h-full flex flex-col rounded-3xl border border-[#284A3C] bg-[#0e1813] p-7 md:p-10">
+              <p className="text-xs uppercase tracking-[0.3em] text-[#C9A24B]">Investor readiness</p>
+              <h2 className="mt-4 font-display text-[clamp(1.9rem,3.4vw,2.75rem)] leading-[1.05] text-balance">
+                Everywhere I&apos;ve worked, I built what investors check first.
+              </h2>
+              <p className="mt-4 font-display italic text-lg text-[#F2EFE6]/60">
+                Through marketing and social strategy, so there&apos;s something worth finding when they look.
+              </p>
+              <dl className="mt-8 divide-y divide-[#284A3C]">
+                {checks.map((row) => (
+                  <div key={row.k} className="grid grid-cols-1 sm:grid-cols-[6.5rem_1fr] gap-1 sm:gap-4 py-3">
+                    <dt className="flex items-center gap-2 text-xs uppercase tracking-widest text-[#C9A24B] sm:pt-1 sm:self-start">
+                      <span className="w-2 h-2 rounded-full bg-[#C9A24B]" aria-hidden="true" />
+                      {row.k}
+                    </dt>
+                    <dd className="text-[#F2EFE6]/85 leading-relaxed">{row.v}</dd>
+                  </div>
+                ))}
+              </dl>
+              <a
+                href="#readiness"
+                className="mt-8 lg:mt-auto self-start inline-flex items-center gap-3 rounded-full border border-[#C9A24B]/60 px-5 py-2.5 text-xs uppercase tracking-widest text-[#C9A24B] hover:bg-[#C9A24B]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#C9A24B] transition-colors"
+              >
+                See it role by role
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="2 4 7 10 12 4" />
+                </svg>
+              </a>
+            </article>
+          </Reveal>
+        </div>
+
+        <Reveal>
+          <p id="readiness" className="scroll-mt-10 mt-20 mb-8 font-display italic text-2xl text-[#F2EFE6]/60">
+            Investor readiness, role by role
+          </p>
+        </Reveal>
+        <div className="rounded-3xl border border-[#284A3C] overflow-hidden">
+          <div
+            className="hidden md:grid md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_repeat(4,5rem)] lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_repeat(4,6rem)] gap-6 px-8 py-4 bg-[#0e1813] border-b border-[#284A3C] text-xs uppercase tracking-widest text-[#F2EFE6]/50"
+            aria-hidden="true"
+          >
+            <span>Where</span>
+            <span>What I built</span>
+            {CHECKS.map((c) => (
+              <span key={c} className="text-center">{c}</span>
+            ))}
+          </div>
+          <ul className="divide-y divide-[#284A3C]">
+            {READINESS.map((r, i) => (
+              <li key={r.org}>
+                <Reveal delay={i * 40}>
+                  <div className="grid grid-cols-1 md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_repeat(4,5rem)] lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_repeat(4,6rem)] gap-2 md:gap-6 px-6 md:px-8 py-5 md:items-center">
+                    <div>
+                      <p className="font-display text-lg leading-snug">{r.org}</p>
+                      <p className="text-sm text-[#F2EFE6]/50">{r.role}</p>
+                    </div>
+                    <p className="text-[#F2EFE6]/80 leading-relaxed">{r.built}</p>
+                    {CHECKS.map((c) => {
+                      const on = r.checks.includes(c);
+                      return (
+                        <div key={c} className="hidden md:flex justify-center">
+                          {on ? (
+                            <span className="w-3 h-3 rounded-full bg-[#C9A24B] shadow-[0_0_0_4px_rgba(201,162,75,0.15)]">
+                              <span className="sr-only">{c}</span>
+                            </span>
+                          ) : (
+                            <span className="w-1 h-1 rounded-full bg-[#F2EFE6]/20" aria-hidden="true" />
+                          )}
+                        </div>
+                      );
+                    })}
+                    <div className="md:hidden flex flex-wrap gap-2 mt-1">
+                      {r.checks.map((c) => (
+                        <span
+                          key={c}
+                          className="rounded-full border border-[#C9A24B]/50 text-[#C9A24B] text-[11px] uppercase tracking-widest px-2.5 py-1"
+                        >
+                          {c}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </Reveal>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ====================================================
+   3. METRIC WALL
 ==================================================== */
 // The Your Aura mark is a tall lockup (wreath over wordmark); at the shared h-8
 // it reads as a smudge, so it gets its own height to sit at the same optical weight.
@@ -260,7 +450,7 @@ function Metric({
 
 function MetricWall() {
   return (
-    <section id="portfolio" className="px-6 md:px-12 lg:px-20 py-20 border-t border-[#F2EFE6]/10">
+    <section className="px-6 md:px-12 lg:px-20 py-20 border-t border-[#F2EFE6]/10">
       <div className="max-w-7xl mx-auto">
         <Reveal>
           <p className="font-display italic text-2xl text-[#F2EFE6]/60 mb-12">
@@ -269,24 +459,27 @@ function MetricWall() {
         </Reveal>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
           <Reveal delay={0}>
-            <Metric n={<CountUp to={200} suffix="+" />} label="accounts owned, cold to close" color="gold" />
-            <MetricLogo src="/img/logos/biotech-connection.png" alt="Biotech Connection LA" />
+            <div className="grid grid-cols-2 gap-6">
+              <Metric n={<CountUp to={3} suffix="×" />} label="audience in 8 months" color="gold" />
+              <Metric n={<CountUp to={93} suffix="k" />} label="newsletter subscribers" color="" />
+            </div>
+            <MetricLogo src="/img/logos/usc-brain.png" alt="USC Center for Personalized Brain Health" />
           </Reveal>
 
           <Reveal delay={80}>
             <div className="grid grid-cols-2 gap-6">
-              <Metric n={<CountUp to={5000} suffix="+" />} label="prospects engaged" color="" />
-              <Metric n={<CountUp to={100} suffix="%" />} label="follow-up coverage" color="sage" />
+              <Metric n={<CountUp to={400} suffix="+" />} label="creator partnerships" color="sage" />
+              <Metric n={<CountUp to={5} suffix="k+" />} label="creators engaged" color="" />
             </div>
             <MetricLogo src="/img/logos/superbiome.png" alt="Milieu Skin Microbiome" />
           </Reveal>
 
           <Reveal delay={160}>
             <div className="grid grid-cols-2 gap-6">
-              <Metric n={<CountUp to={20} prefix="$" suffix="k+" />} label="closed as founder" color="" />
-              <Metric n={<CountUp to={30} suffix="%" />} label="repeat rate" color="sage" />
+              <Metric n={<CountUp to={200} suffix="+" />} label="biotech and pharma accounts" color="" />
+              <Metric n={<CountUp to={20} suffix="+" />} label="KOLs" color="sage" />
             </div>
-            <MetricLogo src="/img/logos/aura-white.png" alt="Your Aura Fragrance" tall />
+            <MetricLogo src="/img/logos/biotech-connection.png" alt="Biotech Connection LA" />
           </Reveal>
         </div>
       </div>
@@ -654,17 +847,17 @@ function CaseStudies() {
     art: string; newsletters?: boolean; role?: string;
   }[] = [
     {
-      tag: "HIPAA COMPLIANT MARKETING",
+      tag: "MARKETING & SOCIAL STRATEGY · USC · HIPAA COMPLIANT",
       role: "Revenue Ops & Marketing Lead",
       title: "I joined a world‑class Alzheimer's center to get their science out of the journals and into the world, loud and clear.",
       body: (
         <ul className="space-y-3">
           <CaseBullet>
-            Led the cross‑functional marketing engine of an Alzheimer&apos;s Lab &amp; Brain Health Clinic: content, email, social, and web, all HIPAA‑compliant and on‑brand.
+            Ran social across YouTube, LinkedIn, Facebook, and Instagram for an Alzheimer&apos;s Lab &amp; Brain Health Clinic: every piece planned, produced, edited, and distributed as short clips, email, and a long‑form docu‑series, all HIPAA‑compliant.
           </CaseBullet>
           <CaseBullet>
-            <strong className="text-[#C9A24B] font-medium">2× newsletter and social reach in 8 months</strong>
-            , growing a pipeline of engaged patients and caregivers.
+            <strong className="text-[#C9A24B] font-medium">Tripled the total audience in 8 months</strong>
+            , with newsletter and social reach doubled, growing a pipeline of engaged patients and caregivers.
           </CaseBullet>
           <CaseBullet>
             Launched and scaled a Spanish‑language newsletter, expanding the addressable LA market.
@@ -675,7 +868,7 @@ function CaseStudies() {
       newsletters: true,
     },
     {
-      tag: "BUSINESS DEVELOPMENT · OUTBOUND · CLOSING",
+      tag: "KOL NETWORK · EVENTS · SPONSORSHIP",
       role: "Business Developer",
       title: "I owned 200+ accounts as a business developer, cold contact to close.",
       body: (
@@ -690,25 +883,25 @@ function CaseStudies() {
             <strong className="text-[#C9A24B] font-medium">30% lift in sponsorship revenue YoY</strong>.
           </CaseBullet>
           <CaseBullet>
-            Closed Amgen and USC Keck onto the sponsor list, and filled 100-attendee events from cold outreach.
+            Closed Amgen and USC Keck onto the sponsor list, and filled 100-attendee events from cold outreach, owning the pre-event buzz, the day-of social content, and the follow-up emails.
           </CaseBullet>
         </ul>
       ),
       art: "bcla-video",
     },
     {
-      tag: "PROSPECTING AT VOLUME · AI ORCHESTRATION",
+      tag: "CREATOR & DOCTOR PARTNERSHIPS · AI ORCHESTRATION",
       role: "Clinical Sales & AI Automation Lead",
-      title: "I worked 40,000 accounts down to the 5,000 worth calling.",
+      title: "I built a 400+ creator content engine for a science-first skincare brand.",
       body: (
         <ul className="space-y-3">
           <CaseBullet>
             Reviewed{" "}
-            <strong className="text-[#C9A24B] font-medium">40,000+ accounts to engage 5,000+ high-intent prospects</strong>
-            , sharpening the ideal customer profile until the list was worth working.
+            <strong className="text-[#C9A24B] font-medium">40,000+ TikTok and Instagram accounts to engage 5,000+ high-intent creators</strong>
+            , sharpening the creator profile until it matched the brand&apos;s scientific standard.
           </CaseBullet>
           <CaseBullet>
-            Set and closed VIP partnerships with doctors and aestheticians on 1-on-1 calls, anchored on scientific credibility and clear expectations.
+            Set and closed VIP partnerships with doctors and aestheticians, some with 500k+ followings, on 1-on-1 calls anchored on scientific credibility and clear expectations.
           </CaseBullet>
           <CaseBullet>
             Built the flow in this video with n8n, Supabase, and Claude Code:{" "}
@@ -720,11 +913,16 @@ function CaseStudies() {
       art: "n8n-video",
     },
     {
-      tag: "0→1 GO-TO-MARKET · DIAGNOSTICS",
+      tag: "INVESTOR READINESS · 0→1 GO-TO-MARKET",
       role: "Founding Go-To-Market Operator",
-      title: "I set the go-to-market plan for a 0→1 diagnostics startup, then closed the first clients myself.",
+      title: "I built the investor deck and website for a 0→1 diagnostics startup, then closed the first clients myself.",
       body: (
         <ul className="space-y-3">
+          <CaseBullet>
+            Built the{" "}
+            <strong className="text-[#C9A24B] font-medium">v1 investor deck and the investor website</strong>
+            , plus the operational workflows behind them, before anyone asked.
+          </CaseBullet>
           <CaseBullet>
             Set the full commercial plan for a{" "}
             <strong className="text-[#C9A24B] font-medium">0→1 longevity-metabolomics diagnostics startup</strong>
@@ -736,14 +934,14 @@ function CaseStudies() {
             , and closed the first paying clients on a pilot program.
           </CaseBullet>
           <CaseBullet>
-            Wrote the sales playbook for further market development, and built the company&apos;s investor website and pitch deck.
+            Wrote the sales playbook for further market development.
           </CaseBullet>
         </ul>
       ),
       art: "Metaba Health — site / ops board",
     },
     {
-      tag: "0→1 · EMBEDDED AI · DTC PRODUCTS",
+      tag: "FOUNDER · FROM USC RESEARCH TO A BRAND",
       role: "Founder",
       title: "I bootstrapped a personalized perfume company into 5 figures of revenue.",
       body: (
@@ -908,33 +1106,33 @@ function Capabilities() {
   const caps: { num: string; icon: string; title: string; desc: string }[] = [
     {
       num: "01",
-      icon: "link",
-      title: "Business development, cold to close",
-      desc: "Research the account, cold-source the decision-maker, book the meeting, close or move on. I have run this motion on 200+ accounts, every one tracked to a decision.",
+      icon: "trajectory",
+      title: "Investor readiness",
+      desc: "The deck, the website, and the science in plain words, ready before the first investor meeting. I built Metaba Health's v1 investor deck and TrippBio's investor pitch infographics.",
     },
     {
       num: "02",
       icon: "nodes",
-      title: "AI-native operations",
-      desc: "Workflows that qualify, personalize, and follow up while you sleep. I automate everything that isn't selling, so the hours go into dials.",
+      title: "Marketing & social strategy",
+      desc: "One plan across LinkedIn, Instagram, TikTok, YouTube, and Facebook, from long-form video to short clips. At USC, the audience tripled in 8 months.",
     },
     {
       num: "03",
       icon: "flask",
       title: "Science-fluent messaging & content",
-      desc: "I turn dense science into messaging each buyer persona actually reads, clinician, investor, or patient, sharpened until it generates the leads you close.",
+      desc: "I turn dense science into messaging each audience actually reads, clinician, investor, or patient, sharpened until it earns their attention.",
     },
     {
       num: "04",
-      icon: "trajectory",
-      title: "0→1 go-to-market",
-      desc: "I use my experience to test the market, find the winning strategy, and generate increasing revenue.",
+      icon: "link",
+      title: "KOLs & creator partnerships",
+      desc: "Doctors, researchers, and creators who vouch for the science: 20+ KOLs at Biotech Connection LA, 400+ creators at Milieu.",
     },
     {
       num: "05",
       icon: "pin",
-      title: "A deployable network",
-      desc: "Principal investigators, clinicians, clinic directors, SEO & GEO specialists, and active-ingredient + supplement manufacturers, on call from day one.",
+      title: "Business development, cold to close",
+      desc: "Research the account, cold-source the decision-maker, book the meeting, close or move on. I have run this motion on 200+ accounts, every one tracked to a decision.",
     },
   ];
 
@@ -946,7 +1144,7 @@ function Capabilities() {
             How I help your team.
           </h2>
           <p className="font-display italic text-lg text-[#F2EFE6]/55 mb-8 md:mb-12">
-            The route from complex science, to the right message, to revenue.
+            From complex science, to the right message, in front of the people who fund it.
           </p>
         </Reveal>
         {/* Olympic rings layout: 3 on top, 2 offset below (lg+). Mobile: 1-col, sm: 2-col */}
@@ -1279,15 +1477,16 @@ function About() {
               Who I am.
             </h2>
             <p className="text-[#F2EFE6] text-lg font-medium leading-relaxed mb-4">
-              My background is researching pharmacology; my day‑to‑day is
-              booking meetings and closing business.
+              I trained in pharmacology at USC. Every role since has been about
+              getting science in front of the people who fund it, join it, and
+              use it.
             </p>
             <p className="text-[#F2EFE6]/75 leading-relaxed mb-4">
               I started in the lab and moved toward where decisions get made.
               <br />
-              Over time I went from Alzheimer&apos;s and toxicology research onto
-              the phone, because someone had to build the outbound motion and I
-              turned out to be good at it.
+              Over time I went from Alzheimer&apos;s and toxicology research into
+              marketing, social, and sales, because someone had to tell the story
+              and build the motion, and I turned out to be good at it.
             </p>
             <p className="text-[#F2EFE6]/75 leading-relaxed mb-4">
               I like connecting operators and leadership to push for the few
@@ -1368,8 +1567,8 @@ function CTA() {
       <div className="relative max-w-4xl mx-auto text-center">
         <Reveal>
           <h2 className="font-display text-[clamp(2.2rem,5vw,3.6rem)] leading-tight">
-            I turn cold outreach{" "}
-            <span className="italic text-[#9FC4AE]">into closed business.</span>
+            Raising soon?{" "}
+            <span className="italic text-[#9FC4AE]">Get the science seen first.</span>
           </h2>
         </Reveal>
         <Reveal delay={120}>

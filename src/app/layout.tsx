@@ -30,14 +30,14 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Juan Arenas",
     description:
-      "Go-to-market operator for scientific ventures. I turn complex science into revenue, and I build like it's my own company.",
+      "USC-trained pharmacologist. Marketing and social strategy that gets science companies investor-ready.",
     images: [{ url: "/img/og-image.jpg", width: 1200, height: 1600 }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Juan Arenas",
     description:
-      "Go-to-market operator for scientific ventures. I turn complex science into revenue, and I build like it's my own company.",
+      "USC-trained pharmacologist. Marketing and social strategy that gets science companies investor-ready.",
     images: ["/img/og-image.jpg"],
   },
 };
