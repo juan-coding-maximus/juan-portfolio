@@ -70,12 +70,12 @@ export function NextStepResolver({
     <div className="mt-3 flex flex-col gap-2 rounded-md border border-[#E2DFD5] bg-[#FAF9F5] p-3">
       <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.14em] text-[#8A6D2F]">
         <Ico name="alert" size={11} />
-        What&apos;s the next step{accountName ? ` for ${accountName}` : ""}?
+        What&apos;s the next action{accountName ? ` for ${accountName}` : ""}?
       </div>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="e.g. Call back Thursday about the reorder"
+        placeholder="Name it: bring a GSE sample Thursday, quote a case price, call Maria back"
         rows={2}
         autoFocus
         className="w-full resize-none rounded-md border border-[#E2DFD5] bg-white p-2 text-[14px] leading-relaxed text-[#14201B] placeholder:text-[#A9AFA9] focus:outline-none"
