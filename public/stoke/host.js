@@ -63,6 +63,10 @@
         resolve(clean);
       };
       ws.onerror = () => { clearTimeout(timeout); reject(new Error('Could not connect, check the link')); };
+      ws.onclose = () => {
+        const el = document.querySelector('.screen.active .status');
+        if (el) el.textContent = 'Disconnected. Use the reload button (top right).';
+      };
       ws.onmessage = (evt) => handleMessage(JSON.parse(evt.data));
     });
   }
@@ -382,6 +386,7 @@
 
   $('replayBtn').addEventListener('click', replay);
   $('againBtn').addEventListener('click', () => send({ type: 'reset' }));
+  $('reloadBtn').addEventListener('click', () => location.reload());
 
   const autoHost = new URLSearchParams(location.search).get('server') || localStorage.getItem('stokeServer');
   if (autoHost) {

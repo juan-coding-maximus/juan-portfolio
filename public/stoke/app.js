@@ -71,7 +71,8 @@
         reject(new Error('Could not connect, check the link'));
       };
       ws.onclose = () => {
-        $('joinStatus').textContent = 'Disconnected. Reload to reconnect.';
+        const el = document.querySelector('.screen.active .status');
+        if (el) el.textContent = 'Disconnected. Use the reload button (top right).';
       };
       ws.onmessage = (evt) => handleMessage(JSON.parse(evt.data));
     });
@@ -272,6 +273,7 @@
   });
 
   $('tapBtn').addEventListener('pointerdown', onTap);
+  $('reloadBtn').addEventListener('click', () => location.reload());
 
   // auto-connect if a server link was shared via QR/URL
   const auto = serverHost();
