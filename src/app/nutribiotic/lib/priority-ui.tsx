@@ -47,24 +47,24 @@ const ROW_H = 34;
  * second copy of the area's identity: the id, label and colour still come
  * from listAreas() alone, this only picks how few letters stand for them
  * here. A key with no entry falls back to its own first three letters
- * (deriveAreaAbbr below), so a new area is never invisible for want of an
- * edit to this table, only less legible than a chosen code would be.
+ * (areaAbbr below), so a new area is never invisible for want of an edit
+ * to this table, only less legible than a chosen code would be.
  */
 const AREA_ABBR: Record<string, string> = {
   "san-diego": "SD",
   oceanside: "OCS",
   "orange-county": "OC",
   "inland-empire": "IE",
-  "east-la": "ELA",
+  "east-la": "eLA",
   "palm-desert": "PD",
-  "south-bay": "SBY",
-  "south-la": "SLA",
+  "south-bay": "Bay",
+  "south-la": "sLA",
   "santa-monica-venice": "VEN",
   westwood: "WWD",
   "beverly-hills-weho": "BEV",
   "hollywood-pasadena": "HLY",
   "woodland-hills": "WDH",
-  "upper-valley": "UPV",
+  "upper-valley": "VAL",
   ventura: "VTA",
   "santa-barbara": "SB",
   "san-luis-obispo": "SLO",
