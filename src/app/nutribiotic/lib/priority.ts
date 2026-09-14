@@ -134,6 +134,20 @@ export type PriorityInput = {
    *  (assign_areas.py). Carried, never scored on: it is what lets a caller
    *  group or order the SAME book by area without a second read of it. */
   area?: string | null;
+  /** nb_accounts.channel, carried and never scored on, same reasoning as
+   *  area: it is what lets a caller split the SAME ranked book by client
+   *  type (priority-ui.tsx's OpportunityList) without a second read. */
+  channel?: string | null;
+  /** nb_accounts.origin. Carried, never scored on: byOriginThenPriority
+   *  below is the only thing that reads it, to keep a hand-added account
+   *  ahead of an auto-landed one at the same score. */
+  origin?: string | null;
+  /** The specialty tag names a site actually stated (places_search_ingest.py's
+   *  FIT_TERMS, e.g. "facials", "sports nutrition"), carried and never scored
+   *  on. Lets priority-ui.tsx's OpportunityList classify a freshly landed
+   *  /search prospect (channel is "unknown" until a human sets it) by what
+   *  its own site says it does, not only by an ERP-set channel. */
+  fit_tags?: string[];
   /** nb_v_account_potential.potential_grade, the bare letter. */
   tier: string | null;
   trailing_12m_revenue: number | null;
@@ -496,6 +510,29 @@ export function byPriority(a: PriorityResult | undefined, b: PriorityResult | un
   // screens already sort on (tier, confidence desc) for exactly this reason:
   // between two equal numbers, prefer the one built on more real inputs.
   return (b?.confidence ?? 0) - (a?.confidence ?? 0);
+}
+
+/**
+ * A hand-typed account always outranks one landed off a /search sweep, score
+ * or no score (Juan, 2026-09-14: "these prospects that come from /search are
+ * less priority than the hand-added, which should always top the list").
+ * Three tiers, cheapest signal first: `origin === "manual"` (Juan typed it
+ * himself, on the Visit tab or elsewhere) always leads; `origin ===
+ * "enriched"` (a /search Places sweep landed it, unread by a human) always
+ * trails; everything else (an ERP/HubSpot import, a synthetic seed) sits
+ * between the two, exactly where it already sorted before this rule existed.
+ * `byPriority` breaks every tie inside a tier, so within "hand-added" the
+ * usual score ordering is untouched, this only ever reorders ACROSS origins.
+ */
+export function byOriginThenPriority(
+  a: { account: PriorityInput; result: PriorityResult },
+  b: { account: PriorityInput; result: PriorityResult },
+): number {
+  const rank = (origin: string | null | undefined) => (origin === "manual" ? 0 : origin === "enriched" ? 2 : 1);
+  const ar = rank(a.account.origin);
+  const br = rank(b.account.origin);
+  if (ar !== br) return ar - br;
+  return byPriority(a.result, b.result);
 }
 
 /**

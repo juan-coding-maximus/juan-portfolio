@@ -11,11 +11,18 @@
  * pipeline's to make in bulk:
  *
  *   Search this area   Google + the book. A list. Nothing fetched, nothing written.
- *   Look further       ONLY the ticked rows get their websites read.
- *   Add to SDR         ONLY the ticked rows become prospects and calls.
+ *   Look further       ONLY the ticked rows get their websites read. A preview.
+ *   Add to SDR         ONLY the ticked rows become prospects and calls, reading
+ *                       the site first for any row "Look further" hasn't already
+ *                       covered (Juan, 2026-09-14: "add to SDR should
+ *                       automatically run enrichment" — a landed row should
+ *                       never carry an empty about/fit/decision-maker set just
+ *                       because nobody tapped Look Further first).
  *
- * The selection SURVIVES between them, so the normal shape is: tick eight,
- * look further, untick the four that turned out wrong, add four.
+ * The selection SURVIVES between them, so the normal shape is now: tick eight,
+ * add eight straight to SDR (each gets read on the way in), or tick eight,
+ * look further first to preview fit, untick the four that turned out wrong,
+ * add four.
  *
  * WHAT THIS FILE IS ALLOWED TO DO: collect filters, post them, and display what
  * comes back. It computes no counts of its own, it never fills a blank, and it
@@ -390,7 +397,26 @@ export function SearchClient() {
     if (!rows) return;
     setBusy("land");
     setFailure(null);
-    const picked = rows.filter((r) => selected.has(r.key) && !r.id);
+    let working = rows;
+    // Add to SDR now enriches automatically (Juan, 2026-09-14): a row that
+    // hasn't had its site read yet gets read now, in the same click, so a
+    // landed prospect never carries an empty about/fit/decision-maker set
+    // just because nobody happened to tap "Look further" first. "Look
+    // further" itself stays, for previewing what a fit looks like before
+    // committing to a call queue.
+    const toEnrich = working.filter((r) => selected.has(r.key) && !r.id && !r.enriched);
+    if (toEnrich.length > 0) {
+      const enrichReply = await post("enrich", { candidates: toEnrich });
+      if (!enrichReply) {
+        setBusy(null);
+        return;
+      }
+      const byKey = new Map((enrichReply.candidates ?? []).map((c) => [c.key, c]));
+      working = working.map((r) => byKey.get(r.key) ?? r);
+      setRows(working);
+      setEnrichMeta(enrichReply.stages ?? null);
+    }
+    const picked = working.filter((r) => selected.has(r.key) && !r.id);
     const reply = await post("land", {
       category: query.trim(),
       candidates: picked,
@@ -398,7 +424,10 @@ export function SearchClient() {
     });
     if (reply) {
       const byKey = new Map((reply.candidates ?? []).map((c) => [c.key, c]));
-      setRows(rows.map((r) => (byKey.has(r.key) ? { ...r, id: byKey.get(r.key)!.id } : r)));
+      // working, not the stale `rows` closed over at the top of this call: it
+      // carries whatever runEnrich just merged in above, so a row enriched in
+      // this same click does not lose that just because it also landed.
+      setRows(working.map((r) => (byKey.has(r.key) ? { ...r, id: byKey.get(r.key)!.id } : r)));
       setLandMeta(reply);
       // Only what actually landed loses its tick. Anything the server skipped
       // stays ticked and stays visible, because it did not happen.
@@ -797,7 +826,7 @@ export function SearchClient() {
               onClick={runLand}
               disabled={busy !== null}
               className={primaryBtn}
-              title="Add these as prospects in the OS and queue an SDR call for each"
+              title="Reads any un-enriched site first, then adds these as prospects in the OS and queues an SDR call for each"
             >
               <Ico name="phone-arrow" size={13} />
               {busy === "land" ? "Adding..." : `Add ${selectedUnlanded.length} to SDR`}

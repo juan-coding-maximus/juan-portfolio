@@ -19,8 +19,9 @@
  */
 
 import Link from "next/link";
+import { accountType } from "./account-filters";
 import type { PriorityBook } from "./dal";
-import { bandLabel, type PriorityResult } from "./priority";
+import { bandLabel, byPriority, type PriorityInput, type PriorityResult } from "./priority";
 import { Ico } from "./ui";
 
 const BAND_CLASS: Record<PriorityResult["band"], string> = {
@@ -151,6 +152,30 @@ export function PriorityPanel({
  * how to open that account in the center panel whether or not it has a row
  * scheduled (see sdr-ui.tsx's `focusAccountId`).
  */
+/** The one row markup both TopOpportunities and OpportunityList render, so
+ *  "same style" is guaranteed by sharing the function, not by copying JSX. */
+function ScoreRows({ rows }: { rows: PriorityBook["ranked"] }) {
+  return (
+    <ul className="flex flex-col">
+      {rows.map(({ account, result }) => (
+        <li key={account.id} className="border-b border-[#F0EEE6] last:border-b-0">
+          <Link
+            href={`/nutribiotic/sdr?account=${account.id}`}
+            className="flex items-center gap-2 px-2.5 py-2 hover:bg-[#FAF9F5]"
+          >
+            <span
+              className={`w-7 shrink-0 rounded px-1 py-0.5 text-center text-[10.5px] font-medium tabular-nums ${BAND_CLASS[result.band]}`}
+            >
+              {result.score}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[#14201B]">{account.name}</span>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function TopOpportunities({
   ranked,
   limit = 100,
@@ -167,27 +192,100 @@ export function TopOpportunities({
   if (rows.length === 0) return null;
 
   return (
-    <div className="w-full lg:w-[220px] lg:shrink-0">
+    <div className="w-full">
       <div className="mb-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#5B6560]">Top Opportunities</div>
       <div className="max-h-[600px] overflow-y-auto rounded-lg border border-[#E2DFD5] bg-white">
-        <ul className="flex flex-col">
-          {rows.map(({ account, result }) => (
-            <li key={account.id} className="border-b border-[#F0EEE6] last:border-b-0">
-              <Link
-                href={`/nutribiotic/sdr?account=${account.id}`}
-                className="flex items-center gap-2 px-2.5 py-2 hover:bg-[#FAF9F5]"
-              >
-                <span
-                  className={`w-7 shrink-0 rounded px-1 py-0.5 text-center text-[10.5px] font-medium tabular-nums ${BAND_CLASS[result.band]}`}
-                >
-                  {result.score}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[#14201B]">{account.name}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <ScoreRows rows={rows} />
       </div>
     </div>
+  );
+}
+
+/**
+ * ONE TYPE-FILTERED LIST, same rail, same row style, just shorter (Juan,
+ * 2026-09-14: "a few lists on the right, by type of client... make each list
+ * rectangle shorter, housing only 8 opportunities but scrollable within").
+ *
+ * Sorted purely by score ("descending order of fit /100"), deliberately NOT
+ * `book.ranked`'s own order: the top rail leads with hand-added accounts
+ * over /search ones at the same score (byOriginThenPriority), which is the
+ * right rule for "call this first" and the wrong one for "who do we have of
+ * this type" -- a type list answers the second question, so it re-sorts on
+ * `byPriority` alone.
+ */
+function OpportunityList({
+  ranked,
+  title,
+  match,
+  visibleRows = 8,
+}: {
+  ranked: PriorityBook["ranked"];
+  title: string;
+  match: (account: PriorityInput) => boolean;
+  visibleRows?: number;
+}) {
+  const rows = ranked.filter((r) => match(r.account)).sort((a, b) => byPriority(a.result, b.result));
+  if (rows.length === 0) return null;
+
+  // One row is 34px (py-2 + the 12.5px name line + its border); 8 rows is a
+  // real height cap on that number, not an eyeballed pixel guess.
+  const ROW_H = 34;
+
+  return (
+    <div className="w-full">
+      <div className="mb-2 flex items-baseline justify-between gap-2">
+        <span className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[#5B6560]">{title}</span>
+        <span className="text-[10.5px] tabular-nums text-[#8A928C]">{rows.length}</span>
+      </div>
+      <div
+        className="overflow-y-auto rounded-lg border border-[#E2DFD5] bg-white"
+        style={{ maxHeight: ROW_H * visibleRows }}
+      >
+        <ScoreRows rows={rows} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The three fixed opportunity types Juan named, 2026-09-14: "same column and
+ * style as Top opportunities just under it." Each predicate reuses whatever
+ * already classifies an account rather than inventing a second vocabulary:
+ * `accountType()` (account-filters.ts, ERP channel -> Juan's five types) for
+ * an account somebody has already typed a channel on, OR'd with the specialty
+ * words a /search "Look further" pass read straight off the business's own
+ * site (`fit_tags`, places_search_ingest.py's FIT_TERMS) for one that hasn't
+ * -- a freshly landed medspa lands with channel "unknown" until a human sets
+ * it, and without this half it would be invisible on this rail on day one.
+ * "Small grocery" has no fit-tag equivalent (a grocer's site rarely states a
+ * product specialty the way a spa does), so it reads the raw channel value
+ * literally: nb_accounts.channel `"grocery"` is already the independent/small
+ * store value, distinct from `"mass_retail"`.
+ */
+const BEAUTY_TAGS = new Set(["facials", "microblading", "PRP", "skincare"]);
+const SPORTS_NUTRITION_TAGS = new Set([
+  "sports nutrition", "protein", "vegan protein", "nutraceuticals", "vitamin", "supplements",
+]);
+
+export function OpportunityTypeLists({ ranked }: { ranked: PriorityBook["ranked"] }) {
+  const hasTag = (account: PriorityInput, tags: Set<string>) => (account.fit_tags ?? []).some((t) => tags.has(t));
+  return (
+    <>
+      <OpportunityList
+        title="Beauty Opportunities"
+        ranked={ranked}
+        match={(a) => accountType(a.channel) === "beauty" || hasTag(a, BEAUTY_TAGS)}
+      />
+      <OpportunityList
+        title="Small Grocery"
+        ranked={ranked}
+        match={(a) => (a.channel ?? "") === "grocery"}
+      />
+      <OpportunityList
+        title="Sports Nutrition"
+        ranked={ranked}
+        match={(a) => accountType(a.channel) === "sports" || hasTag(a, SPORTS_NUTRITION_TAGS)}
+      />
+    </>
   );
 }

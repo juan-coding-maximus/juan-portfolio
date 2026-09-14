@@ -38,7 +38,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { hasAccess } from "./devices";
 import { hasWidgetToken } from "./session";
-import { areaProspectCounts, byPriority, computePriority, type PriorityInput, type PriorityResult, type Readiness } from "./priority";
+import { areaProspectCounts, byOriginThenPriority, computePriority, type PriorityInput, type PriorityResult, type Readiness } from "./priority";
 import type { LeadStage } from "./account-filters";
 
 const SB_URL = process.env.NB_SUPABASE_URL ?? "";
@@ -412,6 +412,11 @@ export type Account = {
   future_state: string | null;
   impact: string | null;
   business_hours: Record<string, string[][]> | null;
+  /** Provenance ledger, keyed by field (e.g. `business_hours.source_tier`,
+   *  `phone.source_tier`: "manual_note" > "website" > "places"). Read by
+   *  every automated hours/phone writer so a stronger tier is never quietly
+   *  overwritten by a weaker one; see [[applyAccountFacts]]. */
+  enrichment_status: Record<string, { source_tier?: string; [k: string]: unknown }> | null;
   /** HubSpot company record id. Null = this account has no company in the portal. */
   hubspot_company_id: string | null;
   /** HQ's own potential grade (HubSpot's potential__cloned_), pull-only, A-G with a label ("B - medium"). See ui.tsx's TierChip. */
@@ -467,6 +472,15 @@ export type AccountFactsReport = {
  * is never discarded, only demoted: the caller (recordTouchpoint) appends an
  * "Old version" line to the note filed for this visit, so the correction is
  * visible where a human actually reads it, not buried in a JSON column.
+ *
+ * TOP OF THE TIER CHAIN (2026-09-14, Juan: "take my notes as higher status
+ * when I log a call or meeting, those are the actual hours for sure"). Every
+ * write here stamps `enrichment_status.<field>.source_tier = "manual_note"`,
+ * which is the marker `headhunter.py`'s site-hours/phone pass and
+ * `enrich_hours.py`'s Places pass both check before they touch the same
+ * cell (manual_note > website > places). A word heard in the field outranks
+ * a scrape the same way a team page outranks Places for a name (HARD RULE
+ * 21); this is that rule's phone/hours counterpart.
  */
 export async function applyAccountFacts(
   accountId: string,
@@ -481,23 +495,29 @@ export async function applyAccountFacts(
   if (!row) return report;
 
   const patch: Record<string, unknown> = {};
+  const status = { ...(row.enrichment_status || {}) };
+  const stamp = { source_tier: "manual_note", found_by: "clientos: dictated visit/call note", at: new Date().toISOString() };
 
   if (hasAnyHours) {
     if (!row.business_hours) {
       patch.business_hours = facts.business_hours;
       report.business_hours = { status: "filled" };
+      status.business_hours = stamp;
     } else if (JSON.stringify(row.business_hours) !== JSON.stringify(facts.business_hours)) {
       patch.business_hours = facts.business_hours;
       report.business_hours = { status: "updated", old: row.business_hours };
+      status.business_hours = stamp;
     }
   }
   if (facts.phone) {
     if (!row.phone) {
       patch.phone = facts.phone;
       report.phone = { status: "filled", value: facts.phone };
+      status.phone = stamp;
     } else if (row.phone !== facts.phone) {
       patch.phone = facts.phone;
       report.phone = { status: "updated", old: row.phone, value: facts.phone };
+      status.phone = stamp;
     }
   }
   if (facts.email) {
@@ -511,6 +531,7 @@ export async function applyAccountFacts(
   }
 
   if (Object.keys(patch).length > 0) {
+    if (patch.business_hours !== undefined || patch.phone !== undefined) patch.enrichment_status = status;
     await mutate<Account>("nb_accounts", "PATCH", patch, { id: `eq.${accountId}` });
   }
   return report;
@@ -2052,9 +2073,13 @@ export async function getPriorityBook(): Promise<PriorityBook> {
       do_not_visit: boolean | null;
       area: string | null;
       readiness: Readiness | null;
+      channel: string | null;
+      origin: string | null;
+      enrichment_status: { product_fit_signals?: { tags?: Record<string, unknown> } } | null;
     }>(
       "nb_accounts?select=id,name,lifecycle,phone,area,trailing_12m_revenue,lifetime_revenue,first_order_at,last_order_at," +
-        `expected_reorder_days,places_status,closed_at,do_not_visit,readiness&hubspot_owner_id=eq.${JUAN_OWNER_ID}` +
+        "expected_reorder_days,places_status,closed_at,do_not_visit,readiness,channel,origin,enrichment_status" +
+        `&hubspot_owner_id=eq.${JUAN_OWNER_ID}` +
         // Same scope every other surface uses: not the waypoint (Juan's own
         // apartment is not an account), and not a closed one. A closed store
         // is not a low priority, it is not a customer, and ranking it at all
@@ -2105,13 +2130,19 @@ export async function getPriorityBook(): Promise<PriorityBook> {
     urgency: urgencyById.get(a.id)?.urgency ?? null,
     urgency_reason: urgencyById.get(a.id)?.urgency_reason ?? null,
     last_touch_at: lastTouch.get(a.id) ?? null,
+    // The specialty words a /search "Look further" pass read off the
+    // business's own site (headhunter/places_search_ingest's FIT_TERMS),
+    // carried as plain tag names so priority-ui.tsx's OpportunityList can
+    // classify a freshly landed prospect (channel still "unknown", nobody
+    // has typed a channel on it yet) the same as one the ERP already tagged.
+    fit_tags: Object.keys(a.enrichment_status?.product_fit_signals?.tags ?? {}),
   }));
 
   const byId = computePriority(inputs);
   const ranked = inputs
     .map((account) => ({ account, result: byId.get(account.id)! }))
     .filter((r) => r.result.score !== null)
-    .sort((x, y) => byPriority(x.result, y.result));
+    .sort(byOriginThenPriority);
 
   return {
     byId,

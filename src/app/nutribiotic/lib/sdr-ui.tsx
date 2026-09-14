@@ -46,7 +46,7 @@ import {
   toggleShowProspectAccounts,
 } from "./prefs-actions";
 import type { Readiness } from "./priority";
-import { TopOpportunities } from "./priority-ui";
+import { OpportunityTypeLists, TopOpportunities } from "./priority-ui";
 import { TouchpointCapture } from "./touchpoint-ui";
 import type { FiledTouchpoint } from "./touchpoint-ui";
 import { Ico, HUBSPOT_COMPANY_URL, OpenBadge, daysAgo, fullAddress, googleMapsUrl } from "./ui";
@@ -1456,8 +1456,15 @@ export function SdrScreen({
       </div>
 
       {/* Left is SDR work to do, center is the selected account, right is
-          all-time best (Juan, 2026-09-08). */}
-      {topRanked && topRanked.length > 0 && <TopOpportunities ranked={topRanked} />}
+          all-time best (Juan, 2026-09-08), then the three type-scoped
+          opportunity lists stacked under it in the same column
+          (Juan, 2026-09-14). */}
+      {topRanked && topRanked.length > 0 && (
+        <div className="flex w-full flex-col gap-4 lg:w-[220px] lg:shrink-0">
+          <TopOpportunities ranked={topRanked} />
+          <OpportunityTypeLists ranked={topRanked} />
+        </div>
+      )}
       </div>
     </div>
   );
