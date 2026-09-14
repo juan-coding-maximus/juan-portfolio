@@ -274,6 +274,9 @@
 
   $('tapBtn').addEventListener('pointerdown', onTap);
   $('reloadBtn').addEventListener('click', () => location.reload());
+  document.querySelectorAll('.step').forEach((el) => {
+    el.addEventListener('click', () => showScreen(el.dataset.step));
+  });
 
   // auto-connect if a server link was shared via QR/URL
   const auto = serverHost();

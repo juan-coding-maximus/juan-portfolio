@@ -46,7 +46,9 @@ body {
   text-align: center;
   padding: 10px 4px;
   color: #555;
+  cursor: pointer;
 }
+.steps .step:hover { color: var(--muted); }
 .steps .step.done { color: var(--muted); }
 .steps .step.active { color: var(--text); border-bottom: 2px solid var(--text); }
 

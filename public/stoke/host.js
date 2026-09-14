@@ -387,6 +387,9 @@
   $('replayBtn').addEventListener('click', replay);
   $('againBtn').addEventListener('click', () => send({ type: 'reset' }));
   $('reloadBtn').addEventListener('click', () => location.reload());
+  document.querySelectorAll('.step').forEach((el) => {
+    el.addEventListener('click', () => showScreen(el.dataset.step));
+  });
 
   const autoHost = new URLSearchParams(location.search).get('server') || localStorage.getItem('stokeServer');
   if (autoHost) {
