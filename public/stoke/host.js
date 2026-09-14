@@ -206,12 +206,14 @@
 
     const allTaps = lastResults.flatMap((r) => r.taps);
     const summary = SCORING.summarize(allTaps);
+    const tile = (color, count, label, pct) =>
+      `<div class="tile" style="border-color:${color}66"><b style="color:${color}">${count}</b><span>${label}</span><small>${pct.toFixed(0)}%</small></div>`;
     $('summaryRow').innerHTML = `
-      <div class="tile" style="border-color:${SCORING.COLORS.perfect}"><b>${summary.counts.perfect}</b><span>Perfect</span><small>${summary.pct.perfect.toFixed(0)}%</small></div>
-      <div class="tile" style="border-color:${SCORING.COLORS.good}"><b>${summary.counts.good}</b><span>Good</span><small>${summary.pct.good.toFixed(0)}%</small></div>
-      <div class="tile" style="border-color:${SCORING.COLORS.okay}"><b>${summary.counts.okay}</b><span>Okay</span><small>${summary.pct.okay.toFixed(0)}%</small></div>
-      <div class="tile" style="border-color:${SCORING.COLORS.rushing}"><b>${summary.counts.rushing}</b><span>Rushing</span><small>${summary.pct.rushing.toFixed(0)}%</small></div>
-      <div class="tile" style="border-color:${SCORING.COLORS.dragging}"><b>${summary.counts.dragging}</b><span>Dragging</span><small>${summary.pct.dragging.toFixed(0)}%</small></div>
+      ${tile(SCORING.COLORS.perfect, summary.counts.perfect, 'Perfect', summary.pct.perfect)}
+      ${tile(SCORING.COLORS.good, summary.counts.good, 'Good', summary.pct.good)}
+      ${tile(SCORING.COLORS.okay, summary.counts.okay, 'Okay', summary.pct.okay)}
+      ${tile(SCORING.COLORS.rushing, summary.counts.rushing, 'Rushing', summary.pct.rushing)}
+      ${tile(SCORING.COLORS.dragging, summary.counts.dragging, 'Dragging', summary.pct.dragging)}
     `;
 
     const body = $('memberTableBody');
