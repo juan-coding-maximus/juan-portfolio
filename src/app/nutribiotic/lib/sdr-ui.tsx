@@ -14,7 +14,7 @@
  * phone involved at all is a real, separate build once Juan picks a provider.
  */
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   addSdrItemToRoute,
   addSdrScheduleItem,
@@ -1112,6 +1112,23 @@ export function SdrScreen({
   const [items, setItems] = useState(initialItems);
   const [active, setActive] = useState<SdrDayItem | null>(null);
 
+  /* Phone width stacks the panel BELOW the whole day's rail (this column
+   * only sits beside it from lg up), so picking a name off the queue used to
+   * leave Juan staring at the row he just tapped, with the account's phone
+   * and contacts a scroll away. He wants his thumb already on the panel the
+   * moment he's about to dial (2026-09-14: "exactly where I want to have my
+   * phone in for the moment when I actually make that call"). `block:
+   * "start"` on desktop, where the panel is already beside the rail and
+   * already in view, is a no-op scroll, not a jump. */
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (active) panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Keyed on the id on purpose: a status change on the already-open row
+    // (done/skipped/filed) re-renders `active` with a new object but should
+    // not yank the screen back down to a panel he's already looking at.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active?.id]);
+
   // area id -> colour, off the same `areas` list the day groups already
   // paint their dots with (see groupByArea below), so a right-rail dot and a
   // day-group dot for the same area can never disagree about its colour.
@@ -1511,7 +1528,7 @@ export function SdrScreen({
         })}
       </div>
 
-      <div className="min-w-0 flex-1">
+      <div ref={panelRef} className="min-w-0 flex-1 scroll-mt-3">
         {active ? (
           <AccountPanel item={active} areas={areas} onFiled={onFiled} />
         ) : (
