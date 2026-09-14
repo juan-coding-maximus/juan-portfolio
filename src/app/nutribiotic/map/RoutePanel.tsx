@@ -283,7 +283,10 @@ function AddStopForm({
   onAddAccount: (account: ClientSearchAccount) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [kind, setKind] = useState<AddKind>("stop");
+  // CLIENT IS THE DEFAULT PILL (Juan, 2026-09-14). Nearly every stop he adds by
+  // hand is an account he already has a row for, so the panel opens on the arm
+  // that needs no typing. Lunch, hotel and a plain address stay one tap away.
+  const [kind, setKind] = useState<AddKind>("client");
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -319,7 +322,12 @@ function AddStopForm({
     return (
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          // Every open starts on Client, not on whatever was picked last time.
+          setKind("client");
+          reset();
+          setOpen(true);
+        }}
         className="inline-flex items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white px-3 py-2 text-[12.5px] font-medium text-[#3D4A44] transition-colors hover:bg-[#FAF9F5]"
       >
         <Ico name="pin" size={13} />
