@@ -1062,6 +1062,11 @@ export function SdrScreen({
   const [items, setItems] = useState(initialItems);
   const [active, setActive] = useState<SdrDayItem | null>(null);
 
+  // area id -> colour, off the same `areas` list the day groups already
+  // paint their dots with (see groupByArea below), so a right-rail dot and a
+  // day-group dot for the same area can never disagree about its colour.
+  const areaColor = useMemo(() => Object.fromEntries(areas.map((a) => [a.id, a.color])), [areas]);
+
   const [showChains, setShowChains] = useState(initialShowChains);
   function toggleChains() {
     const next = !showChains;
@@ -1412,8 +1417,11 @@ export function SdrScreen({
                   {/* The area's own colour, the same swatch the map paints its
                       frontier and its filter chip with, so a section header and
                       the region it names are visibly one thing. The count is
-                      how many of that area's accounts score 80+ right now: the
-                      reason this section sits where it does. */}
+                      how many rows are actually in THIS group, on THIS day
+                      (Juan, 2026-09-14: the header number and the cards under
+                      it disagreed, because this used to print area.prospects,
+                      the book-wide count of that area's 80+-score accounts,
+                      a different number entirely from what is on screen). */}
                   <div className="mb-1 flex items-center gap-1.5 text-[11px] uppercase tracking-[0.08em] text-[#8A928C]">
                     <span
                       aria-hidden
@@ -1421,7 +1429,7 @@ export function SdrScreen({
                       style={{ background: area?.color ?? "#C9CCC6" }}
                     />
                     <span className="truncate">{area?.label ?? "No area"}</span>
-                    {area && <span className="tabular-nums text-[#B4B9B3]">{area.prospects}</span>}
+                    <span className="tabular-nums text-[#B4B9B3]">{areaItems.length}</span>
                   </div>
                   <ul className="flex flex-col gap-1.5">
                     {areaItems.map((it) => (
@@ -1461,8 +1469,8 @@ export function SdrScreen({
           (Juan, 2026-09-14). */}
       {topRanked && topRanked.length > 0 && (
         <div className="flex w-full flex-col gap-4 lg:w-[220px] lg:shrink-0">
-          <TopOpportunities ranked={topRanked} />
-          <OpportunityTypeLists ranked={topRanked} />
+          <TopOpportunities ranked={topRanked} areaColor={areaColor} />
+          <OpportunityTypeLists ranked={topRanked} areaColor={areaColor} />
         </div>
       )}
       </div>

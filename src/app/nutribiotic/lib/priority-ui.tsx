@@ -40,6 +40,60 @@ const ACTION_ICON: Record<string, string> = { call: "phone", visit: "route", ema
 const ROW_H = 34;
 
 /**
+ * The short code each territory area wears on a narrow right-rail row (Juan,
+ * 2026-09-14: "make sure the lists have a dot next to each where it says
+ * their location in a shortened version," naming BEV/OCS/SB/SD/IN/VEN
+ * himself). Purely a display abbreviation of `nb_territory_areas.id`, never a
+ * second copy of the area's identity: the id, label and colour still come
+ * from listAreas() alone, this only picks how few letters stand for them
+ * here. A key with no entry falls back to its own first three letters
+ * (deriveAreaAbbr below), so a new area is never invisible for want of an
+ * edit to this table, only less legible than a chosen code would be.
+ */
+const AREA_ABBR: Record<string, string> = {
+  "san-diego": "SD",
+  oceanside: "OCS",
+  "orange-county": "OC",
+  "inland-empire": "IE",
+  "east-la": "ELA",
+  "palm-desert": "PD",
+  "south-bay": "SBY",
+  "south-la": "SLA",
+  "santa-monica-venice": "VEN",
+  westwood: "WWD",
+  "beverly-hills-weho": "BEV",
+  "hollywood-pasadena": "HLY",
+  "woodland-hills": "WDH",
+  "upper-valley": "UPV",
+  ventura: "VTA",
+  "santa-barbara": "SB",
+  "san-luis-obispo": "SLO",
+  inland: "IN",
+};
+
+function areaAbbr(areaId: string): string {
+  return AREA_ABBR[areaId] ?? areaId.replace(/[^a-z]/gi, "").slice(0, 3).toUpperCase();
+}
+
+/** area id -> colour, the same map/lib/dal.ts's TerritoryArea rows already
+ *  carry; passed down rather than re-derived so a right-rail dot and the
+ *  map's own frontier for that area can never disagree about its colour. */
+export type AreaColorMap = Record<string, string>;
+
+/** The dot + code itself, rendered only where the account has an area to
+ *  show (a cold prospect nobody has geocoded/assigned yet prints nothing,
+ *  never a guessed location). */
+function AreaTag({ areaId, areaColor }: { areaId: string | null | undefined; areaColor: AreaColorMap }) {
+  if (!areaId) return null;
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 text-[10.5px] font-medium tabular-nums text-[#8A928C]">
+      <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: areaColor[areaId] ?? "#C9CCC6" }} />
+      {areaAbbr(areaId)}
+    </span>
+  );
+}
+
+/**
  * The score as a chip. `reason` rides in the title so the evidence is one
  * hover away even where the row has no space to print it; a chip with no
  * reason attached is not renderable, the prop is required.
@@ -160,7 +214,7 @@ export function PriorityPanel({
  */
 /** The one row markup both TopOpportunities and OpportunityList render, so
  *  "same style" is guaranteed by sharing the function, not by copying JSX. */
-function ScoreRows({ rows }: { rows: PriorityBook["ranked"] }) {
+function ScoreRows({ rows, areaColor }: { rows: PriorityBook["ranked"]; areaColor: AreaColorMap }) {
   return (
     <ul className="flex flex-col">
       {rows.map(({ account, result }) => (
@@ -175,6 +229,7 @@ function ScoreRows({ rows }: { rows: PriorityBook["ranked"] }) {
               {result.score}
             </span>
             <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[#14201B]">{account.name}</span>
+            <AreaTag areaId={account.area} areaColor={areaColor} />
           </Link>
         </li>
       ))}
@@ -184,6 +239,7 @@ function ScoreRows({ rows }: { rows: PriorityBook["ranked"] }) {
 
 export function TopOpportunities({
   ranked,
+  areaColor,
   limit = 100,
   visibleRows = 8,
 }: {
@@ -193,6 +249,7 @@ export function TopOpportunities({
    *  can sit in the same row as the (client-state-driven) day rail and
    *  account panel. `ranked` is a plain array, serializes fine. */
   ranked: PriorityBook["ranked"];
+  areaColor: AreaColorMap;
   limit?: number;
   /** Rows tall before it scrolls (Juan, 2026-09-14: "top opportunities is
    *  too long of a rectangle"). All up to `limit` are still in the list,
@@ -209,7 +266,7 @@ export function TopOpportunities({
         className="overflow-y-auto rounded-lg border border-[#E2DFD5] bg-white"
         style={{ maxHeight: ROW_H * visibleRows }}
       >
-        <ScoreRows rows={rows} />
+        <ScoreRows rows={rows} areaColor={areaColor} />
       </div>
     </div>
   );
@@ -229,11 +286,13 @@ export function TopOpportunities({
  */
 function OpportunityList({
   ranked,
+  areaColor,
   title,
   match,
   visibleRows = 8,
 }: {
   ranked: PriorityBook["ranked"];
+  areaColor: AreaColorMap;
   title: string;
   match: (account: PriorityInput) => boolean;
   visibleRows?: number;
@@ -251,7 +310,7 @@ function OpportunityList({
         className="overflow-y-auto rounded-lg border border-[#E2DFD5] bg-white"
         style={{ maxHeight: ROW_H * visibleRows }}
       >
-        <ScoreRows rows={rows} />
+        <ScoreRows rows={rows} areaColor={areaColor} />
       </div>
     </div>
   );
@@ -277,23 +336,32 @@ const SPORTS_NUTRITION_TAGS = new Set([
   "sports nutrition", "protein", "vegan protein", "nutraceuticals", "vitamin", "supplements",
 ]);
 
-export function OpportunityTypeLists({ ranked }: { ranked: PriorityBook["ranked"] }) {
+export function OpportunityTypeLists({
+  ranked,
+  areaColor,
+}: {
+  ranked: PriorityBook["ranked"];
+  areaColor: AreaColorMap;
+}) {
   const hasTag = (account: PriorityInput, tags: Set<string>) => (account.fit_tags ?? []).some((t) => tags.has(t));
   return (
     <>
       <OpportunityList
         title="Beauty Opportunities"
         ranked={ranked}
+        areaColor={areaColor}
         match={(a) => accountType(a.channel) === "beauty" || hasTag(a, BEAUTY_TAGS)}
       />
       <OpportunityList
         title="Small Grocery"
         ranked={ranked}
+        areaColor={areaColor}
         match={(a) => (a.channel ?? "") === "grocery"}
       />
       <OpportunityList
         title="Sports Nutrition"
         ranked={ranked}
+        areaColor={areaColor}
         match={(a) => accountType(a.channel) === "sports" || hasTag(a, SPORTS_NUTRITION_TAGS)}
       />
     </>
