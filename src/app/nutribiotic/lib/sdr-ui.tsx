@@ -593,17 +593,25 @@ function ScheduleRow({
   onSelect,
   onStatus,
   onReschedule,
+  onFiled,
 }: {
   item: SdrDayItem;
   active: boolean;
   onSelect: () => void;
   onStatus: (status: "done" | "skipped") => void;
   onReschedule: (date: string) => void;
+  /** Files the call right from the row, no need to open the panel below to
+   *  reach the log box: the phone-width layout stacks the panel under a full
+   *  day of rows, which is a lot of scrolling for something this quick
+   *  (Juan, 2026-09-14). Marks the row done the same way the panel's own
+   *  onFiled does. */
+  onFiled: (result: FiledTouchpoint) => void;
 }) {
   const done = item.status === "done";
   const skipped = item.status === "skipped";
   const [moving, setMoving] = useState(false);
   const [routing, setRouting] = useState(false);
+  const [logging, setLogging] = useState(false);
 
   return (
     <li
@@ -703,17 +711,38 @@ function ScheduleRow({
               <Ico name="check" size={12} />
             </button>
             <button
-              onClick={() => onStatus("skipped")}
-              title="Skip"
-              className="flex h-6 w-6 items-center justify-center rounded-md border border-[#E2DFD5] text-[#8A928C] hover:bg-[#F7F6F1]"
+              onClick={() => setLogging((v) => !v)}
+              title="Log this call"
+              className={`flex h-6 w-6 items-center justify-center rounded-md border text-[#5B6560] hover:bg-[#F7F6F1] ${
+                logging ? "border-[#14201B]" : "border-[#E2DFD5]"
+              }`}
             >
-              <Ico name="close" size={12} />
+              <Ico name="plus" size={12} />
             </button>
           </>
         )}
       </div>
 
       {routing && item.account_id && <AddToRoute accountId={item.account_id} onClose={() => setRouting(false)} />}
+
+      {logging && (
+        <div className="w-full border-t border-[#EFEDE5] pt-2">
+          {/* Same "Called X and spoke with: " template the desktop panel
+              uses below, just reachable without opening it (Juan, 2026-09-14:
+              this is the phone-friendly path). Keyed to the item so it always
+              starts fresh for whoever picks up this time. */}
+          <TouchpointCapture
+            key={item.id}
+            accountIdHint={item.account_id}
+            onFiled={(result) => {
+              onFiled(result);
+              setLogging(false);
+            }}
+            lockKind="call"
+            initialText={`Called ${item.displayName} and spoke with: `}
+          />
+        </div>
+      )}
 
       {moving && (
         <div className="flex w-full items-center gap-2 border-t border-[#EFEDE5] pt-2">
@@ -1253,6 +1282,13 @@ export function SdrScreen({
     setItems((prev) => [...prev, item]);
   }
 
+  /** The row's own "+" log box, 2026-09-14: same result shape the panel's
+   *  onFiled handles below, just addressed to whichever row was tapped
+   *  rather than whatever is `active`. */
+  function filedFromRow(id: string, result: FiledTouchpoint) {
+    setStatus(id, "done", result.activityId ?? undefined);
+  }
+
   function setStatus(id: string, status: "done" | "skipped", completedActivityId?: number) {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, status, completed_activity_id: completedActivityId ?? it.completed_activity_id } : it)));
     if (active?.id === id) setActive(null);
@@ -1461,6 +1497,7 @@ export function SdrScreen({
                         onSelect={() => setActive(it)}
                         onStatus={(status) => setStatus(it.id, status)}
                         onReschedule={(date) => reschedule(it.id, date)}
+                        onFiled={(result) => filedFromRow(it.id, result)}
                       />
                     ))}
                   </ul>
