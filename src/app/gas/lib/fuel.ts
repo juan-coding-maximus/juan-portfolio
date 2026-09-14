@@ -27,6 +27,10 @@ type RawPlace = {
   };
 };
 
+/* Warehouse-club pumps need a membership card at the pump, so their price is
+   not a price Juan can pay. Delete the pattern if he ever joins one. */
+const MEMBERS_ONLY = /costco|sam[’']?s club/i;
+
 /** Gas stations around one point, keeping only those Google has a live
  *  regular-unleaded price for. A station with no price is not a candidate:
  *  showing it would mean inventing a number. Closed stations are dropped. */
@@ -58,6 +62,7 @@ export async function fuelNearby(
   const out: Station[] = [];
   for (const p of data.places ?? []) {
     if (p.currentOpeningHours?.openNow === false) continue;
+    if (MEMBERS_ONLY.test(p.displayName?.text ?? "")) continue;
     const lat = p.location?.latitude;
     const lng = p.location?.longitude;
     if (!p.id || lat == null || lng == null) continue;
