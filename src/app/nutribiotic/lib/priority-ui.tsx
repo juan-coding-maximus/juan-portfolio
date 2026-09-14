@@ -33,6 +33,12 @@ const BAND_CLASS: Record<PriorityResult["band"], string> = {
 
 const ACTION_ICON: Record<string, string> = { call: "phone", visit: "route", email: "mail", open: "external" };
 
+/** One score-row's real rendered height (py-2 + the 12.5px name line + its
+ *  border): every list on the right rail caps its box at a whole number of
+ *  these rather than an eyeballed pixel guess, so "N rows visible" means N
+ *  rows exactly, whichever list it is. */
+const ROW_H = 34;
+
 /**
  * The score as a chip. `reason` rides in the title so the evidence is one
  * hover away even where the row has no space to print it; a chip with no
@@ -179,6 +185,7 @@ function ScoreRows({ rows }: { rows: PriorityBook["ranked"] }) {
 export function TopOpportunities({
   ranked,
   limit = 100,
+  visibleRows = 8,
 }: {
   /** `PriorityBook.ranked` itself, NOT the book: `PriorityBook.byId` is a
    *  `Map`, which cannot cross the server/client prop boundary, and this
@@ -187,6 +194,10 @@ export function TopOpportunities({
    *  account panel. `ranked` is a plain array, serializes fine. */
   ranked: PriorityBook["ranked"];
   limit?: number;
+  /** Rows tall before it scrolls (Juan, 2026-09-14: "top opportunities is
+   *  too long of a rectangle"). All up to `limit` are still in the list,
+   *  scrollable, this only caps how much of the rail one box eats. */
+  visibleRows?: number;
 }) {
   const rows = ranked.slice(0, limit);
   if (rows.length === 0) return null;
@@ -194,7 +205,10 @@ export function TopOpportunities({
   return (
     <div className="w-full">
       <div className="mb-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#5B6560]">Top Opportunities</div>
-      <div className="max-h-[600px] overflow-y-auto rounded-lg border border-[#E2DFD5] bg-white">
+      <div
+        className="overflow-y-auto rounded-lg border border-[#E2DFD5] bg-white"
+        style={{ maxHeight: ROW_H * visibleRows }}
+      >
         <ScoreRows rows={rows} />
       </div>
     </div>
@@ -226,10 +240,6 @@ function OpportunityList({
 }) {
   const rows = ranked.filter((r) => match(r.account)).sort((a, b) => byPriority(a.result, b.result));
   if (rows.length === 0) return null;
-
-  // One row is 34px (py-2 + the 12.5px name line + its border); 8 rows is a
-  // real height cap on that number, not an eyeballed pixel guess.
-  const ROW_H = 34;
 
   return (
     <div className="w-full">
