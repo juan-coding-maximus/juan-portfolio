@@ -359,14 +359,21 @@ export function AccountDetailBody({
           ) : (
             <ul className="divide-y divide-[#EDEBE3] overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
               {acts.map((t) => (
-                <li key={t.id} className="flex items-baseline gap-3 px-4 py-2.5 text-[13.5px]">
-                  <span className="w-[86px] shrink-0 text-[12px] text-[#8A928C]">
-                    {daysAgo(t.at)}
+                <li key={t.id} className="flex flex-col gap-1 px-4 py-2.5 text-[13.5px]">
+                  <span className="flex items-baseline gap-3">
+                    <span className="w-[86px] shrink-0 text-[12px] text-[#8A928C]">
+                      {daysAgo(t.at)}
+                    </span>
+                    <span className="font-medium">{t.kind.replace(/_/g, " ")}</span>
                   </span>
-                  <span className="w-[104px] shrink-0 font-medium">{t.kind.replace(/_/g, " ")}</span>
-                  <span className="min-w-0 flex-1 truncate text-[#5B6560]">
-                    {t.detail ?? t.outcome?.replace(/_/g, " ") ?? ""}
-                  </span>
+                  {/* Full note, not a squeezed one-liner (Juan, 2026-09-14):
+                      meeting/call notes are the whole record of what was said,
+                      so they wrap and read in full rather than truncating. */}
+                  {(t.detail ?? t.outcome?.replace(/_/g, " ")) && (
+                    <p className="ml-[98px] max-w-[68ch] whitespace-pre-wrap text-[#5B6560]">
+                      {t.detail ?? t.outcome?.replace(/_/g, " ")}
+                    </p>
+                  )}
                 </li>
               ))}
             </ul>
