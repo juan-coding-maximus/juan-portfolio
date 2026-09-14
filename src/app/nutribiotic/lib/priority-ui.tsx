@@ -52,7 +52,7 @@ const ROW_H = 34;
  */
 const AREA_ABBR: Record<string, string> = {
   "san-diego": "SD",
-  oceanside: "OCS",
+  oceanside: "Ocs",
   "orange-county": "OC",
   "inland-empire": "IE",
   "east-la": "eLA",
