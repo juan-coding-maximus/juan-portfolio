@@ -80,6 +80,9 @@ export type SdrAccountPanel = {
   id: string;
   name: string;
   channel: string;
+  /** nb_accounts.area, the territory area id. Null on an account
+   *  assign_areas.py hasn't placed yet (no city match, no coordinates). */
+  area: string | null;
   street: string | null;
   city: string | null;
   state: string | null;
@@ -131,6 +134,7 @@ export async function getSdrAccountPanel(accountId: string): Promise<SdrAccountP
     id: a.id,
     name: a.name,
     channel: a.channel,
+    area: a.area,
     street: a.street,
     city: a.city,
     state: a.state,

@@ -775,7 +775,17 @@ function Fact({ label, value, href }: { label: string; value: string | null; hre
  * deliberately thinner: no activity table, no order history, no full
  * property dump, just what he'd want in front of him before dialing.
  */
-function AccountPanel({ item, onFiled }: { item: SdrDayItem; onFiled: (r: FiledTouchpoint) => void }) {
+function AccountPanel({
+  item,
+  areas,
+  onFiled,
+}: {
+  item: SdrDayItem;
+  /** Same list the day groups and the right rail already colour their dots
+   *  from, so the panel header's dot can never disagree with either. */
+  areas: SdrAreaGroup[];
+  onFiled: (r: FiledTouchpoint) => void;
+}) {
   const [panel, setPanel] = useState<SdrAccountPanel | null>(null);
   const [loading, startTransition] = useTransition();
 
@@ -790,15 +800,26 @@ function AccountPanel({ item, onFiled }: { item: SdrDayItem; onFiled: (r: FiledT
 
   const phone = panel?.phone ?? item.displayPhone;
   const address = panel ? [panel.street, panel.city].filter(Boolean).join(", ") : null;
+  const area = panel?.area ? (areas.find((a) => a.id === panel.area) ?? null) : null;
 
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-lg border border-[#E2DFD5] bg-white p-4">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <div className="text-[17px] font-semibold text-[#14201B]">{item.displayName}</div>
               {panel?.businessHours && <OpenBadge businessHours={panel.businessHours} />}
+              {/* The territory this account sits in, full name (not the
+                  right rail's abbreviation) and its map colour, so the panel
+                  answers "where is this" without a trip to the map
+                  (Juan, 2026-09-14). */}
+              {area && (
+                <span className="inline-flex items-center gap-1.5 text-[12.5px] text-[#5B6560]">
+                  <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: area.color }} />
+                  {area.label}
+                </span>
+              )}
             </div>
             {!item.account_id && (
               <div className="mt-0.5 text-[12px] text-[#8A928C]">New prospect, not yet an account</div>
@@ -1455,7 +1476,7 @@ export function SdrScreen({
 
       <div className="min-w-0 flex-1">
         {active ? (
-          <AccountPanel item={active} onFiled={onFiled} />
+          <AccountPanel item={active} areas={areas} onFiled={onFiled} />
         ) : (
           <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-[#D8D4C8] text-[13px] text-[#8A928C]">
             Pick a call or visit from the queue

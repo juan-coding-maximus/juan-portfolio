@@ -389,6 +389,10 @@ export type Account = {
   channel: string;
   street: string | null;
   city: string | null;
+  /** nb_accounts.area, the territory area id (assign_areas.py). Already
+   *  selected (getAccount reads `*`), typed here 2026-09-14 so the SDR
+   *  panel header can show the full territory name and its map colour. */
+  area: string | null;
   /* Already selected (getAccount reads `*`), typed here 2026-09-08 so the SDR
      panel can build a Google Maps search from a full address, and fall back to
      the pin when the address is too thin, rather than to nothing. */
