@@ -46,6 +46,7 @@ import { appleMapsUrl, CUSTOM_STOP_LABEL, fullAddress, Ico, prettyPhone, ReachLi
 import { AccountLink } from "../lib/modal";
 import { resolveStopAddress } from "../lib/stop-actions";
 import { CallSearchField } from "./CallSearchField";
+import { ClientSearchField, type ClientSearchAccount } from "./ClientSearchField";
 import { DayMoveMenu } from "./DayMoveMenu";
 import { routeDriveLegs, type DriveLeg } from "./drive-actions";
 import { BAND_STYLE, driveBand, likelyDriveMinutes } from "./traffic";
@@ -256,9 +257,33 @@ const KINDS: { value: CustomStopKind; hint: string }[] = [
   { value: "stop", hint: "Any address or place name" },
 ];
 
-function AddStopForm({ onAdd }: { onAdd: (stop: Omit<CustomStop, "id">) => void }) {
+/**
+ * THE FOURTH PILL (Juan, 2026-09-14): a client, alongside lunch/hotel/stop.
+ *
+ * It is a fourth choice in the same row but NOT a fourth CustomStopKind, and
+ * that difference is the whole point. Lunch, hotel and stop have no row
+ * anywhere, so they carry their own label and coordinates into the draft. An
+ * account has a row: it goes into route_draft as the bare nb_accounts.id
+ * string it has always been (see dal.ts RouteDraftEntry), resolved against the
+ * live account on every render. So a client stop keeps its account_id, its
+ * tier, its order history and its profile link, and a rename or a move
+ * upstream is reflected rather than frozen into the draft.
+ */
+type AddKind = CustomStopKind | "client";
+
+function AddStopForm({
+  onAdd,
+  accounts,
+  inRoute,
+  onAddAccount,
+}: {
+  onAdd: (stop: Omit<CustomStop, "id">) => void;
+  accounts: ClientSearchAccount[];
+  inRoute: Set<string>;
+  onAddAccount: (account: ClientSearchAccount) => void;
+}) {
   const [open, setOpen] = useState(false);
-  const [kind, setKind] = useState<CustomStopKind>("stop");
+  const [kind, setKind] = useState<AddKind>("stop");
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -270,7 +295,7 @@ function AddStopForm({ onAdd }: { onAdd: (stop: Omit<CustomStop, "id">) => void 
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (busy) return;
+    if (busy || kind === "client") return; // a client is added by picking one
     setBusy(true);
     setError(null);
     const res = await resolveStopAddress(query);
@@ -298,12 +323,16 @@ function AddStopForm({ onAdd }: { onAdd: (stop: Omit<CustomStop, "id">) => void 
         className="inline-flex items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white px-3 py-2 text-[12.5px] font-medium text-[#3D4A44] transition-colors hover:bg-[#FAF9F5]"
       >
         <Ico name="pin" size={13} />
-        Add lunch, hotel or other stop
+        Add a client, lunch, hotel or other stop
       </button>
     );
   }
 
   const hint = KINDS.find((k) => k.value === kind)?.hint ?? "";
+  const pills: { value: AddKind; label: string }[] = [
+    ...KINDS.map((k) => ({ value: k.value as AddKind, label: CUSTOM_STOP_LABEL[k.value] })),
+    { value: "client", label: "Client" },
+  ];
 
   return (
     <form
@@ -311,54 +340,93 @@ function AddStopForm({ onAdd }: { onAdd: (stop: Omit<CustomStop, "id">) => void 
       className="rounded-lg border border-[#E2DFD5] bg-white p-3.5"
     >
       <div className="flex flex-wrap items-center gap-1.5">
-        {KINDS.map((k) => (
+        {pills.map((k) => (
           <button
             key={k.value}
             type="button"
-            onClick={() => setKind(k.value)}
+            onClick={() => {
+              setKind(k.value);
+              reset();
+            }}
             className={`rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
               kind === k.value
                 ? "bg-[#14201B] text-[#F7F6F1]"
                 : "border border-[#E2DFD5] text-[#5B6560] hover:bg-[#FAF9F5]"
             }`}
           >
-            {CUSTOM_STOP_LABEL[k.value]}
+            {k.label}
           </button>
         ))}
       </div>
 
-      <div className="mt-2.5">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={hint}
-          autoFocus
-          className="w-full min-w-0 rounded-md border border-[#E2DFD5] bg-[#FCFBF7] px-3 py-2 text-[13.5px] outline-none placeholder:text-[#A9AFA9] focus:border-[#8A928C]"
-        />
-      </div>
+      {/* A client is searched, not typed through Google Places: it is already a
+          row of Juan's, with its own coordinates and its own history. Picking
+          one from the list IS the add, so this arm has no "Add to route". */}
+      {kind === "client" ? (
+        <>
+          <div className="mt-2.5">
+            <ClientSearchField
+              accounts={accounts}
+              inRoute={inRoute}
+              onPick={(a) => {
+                onAddAccount(a);
+                reset();
+                setOpen(false);
+              }}
+            />
+          </div>
+          <div className="mt-2.5 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                reset();
+                setOpen(false);
+              }}
+              className="rounded-md border border-[#E2DFD5] bg-white px-3 py-2 text-[12.5px] font-medium text-[#8A928C] transition-colors hover:text-[#3D4A44]"
+            >
+              Cancel
+            </button>
+            <span className="text-[12px] text-[#8A928C]">
+              Your accounts and prospects. Pick one to put it on this day.
+            </span>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="mt-2.5">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={hint}
+              autoFocus
+              className="w-full min-w-0 rounded-md border border-[#E2DFD5] bg-[#FCFBF7] px-3 py-2 text-[13.5px] outline-none placeholder:text-[#A9AFA9] focus:border-[#8A928C]"
+            />
+          </div>
 
-      <div className="mt-2.5 flex items-center gap-2">
-        <button
-          type="submit"
-          disabled={busy || query.trim().length < 3}
-          className="rounded-md bg-[#2C6A46] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {busy ? "Finding..." : "Add to route"}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            reset();
-            setOpen(false);
-          }}
-          className="rounded-md border border-[#E2DFD5] bg-white px-3 py-2 text-[12.5px] font-medium text-[#8A928C] transition-colors hover:text-[#3D4A44]"
-        >
-          Cancel
-        </button>
-        <span className="text-[12px] text-[#8A928C]">
-          {error ? <span className="text-[#B5372A]">{error}</span> : "Address or place name, looked up before it is added."}
-        </span>
-      </div>
+          <div className="mt-2.5 flex items-center gap-2">
+            <button
+              type="submit"
+              disabled={busy || query.trim().length < 3}
+              className="rounded-md bg-[#2C6A46] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {busy ? "Finding..." : "Add to route"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                reset();
+                setOpen(false);
+              }}
+              className="rounded-md border border-[#E2DFD5] bg-white px-3 py-2 text-[12.5px] font-medium text-[#8A928C] transition-colors hover:text-[#3D4A44]"
+            >
+              Cancel
+            </button>
+            <span className="text-[12px] text-[#8A928C]">
+              {error ? <span className="text-[#B5372A]">{error}</span> : "Address or place name, looked up before it is added."}
+            </span>
+          </div>
+        </>
+      )}
     </form>
   );
 }
@@ -775,6 +843,9 @@ export function RoutePanel({
   onClear,
   onShowInMap,
   onAddCustomStop,
+  accounts,
+  inRoute,
+  onAddAccount,
   calls,
   onAddCall,
   onRemoveCall,
@@ -819,6 +890,16 @@ export function RoutePanel({
   onClear: () => void;
   onShowInMap: (id: string) => void;
   onAddCustomStop: (stop: Omit<CustomStop, "id">) => void;
+  /** Juan's whole owned book, for the "Client" search in the add-stop row
+   *  (2026-09-14). The same array MapScreen resolves a draft entry against, so
+   *  anything pickable here is something the route can actually draw. */
+  accounts: ClientSearchAccount[];
+  /** Stop ids already on the active day, so the search can say so rather than
+   *  offering an add that does nothing. */
+  inRoute: Set<string>;
+  /** Put an account on this day. Goes into route_draft as its nb_accounts.id,
+   *  never as a copied address. */
+  onAddAccount: (account: ClientSearchAccount) => void;
   /** This day's calls (0041): phone-only, no drive position. */
   calls: CallEntry[];
   onAddCall: (call: Omit<CallEntry, "id">) => void;
@@ -1056,14 +1137,13 @@ export function RoutePanel({
         <DayTabs days={days} active={activeDay} onSelect={onSelectDay} />
         {callsSection}
         {dayBar}
-        <div className="rounded-lg border border-dashed border-[#E2DFD5] bg-white p-5 text-[13.5px] leading-relaxed text-[#5B6560]">
-          Nothing planned for {dayLabel(activeDay).weekday} yet. Tap a pin on the map and choose{" "}
-          <span className="font-medium text-[#3D4A44]">Add to route</span> to start one, or add a
-          lunch or hotel stop below. The list stays put until you remove a stop, so a route you
-          build in the morning is still here later.
-        </div>
         <div className="mt-2">
-          <AddStopForm onAdd={onAddCustomStop} />
+          <AddStopForm
+            onAdd={onAddCustomStop}
+            accounts={accounts}
+            inRoute={inRoute}
+            onAddAccount={onAddAccount}
+          />
         </div>
       </>
     );
@@ -1511,7 +1591,12 @@ export function RoutePanel({
       </div>
 
       <div className="mt-2">
-        <AddStopForm onAdd={onAddCustomStop} />
+        <AddStopForm
+          onAdd={onAddCustomStop}
+          accounts={accounts}
+          inRoute={inRoute}
+          onAddAccount={onAddAccount}
+        />
       </div>
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">

@@ -545,6 +545,14 @@ export function MapScreen({
         onClear={clearRoute}
         onShowInMap={showInMap}
         onAddCustomStop={handleAddCustomStop}
+        /* The "Client" pill in the add-stop row (2026-09-14) searches the same
+           owned book the map draws, and adds through the SAME smart-insert
+           path a pin's "Add to route" uses -- one account id into route_draft,
+           dropped into the cheapest gap. Deliberately not a second add path:
+           a stop added by name and a stop added by pin are the same stop. */
+        accounts={accounts}
+        inRoute={inRoute}
+        onAddAccount={(a) => handleAddToRoute(a.id, a.lat, a.lng)}
         calls={calls}
         onAddCall={addCall}
         onRemoveCall={removeCall}
