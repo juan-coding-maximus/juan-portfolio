@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Stoke Click</title>
+<link rel="stylesheet" href="/stoke/style.css" />
+</head>
+<body>
+
+<div class="steps" id="steps">
+  <span class="step active" data-step="connect">1 Connect</span>
+  <span class="step" data-step="join">2 Join</span>
+  <span class="step" data-step="play">3 Play</span>
+  <span class="step" data-step="result">4 Result</span>
+</div>
+
+<section id="screen-connect" class="screen active">
+  <h1>Stoke Click</h1>
+  <p class="sub">Tap-timing practice for the band</p>
+  <label class="field">Session link (from the host's terminal or QR)
+    <input id="serverInput" type="text" placeholder="abc-def-ghi.trycloudflare.com" autocomplete="off" />
+  </label>
+  <button id="connectBtn" class="primary">Connect</button>
+  <p id="connectStatus" class="status"></p>
+</section>
+
+<section id="screen-join" class="screen">
+  <h2>Join</h2>
+  <p class="sub" id="joinSub">Connected</p>
+  <input id="nameInput" type="text" placeholder="Your name" maxlength="24" autocomplete="off" />
+  <button id="joinBtn" class="primary">Join session</button>
+  <p id="joinStatus" class="status"></p>
+</section>
+
+<section id="screen-play" class="screen">
+  <p class="sub" id="playSongLine">Waiting for the host to start</p>
+  <div class="beatPulse" id="beatPulse"></div>
+  <p class="sub" id="playStatus"></p>
+  <button id="tapBtn" class="tap">TAP</button>
+  <div class="lastTaps" id="lastTaps"></div>
+</section>
+
+<section id="screen-result" class="screen">
+  <h2>Your result</h2>
+  <div id="myStats" class="myStats"></div>
+  <p class="sub">Full breakdown is on the host's dashboard.</p>
+  <p id="resultStatus" class="status"></p>
+</section>
+
+<script src="/stoke/scoring.js"></script>
+<script src="/stoke/app.js"></script>
+</body>
+</html>

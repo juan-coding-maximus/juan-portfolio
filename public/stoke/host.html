@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stoke Click &middot; Dashboard</title>
+<link rel="stylesheet" href="/stoke/style.css" />
+<style>
+  body { align-items: flex-start; padding: 32px; }
+  .screen { max-width: 980px; }
+  .screen.active { display: flex; }
+</style>
+</head>
+<body>
+
+<div class="steps" id="steps">
+  <span class="step active" data-step="connect">1 Connect</span>
+  <span class="step" data-step="setup">2 Setup</span>
+  <span class="step" data-step="live">3 Live</span>
+  <span class="step" data-step="analyze">4 Analyze</span>
+</div>
+
+<section id="screen-connect" class="screen active">
+  <h1>Stoke Click &middot; Dashboard</h1>
+  <p class="sub">The computer that leads the session</p>
+  <label class="field">Session link (printed by start.sh)
+    <input id="serverInput" type="text" placeholder="abc-def-ghi.trycloudflare.com" autocomplete="off" />
+  </label>
+  <button id="connectBtn" class="primary">Connect</button>
+  <p id="connectStatus" class="status"></p>
+</section>
+
+<section id="screen-setup" class="screen">
+  <div class="setupGrid">
+    <div class="setupLeft">
+      <h2>Setup</h2>
+      <label class="field">Song
+        <select id="songSelect"></select>
+      </label>
+      <div class="row2">
+        <label class="field">BPM
+          <input id="bpmInput" type="number" min="20" max="300" />
+        </label>
+        <label class="field">Beat offset (ms)
+          <input id="offsetInput" type="number" step="10" />
+        </label>
+      </div>
+      <button id="testClickBtn" class="ghost">Test click</button>
+      <label class="field checkboxField"><input id="playHereCheck" type="checkbox" checked /> Also play song + click on this computer</label>
+      <button id="startBtn" class="primary" disabled>Start song</button>
+      <p id="setupStatus" class="status"></p>
+    </div>
+    <div class="setupRight">
+      <h3>Join</h3>
+      <img id="qrImg" class="qr" alt="Scan to join" />
+      <p class="sub small" id="joinLink"></p>
+      <ul id="memberList" class="members"></ul>
+    </div>
+  </div>
+</section>
+
+<section id="screen-live" class="screen">
+  <h2 id="liveTitle">Running</h2>
+  <p class="sub" id="liveSub"></p>
+  <div class="beatPulse" id="beatPulse"></div>
+  <ul id="liveMemberList" class="members"></ul>
+</section>
+
+<section id="screen-analyze" class="screen">
+  <h2 id="analyzeTitle">Results</h2>
+  <div class="summaryRow" id="summaryRow"></div>
+  <table class="leaderboard" id="memberTable">
+    <thead><tr><th>Name</th><th>Avg off</th><th>Consistency</th><th>Perfect+Good</th></tr></thead>
+    <tbody id="memberTableBody"></tbody>
+  </table>
+
+  <div class="trackControls">
+    <button id="replayBtn" class="ghost">Replay with all taps</button>
+    <label class="checkboxField"><input id="includeClickCheck" type="checkbox" checked /> include reference click</label>
+    <span id="replayStatus" class="status"></span>
+  </div>
+
+  <div class="legend">
+    <span><i style="background:#3ecf6e"></i>Perfect / Good</span>
+    <span><i style="background:#e8c547"></i>Okay</span>
+    <span><i style="background:#ef5555"></i>Rushing / Dragging</span>
+  </div>
+
+  <div id="trackScroll" class="trackScroll">
+    <div id="trackInner" class="trackInner">
+      <canvas id="waveCanvas"></canvas>
+      <div id="playhead" class="playhead"></div>
+      <div id="memberRows"></div>
+    </div>
+  </div>
+
+  <button id="againBtn" class="primary">Run it again</button>
+</section>
+
+<script src="/stoke/scoring.js"></script>
+<script src="/stoke/host.js"></script>
+</body>
+</html>

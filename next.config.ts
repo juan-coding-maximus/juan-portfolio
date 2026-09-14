@@ -28,6 +28,16 @@ const nextConfig: NextConfig = {
       // Agency-of-agents portfolio (portfolio-agency.html in the agency repo),
       // shipped as a static asset under public/stack/.
       { source: "/stack", destination: "/stack/index.html" },
+      // Stoke Club rehearsal click-sync app (source: agency repo
+      // projects/band-click-sync/app/public/). Static frontend only, absolute
+      // /stoke/... asset paths (see index.html/host.html) since a relative
+      // path from the bare /stoke URL resolves against site root, not this
+      // subpath, same gotcha as /eldepartamento above. The realtime scoring
+      // server itself runs off-Vercel (Juan's laptop + a cloudflared tunnel,
+      // see projects/band-click-sync/app/start.sh); this only serves the page
+      // and the two song files.
+      { source: "/stoke", destination: "/stoke/index.html" },
+      { source: "/stoke/host", destination: "/stoke/host.html" },
     ];
   },
   // Juan's vCard (public/p/ja.vcf) for the NutriBiotic business card QR code.
