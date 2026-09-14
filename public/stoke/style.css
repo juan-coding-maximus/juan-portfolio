@@ -81,6 +81,9 @@ body {
 }
 .screen.active { display: flex; }
 
+.logo { align-self: flex-start; height: 56px; width: auto; margin-bottom: 2px; }
+.logo.logo-small { height: 36px; }
+
 h1 { font-size: 32px; margin: 0 0 2px; font-weight: 700; }
 h2 { font-size: 19px; margin: 0 0 2px; font-weight: 600; }
 h3 { font-size: 13px; margin: 0 0 4px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }

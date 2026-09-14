@@ -166,7 +166,7 @@
   function beginLive(serverStartTime) {
     showScreen('live');
     $('liveTitle').textContent = `${lastRun.title} · ${lastRun.bpm} BPM`;
-    $('liveSub').textContent = 'Running… results appear here when everyone finishes.';
+    $('liveSub').textContent = 'Results appear when everyone finishes';
 
     if (!$('playHereCheck').checked) return;
     ensureAudioContext();
