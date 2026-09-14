@@ -100,7 +100,13 @@ export type SdrAccountPanel = {
    *  capture box. Null means no rep has tagged it yet. */
   readiness: Readiness | null;
   quirks: string | null;
+  /** The gap-selling triple (nb_accounts.current_state/future_state/impact),
+   *  the same three fields account-detail.tsx's "The gap" card reads. Null
+   *  on every account as of 2026-09-14 (see lib/priority.ts's own comment on
+   *  this), nobody has run discovery to fill them yet, not a UI gap. */
   currentState: string | null;
+  futureState: string | null;
+  impact: string | null;
   lastOrderAt: string | null;
   /** Google Places hours, same shape account-detail.tsx already renders.
    *  Null on an account the enricher hasn't reached yet, a real gap, never a
@@ -148,6 +154,8 @@ export async function getSdrAccountPanel(accountId: string): Promise<SdrAccountP
     readiness: a.readiness,
     quirks: a.quirks,
     currentState: a.current_state,
+    futureState: a.future_state,
+    impact: a.impact,
     lastOrderAt: a.last_order_at,
     businessHours: a.business_hours,
     hubspotCompanyId: a.hubspot_company_id,

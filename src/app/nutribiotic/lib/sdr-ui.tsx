@@ -879,6 +879,29 @@ function AccountPanel({
 
         {panel && (
           <>
+            {/* THE THREE-SENTENCE READ, first thing under the header, the
+                phone screen he's already scrolled to right before dialing
+                (Juan, 2026-09-14). Same three fields account-detail.tsx's
+                "The gap" card reads (nb_accounts.current_state/future_state/
+                impact), just read as a short paragraph instead of a labeled
+                table: where they are, where they could be, what it's worth.
+                A gap here is reported, not hidden, so it's visible as work
+                still to do rather than looking finished when it isn't. */}
+            <div className="mt-3 rounded-md border border-[#E2DFD5] bg-[#FAF9F5] p-2.5 text-[13px] leading-relaxed text-[#3D4A44]">
+              {panel.currentState || panel.futureState || panel.impact ? (
+                <div className="flex flex-col gap-1">
+                  {panel.currentState && <div>{panel.currentState}</div>}
+                  {panel.futureState && <div>{panel.futureState}</div>}
+                  {panel.impact && <div>{panel.impact}</div>}
+                </div>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[#8A928C]">
+                  <Ico name="alert" size={12} />
+                  No executive summary on file yet, nobody has run discovery on this account.
+                </span>
+              )}
+            </div>
+
             <div className="mt-3 flex flex-col gap-1.5">
               <Fact label="Address" value={address} />
               <Fact label="Status" value={panel.lifecycle} />
