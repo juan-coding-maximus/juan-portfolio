@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {
-  title: "Gas Stop",
+  title: "Gas",
   description: "The cheapest fill on the way to where you're going.",
   robots: { index: false, follow: false },
   manifest: "/gas/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "Gas Stop", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "Gas", statusBarStyle: "default" },
   other: { "apple-mobile-web-app-capable": "yes" },
 };
 

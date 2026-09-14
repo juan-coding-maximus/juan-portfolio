@@ -33,7 +33,17 @@ function appleMapsTwoStops(station: Scored, destAddress: string): string {
   return `https://maps.apple.com/?saddr=Current%20Location&daddr=${stop}+to:${end}&dirflg=d`;
 }
 
-const UPSIDE_URL = "https://www.upside.com/find-offers";
+/* upside.com publishes /mobile/app/* as a universal link for its iOS app
+   (apple-app-site-association, checked 2026-09-14), so this opens the
+   installed app rather than the website. Upside has no public API or
+   per-station link, so the offer and its price are checked in the app. */
+const UPSIDE_URL = "https://www.upside.com/mobile/app/gas";
+
+/** GasBuddy's station search, the one public source that labels cash and
+ *  credit separately, for checking the card price before driving. */
+function gasBuddyUrl(s: Scored): string {
+  return `https://www.gasbuddy.com/home?search=${encodeURIComponent(s.address)}&fuel=1`;
+}
 
 export default function GasApp() {
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
@@ -117,7 +127,7 @@ export default function GasApp() {
   return (
     <main className="mx-auto max-w-[440px] px-5 pb-16 pt-[max(20px,env(safe-area-inset-top))]">
       <header className="flex items-center justify-between">
-        <h1 className="font-[family-name:var(--font-fraunces)] text-[30px] font-semibold leading-none tracking-tight">Gas Stop</h1>
+        <h1 className="font-[family-name:var(--font-fraunces)] text-[30px] font-semibold leading-none tracking-tight">Gas</h1>
         <LocationPill state={locState} onRetry={locate} />
       </header>
 
@@ -245,6 +255,10 @@ function StationCard({ s, rank, gallons, destAddress }: { s: Scored; rank: numbe
       <div className="mt-2 text-[14px] text-[#3D4A44]">
         ${Math.round(s.afterDiscount * gallons)} for {gal(gallons)} gal
         {s.updatedAt && <span className="text-[#8A928C]"> · price {ago(s.updatedAt)}</span>}
+        <span className="text-[#8A928C]"> · </span>
+        <a href={gasBuddyUrl(s)} target="_blank" rel="noopener" className="text-[#2C6A46] underline-offset-2 hover:underline">
+          GasBuddy
+        </a>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2">
         <a
