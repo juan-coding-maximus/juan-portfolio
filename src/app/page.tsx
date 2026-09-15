@@ -819,6 +819,36 @@ function SuitIcon() {
   );
 }
 
+function FiveStars() {
+  return (
+    <div className="flex items-center gap-0.5" aria-label="5 out of 5 stars">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <svg key={i} width="13" height="13" viewBox="0 0 24 24" fill="#C9A24B" aria-hidden="true">
+          <path d="M12 2.5l2.9 6.4 6.9.7-5.2 4.7 1.6 6.8L12 17.6l-6.2 3.5 1.6-6.8-5.2-4.7 6.9-.7z" />
+        </svg>
+      ))}
+    </div>
+  );
+}
+
+function Testimonial({
+  quote, name, role, linkedin, photo,
+}: { quote: React.ReactNode; name: string; role: string; linkedin: string; photo: string }) {
+  return (
+    <div className="mt-5 flex gap-4 rounded-2xl border border-[#284A3C] bg-[#0e1813] p-5">
+      <img src={photo} alt={name} className="h-12 w-12 shrink-0 rounded-full object-cover" />
+      <div>
+        <FiveStars />
+        <p className="mt-2 text-sm italic text-[#F2EFE6]/80">{quote}</p>
+        <p className="mt-3 text-xs uppercase tracking-widest text-[#C9A24B]/80">
+          <a href={linkedin} target="_blank" rel="noopener noreferrer" className="hover:underline">{name}</a>
+          {" "}· {role}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function CaseBullet({ children }: { children: React.ReactNode }) {
   return (
     <li className="flex gap-3">
@@ -917,26 +947,39 @@ function CaseStudies() {
       role: "Founding Go-To-Market Operator",
       title: "I built the investor deck and website for a 0→1 diagnostics startup, then closed the first clients myself.",
       body: (
-        <ul className="space-y-3">
-          <CaseBullet>
-            Built the{" "}
-            <strong className="text-[#C9A24B] font-medium">v1 investor deck and the investor website</strong>
-            , plus the operational workflows behind them, before anyone asked.
-          </CaseBullet>
-          <CaseBullet>
-            Set the full commercial plan for a{" "}
-            <strong className="text-[#C9A24B] font-medium">0→1 longevity-metabolomics diagnostics startup</strong>
-            : AI-driven Meta Ads leads, custom conversion software, and route-planned visits into dermatology and longevity-clinic accounts.
-          </CaseBullet>
-          <CaseBullet>
-            Cold-called dermatologists and clinic decision-makers across Los Angeles with zero brand recognition behind me, engaged{" "}
-            <strong className="text-[#C9A24B] font-medium">50+ high-intent leads</strong>
-            , and closed the first paying clients on a pilot program.
-          </CaseBullet>
-          <CaseBullet>
-            Wrote the sales playbook for further market development.
-          </CaseBullet>
-        </ul>
+        <>
+          <ul className="space-y-3">
+            <CaseBullet>
+              Built the{" "}
+              <strong className="text-[#C9A24B] font-medium">v1 investor deck and the investor website</strong>
+              , plus the operational workflows behind them, before anyone asked.
+            </CaseBullet>
+            <CaseBullet>
+              Set the full commercial plan for a{" "}
+              <strong className="text-[#C9A24B] font-medium">0→1 longevity-metabolomics diagnostics startup</strong>
+              : AI-driven Meta Ads leads, custom conversion software, and route-planned visits into dermatology and longevity-clinic accounts.
+            </CaseBullet>
+            <CaseBullet>
+              Cold-called dermatologists and clinic decision-makers across Los Angeles with zero brand recognition behind me, engaged{" "}
+              <strong className="text-[#C9A24B] font-medium">50+ high-intent leads</strong>
+              , and closed the first paying clients on a pilot program.
+            </CaseBullet>
+            <CaseBullet>
+              Wrote the sales playbook for further market development.
+            </CaseBullet>
+          </ul>
+          <Testimonial
+            quote={
+              <>
+                &ldquo;What really sets him apart is that once he understands the high-level goals and objectives, he immediately breaks them down into a concrete list of tasks and action items to begin moving the project forward. He&apos;s great at bridging the gap between idea and execution.&rdquo; &ldquo;He is someone who truly cares about both the quality of his work and the people he collaborates with.&rdquo;
+              </>
+            }
+            name="Philip Sell"
+            role="CEO & Co-founder, Metaba"
+            linkedin="https://www.linkedin.com/in/philipjsell/"
+            photo="/img/phil-sell-metaba.png"
+          />
+        </>
       ),
       art: "Metaba Health — site / ops board",
     },
