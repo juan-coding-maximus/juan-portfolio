@@ -11,10 +11,11 @@
  * this as a client child.
  */
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import type { Account, Activity, Contact, PurchaseLine, PurchaseOrder, Tier } from "./dal";
 import { setPotentialJuan } from "./account-actions";
 import { useRoute } from "./route-context";
+import { TouchpointCapture } from "./touchpoint-ui";
 import {
   Card,
   Empty,
@@ -30,6 +31,56 @@ import {
   prettyUrl,
   withinTrailing12mo,
 } from "./ui";
+
+/**
+ * The "+" on an open profile (Juan, 2026-09-15: standing in front of an
+ * account he already has open, the only thing he actually wants next is to
+ * log what just happened here, not the global QuickCapture button underneath
+ * this very modal, unreachable at z-40 while the profile sits at z-50). Opens
+ * the SAME TouchpointCapture every other door uses, with this account already
+ * hinted (skips account matching entirely) and the name seeded into the box
+ * so he never has to say what store he's at. z-[60]: one layer above the
+ * account modal (modal.tsx, z-50) it renders inside of.
+ */
+function LogVisitSheet({ account, onClose }: { account: Account; onClose: () => void }) {
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-[#14201B]/40 px-4 py-8 backdrop-blur-[2px] sm:py-14"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-[600px] rounded-xl border border-[#E2DFD5] bg-[#F7F6F1] shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-4 border-b border-[#E2DFD5] px-5 py-4">
+          <h2 className="truncate font-[family-name:var(--font-fraunces)] text-[19px] leading-none font-semibold tracking-tight">
+            Log a visit &middot; {account.name}
+          </h2>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="shrink-0 rounded-md p-1.5 text-[#8A928C] transition-colors hover:bg-[#ECEAE1] hover:text-[#14201B]"
+          >
+            <Ico name="close" size={16} />
+          </button>
+        </div>
+        <div className="max-h-[78vh] overflow-x-hidden overflow-y-auto px-5 py-5">
+          <TouchpointCapture accountIdHint={account.id} initialText={`${account.name}: `} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const POTENTIAL_LETTERS: Tier[] = ["A", "B", "C", "D", "E", "F", "G"];
 
@@ -132,9 +183,12 @@ export function AccountDetailBody({
   const links = SOCIAL_LINKS(a);
   const { addToRoute, inRoute } = useRoute();
   const onRoute = inRoute.has(a.id);
+  const [logVisitOpen, setLogVisitOpen] = useState(false);
 
   return (
     <div className="flex flex-col gap-5">
+      {logVisitOpen && <LogVisitSheet account={a} onClose={() => setLogVisitOpen(false)} />}
+
       {/* THE THREE OUTSIDE HANDLES, ABOVE EVERYTHING. Juan, 2026-08-05: the
           HubSpot record was reachable only from a map pin's card, so opening an
           account from a list meant closing the profile again to get to the
@@ -211,6 +265,17 @@ export function AccountDetailBody({
           <Ico name={onRoute ? "check" : "route"} size={13} />
           {onRoute ? "On the route" : "Add to route"}
         </button>
+
+        {/* Log a visit, right here. Same capture box as ClientOS and /visit,
+            pre-aimed at this account so it never has to say the store's name. */}
+        <button
+          type="button"
+          onClick={() => setLogVisitOpen(true)}
+          className="inline-flex items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white px-3.5 py-2 text-[13px] font-medium text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] hover:text-[#14201B]"
+        >
+          <Ico name="plus" size={13} />
+          Log a visit
+        </button>
       </div>
 
       <div className="grid min-w-0 gap-5 lg:grid-cols-[1fr_320px]">
@@ -233,11 +298,18 @@ export function AccountDetailBody({
             <ul className="flex flex-col gap-3">
               {contacts.map((c) => {
                 const name = [c.first_name, c.last_name].filter(Boolean).join(" ");
+                // c.title is free text (e.g. "DVM, Veterinarian"); c.role_tag is the
+                // coarse relationship the extractor read from what he actually
+                // called them (owner/manager/buyer/clerk/other). Title wins when
+                // set, since it's more specific, but a role_tag with no title is
+                // real information (an owner named with no job title stated) and
+                // used to render nothing at all here, silently.
+                const roleLabel = c.title || (c.role_tag ? c.role_tag[0].toUpperCase() + c.role_tag.slice(1) : null);
                 return (
                   <li key={c.id} className="flex flex-col gap-0.5 text-[13.5px]">
                     <div className="flex items-baseline gap-2">
                       {name && <span className="font-medium">{name}</span>}
-                      {c.title && <span className="text-[12px] text-[#8A928C]">{c.title}</span>}
+                      {roleLabel && <span className="text-[12px] text-[#8A928C]">{roleLabel}</span>}
                       {c.is_decision_maker && (
                         <span className="rounded bg-[#ECEAE1] px-1.5 py-0.5 text-[10.5px] font-medium tracking-wide text-[#3D4A44] uppercase">
                           Decision maker

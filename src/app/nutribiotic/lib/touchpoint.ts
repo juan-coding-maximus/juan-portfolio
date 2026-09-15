@@ -381,7 +381,11 @@ const EXTRACT_TOOL = {
             first_name: { type: ["string", "null"] },
             last_name: { type: ["string", "null"] },
             title: { type: ["string", "null"] },
-            role_tag: { type: ["string", "null"], enum: ["buyer", "owner", "manager", "clerk", "other", null] },
+            role_tag: {
+              type: ["string", "null"],
+              enum: ["buyer", "owner", "manager", "clerk", "other", null],
+              description: "What the text actually calls this person, not a default. 'owner' requires the text to say or clearly imply they own/run the store. 'buyer' means they were called the buyer or place/decide orders, never a fallback guess for an unspecified role. Null when no role is stated.",
+            },
             is_decision_maker: { type: "boolean" },
             email: { type: ["string", "null"] },
             phone: { type: ["string", "null"] },
@@ -490,6 +494,7 @@ RULES, all absolute:
 - activity.detail is what the rep said, kept in the rep's own first-person words ("I called...", not "The rep called..."). You may tidy filler, punctuation, and capitalization, and add light structure, but never rewrite it into third person, never paraphrase away his actual wording, and never drop a fact he stated.
 - activity.hubspot_summary is what reaches the shared CRM another rep or HQ reads. It must match activity.detail's first-person voice and completeness: never third person, never "the rep," never "visited" with no subject, and never drop a fact, however small (an aside about where someone is from, what they said about themselves, etc). You may tighten redundant phrasing, but do not summarize facts away. Still never invent a name, number, date, or fact not in the text.
 - Only include a person in "people" if the note actually names them or clearly describes a specific individual (a title alone like "the manager" with no name is still worth including with first_name/last_name null, if a real detail like an email or a stated preference is attached to them).
+- role_tag is this person's relationship to the business, read from what the text actually calls them: "owner" only when the text states or clearly implies they own or run the store ("the store owner," "she's owned it 40 years," "his shop"); "manager" when called a manager or store lead; "clerk" for front-desk or counter staff with no stated authority; "buyer" ONLY when the text calls them the buyer or the one who places/decides orders and nothing stronger (owner/manager) is stated; "other" for a role that doesn't fit those, e.g. a vet or a bookkeeper; null when no role is stated at all. Never default to "buyer" as a guess, it is its own specific claim, not a fallback for "someone at this business." is_decision_maker is separate: whether they can approve buying, not which of these roles they hold.
 - Only include a calendar_action if the note describes something that should go on a calendar (a scheduled meeting, an explicit follow-up date, a planned return visit). Do not invent a follow-up that was not mentioned.
 - when_iso must be a real resolved timestamp if a specific day/time was stated; if only vague ("follow up soon") leave it null and say so in notes.
 - FIRST, decide whether a customer was actually contacted. If nobody at a business was spoken to, walked in on, called, emailed or texted, activity.kind is "field_note" and direction is "internal". An observation about a storefront he only looked at or walked through, a thought about the market or the product line, a note to self about how the work should go, and an instruction to his own agency are ALL field notes. Do not reach for "visit", "call" or "meeting" because the note mentions a business name; a business named in passing is not a business contacted. A field note is never written to HubSpot, so hubspot_summary for one is short and plain, and it must never claim a contact happened ("I visited...", "I called...") when none did.
