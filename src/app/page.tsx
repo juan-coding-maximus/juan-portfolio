@@ -222,65 +222,56 @@ function Hero() {
 /* ====================================================
    2. HIGHLIGHTS
 ==================================================== */
-type Check = "Story" | "Audience" | "Voices" | "Proof";
-const CHECKS: Check[] = ["Story", "Audience", "Voices", "Proof"];
-
-// Every line traces to jobhunt/memory/cv/master.tex. Add a role or a check only from that file.
-// `href` scrolls to the matching case study below; rows without one are not clickable.
-const READINESS: { org: string; role: string; built: string; checks: Check[]; href?: string }[] = [
+// Every line traces to jobhunt/memory/cv/master.tex. Add a role only from that file.
+// Each row scrolls to its case study below.
+const READINESS: { org: string; role: string; time: string; built: string; href: string }[] = [
   {
     org: "Metaba Health",
     role: "Founding Go-To-Market Operator",
+    time: "1 year 2 months",
     built: "The new investor deck, a dedicated investor website, and the first paying clients.",
-    checks: ["Story", "Proof"],
     href: "#case-metaba",
-  },
-  {
-    org: "TrippBio",
-    role: "Associate Researcher",
-    built: "Investor pitch infographics on the commercial need for its assets, plus clinical trial analysis reported to the CEO.",
-    checks: ["Story"],
   },
   {
     org: "USC Center for Personalized Brain Health",
     role: "Marketing & Social Strategy",
+    time: "1 year 1 month",
     built: "Social across YouTube, LinkedIn, Facebook, and Instagram, from short clips to a docu-series. Audience tripled in 8 months.",
-    checks: ["Story", "Audience"],
     href: "#case-usc",
   },
   {
-    org: "Milieu Skin Microbiome",
+    org: "Superbiome",
     role: "Clinical Partners & Creator Orchestration",
+    time: "3 months",
     built: "A content engine of 400+ creators, dermatologists among them, running across Meta and TikTok.",
-    checks: ["Audience", "Voices"],
-    href: "#case-milieu",
+    href: "#case-superbiome",
   },
   {
     org: "Biotech Connection LA",
     role: "Business Developer",
+    time: "1 year 8 months",
     built: "20+ KOLs, 100-attendee industry events with the social content around them, and Amgen and USC Keck as sponsors.",
-    checks: ["Audience", "Voices", "Proof"],
     href: "#case-bcla",
   },
   {
     org: "Your Aura Fragrance",
-    role: "Co-Founder",
+    role: "Founder",
+    time: "1 year 3 months",
     built: "A brand built on my USC toxicology research: 200+ customers and a 30% repeat rate.",
-    checks: ["Story", "Proof"],
     href: "#case-aura",
   },
   {
     org: "NutriBiotic",
     role: "Field Sales Manager",
+    time: "3 months · present",
     built: "Science-first handouts that prove product validity, and 40 new accounts in 40 days.",
-    checks: ["Story", "Proof"],
     href: "#case-nutribiotic",
   },
 ];
 
 function Highlights() {
   const rowGrid =
-    "grid grid-cols-1 md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_repeat(4,5rem)] lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_repeat(4,6rem)] gap-2 md:gap-6 px-6 md:px-8 py-5 md:items-center";
+    "grid grid-cols-1 md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] lg:grid-cols-[minmax(0,23rem)_minmax(0,1fr)] gap-2 md:gap-8 px-6 md:px-8 py-5 md:items-center";
 
   return (
     <section id="portfolio" className="px-6 md:px-12 lg:px-20 py-20 md:py-28 border-t border-[#F2EFE6]/10">
@@ -293,64 +284,26 @@ function Highlights() {
         </Reveal>
         <div className="rounded-3xl border border-[#284A3C] overflow-hidden">
           <div
-            className="hidden md:grid md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_repeat(4,5rem)] lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_repeat(4,6rem)] gap-6 px-8 py-4 bg-[#0e1813] border-b border-[#284A3C] text-xs uppercase tracking-widest text-[#F2EFE6]/50"
+            className="hidden md:grid md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] lg:grid-cols-[minmax(0,23rem)_minmax(0,1fr)] gap-8 px-8 py-4 bg-[#0e1813] border-b border-[#284A3C] text-xs uppercase tracking-widest text-[#F2EFE6]/50"
             aria-hidden="true"
           >
             <span>Where</span>
             <span>What I built</span>
-            {CHECKS.map((c) => (
-              <span key={c} className="text-center">{c}</span>
-            ))}
           </div>
           <ul className="divide-y divide-[#284A3C]">
-            {READINESS.map((r, i) => {
-              const inner = (
-                <>
+            {READINESS.map((r, i) => (
+              <li key={r.org}>
+                <Reveal delay={i * 40}>
+                  <a href={r.href} className={`${rowGrid} hover:bg-[#0e1813] transition-colors`}>
                     <div>
                       <p className="font-display text-lg leading-snug">{r.org}</p>
-                      <p className="text-sm text-[#F2EFE6]/50">{r.role}</p>
+                      <p className="text-sm text-[#F2EFE6]/50">{r.role} · <span className="whitespace-nowrap">{r.time}</span></p>
                     </div>
                     <p className="text-[#F2EFE6]/80 leading-relaxed">{r.built}</p>
-                    {CHECKS.map((c) => {
-                      const on = r.checks.includes(c);
-                      return (
-                        <div key={c} className="hidden md:flex justify-center">
-                          {on ? (
-                            <span className="w-3 h-3 rounded-full bg-[#C9A24B] shadow-[0_0_0_4px_rgba(201,162,75,0.15)]">
-                              <span className="sr-only">{c}</span>
-                            </span>
-                          ) : (
-                            <span className="w-1 h-1 rounded-full bg-[#F2EFE6]/20" aria-hidden="true" />
-                          )}
-                        </div>
-                      );
-                    })}
-                    <div className="md:hidden flex flex-wrap gap-2 mt-1">
-                      {r.checks.map((c) => (
-                        <span
-                          key={c}
-                          className="rounded-full border border-[#C9A24B]/50 text-[#C9A24B] text-[11px] uppercase tracking-widest px-2.5 py-1"
-                        >
-                          {c}
-                        </span>
-                      ))}
-                    </div>
-                </>
-              );
-              return (
-                <li key={r.org}>
-                  <Reveal delay={i * 40}>
-                    {r.href ? (
-                      <a href={r.href} className={`${rowGrid} hover:bg-[#0e1813] transition-colors`}>
-                        {inner}
-                      </a>
-                    ) : (
-                      <div className={rowGrid}>{inner}</div>
-                    )}
-                  </Reveal>
-                </li>
-              );
-            })}
+                  </a>
+                </Reveal>
+              </li>
+            ))}
           </ul>
         </div>
       </div>
@@ -363,9 +316,9 @@ function Highlights() {
 ==================================================== */
 function MetricLogo({ src, alt }: { src: string; alt: string }) {
   return (
-    <div className="mt-8 flex justify-center">
+    <div className="mt-6 flex justify-center">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt={alt} className="h-12 w-auto object-contain rounded-2xl" />
+      <img src={src} alt={alt} className="h-10 w-auto object-contain rounded-xl" />
     </div>
   );
 }
@@ -380,7 +333,7 @@ function Metric({
   color: string;
 }) {
   return (
-    <div>
+    <div className="text-center max-w-[11rem]">
       <div
         className={`font-display text-[clamp(2rem,4vw,3.2rem)] leading-none ${
           color === "gold"
@@ -410,7 +363,7 @@ function MetricWall() {
         </Reveal>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
           <Reveal delay={0}>
-            <div className="grid grid-cols-2 gap-6">
+            <div className="flex justify-center gap-8">
               <Metric n={<CountUp to={3} suffix="×" />} label="audience in 8 months" color="gold" />
               <Metric n={<CountUp to={93} suffix="k" />} label="newsletter subscribers" color="" />
             </div>
@@ -418,7 +371,7 @@ function MetricWall() {
           </Reveal>
 
           <Reveal delay={80}>
-            <div className="grid grid-cols-2 gap-6">
+            <div className="flex justify-center gap-8">
               <Metric n={<CountUp to={200} suffix="+" />} label="biotech and pharma accounts" color="" />
               <Metric n={<CountUp to={20} suffix="+" />} label="KOLs" color="sage" />
             </div>
@@ -426,7 +379,7 @@ function MetricWall() {
           </Reveal>
 
           <Reveal delay={160}>
-            <div className="grid grid-cols-2 gap-6">
+            <div className="flex justify-center gap-8">
               <Metric n={<CountUp to={40} />} label="new accounts in 40 days" color="gold" />
               <Metric n={<CountUp to={30} suffix="+" />} label="reps on my sales playbook" color="" />
             </div>
@@ -452,7 +405,7 @@ function BrandStrip() {
   const brain:   BrandItem = { kind: "img", src: "/img/logos/usc-brain.png",         alt: "USC Center for Personalized Brain Health", href: "https://keck.usc.edu/cpbh",     rounded: true };
   const bio:     BrandItem = { kind: "img", src: "/img/logos/biotech-connection.png",alt: "Biotech Connection LA",                    href: "https://bc-la.org",             rounded: true };
   const metaba:  BrandItem = { kind: "img", src: "/img/logos/metaba.png",            alt: "Metaba Health",                            href: "https://metabahealth.us",       rounded: true };
-  const super_:  BrandItem = { kind: "img", src: "/img/logos/superbiome.png",        alt: "Milieu Skin Microbiome",                   href: "https://milieuskin.com",        rounded: true };
+  const super_:  BrandItem = { kind: "img", src: "/img/logos/superbiome.png",        alt: "Superbiome",                   href: "https://milieuskin.com",        rounded: true };
   const nutri:   BrandItem = { kind: "img", src: "/img/logos/nutribiotic-white.png", alt: "NutriBiotic",                              href: "https://nutribiotic.com" };
 
   // Every logo once before any repeat; NutriBiotic twice per cycle. The marquee
@@ -823,11 +776,11 @@ function CaseBullet({ children }: { children: React.ReactNode }) {
 
 function Social({ name }: { name: "YouTube" | "LinkedIn" | "Facebook" | "Instagram" }) {
   const cls =
-    name === "YouTube" ? "text-[#FF0000]" :
-    name === "LinkedIn" ? "text-[#0A66C2]" :
-    name === "Facebook" ? "text-[#1877F2]" :
-    "text-[#E1306C]";
-  return <strong className={`font-medium ${cls}`}>{name}</strong>;
+    name === "YouTube" ? "text-[#FF0000]/70" :
+    name === "LinkedIn" ? "text-[#0A66C2]/80" :
+    name === "Facebook" ? "text-[#1877F2]/75" :
+    "text-[#E1306C]/70";
+  return <span className={cls}>{name}</span>;
 }
 
 function CaseStudies() {
@@ -840,12 +793,12 @@ function CaseStudies() {
       id: "case-usc",
       logo: { src: "/img/logos/usc-brain.png", alt: "USC Center for Personalized Brain Health" },
       tag: "MARKETING & SOCIAL STRATEGY · USC · HIPAA SECURE · COMPLIANT SCIENTIFIC CLAIMS",
-      role: "Marketing & Social Strategy",
+      role: "Marketing & Social Strategy · 1 year 1 month",
       title: "I joined a world‑class Alzheimer's center to get their science out of the journals and into the world, loud and clear.",
       body: (
         <ul className="space-y-3">
           <CaseBullet>
-            Ran social across <Social name="YouTube" />, <Social name="LinkedIn" />, <Social name="Facebook" />, and <Social name="Instagram" /> for an Alzheimer&apos;s Lab &amp; Brain Health Clinic: every piece planned, produced, edited, and distributed as short clips, email, and a long‑form docu‑series, all HIPAA‑compliant.
+            Ran social across <Social name="YouTube" />, <Social name="LinkedIn" />, <Social name="Facebook" />, and <Social name="Instagram" />{" "}for an Alzheimer&apos;s Lab &amp; Brain Health Clinic: every piece planned, produced, edited, and distributed as short clips, email, and a long‑form docu‑series, all HIPAA‑compliant.
           </CaseBullet>
           <CaseBullet>
             <strong className="text-[#C9A24B] font-medium">Tripled the total audience in 8 months</strong>
@@ -863,7 +816,7 @@ function CaseStudies() {
       id: "case-bcla",
       logo: { src: "/img/logos/biotech-connection.png", alt: "Biotech Connection LA" },
       tag: "KOL NETWORK · EVENTS · CONTENT",
-      role: "Business Developer",
+      role: "Business Developer · 1 year 8 months",
       title: "I owned 200+ accounts as a business developer, cold contact to close.",
       body: (
         <ul className="space-y-3">
@@ -885,10 +838,10 @@ function CaseStudies() {
       art: "bcla-video",
     },
     {
-      id: "case-milieu",
-      logo: { src: "/img/logos/superbiome.png", alt: "Milieu Skin Microbiome" },
+      id: "case-superbiome",
+      logo: { src: "/img/logos/superbiome.png", alt: "Superbiome" },
       tag: "CREATOR & DOCTOR PARTNERSHIPS · TARGETED OUTBOUND",
-      role: "Clinical Partners & Creator Orchestration",
+      role: "Clinical Partners & Creator Orchestration · 3 months",
       title: "I built a 400+ creator content engine for a science-first skincare brand.",
       body: (
         <ul className="space-y-3">
@@ -916,7 +869,7 @@ function CaseStudies() {
       id: "case-metaba",
       logo: { src: "/img/logos/metaba.png", alt: "Metaba Health" },
       tag: "INVESTOR READINESS · 0→1 GO-TO-MARKET",
-      role: "Founding Go-To-Market Operator",
+      role: "Founding Go-To-Market Operator · 1 year 2 months",
       title: "I built the investor deck and website for a 0→1 diagnostics startup, then closed the first clients myself.",
       body: (
         <>
@@ -958,7 +911,7 @@ function CaseStudies() {
       id: "case-aura",
       logo: { src: "/img/logos/aura-fragrance-science.png", alt: "Your Aura Fragrance Science", tall: true },
       tag: "FROM USC RESEARCH TO A CPG BRAND",
-      role: "Founder",
+      role: "Founder · 1 year 3 months",
       title: "I bootstrapped a personalized perfume company into 5 figures of revenue.",
       body: (
         <>
@@ -991,7 +944,7 @@ function CaseStudies() {
       id: "case-nutribiotic",
       logo: { src: "/img/logos/nutribiotic-white.png", alt: "NutriBiotic" },
       tag: "BRAND STRATEGY · SALES PLAYBOOK",
-      role: "Field Sales Manager",
+      role: "Field Sales Manager · 3 months · present",
       title: "I map the enterprise buyer experience and steer our brand strategy and sales towards it.",
       body: (
         <ul className="space-y-3">
@@ -1135,7 +1088,7 @@ function Capabilities() {
       num: "01",
       icon: "trajectory",
       title: "Investor readiness",
-      desc: "The deck, the website, and the science in plain words, ready before the first investor meeting. I built Metaba Health's new investor deck and TrippBio's investor pitch infographics.",
+      desc: "The deck, the website, and the science in plain words, ready before the first investor meeting. I built Metaba Health's new investor deck and investor website.",
     },
     {
       num: "02",
@@ -1153,7 +1106,7 @@ function Capabilities() {
       num: "04",
       icon: "link",
       title: "KOLs & creator partnerships",
-      desc: "Doctors, researchers, and creators who vouch for the science: 20+ KOLs at Biotech Connection LA, 400+ creators at Milieu.",
+      desc: "Doctors, researchers, and creators who vouch for the science: 20+ KOLs at Biotech Connection LA, 400+ creators at Superbiome.",
     },
     {
       num: "05",
