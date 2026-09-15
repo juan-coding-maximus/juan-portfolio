@@ -98,8 +98,48 @@ two are marked TODO because they aren't tested yet.
 17. If Section 8 (new-door prospecting) is greenlit, build discovery only first, prove the list, then the script.
 18. Use the Sales OS (`juanarenas.bio/nutribiotic`) and Desktop bundle as the single source for all of the above, never a parallel list.
 
+## 10. Plameca's own sales meeting framework (borrowed, not yet field-tested)
+
+Source: Óscar Fernández Francisco, director general of the Plameca group (Plameca, ATP Farma,
+NutriBiotic), relayed from Armando, the group's sales rep manager in Spain, called out as an
+excellent salesperson. From Juan's 2026-09-15 discovery call. Nothing below has been run at a
+SoCal door yet; try it, then move whatever survives up into Sections 1-6 as field-tested, and
+strike the rest.
+
+Three things matter most inside the meeting, in this order:
+
+1. **Generate the need** before talking about the product at all.
+2. **The golden minute**: explain how the product covers that need, its actual benefits.
+3. **Help them sell it**: give the buyer what they need to place the product with their own
+   customers, not just to stock it.
+
+Then the rest of the call, in order:
+
+4. **The novelty.** Four new products a year is the cadence Plameca uses; lead with whatever's
+   new this trip and its specific benefits.
+5. **The current promotion.** A concrete reason to buy this week, not "sometime."
+6. **Top sellers they don't carry.** Check the dossier for what's missing, then act genuinely
+   surprised they don't carry it, "we sell millions of this every year." Only works when the
+   number is real for that product; don't borrow the line for a product that isn't actually a
+   top seller.
+7. **Restock needs.** This step depends on already knowing what the account is supposed to have
+   bought, exactly the dossier-before-the-door habit in Section 3, step 1.
+
+Before the meeting: call ahead, then send a reminder email. That's how Plameca's own reps book
+meetings, not a cold walk-in.
+
+Framing to open with: name yourself as a new rep, and the reason for the questions is
+understanding the client better in order to serve them and to shape better products around what
+the market is actually asking for.
+
+**Where this overlaps what's already field-tested:** Section 3's dossier-read and reorder ask
+cover steps 1 and 7 above already. What's new here is the golden-minute framing, the novelty/promo
+sequencing, and the top-seller surprise beat, none of which are explicit in Sections 1-6 today.
+
 ## Changelog
 
+- 2026-09-15 · added Section 10 (Plameca's own sales meeting framework, from Óscar Fernández via
+  the Armando referral, not yet field-tested).
 - 2026-09-04 · added Section 9 (weekly action checklist, a run-order compression of Sections 1-3/6/7, two items marked TODO).
 - 2026-08-14 · added Section 8 (new-account prospecting kit, proposed, awaiting go-ahead).
 - 2026-08-02 · v0 skeleton, structure and the already-proven sections.
