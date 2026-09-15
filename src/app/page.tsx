@@ -826,7 +826,7 @@ function Social({ name }: { name: "YouTube" | "LinkedIn" | "Facebook" | "Instagr
     name === "YouTube" ? "text-[#FF0000]" :
     name === "LinkedIn" ? "text-[#0A66C2]" :
     name === "Facebook" ? "text-[#1877F2]" :
-    "bg-gradient-to-r from-[#F58529] via-[#DD2A7B] to-[#8134AF] bg-clip-text text-transparent";
+    "text-[#E1306C]";
   return <strong className={`font-medium ${cls}`}>{name}</strong>;
 }
 
