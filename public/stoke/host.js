@@ -21,6 +21,7 @@
   let ws = null;
   let audioCtx = null;
   let clickGainNode = null;
+  let songGainNode = null;
   let clockOffset = 0;
   let songs = [];
   let songCache = new Map(); // songId -> AudioBuffer
@@ -28,6 +29,7 @@
   let lastResults = null;
   let liveActiveSource = null;
   let isReplaying = false;
+  let clickOnly = false;
 
   const PLAYER_URL_BASE = 'https://juanarenas.bio/stoke';
 
@@ -37,14 +39,42 @@
       clickGainNode = audioCtx.createGain();
       clickGainNode.gain.value = 0.7;
       clickGainNode.connect(audioCtx.destination);
+      songGainNode = audioCtx.createGain();
+      songGainNode.gain.value = 1;
+      songGainNode.connect(audioCtx.destination);
     }
     if (audioCtx.state === 'suspended') audioCtx.resume();
     return audioCtx;
   }
 
+  function setClickOnlyUI(value) {
+    clickOnly = value;
+    const btn = $('clickOnlyBtn');
+    if (btn) {
+      btn.textContent = value ? 'Click only: ON' : 'Click only: off';
+      btn.classList.toggle('primary', value);
+      btn.classList.toggle('ghost', !value);
+    }
+    if (songGainNode) {
+      const now = audioCtx.currentTime;
+      songGainNode.gain.cancelScheduledValues(now);
+      songGainNode.gain.setValueAtTime(songGainNode.gain.value, now);
+      songGainNode.gain.linearRampToValueAtTime(value ? 0 : 1, now + 0.08);
+    }
+  }
+
+  // The dashboard can be loaded from a different origin than the session
+  // server (the static juanarenas.bio mirror vs. the laptop behind a
+  // cloudflared tunnel). Every song file and API call must resolve against
+  // the session server, not the page's own origin.
+  function mediaUrl(path) {
+    const host = localStorage.getItem('stokeServer');
+    return host ? `https://${host}${path}` : path;
+  }
+
   function loadSong(song) {
     if (songCache.has(song.id)) return songCache.get(song.id);
-    const p = fetch(song.file)
+    const p = fetch(mediaUrl(song.file))
       .then((r) => r.arrayBuffer())
       .then((buf) => ensureAudioContext().decodeAudioData(buf));
     songCache.set(song.id, p);
@@ -106,9 +136,21 @@
       renderMembers(msg.members);
       return;
     }
+    if (msg.type === 'songs_updated') {
+      const keepId = $('songSelect').value;
+      songs = msg.songs;
+      populateSongs();
+      if (songs.some((s) => s.id === keepId)) $('songSelect').value = keepId;
+      applySongDefaults();
+      return;
+    }
     if (msg.type === 'start_at') {
       lastRun = msg.run;
       beginLive(msg.serverTime);
+      return;
+    }
+    if (msg.type === 'click_toggle') {
+      setClickOnlyUI(!!msg.clickOnly);
       return;
     }
     if (msg.type === 'run_complete') {
@@ -127,7 +169,7 @@
     const sel = $('songSelect');
     sel.innerHTML = songs.map((s) => `<option value="${s.id}">${s.title} — ${s.artist}</option>`).join('');
     applySongDefaults();
-    sel.addEventListener('change', applySongDefaults);
+    sel.onchange = applySongDefaults;
   }
 
   function applySongDefaults() {
@@ -167,6 +209,7 @@
     showScreen('live');
     $('liveTitle').textContent = `${lastRun.title} · ${lastRun.bpm} BPM`;
     $('liveSub').textContent = 'Results appear when everyone finishes';
+    setClickOnlyUI(!!lastRun.clickOnly);
 
     if (!$('playHereCheck').checked) return;
     ensureAudioContext();
@@ -178,9 +221,10 @@
       const startTime = audioCtx.currentTime + delayMs / 1000;
       const beatOffsetSec = lastRun.beatOffsetMs / 1000;
       const beatIntervalSec = 60 / lastRun.bpm;
+      songGainNode.gain.setValueAtTime(lastRun.clickOnly ? 0 : 1, startTime);
       const source = audioCtx.createBufferSource();
       source.buffer = buffer;
-      source.connect(audioCtx.destination);
+      source.connect(songGainNode);
       source.start(startTime);
       liveActiveSource = source;
       const totalBeats = Math.floor((buffer.duration - beatOffsetSec) / beatIntervalSec) + 1;
@@ -381,7 +425,54 @@
   });
 
   $('startBtn').addEventListener('click', () => {
-    send({ type: 'start_request', songId: $('songSelect').value, bpm: parseFloat($('bpmInput').value), beatOffsetMs: parseFloat($('offsetInput').value) });
+    send({
+      type: 'start_request',
+      songId: $('songSelect').value,
+      bpm: parseFloat($('bpmInput').value),
+      beatOffsetMs: parseFloat($('offsetInput').value),
+      clickOnly: $('startClickOnlyCheck').checked,
+    });
+  });
+
+  $('clickOnlyBtn').addEventListener('click', () => {
+    send({ type: 'click_toggle', clickOnly: !clickOnly });
+  });
+
+  $('uploadBtn').addEventListener('click', async () => {
+    const file = $('uploadFile').files[0];
+    if (!file) { $('uploadStatus').textContent = 'Choose a song file first.'; return; }
+    const title = $('uploadTitle').value.trim() || file.name.replace(/\.[^.]+$/, '');
+    const artist = $('uploadArtist').value.trim();
+    const bpm = parseFloat($('uploadBpm').value);
+    const offsetMs = parseFloat($('uploadOffset').value) || 0;
+    if (!bpm || bpm <= 0) { $('uploadStatus').textContent = 'Enter the official BPM.'; return; }
+    const ext = (file.name.match(/\.[^.]+$/) || ['.mp3'])[0];
+    $('uploadStatus').textContent = 'Uploading…';
+    $('uploadBtn').disabled = true;
+    try {
+      const qs = new URLSearchParams({ title, artist, bpm: String(bpm), offsetMs: String(offsetMs), ext });
+      const res = await fetch(mediaUrl(`/upload?${qs.toString()}`), {
+        method: 'POST',
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        body: file,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      songs = data.songs;
+      populateSongs();
+      $('songSelect').value = data.song.id;
+      applySongDefaults();
+      $('uploadStatus').textContent = `Added "${data.song.title}". Selected below.`;
+      $('uploadFile').value = '';
+      $('uploadTitle').value = '';
+      $('uploadArtist').value = '';
+      $('uploadBpm').value = '';
+      $('uploadOffset').value = '';
+    } catch (e) {
+      $('uploadStatus').textContent = e.message;
+    } finally {
+      $('uploadBtn').disabled = false;
+    }
   });
 
   $('replayBtn').addEventListener('click', replay);

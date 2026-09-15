@@ -45,7 +45,7 @@
         <select id="songSelect"></select>
       </label>
       <div class="row2">
-        <label class="field">BPM
+        <label class="field">Official BPM
           <input id="bpmInput" type="number" min="20" max="300" />
         </label>
         <label class="field">Beat offset (ms)
@@ -54,8 +54,33 @@
       </div>
       <button id="testClickBtn" class="ghost">Test click</button>
       <label class="field checkboxField"><input id="playHereCheck" type="checkbox" checked /> Also play song + click on this computer</label>
+      <label class="field checkboxField"><input id="startClickOnlyCheck" type="checkbox" /> Start in click only (song muted, official BPM click)</label>
       <button id="startBtn" class="primary" disabled>Start song</button>
       <p id="setupStatus" class="status"></p>
+
+      <div class="uploadBox">
+        <h3>Add any song</h3>
+        <p class="sub small">Upload a file you have the audio for (mp3, wav, m4a, aac, ogg, flac, or an mp4 pulled from a video). Set its real BPM once, and it's saved here for next time.</p>
+        <input id="uploadFile" type="file" accept="audio/*,video/mp4,.mp3,.wav,.m4a,.mp4,.aac,.ogg,.flac" />
+        <div class="row2">
+          <label class="field">Title
+            <input id="uploadTitle" type="text" placeholder="Song title" autocomplete="off" />
+          </label>
+          <label class="field">Artist
+            <input id="uploadArtist" type="text" placeholder="Artist (optional)" autocomplete="off" />
+          </label>
+        </div>
+        <div class="row2">
+          <label class="field">Official BPM
+            <input id="uploadBpm" type="number" min="20" max="300" placeholder="e.g. 120" />
+          </label>
+          <label class="field">Beat offset (ms)
+            <input id="uploadOffset" type="number" step="10" placeholder="0" />
+          </label>
+        </div>
+        <button id="uploadBtn" class="ghost">Upload &amp; add to song list</button>
+        <p id="uploadStatus" class="status"></p>
+      </div>
     </div>
     <div class="setupRight">
       <img src="/stoke/img/stoke-club-logo.png" alt="Stoke Club" class="logo logo-small" />
@@ -71,6 +96,7 @@
   <h2 id="liveTitle">Running</h2>
   <p class="sub" id="liveSub"></p>
   <div class="beatPulse" id="beatPulse"></div>
+  <button id="clickOnlyBtn" class="ghost">Click only: off</button>
   <ul id="liveMemberList" class="members"></ul>
 </section>
 

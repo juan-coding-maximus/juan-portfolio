@@ -29,11 +29,22 @@
   let isPlaying = false;
   let tapLog = [];
   let clickGainNode = null;
+  let songGainNode = null;
   let activeSource = null;
+  let clickOnly = false;
 
   function serverHost() {
     const params = new URLSearchParams(location.search);
     return params.get('server') || localStorage.getItem('stokeServer') || '';
+  }
+
+  // The page (and its song audio, upload endpoint) can be served from a
+  // different origin than the session server (e.g. the static juanarenas.bio
+  // mirror vs. the laptop behind a cloudflared tunnel). Every song file and
+  // API call must resolve against the session server, not the page's own origin.
+  function mediaUrl(path) {
+    const host = localStorage.getItem('stokeServer');
+    return host ? `https://${host}${path}` : path;
   }
 
   function ensureAudioContext() {
@@ -42,14 +53,29 @@
       clickGainNode = audioCtx.createGain();
       clickGainNode.gain.value = 0.7;
       clickGainNode.connect(audioCtx.destination);
+      songGainNode = audioCtx.createGain();
+      songGainNode.gain.value = 1;
+      songGainNode.connect(audioCtx.destination);
     }
     if (audioCtx.state === 'suspended') audioCtx.resume();
     return audioCtx;
   }
 
+  function setClickOnly(value) {
+    clickOnly = value;
+    if (songGainNode) {
+      const now = audioCtx.currentTime;
+      songGainNode.gain.cancelScheduledValues(now);
+      songGainNode.gain.setValueAtTime(songGainNode.gain.value, now);
+      songGainNode.gain.linearRampToValueAtTime(value ? 0 : 1, now + 0.08);
+    }
+    const status = $('playStatus');
+    if (status && isPlaying) status.textContent = value ? 'Click only · song muted' : 'Tap on the beat';
+  }
+
   async function loadSong(url) {
     songReady = false;
-    const res = await fetch(url);
+    const res = await fetch(mediaUrl(url));
     const buf = await res.arrayBuffer();
     songBuffer = await audioCtx.decodeAudioData(buf);
     songReady = true;
@@ -124,6 +150,10 @@
       beginCountdownAndPlay(msg.serverTime);
       return;
     }
+    if (msg.type === 'click_toggle') {
+      setClickOnly(!!msg.clickOnly);
+      return;
+    }
     if (msg.type === 'reset') {
       isPlaying = false;
       tapLog = [];
@@ -152,7 +182,7 @@
       $('playStatus').textContent = 'Starting...';
       setTimeout(() => {
         isPlaying = true;
-        $('playStatus').textContent = 'Tap on the beat';
+        $('playStatus').textContent = (run && run.clickOnly) ? 'Click only · song muted' : 'Tap on the beat';
         startPulse(beatOffsetSec);
       }, delayMs);
     });
@@ -161,9 +191,11 @@
   function schedulePlayback(startTime, beatOffsetSec) {
     songStartAudioTime = startTime;
     totalBeats = Math.floor((songBuffer.duration - beatOffsetSec) / beatIntervalSec) + 1;
+    clickOnly = !!(run && run.clickOnly);
+    songGainNode.gain.setValueAtTime(clickOnly ? 0 : 1, startTime);
     const source = audioCtx.createBufferSource();
     source.buffer = songBuffer;
-    source.connect(audioCtx.destination);
+    source.connect(songGainNode);
     source.start(startTime);
     source.onended = onSongEnded;
     activeSource = source;
