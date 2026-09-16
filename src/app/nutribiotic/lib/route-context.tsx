@@ -85,6 +85,14 @@ type RouteCtx = {
   stopTimes: Record<string, string>;
   /** Set or (with null) clear one stop's stated time on the active day. */
   setStopTime: (id: string, at: string | null) => void;
+  /** Set the moment an optimistic write below (any of them, same shared
+   *  cause) fails to persist and gets reverted. Every one of these writes
+   *  used to fail silently: the tap moved the list, the save rejected, and
+   *  it just quietly slid back with nothing on screen saying why (Juan,
+   *  2026-09-16: added a client, watched it disappear, no message at all).
+   *  Cleared automatically the next time any write is attempted. */
+  writeError: string | null;
+  dismissWriteError: () => void;
 };
 
 const Ctx = createContext<RouteCtx | null>(null);
@@ -120,6 +128,7 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   const [doneByDay, setDoneByDay] = useState<RouteDoneByDay>({});
   const [timesByDay, setTimesByDay] = useState<RouteStopTimesByDay>({});
   const [hydrated, setHydrated] = useState(false);
+  const [writeError, setWriteError] = useState<string | null>(null);
   const dayTouchedRef = useRef(false);
   const hydratedRef = useRef(false);
 
@@ -222,8 +231,12 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   function commitDay(day: string, next: RouteDraftEntry[]) {
     const prev = draftByDay;
     const nextByDay = { ...draftByDay, [day]: next };
+    setWriteError(null);
     setDraftByDay(nextByDay);
-    saveRouteDraft(nextByDay).catch(() => setDraftByDay(prev));
+    saveRouteDraft(nextByDay).catch(() => {
+      setDraftByDay(prev);
+      setWriteError("Couldn't save that change. Check your connection and try again.");
+    });
   }
 
   const inRoute = useMemo(() => new Set(routeDraft.map(entryId)), [routeDraft]);
@@ -304,8 +317,12 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       [activeDay]: routeDraft.filter((e) => entryId(e) !== id),
       [day]: [...targetList, entry],
     };
+    setWriteError(null);
     setDraftByDay(nextByDay);
-    saveRouteDraft(nextByDay).catch(() => setDraftByDay(prev));
+    saveRouteDraft(nextByDay).catch(() => {
+      setDraftByDay(prev);
+      setWriteError("Couldn't save that change. Check your connection and try again.");
+    });
   }
 
   function clearRoute() {
@@ -320,8 +337,12 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   function commitCalls(day: string, next: CallEntry[]) {
     const prev = callsByDay;
     const nextByDay = { ...callsByDay, [day]: next };
+    setWriteError(null);
     setCallsByDay(nextByDay);
-    saveRouteCalls(nextByDay).catch(() => setCallsByDay(prev));
+    saveRouteCalls(nextByDay).catch(() => {
+      setCallsByDay(prev);
+      setWriteError("Couldn't save that change. Check your connection and try again.");
+    });
   }
 
   function addCall(call: Omit<CallEntry, "id">) {
@@ -352,8 +373,12 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       [activeDay]: calls.filter((c) => c.id !== id),
       [day]: [...targetList, entry],
     };
+    setWriteError(null);
     setCallsByDay(nextByDay);
-    saveRouteCalls(nextByDay).catch(() => setCallsByDay(prev));
+    saveRouteCalls(nextByDay).catch(() => {
+      setCallsByDay(prev);
+      setWriteError("Couldn't save that change. Check your connection and try again.");
+    });
   }
 
   // Same optimistic-write shape again, over the done set (0042). A toggle
@@ -362,8 +387,12 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   function commitDone(day: string, next: string[]) {
     const prev = doneByDay;
     const nextByDay = { ...doneByDay, [day]: next };
+    setWriteError(null);
     setDoneByDay(nextByDay);
-    saveRouteDone(nextByDay).catch(() => setDoneByDay(prev));
+    saveRouteDone(nextByDay).catch(() => {
+      setDoneByDay(prev);
+      setWriteError("Couldn't save that change. Check your connection and try again.");
+    });
   }
 
   /* Same optimistic write as every other column on this row. Clearing the last
@@ -377,8 +406,12 @@ export function RouteProvider({ children }: { children: ReactNode }) {
     const nextByDay = { ...timesByDay };
     if (Object.keys(dayTimes).length > 0) nextByDay[activeDay] = dayTimes;
     else delete nextByDay[activeDay];
+    setWriteError(null);
     setTimesByDay(nextByDay);
-    saveRouteStopTimes(nextByDay).catch(() => setTimesByDay(prev));
+    saveRouteStopTimes(nextByDay).catch(() => {
+      setTimesByDay(prev);
+      setWriteError("Couldn't save that change. Check your connection and try again.");
+    });
   }
 
   function toggleDone(id: string) {
@@ -414,6 +447,8 @@ export function RouteProvider({ children }: { children: ReactNode }) {
         toggleDone,
         stopTimes,
         setStopTime,
+        writeError,
+        dismissWriteError: () => setWriteError(null),
       }}
     >
       {children}

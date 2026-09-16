@@ -44,6 +44,7 @@ import type { CallEntry, CustomStop, CustomStopKind, RouteEndpoint, RouteSchedul
 import { dayLabel } from "../lib/field-week";
 import { appleMapsUrl, CUSTOM_STOP_LABEL, fullAddress, Ico, prettyPhone, ReachLinks, TierChip } from "../lib/ui";
 import { AccountLink } from "../lib/modal";
+import { useRoute } from "../lib/route-context";
 import { resolveStopAddress } from "../lib/stop-actions";
 import { CallSearchField } from "./CallSearchField";
 import { ClientSearchField, type ClientSearchAccount } from "./ClientSearchField";
@@ -301,7 +302,19 @@ function AddStopForm({
     if (busy || kind === "client") return; // a client is added by picking one
     setBusy(true);
     setError(null);
-    const res = await resolveStopAddress(query);
+    // A THROWN server action, not just an { ok: false } answer, used to reach
+    // Next's error.tsx and take the whole route panel down with it (Juan,
+    // 2026-09-16). resolveStopAddress can throw on a bad deploy or a dropped
+    // connection same as any other network call, and that is exactly the
+    // moment a field-level message matters most.
+    let res;
+    try {
+      res = await resolveStopAddress(query);
+    } catch {
+      setBusy(false);
+      setError("Couldn't reach the lookup. Try again.");
+      return;
+    }
     setBusy(false);
     if (!res.ok) {
       setError(res.error);
@@ -943,6 +956,11 @@ export function RoutePanel({
 }) {
   const [legs, setLegs] = useState<DriveLeg[] | null>(null);
   const [legState, setLegState] = useState<"loading" | "ok" | "unavailable">("loading");
+  // A save that got optimistically drawn and then quietly reverted used to
+  // say nothing at all (Juan, 2026-09-16). Read straight off RouteProvider
+  // rather than threaded through from MapScreen, since every write it can
+  // report on already lives there.
+  const { writeError, dismissWriteError } = useRoute();
 
   // DRAG TO REORDER (2026-08-25), alongside the up/down chevrons, not instead
   // of them -- the comment on the chevron button below still holds (one-
@@ -1160,6 +1178,15 @@ export function RoutePanel({
   return (
     <>
       {header}
+
+      {writeError && (
+        <p className="mb-3 text-[12.5px] text-[#B5372A]">
+          {writeError}{" "}
+          <button type="button" onClick={dismissWriteError} className="underline hover:no-underline">
+            Dismiss
+          </button>
+        </p>
+      )}
 
       <DayTabs days={days} active={activeDay} onSelect={onSelectDay} />
 

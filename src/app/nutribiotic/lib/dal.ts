@@ -882,25 +882,36 @@ export type PurchaseLine = {
  * headroom, not a display cap — the profile aggregates across every order to
  * rank items by lifetime units, so silently dropping the oldest orders would
  * silently wrong that ranking.
+ *
+ * RUN IN PARALLEL, not order-then-lines (Juan, 2026-09-16: the account modal's
+ * "Loading account..." lagged noticeably on a busy account, e.g. NHC Group's
+ * $83,345 lifetime). nb_order_lines carries its own account_id (migration
+ * 0015), the same fact `order_id` derives it from, so the lines query never
+ * actually needed the orders round trip to finish first -- it was two serial
+ * network hops for no dependency that exists. This was the slowest of the
+ * four branches getAccountDetail already runs in Promise.all, so it set the
+ * floor for how fast the whole modal could open.
  */
 export async function listPurchases(
   accountId: string,
   limit = 500,
 ): Promise<{ orders: PurchaseOrder[]; lines: PurchaseLine[] }> {
-  const orders = await query<PurchaseOrder>("nb_orders", {
-    select: "id,ordered_at,revenue_cents,order_type,origin",
-    account_id: `eq.${accountId}`,
-    order: "ordered_at.desc",
-    limit,
-  });
+  const [orders, lines] = await Promise.all([
+    query<PurchaseOrder>("nb_orders", {
+      select: "id,ordered_at,revenue_cents,order_type,origin",
+      account_id: `eq.${accountId}`,
+      order: "ordered_at.desc",
+      limit,
+    }),
+    query<PurchaseLine>("nb_order_lines", {
+      select: "id,order_id,product_name,qty,line_revenue_cents,origin",
+      account_id: `eq.${accountId}`,
+    }),
+  ]);
   if (orders.data.length === 0) return { orders: [], lines: [] };
 
-  const ids = orders.data.map((o) => o.id).join(",");
-  const lines = await query<PurchaseLine>("nb_order_lines", {
-    select: "id,order_id,product_name,qty,line_revenue_cents,origin",
-    order_id: `in.(${ids})`,
-  });
-  return { orders: orders.data, lines: lines.data };
+  const orderIds = new Set(orders.data.map((o) => o.id));
+  return { orders: orders.data, lines: lines.data.filter((l) => orderIds.has(l.order_id)) };
 }
 
 export type SupportIssue = {

@@ -95,7 +95,17 @@ export function CallSearchField({
     }
     debounceRef.current = setTimeout(() => {
       startSearch(async () => {
-        setResults(await searchHubspotForCall(q));
+        // A THROW here, not just an empty answer, used to reach Next's
+        // error.tsx and take the whole route panel down (Juan, 2026-09-16):
+        // searchHubspotForCall is a server action, and a bad deploy or a
+        // dropped connection rejects the call itself before its own internal
+        // try/catch ever runs. Degrading to "no results" is exactly what
+        // happens when HubSpot has nothing to say anyway.
+        try {
+          setResults(await searchHubspotForCall(q));
+        } catch {
+          setResults([]);
+        }
       });
     }, 250);
   }
