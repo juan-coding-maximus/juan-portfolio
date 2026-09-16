@@ -18,6 +18,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   addSdrItemToRoute,
   addSdrScheduleItem,
+  getRecommendedPack,
   getSdrAccountPanel,
   rescheduleSdrItem,
   runQuickEnrichment,
@@ -1011,8 +1012,16 @@ function AccountPanel({
     setPanel(null);
     setEnrichResult(null);
     if (!item.account_id) return;
+    const accountId = item.account_id;
     startTransition(async () => {
-      setPanel(await getSdrAccountPanel(item.account_id!));
+      setPanel(await getSdrAccountPanel(accountId));
+    });
+    // The recommended pack is never worth the panel's own paint waiting on
+    // it (two sequential Storage HTTP calls, the slowest part of opening a
+    // row by far): fetched after, merged in whenever it lands, same pattern
+    // handleEnrich already uses below.
+    void getRecommendedPack(accountId).then((recommendedPack) => {
+      setPanel((p) => (p && p.id === accountId ? { ...p, recommendedPack } : p));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.account_id]);

@@ -251,8 +251,6 @@ export async function getSdrAccountPanel(accountId: string): Promise<SdrAccountP
   const realActivities = activitiesRes.data.filter(
     (act) => act.origin !== "enriched" && (act.kind === "call" || act.kind === "meeting"),
   );
-  const packHint = CHANNEL_PACK_HINT[a.channel];
-  const recommendedPack = packHint ? await findMarketingFile(packHint) : null;
   return {
     id: a.id,
     name: a.name,
@@ -279,7 +277,9 @@ export async function getSdrAccountPanel(accountId: string): Promise<SdrAccountP
     trailingRevenue: a.trailing_12m_revenue,
     expectedReorderAt: a.expected_reorder_at,
     purchases: summarizePurchases(purchases.orders, purchases.lines),
-    recommendedPack,
+    // Loaded separately, after the panel is already on screen: see
+    // getRecommendedPack below.
+    recommendedPack: null,
     businessHours: a.business_hours,
     hubspotCompanyId: a.hubspot_company_id,
     contacts: contactsRes.data.map((c) => ({
@@ -292,6 +292,25 @@ export async function getSdrAccountPanel(accountId: string): Promise<SdrAccountP
     })),
     activities: realActivities.map((act) => ({ at: act.at, kind: act.kind, detail: act.detail })),
   };
+}
+
+/**
+ * The recommended marketing pack, off getSdrAccountPanel's critical path
+ * (Juan, 2026-09-15: the panel needs to load "super quick" the moment a row
+ * is tapped). findMarketingFile makes two sequential Storage HTTP calls
+ * (list the bucket, then sign a URL), which on a cellular connection was the
+ * slowest part of opening a prospect by a wide margin despite being the
+ * least useful thing on the panel at that instant. Called separately by
+ * sdr-ui.tsx right after the panel itself renders, and merged in when it
+ * resolves, the same progressive-fill pattern runQuickEnrichment already
+ * uses below.
+ */
+export async function getRecommendedPack(accountId: string): Promise<{ label: string; url: string } | null> {
+  const accRes = await getAccount(accountId);
+  const a = accRes.data[0];
+  if (!a) return null;
+  const packHint = CHANNEL_PACK_HINT[a.channel];
+  return packHint ? findMarketingFile(packHint) : null;
 }
 
 /**
