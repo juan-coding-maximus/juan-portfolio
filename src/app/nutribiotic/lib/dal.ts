@@ -744,6 +744,47 @@ export async function getActivityById(id: number): Promise<EngagementActivity | 
   return res.data[0] ?? null;
 }
 
+/**
+ * Another activity on the same account, already filed to HubSpot, carrying
+ * the exact same detail text within a short window. Confirmed 2026-09-16:
+ * the Visit tab can log the same real-world visit twice under two different
+ * kinds a few seconds apart (a "meeting" and a "visit" row, same verbatim
+ * detail, 17s apart, id 320/321 on account a_d78154: 321 filed first as
+ * engagement 519912860871, leaving 320 sitting unfiled with identical
+ * content). Filing 320 separately would double-post the same visit into the
+ * shared portal. This is the guard runEngagement checks before ever
+ * creating a new engagement, not a one-off data patch: the double-submit
+ * that produces this pair is a client-side bug of its own (same class as
+ * the "Needs a match" queue's duplicate CDM Drugs row) that this guard
+ * survives regardless of whether it's ever fully closed.
+ */
+export async function findRecentDuplicateEngagement(
+  accountId: string,
+  detail: string,
+  excludeActivityId: number,
+  windowMinutes = 30,
+): Promise<{ id: number; hubspot_engagement_id: string } | null> {
+  const res = await query<{ id: number; hubspot_engagement_id: string | null; at: string | null; origin?: Origin }>(
+    "nb_activities",
+    {
+      select: "id,hubspot_engagement_id,at",
+      account_id: `eq.${accountId}`,
+      detail: `eq.${detail}`,
+      id: `neq.${excludeActivityId}`,
+      hubspot_engagement_id: "not.is.null",
+      order: "at.desc",
+      limit: 5,
+    },
+  );
+  const cutoff = Date.now() - windowMinutes * 60 * 1000;
+  for (const row of res.data) {
+    if (!row.hubspot_engagement_id) continue;
+    const at = row.at ? new Date(row.at).getTime() : 0;
+    if (at >= cutoff) return { id: row.id, hubspot_engagement_id: row.hubspot_engagement_id };
+  }
+  return null;
+}
+
 /** Activities Juan has logged (any door) that have never crossed into HubSpot,
  * for the Visit tab's filing queue. Synthetic rows are excluded at the query
  * rather than left for the caller to filter, same rule hubspot_notes.py's

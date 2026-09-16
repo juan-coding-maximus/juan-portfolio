@@ -38,6 +38,7 @@
 
 import "server-only";
 import {
+  findRecentDuplicateEngagement,
   getAccountForEngagement,
   getActivityById,
   getTouchpointParsedForActivity,
@@ -652,6 +653,35 @@ export async function runEngagement(activityId: number, opts: { write: boolean }
       wrote: false,
       noteId: activity.hubspot_engagement_id,
     };
+  }
+
+  // A sibling activity on this account already carries this exact detail to
+  // HubSpot: the same real-world visit got logged twice (confirmed
+  // 2026-09-16, a "meeting" and a "visit" row 17s apart, same verbatim
+  // text). Stamp this one to match rather than file a second engagement for
+  // one visit. See findRecentDuplicateEngagement's docstring.
+  if (activity.detail) {
+    const sibling = await findRecentDuplicateEngagement(account.id, activity.detail, activityId);
+    if (sibling) {
+      if (opts.write) await stampActivityEngagementId(activityId, sibling.hubspot_engagement_id);
+      return {
+        status: "ok",
+        activityId,
+        accountId: account.id,
+        accountName: account.name,
+        otype,
+        etype,
+        lines: [],
+        matchedNames: [],
+        unmatchedPeople: [],
+        contactErrors: [],
+        leaks: [],
+        companyPhone: null,
+        alreadyFiledId: sibling.hubspot_engagement_id,
+        wrote: false,
+        noteId: sibling.hubspot_engagement_id,
+      };
+    }
   }
 
   // SECOND scope assertion: the live portal record, because the OS mirror can
