@@ -1005,26 +1005,48 @@ function AccountPanel({
 }) {
   const [panel, setPanel] = useState<SdrAccountPanel | null>(null);
   const [loading, startTransition] = useTransition();
+  // Set only when the load itself failed (a dropped LTE handoff mid-route is
+  // the real case, see fetchWithTimeout in dal.ts), never for "no account
+  // yet". Caught here rather than left to throw out of the transition: an
+  // uncaught throw there reaches the segment's error boundary and blanks the
+  // whole SDR queue over one row's panel not loading, exactly the failure
+  // this exists to stop (Juan, 2026-09-16: "needs to work in the car").
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [enriching, setEnriching] = useState(false);
   const [enrichResult, setEnrichResult] = useState<QuickEnrichResult | null>(null);
+  const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
     setPanel(null);
     setEnrichResult(null);
+    setLoadError(null);
     if (!item.account_id) return;
     const accountId = item.account_id;
+    let cancelled = false;
     startTransition(async () => {
-      setPanel(await getSdrAccountPanel(accountId));
+      try {
+        const result = await getSdrAccountPanel(accountId);
+        if (!cancelled) setPanel(result);
+      } catch (err) {
+        if (!cancelled) setLoadError(err instanceof Error ? err.message : "Couldn't load this account.");
+      }
     });
     // The recommended pack is never worth the panel's own paint waiting on
     // it (two sequential Storage HTTP calls, the slowest part of opening a
     // row by far): fetched after, merged in whenever it lands, same pattern
-    // handleEnrich already uses below.
-    void getRecommendedPack(accountId).then((recommendedPack) => {
-      setPanel((p) => (p && p.id === accountId ? { ...p, recommendedPack } : p));
-    });
+    // handleEnrich already uses below. Best-effort: a failure here never
+    // blocks the panel that's already on screen, the pack link just stays
+    // off it.
+    getRecommendedPack(accountId)
+      .then((recommendedPack) => {
+        if (!cancelled) setPanel((p) => (p && p.id === accountId ? { ...p, recommendedPack } : p));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item.account_id]);
+  }, [item.account_id, retryTick]);
 
   /** ~30s pass over the website, Google Places, and this account's own order
    *  history (lib/quick-enrich.ts), fired from the button beside Call. Merges
@@ -1130,6 +1152,24 @@ function AccountPanel({
         )}
 
         {loading && <div className="mt-3 text-[12.5px] text-[#8A928C]">Loading account…</div>}
+
+        {/* Degrades in place, not to the segment's error boundary: the
+            number and Call/Log-this-call further down still work off
+            `item` alone, so a dropped connection loses the account detail,
+            never the ability to dial and log what just happened. */}
+        {loadError && !loading && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-[#E2DFD5] bg-[#FAF9F5] p-2.5 text-[12.5px] text-[#5B6560]">
+            <Ico name="alert" size={12} />
+            <span>Couldn&rsquo;t load the rest of this account. You can still call and log below.</span>
+            <button
+              type="button"
+              onClick={() => setRetryTick((t) => t + 1)}
+              className="ml-auto rounded-md border border-[#E2DFD5] bg-white px-2 py-1 text-[11.5px] font-medium text-[#3D4A44] hover:bg-[#F7F6F1]"
+            >
+              Retry
+            </button>
+          </div>
+        )}
 
         {panel && (
           <>

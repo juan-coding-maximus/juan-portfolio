@@ -99,6 +99,40 @@ const verifyReadAccess = cache(async (): Promise<true> => {
 
 type QueryOpts = Record<string, string | number | undefined>;
 
+/**
+ * A bare `fetch` has no timeout: on a dropped or degraded cellular link (SDR
+ * is built to be read at a light, mid-route) it can hang well past the
+ * moment Juan has already looked back at the road, and a single dropped LTE
+ * handoff throws all the way past the caller to the segment's error
+ * boundary, taking down the whole queue over one account's panel failing to
+ * load. `timeoutMs` bounds the hang; one retry after a short pause covers
+ * the handoff itself, which is usually clear a second later. Only network-
+ * level failures retry, an HTTP error status is a real answer and is
+ * returned as-is on the first try.
+ */
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  { timeoutMs = 8000, retries = 0 }: { timeoutMs?: number; retries?: number } = {},
+): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...init, signal: controller.signal });
+    } catch (err) {
+      if (attempt >= retries) {
+        throw err instanceof Error && err.name === "AbortError"
+          ? new Error(`Request to ${url} timed out after ${timeoutMs}ms.`)
+          : err;
+      }
+      await new Promise((r) => setTimeout(r, 500));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+}
+
 async function query<T extends { origin?: Origin }>(
   table: string,
   opts: QueryOpts = {},
@@ -116,14 +150,20 @@ async function query<T extends { origin?: Origin }>(
     if (v !== undefined) params.set(k, String(v));
   }
 
-  const res = await fetch(`${SB_URL}/rest/v1/${table}?${params}`, {
-    headers: {
-      apikey: SB_KEY,
-      Authorization: `Bearer ${SB_KEY}`,
-      Accept: "application/json",
+  // Reads are safe to retry: a GET that never reached the server or whose
+  // response was lost to a handoff cost nothing to repeat.
+  const res = await fetchWithTimeout(
+    `${SB_URL}/rest/v1/${table}?${params}`,
+    {
+      headers: {
+        apikey: SB_KEY,
+        Authorization: `Bearer ${SB_KEY}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
     },
-    cache: "no-store",
-  });
+    { retries: 1 },
+  );
 
   if (!res.ok) {
     throw new Error(`Supabase ${table} -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
@@ -173,7 +213,12 @@ async function mutate<T>(
     if (v !== undefined) params.set(k, String(v));
   }
 
-  const res = await fetch(`${SB_URL}/rest/v1/${table}?${params}`, {
+  // Writes never auto-retry: a POST/PATCH whose response is lost to a
+  // handoff may have already landed, and re-sending it risks a second
+  // touchpoint or a second write rather than a lost one. The timeout alone
+  // still stops it from hanging past the moment he's looked back at the
+  // road; a failed write surfaces plainly and he tries again on purpose.
+  const res = await fetchWithTimeout(`${SB_URL}/rest/v1/${table}?${params}`, {
     method,
     headers: {
       apikey: SB_KEY,

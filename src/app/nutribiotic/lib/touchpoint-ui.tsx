@@ -48,22 +48,38 @@ export const READINESS_OPTIONS: { value: Readiness; icon: string; title: string;
 ];
 
 /** Survives a gate redirect, an iOS eviction, or a version-skew reload. The
- * key is per-surface, so a draft typed in ClientOS is the one ClientOS
- * restores. Text only: never a customer's name keyed to an account id. */
+ * base key is per-surface, so a draft typed in ClientOS is the one ClientOS
+ * restores. Text only: the value stored is never a customer's name, but the
+ * KEY itself is scoped by account id (see scopedDraftKey below) whenever one
+ * is known, which is a different thing: without that scoping, a half-typed
+ * note left open on one account was restored verbatim onto the next account
+ * he opened, an SDR/account-detail bug (Juan, 2026-09-16) where a note meant
+ * for one company could get filed against a different one entirely. */
 const DRAFT_KEY = "nb.touchpoint.draft.v1";
 
-function readDraft(): string {
+/** Scopes the draft key to the account being called on, when there is one.
+ *  SDR and the account-detail page always pass accountIdHint and must never
+ *  share a draft slot across two different accounts. ClientOS/QuickCapture
+ *  and /visit's blank composer pass none (there is no account yet at the
+ *  point of capture), and keep the single shared slot the safety net has
+ *  always used there. */
+function scopedDraftKey(accountIdHint?: string | null): string {
+  return accountIdHint ? `${DRAFT_KEY}:${accountIdHint}` : DRAFT_KEY;
+}
+
+function readDraft(accountIdHint?: string | null): string {
   try {
-    return window.localStorage.getItem(DRAFT_KEY) ?? "";
+    return window.localStorage.getItem(scopedDraftKey(accountIdHint)) ?? "";
   } catch {
     return "";
   }
 }
 
-function writeDraft(value: string): void {
+function writeDraft(value: string, accountIdHint?: string | null): void {
   try {
-    if (value.trim()) window.localStorage.setItem(DRAFT_KEY, value);
-    else window.localStorage.removeItem(DRAFT_KEY);
+    const key = scopedDraftKey(accountIdHint);
+    if (value.trim()) window.localStorage.setItem(key, value);
+    else window.localStorage.removeItem(key);
   } catch {
     /* Private mode, or storage disabled. The draft is a safety net, never a
      * dependency: capture must keep working without it. */
@@ -223,7 +239,7 @@ export function TouchpointCapture({
   useEffect(() => {
     if (restoredRef.current) return;
     restoredRef.current = true;
-    const saved = readDraft();
+    const saved = readDraft(accountIdHint);
     if (saved) {
       setText(saved);
       requestAnimationFrame(() => textareaRef.current && autosize(textareaRef.current));
@@ -240,7 +256,7 @@ export function TouchpointCapture({
       });
     }
     textareaRef.current?.focus({ preventScroll: true });
-  }, [autosize, initialText]);
+  }, [autosize, initialText, accountIdHint]);
 
   /** The one clean landing, whether it came straight through or through the
    *  review card below. */
@@ -256,7 +272,7 @@ export function TouchpointCapture({
     setPendingPhoto(null);
     setDraft(null);
     setText("");
-    writeDraft("");
+    writeDraft("", accountIdHint);
     setKind(lockKind ?? defaultKind ?? "meeting");
     setKindTouched(Boolean(lockKind ?? defaultKind));
     setGrade(null);
@@ -406,7 +422,7 @@ export function TouchpointCapture({
                 onChange={(e) => {
                   const value = e.target.value;
                   setText(value);
-                  writeDraft(value);
+                  writeDraft(value, accountIdHint);
                   autosize(e.target);
                   // Typing before picking a kind is itself a pick: Meeting,
                   // the state `kind` already starts at, is what a rep means
@@ -565,7 +581,7 @@ export function TouchpointCapture({
             // before 2026-09-02 this stayed forever and the only way back to
             // a loggable screen was reloading the page.
             setText("");
-            writeDraft("");
+            writeDraft("", accountIdHint);
             setKind(lockKind ?? defaultKind ?? "meeting");
             setGrade(null);
             setReadiness_(null);
@@ -583,7 +599,7 @@ export function TouchpointCapture({
           onResolved={() => {
             // Same clear-and-reset as AccountMatchResolver's onResolved above.
             setText("");
-            writeDraft("");
+            writeDraft("", accountIdHint);
             setKind(lockKind ?? defaultKind ?? "meeting");
             setGrade(null);
             setReadiness_(null);
