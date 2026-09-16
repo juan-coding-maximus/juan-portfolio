@@ -432,6 +432,11 @@ export type Account = {
    *  HubSpot, local only. Feeds lib/priority.ts's score as a stated point
    *  adjustment, never silently. Null means no rep has tagged it yet. */
   readiness: Readiness | null;
+  /** Mirror of HubSpot's hs_lead_status, pull-only (migration 0028). Already
+   *  selected by getAccount's `select: "*"`, typed here 2026-09-15 so the SDR
+   *  panel can show HQ's own lead status alongside the OS's lifecycle read
+   *  without conflating the two (see 0028's own comment on nb_accounts). */
+  lead_status: string | null;
   origin: Origin;
 };
 
@@ -537,6 +542,85 @@ export async function applyAccountFacts(
   if (Object.keys(patch).length > 0) {
     if (patch.business_hours !== undefined || patch.phone !== undefined) patch.enrichment_status = status;
     await mutate<Account>("nb_accounts", "PATCH", patch, { id: `eq.${accountId}` });
+  }
+  return report;
+}
+
+/** manual_note (a rep heard it live) > website (the business's own page) >
+ *  places (Google's baseline). Lower rank wins a write; see applyAccountFacts'
+ *  own comment for why the ladder exists at all. */
+const HOURS_TIER_RANK: Record<string, number> = { manual_note: 0, website: 1, places: 2 };
+
+export type QuickEnrichPatch = {
+  business_hours: Record<string, string[][]> | null;
+  hours_source_tier: "website" | "places" | null;
+  hours_found_by: string | null;
+  current_state: string | null;
+  future_state: string | null;
+  impact: string | null;
+  gap_summary_found_by: string | null;
+};
+
+export type QuickEnrichReport = {
+  business_hours: { status: "filled" | "updated" | "skipped_stronger_tier" } | null;
+  gap_summary: { status: "filled" } | null;
+};
+
+/**
+ * Writes what the SDR panel's "Enrich further" button found (lib/quick-enrich.ts):
+ * hours read off the website or Google Places, and the gap-selling triple when
+ * the 30-second pass actually turned up grounded evidence for one. Same
+ * discipline as applyAccountFacts and the nutribiotic-enricher agent: a
+ * stronger hours tier already on file is never demoted by a weaker one, and an
+ * existing gap summary is never overwritten, only filled where all three
+ * fields are still blank.
+ */
+export async function applyQuickEnrichment(accountId: string, patch: QuickEnrichPatch): Promise<QuickEnrichReport> {
+  const report: QuickEnrichReport = { business_hours: null, gap_summary: null };
+  const current = await getAccount(accountId);
+  const row = current.data[0];
+  if (!row) return report;
+
+  const dbPatch: Record<string, unknown> = {};
+  const status = { ...(row.enrichment_status || {}) };
+
+  if (patch.business_hours && patch.hours_source_tier) {
+    const existingTier = row.enrichment_status?.business_hours?.source_tier as string | undefined;
+    const existingRank = existingTier ? (HOURS_TIER_RANK[existingTier] ?? 99) : 99;
+    const newRank = HOURS_TIER_RANK[patch.hours_source_tier];
+    if (newRank < existingRank) {
+      dbPatch.business_hours = patch.business_hours;
+      status.business_hours = {
+        source_tier: patch.hours_source_tier,
+        found_by: patch.hours_found_by ?? "sdr_quick_enrich",
+        at: new Date().toISOString(),
+      };
+      report.business_hours = { status: row.business_hours ? "updated" : "filled" };
+    } else {
+      report.business_hours = { status: "skipped_stronger_tier" };
+    }
+  }
+
+  if (
+    !row.current_state &&
+    !row.future_state &&
+    !row.impact &&
+    (patch.current_state || patch.future_state || patch.impact)
+  ) {
+    dbPatch.current_state = patch.current_state;
+    dbPatch.future_state = patch.future_state;
+    dbPatch.impact = patch.impact;
+    status.gap_summary = {
+      source_tier: "sdr_quick_enrich",
+      found_by: patch.gap_summary_found_by ?? "sdr_quick_enrich",
+      at: new Date().toISOString(),
+    };
+    report.gap_summary = { status: "filled" };
+  }
+
+  if (Object.keys(dbPatch).length > 0) {
+    dbPatch.enrichment_status = status;
+    await mutate<Account>("nb_accounts", "PATCH", dbPatch, { id: `eq.${accountId}` });
   }
   return report;
 }
@@ -3880,6 +3964,50 @@ export async function listMarketingFiles(): Promise<MarketingFile[]> {
     return [...marketing, ...field, ...factCards];
   } catch {
     return [];
+  }
+}
+
+/**
+ * Finds one marketing PDF whose filename contains `hint` (case-insensitive),
+ * in the "marketing" folder only, and signs just that one file. Distinct from
+ * listMarketingFiles, which lists AND signs every file in all three folders
+ * (built for a picker UI, too slow to call once per SDR panel open just to
+ * find one match). Used by sdr-actions.ts to point a rep at the one real
+ * collateral piece that fits an account's channel; returns null rather than
+ * guessing when the bucket has no match, never a fabricated file name
+ * (AGENTS.md P2).
+ */
+export async function findMarketingFile(hint: string): Promise<{ label: string; url: string } | null> {
+  await verifySession();
+  if (!isConfigured()) return null;
+  try {
+    const listRes = await fetch(`${SB_URL}/storage/v1/object/list/${MARKETING_BUCKET}`, {
+      method: "POST",
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ prefix: "marketing/", limit: 200, sortBy: { column: "name", order: "asc" } }),
+      cache: "no-store",
+    });
+    if (!listRes.ok) return null;
+    const objects = (await listRes.json()) as Array<{ name: string }>;
+    const match = objects.find((o) => o.name.toLowerCase().includes(hint.toLowerCase()));
+    if (!match) return null;
+    const signRes = await fetch(
+      `${SB_URL}/storage/v1/object/sign/${MARKETING_BUCKET}/marketing/${encodeURIComponent(match.name)}`,
+      {
+        method: "POST",
+        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ expiresIn: 300 }),
+        cache: "no-store",
+      },
+    );
+    if (!signRes.ok) return null;
+    const { signedURL } = (await signRes.json()) as { signedURL: string };
+    return {
+      label: match.name.replace(/\.pdf$/i, ""),
+      url: `${SB_URL}/storage/v1${signedURL}&download=${encodeURIComponent(match.name)}`.replace(/ /g, "%20"),
+    };
+  } catch {
+    return null;
   }
 }
 

@@ -12,19 +12,26 @@
 import { revalidatePath } from "next/cache";
 import {
   addOwnedAccountToRouteDraft,
+  findMarketingFile,
   getAccount,
   insertSdrScheduleItem,
   listActivities,
   listContacts,
+  listPurchases,
   rescheduleSdrScheduleItem,
   searchOwnedAccounts,
   searchOwnedContacts,
   setSdrScheduleStatus,
   type NewSdrScheduleItem,
+  type PurchaseLine,
+  type PurchaseOrder,
   type SdrPriority,
   type SdrScheduleItem,
 } from "./dal";
 import type { Readiness } from "./priority";
+import { enrichAccountQuickly, type QuickEnrichResult } from "./quick-enrich";
+
+export type { QuickEnrichResult };
 
 export type SdrSearchHit = {
   accountId: string;
@@ -76,6 +83,89 @@ export async function searchSdrClients(q: string): Promise<SdrSearchHit[]> {
   return [...byAccount.values()].slice(0, 8);
 }
 
+/**
+ * channel -> a substring of the one real collateral PDF in the "marketing"
+ * bucket (~/Desktop/NutriBiotic/15-sales-collateral, synced by
+ * bridges/nutribiotic/sync_marketing_files.py) that fits what this kind of
+ * account actually is. Juan, 2026-09-15: a call brief with "an angle" means
+ * naming which real piece to bring, not a generic pitch line. Deliberately a
+ * fixed lookup rather than a model guess, findMarketingFile() below still
+ * confirms the file is actually in the bucket before the panel claims it
+ * exists (AGENTS.md P2, no fabrication). A channel absent from this map (or
+ * unmapped by CHANNEL_TYPE in account-filters.ts) gets no recommendation
+ * rather than a forced, badly-fitting one.
+ */
+const CHANNEL_PACK_HINT: Record<string, string> = {
+  pharmacy: "Pharmacy Vitamin",
+  grocery: "Grocery GSE",
+  specialty: "Grocery GSE",
+  holistic_retail: "Grocery GSE",
+  mass_retail: "Grocery GSE",
+  online_retailer: "Grocery GSE",
+  coop: "Grocery GSE",
+  gym: "Sports Nutrition",
+  nutrition_club: "Sports Nutrition",
+  spa_beauty: "Spa Partner",
+  clinic: "Pharmacy Vitamin",
+  holistic_health_services: "Pharmacy Vitamin",
+};
+
+export type PurchaseSummaryItem = {
+  name: string;
+  qty: number;
+  revenueCents: number;
+  /** This same product's share of the account's 3 most recent orders, so the
+   *  panel can show "usually X per visit" beside the lifetime total. Zero
+   *  when the account hasn't ordered it in its last 3 orders even though it
+   *  has lifetime history (a lapsed line, worth naming as a gap, not hiding). */
+  last3Qty: number;
+  last3RevenueCents: number;
+};
+
+export type PurchaseSummary = {
+  orderCount: number;
+  /** Top 5 by lifetime net units, same rank rule account-detail.tsx's
+   *  Purchases card already uses. Net, not gross: a return demotes a line
+   *  rather than inflating it. */
+  topItems: PurchaseSummaryItem[];
+  /** Everything past the top 5, collapsed to names only ("small amounts of
+   *  X, Y, Z"), Juan's own phrase, 2026-09-15: the tail of the order history
+   *  is worth naming so nothing on file looks hidden, not worth a number
+   *  each. */
+  smallItemNames: string[];
+};
+
+/**
+ * Same lifetime-units ranking account-detail.tsx's Purchases card computes
+ * inline (dal.ts's listPurchases has no shared aggregator), plus a last-3-
+ * orders cut the SDR panel needs and the account modal doesn't. Net qty/
+ * revenue across ALL orders decides lifetime rank; the most recent 3 orders'
+ * ids decide the last3 columns. Items that net to zero (bought then fully
+ * returned) are dropped from both lists, same as account-detail.tsx.
+ */
+function summarizePurchases(orders: PurchaseOrder[], lines: PurchaseLine[]): PurchaseSummary | null {
+  if (orders.length === 0) return null;
+  const last3OrderIds = new Set(orders.slice(0, 3).map((o) => o.id));
+  const totals = new Map<string, PurchaseSummaryItem>();
+  for (const l of lines) {
+    const name = l.product_name ?? "Item";
+    const cur = totals.get(name) ?? { name, qty: 0, revenueCents: 0, last3Qty: 0, last3RevenueCents: 0 };
+    cur.qty += l.qty ?? 0;
+    cur.revenueCents += l.line_revenue_cents;
+    if (last3OrderIds.has(l.order_id)) {
+      cur.last3Qty += l.qty ?? 0;
+      cur.last3RevenueCents += l.line_revenue_cents;
+    }
+    totals.set(name, cur);
+  }
+  const items = [...totals.values()].filter((t) => t.qty !== 0).sort((a, b) => b.qty - a.qty);
+  return {
+    orderCount: orders.length,
+    topItems: items.slice(0, 5),
+    smallItemNames: items.slice(5).map((t) => t.name),
+  };
+}
+
 export type SdrAccountPanel = {
   id: string;
   name: string;
@@ -95,6 +185,11 @@ export type SdrAccountPanel = {
   phone: string | null;
   website: string | null;
   lifecycle: string;
+  /** HubSpot's own hs_lead_status, pull-only mirror (migration 0028). What
+   *  the panel labels "Status": HQ's own working state for the account, not
+   *  the OS's behaviour-derived lifecycle above (Juan, 2026-09-15: "status is
+   *  lead status"). */
+  leadStatus: string | null;
   potentialJuan: string | null;
   /** The rep's own readiness tag (migration 0069), set from this same panel's
    *  capture box. Null means no rep has tagged it yet. */
@@ -108,13 +203,30 @@ export type SdrAccountPanel = {
   futureState: string | null;
   impact: string | null;
   lastOrderAt: string | null;
+  lifetimeRevenue: number | null;
+  trailingRevenue: number | null;
+  expectedReorderAt: string | null;
+  /** Null when the account has no loaded order history at all (146 of 459
+   *  accounts do, see dal.ts's listPurchases), a real gap, not a zero. */
+  purchases: PurchaseSummary | null;
+  /** The one real collateral piece (findMarketingFile) that fits this
+   *  account's channel, from CHANNEL_PACK_HINT above. Null on a channel with
+   *  no mapped pack, or when the bucket doesn't actually have a matching
+   *  file, never a name the bucket can't back up. */
+  recommendedPack: { label: string; url: string } | null;
   /** Google Places hours, same shape account-detail.tsx already renders.
    *  Null on an account the enricher hasn't reached yet, a real gap, never a
    *  guess (HARD RULE 1). */
   businessHours: Record<string, string[][]> | null;
   hubspotCompanyId: string | null;
   contacts: { id: string; name: string; title: string | null; phone: string | null; email: string | null; isDecisionMaker: boolean }[];
-  lastActivity: { at: string; kind: string; detail: string | null } | null;
+  /** Calls and meetings only, most recent first, shown in full (Juan,
+   *  2026-09-15: "I only want to see the visits or call information"). Also
+   *  drops the enrichment pipeline's own system notes, geocode.py's
+   *  "Geocoded from Google Places..." chief among them, which used to read as
+   *  if they were something that happened with the client; both filters
+   *  applied together at the query below. */
+  activities: { at: string; kind: string; detail: string | null }[];
 };
 
 /**
@@ -128,14 +240,19 @@ export type SdrAccountPanel = {
  * that actually happened.
  */
 export async function getSdrAccountPanel(accountId: string): Promise<SdrAccountPanel | null> {
-  const [accRes, contactsRes, activitiesRes] = await Promise.all([
+  const [accRes, contactsRes, activitiesRes, purchases] = await Promise.all([
     getAccount(accountId),
     listContacts(accountId),
-    listActivities(accountId, 1),
+    listActivities(accountId, 60),
+    listPurchases(accountId),
   ]);
   const a = accRes.data[0];
   if (!a) return null;
-  const last = activitiesRes.data[0] ?? null;
+  const realActivities = activitiesRes.data.filter(
+    (act) => act.origin !== "enriched" && (act.kind === "call" || act.kind === "meeting"),
+  );
+  const packHint = CHANNEL_PACK_HINT[a.channel];
+  const recommendedPack = packHint ? await findMarketingFile(packHint) : null;
   return {
     id: a.id,
     name: a.name,
@@ -150,6 +267,7 @@ export async function getSdrAccountPanel(accountId: string): Promise<SdrAccountP
     phone: a.phone,
     website: a.website,
     lifecycle: a.lifecycle,
+    leadStatus: a.lead_status,
     potentialJuan: a.potential_juan,
     readiness: a.readiness,
     quirks: a.quirks,
@@ -157,6 +275,11 @@ export async function getSdrAccountPanel(accountId: string): Promise<SdrAccountP
     futureState: a.future_state,
     impact: a.impact,
     lastOrderAt: a.last_order_at,
+    lifetimeRevenue: a.lifetime_revenue,
+    trailingRevenue: a.trailing_12m_revenue,
+    expectedReorderAt: a.expected_reorder_at,
+    purchases: summarizePurchases(purchases.orders, purchases.lines),
+    recommendedPack,
     businessHours: a.business_hours,
     hubspotCompanyId: a.hubspot_company_id,
     contacts: contactsRes.data.map((c) => ({
@@ -167,8 +290,21 @@ export async function getSdrAccountPanel(accountId: string): Promise<SdrAccountP
       email: c.email,
       isDecisionMaker: c.is_decision_maker,
     })),
-    lastActivity: last ? { at: last.at, kind: last.kind, detail: last.detail } : null,
+    activities: realActivities.map((act) => ({ at: act.at, kind: act.kind, detail: act.detail })),
   };
+}
+
+/**
+ * The panel's "Enrich further" button: a ~30-second look at the website,
+ * Google Places, and this account's own order history, right before Juan
+ * dials. See lib/quick-enrich.ts for the pass itself and dal.ts's
+ * applyQuickEnrichment for the tier ladder / blank-fill write rules that
+ * govern what actually lands on the row.
+ */
+export async function runQuickEnrichment(accountId: string): Promise<QuickEnrichResult> {
+  const result = await enrichAccountQuickly(accountId);
+  if (result.wroteHours || result.wroteSummary) revalidatePath("/nutribiotic/sdr");
+  return result;
 }
 
 export async function searchSdrAccounts(query: string) {

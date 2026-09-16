@@ -20,9 +20,11 @@ import {
   addSdrScheduleItem,
   getSdrAccountPanel,
   rescheduleSdrItem,
+  runQuickEnrichment,
   searchSdrAccounts,
   searchSdrClients,
   updateSdrScheduleStatus,
+  type QuickEnrichResult,
   type SdrAccountPanel,
   type SdrSearchHit,
 } from "./sdr-actions";
@@ -47,9 +49,10 @@ import {
 } from "./prefs-actions";
 import type { Readiness } from "./priority";
 import { OpportunityTypeLists, TopOpportunities } from "./priority-ui";
+import { setAccountPhone, setPotentialJuan } from "./account-actions";
 import { TouchpointCapture } from "./touchpoint-ui";
 import type { FiledTouchpoint } from "./touchpoint-ui";
-import { Ico, HUBSPOT_COMPANY_URL, OpenBadge, daysAgo, fullAddress, googleMapsUrl } from "./ui";
+import { Ico, HUBSPOT_COMPANY_URL, OpenBadge, SuccessNote, daysAgo, fullAddress, googleMapsUrl, money } from "./ui";
 
 /** One territory area, in the order the SDR queue and the map legend both use:
  *  most 80+ prospects first (see sdr/page.tsx and lib/priority.ts). `prospects`
@@ -124,6 +127,27 @@ function dayLabel(iso: string, todayIso: string): string {
   if (diffDays === 0) return `Today · ${md}`;
   if (diffDays === 1) return `Tomorrow · ${md}`;
   return `${weekday} · ${md}`;
+}
+
+/** The next `count` weekdays after `todayIso`, Saturday and Sunday skipped
+ *  outright rather than offered as one-tap options nobody works (Juan,
+ *  2026-09-15: quick-move buttons for "move to another day"). */
+function nextWeekdays(todayIso: string, count: number): string[] {
+  const out: string[] = [];
+  let n = 1;
+  while (out.length < count) {
+    const iso = addDaysIso(todayIso, n);
+    const dow = new Date(`${iso}T00:00:00`).getDay();
+    if (dow !== 0 && dow !== 6) out.push(iso);
+    n++;
+  }
+  return out;
+}
+
+/** "Thu 17", compact enough for four of these across one row. */
+function quickDayLabel(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  return `${d.toLocaleDateString("en-US", { weekday: "short" })} ${d.getDate()}`;
 }
 
 type AccountHit = { id: string; name: string; city: string | null; phone: string | null; area: string | null };
@@ -594,6 +618,7 @@ function ScheduleRow({
   onStatus,
   onReschedule,
   onFiled,
+  todayIso,
 }: {
   item: SdrDayItem;
   active: boolean;
@@ -606,6 +631,10 @@ function ScheduleRow({
    *  (Juan, 2026-09-14). Marks the row done the same way the panel's own
    *  onFiled does. */
   onFiled: (result: FiledTouchpoint) => void;
+  /** The server-resolved LA date, so the "move to another day" quick picks
+   *  (nextWeekdays) count from the same today the rest of the queue does,
+   *  never the browser's own UTC clock. */
+  todayIso: string;
 }) {
   const done = item.status === "done";
   const skipped = item.status === "skipped";
@@ -738,38 +767,62 @@ function ScheduleRow({
               onFiled(result);
               setLogging(false);
             }}
-            lockKind="call"
+            defaultKind="call"
             initialText={`Called ${item.displayName} and spoke with: `}
           />
         </div>
       )}
 
       {moving && (
-        <div className="flex w-full items-center gap-2 border-t border-[#EFEDE5] pt-2">
-          <label className="text-[11px] uppercase tracking-[0.08em] text-[#8A928C]">Move to</label>
-          {/* A native date input, not a custom calendar: it is the control both
-              iOS and the Mac already know how to open, and this row is worked
-              from a phone as often as a desk. `defaultValue` is the day it is
-              on now, so the picker opens where the row actually is. */}
-          <input
-            type="date"
-            defaultValue={item.scheduled_date}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (!v || v === item.scheduled_date) return;
-              setMoving(false);
-              onReschedule(v);
-            }}
-            className="rounded-md border border-[#E2DFD5] bg-white px-2 py-1 text-[12.5px] text-[#3D4A44] outline-none focus:border-[#14201B]"
-          />
-          {item.rescheduled_at && (
-            <span
-              className="text-[11px] text-[#8A928C]"
-              title="You moved this one. The automatic follow-up pass will not propose a different day for it."
-            >
-              moved by you
-            </span>
-          )}
+        <div className="flex w-full flex-col gap-1.5 border-t border-[#EFEDE5] pt-2">
+          {/* Four one-tap days, next weekdays only (Juan, 2026-09-15): moving
+              a call almost always means tomorrow or one of the next few
+              working days, and typing a date for that is the slow path. Skips
+              Saturday/Sunday outright rather than offering a day nobody
+              works. The date input below stays for the real exception, an
+              overnight trip or a specific far-out day. */}
+          <div className="grid grid-cols-4 gap-1">
+            {nextWeekdays(todayIso, 4).map((iso, i) => (
+              <button
+                key={iso}
+                type="button"
+                onClick={() => {
+                  setMoving(false);
+                  onReschedule(iso);
+                }}
+                className="rounded-md border border-[#E2DFD5] bg-white px-1.5 py-1 text-[11.5px] font-medium text-[#3D4A44] hover:bg-[#FAF9F5]"
+              >
+                {i === 0 ? "Tomorrow" : quickDayLabel(iso)}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            {/* A native date input, not a custom calendar: it is the control
+                both iOS and the Mac already know how to open, and this row is
+                worked from a phone as often as a desk. `defaultValue` is the
+                day it is on now, so the picker opens where the row actually
+                is. No label here, the four buttons above already say what
+                this row does (Juan, 2026-09-15: less crowded). */}
+            <input
+              type="date"
+              defaultValue={item.scheduled_date}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v || v === item.scheduled_date) return;
+                setMoving(false);
+                onReschedule(v);
+              }}
+              className="rounded-md border border-[#E2DFD5] bg-white px-2 py-1 text-[12.5px] text-[#3D4A44] outline-none focus:border-[#14201B]"
+            />
+            {item.rescheduled_at && (
+              <span
+                className="text-[11px] text-[#8A928C]"
+                title="You moved this one. The automatic follow-up pass will not propose a different day for it."
+              >
+                moved by you
+              </span>
+            )}
+          </div>
         </div>
       )}
     </li>
@@ -797,6 +850,134 @@ function Fact({ label, value, href }: { label: string; value: string | null; hre
   );
 }
 
+/** "53 days", a bare count for the parameter row (Juan, 2026-09-15: "last
+ *  purchase: 53 days"). Distinct from ui.tsx's daysAgo(), which buckets into
+ *  "7mo ago" for anything over 60 days, too coarse for this reading. */
+function exactDaysAgo(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (d <= 0) return "today";
+  return `${d} day${d === 1 ? "" : "s"}`;
+}
+
+/** "22 days ago" / "in the future" reading of expected_reorder_at against
+ *  today, LA wall-clock date rather than a UTC instant so the boundary lands
+ *  on the same day a rep would say it does. */
+function dueInDays(iso: string | null): string | null {
+  if (!iso) return null;
+  const target = new Date(`${iso}T00:00:00`).getTime();
+  const today = new Date(new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" })).getTime();
+  const d = Math.round((target - today) / 86_400_000);
+  if (d === 0) return "today";
+  const n = Math.abs(d);
+  return d > 0 ? `${n} day${n === 1 ? "" : "s"} in future` : `${n} day${n === 1 ? "" : "s"} ago`;
+}
+
+const SDR_POTENTIAL_LETTERS: Tier[] = ["A", "B", "C", "D", "E"];
+
+/**
+ * A-E only, same scope touchpoint-ui.tsx's own visit capture box holds to
+ * (F/G are administrative dispositions, not a size a rep forms looking at a
+ * business): editable right on the call panel, "up there close to the name"
+ * (Juan, 2026-09-15), not buried in a read-only Fact row lower down. Same
+ * write path as account-detail.tsx's own PotentialGrade, setPotentialJuan
+ * (account-actions.ts) -> nb_accounts.potential_juan -> HubSpot's
+ * potential__cloned_ on hubspot_sync.py's next 60-second cycle.
+ */
+function PotentialGradeInline({ accountId, value: initial }: { accountId: string; value: Tier | null }) {
+  const [value, setValue] = useState<Tier | null>(initial);
+  const [pending, startTransition] = useTransition();
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-[11px] uppercase tracking-[0.08em] text-[#8A928C]">Potential</span>
+      <div className="flex gap-0.5">
+        {SDR_POTENTIAL_LETTERS.map((t) => {
+          const active = value === t;
+          return (
+            <button
+              key={t}
+              type="button"
+              disabled={pending}
+              aria-pressed={active}
+              onClick={() => {
+                const next = active ? null : t;
+                setValue(next);
+                startTransition(() => {
+                  void setPotentialJuan(accountId, next);
+                });
+              }}
+              className={`h-5 w-5 rounded text-[10.5px] font-semibold transition-colors ${
+                active ? "bg-[#14201B] text-[#F7F6F1]" : "bg-[#ECEAE1] text-[#3D4A44] hover:bg-[#E2DFD5]"
+              }`}
+            >
+              {t}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The phone number, editable right where he's about to dial it, same "fix
+ * the record" rule as account-actions.ts's setAccountPhone: a number heard
+ * or read wrong is corrected on nb_accounts itself, never left as a note
+ * beside a stale value.
+ */
+function PhoneEditable({ accountId, phone }: { accountId: string; phone: string | null }) {
+  const [editing, setEditing] = useState(false);
+  const [saved, setSaved] = useState(phone);
+  const [value, setValue] = useState(phone ?? "");
+  const [pending, startTransition] = useTransition();
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <input
+          autoFocus
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="+13105551234"
+          className="w-[150px] rounded-md border border-[#E2DFD5] bg-white px-2 py-1 text-[13px] text-[#3D4A44] outline-none focus:border-[#14201B]"
+        />
+        <button
+          type="button"
+          disabled={pending || !value.trim()}
+          onClick={() => {
+            const next = value.trim();
+            startTransition(async () => {
+              await setAccountPhone(accountId, next);
+              setSaved(next);
+              setEditing(false);
+            });
+          }}
+          className="rounded-md bg-[#14201B] px-2 py-1 text-[11.5px] font-medium text-white disabled:opacity-40"
+        >
+          {pending ? "Saving…" : "Save"}
+        </button>
+        <button type="button" onClick={() => setEditing(false)} className="text-[11.5px] text-[#8A928C]">
+          Cancel
+        </button>
+      </div>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        setValue(saved ?? "");
+        setEditing(true);
+      }}
+      title="Correct this number"
+      className="flex items-center gap-1 text-[13px] font-medium text-[#3D4A44] hover:text-[#14201B]"
+    >
+      {saved ?? <span className="font-normal text-[#8A928C]">No phone on file</span>}
+      <Ico name="edit" size={11} />
+    </button>
+  );
+}
+
 /**
  * The main working surface: what the business is, how to reach it, what's
  * already on file, who's there, the one most recent thing that happened, and
@@ -817,15 +998,47 @@ function AccountPanel({
 }) {
   const [panel, setPanel] = useState<SdrAccountPanel | null>(null);
   const [loading, startTransition] = useTransition();
+  const [enriching, setEnriching] = useState(false);
+  const [enrichResult, setEnrichResult] = useState<QuickEnrichResult | null>(null);
 
   useEffect(() => {
     setPanel(null);
+    setEnrichResult(null);
     if (!item.account_id) return;
     startTransition(async () => {
       setPanel(await getSdrAccountPanel(item.account_id!));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.account_id]);
+
+  /** ~30s pass over the website, Google Places, and this account's own order
+   *  history (lib/quick-enrich.ts), fired from the button beside Call. Merges
+   *  the result straight into the panel already on screen rather than
+   *  re-fetching it, so a field he already blank-filled doesn't flash. */
+  async function handleEnrich() {
+    if (!item.account_id || enriching) return;
+    setEnriching(true);
+    setEnrichResult(null);
+    try {
+      const result = await runQuickEnrichment(item.account_id);
+      setEnrichResult(result);
+      if (result.ok && (result.wroteHours || result.wroteSummary)) {
+        setPanel((p) =>
+          p
+            ? {
+                ...p,
+                businessHours: result.wroteHours ? result.businessHours : p.businessHours,
+                currentState: result.wroteSummary ? result.currentState : p.currentState,
+                futureState: result.wroteSummary ? result.futureState : p.futureState,
+                impact: result.wroteSummary ? result.impact : p.impact,
+              }
+            : p,
+        );
+      }
+    } finally {
+      setEnriching(false);
+    }
+  }
 
   const phone = panel?.phone ?? item.displayPhone;
   const address = panel ? [panel.street, panel.city].filter(Boolean).join(", ") : null;
@@ -864,29 +1077,59 @@ function AccountPanel({
               </div>
             )}
           </div>
-          {phone && (
-            <a
-              href={`tel:${phone.replace(/[^0-9+]/g, "")}`}
-              className="flex shrink-0 items-center gap-1.5 rounded-md bg-[#8A2E2E] px-3 py-1.5 text-[13px] font-medium text-white hover:opacity-90"
-            >
-              <Ico name="phone" size={13} />
-              Call {phone}
-            </a>
-          )}
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            {phone && (
+              <a
+                href={`tel:${phone.replace(/[^0-9+]/g, "")}`}
+                className="flex items-center gap-1.5 rounded-md bg-[#8A2E2E] px-3 py-1.5 text-[13px] font-medium text-white hover:opacity-90"
+              >
+                <Ico name="phone" size={13} />
+                Call {phone}
+              </a>
+            )}
+            {item.account_id && (
+              <button
+                type="button"
+                onClick={handleEnrich}
+                disabled={enriching}
+                title="~30s look at the website, Google Maps, and their order history for accurate hours and an executive summary"
+                className="flex items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white px-3 py-1.5 text-[12.5px] font-medium text-[#3D4A44] hover:bg-[#FAF9F5] disabled:opacity-60"
+              >
+                <Ico name="wand" size={12} />
+                {enriching ? "Enriching…" : "Enrich further"}
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Number and A-E potential, editable, right up top beside the name
+            (Juan, 2026-09-15): the two things he corrects most often stood
+            buried as read-only Facts lower in the panel before this. Keyed
+            per account so switching rows never carries stale local state
+            from whoever he was just looking at into the next one. */}
+        {panel && item.account_id && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-4 border-t border-[#E2DFD5] pt-2.5">
+            <PotentialGradeInline key={`grade-${panel.id}`} accountId={panel.id} value={panel.potentialJuan as Tier | null} />
+            <PhoneEditable key={`phone-${panel.id}`} accountId={panel.id} phone={panel.phone} />
+          </div>
+        )}
 
         {loading && <div className="mt-3 text-[12.5px] text-[#8A928C]">Loading account…</div>}
 
         {panel && (
           <>
-            {/* THE THREE-SENTENCE READ, first thing under the header, the
-                phone screen he's already scrolled to right before dialing
-                (Juan, 2026-09-14). Same three fields account-detail.tsx's
-                "The gap" card reads (nb_accounts.current_state/future_state/
-                impact), just read as a short paragraph instead of a labeled
-                table: where they are, where they could be, what it's worth.
-                A gap here is reported, not hidden, so it's visible as work
-                still to do rather than looking finished when it isn't. */}
+            {/* THE ANGLE, first thing under the header, the phone screen he's
+                already scrolled to right before dialing (Juan, 2026-09-14).
+                Same three fields account-detail.tsx's "The gap" card reads
+                (nb_accounts.current_state/future_state/impact), read as a
+                short paragraph: what this account actually is, where the gap
+                is, what it's worth. current_state is written to read as a
+                real angle now (quick-enrich.ts, 2026-09-15: "a nutrition
+                specialty shop inside a gym"), not a bare fact restated, and
+                weighs a rep's own logged calls/meetings above the website or
+                Places when they disagree. A gap here is reported, not
+                hidden, so it's visible as work still to do rather than
+                looking finished when it isn't. */}
             <div className="mt-3 rounded-md border border-[#E2DFD5] bg-[#FAF9F5] p-2.5 text-[13px] leading-relaxed text-[#3D4A44]">
               {panel.currentState || panel.futureState || panel.impact ? (
                 <div className="flex flex-col gap-1">
@@ -900,14 +1143,87 @@ function AccountPanel({
                   No executive summary on file yet, nobody has run discovery on this account.
                 </span>
               )}
+              {panel.recommendedPack && (
+                <a
+                  href={panel.recommendedPack.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-[#E3EFE6] px-2.5 py-1 text-[12.5px] font-medium text-[#2C6A46] hover:opacity-90"
+                >
+                  <Ico name="book" size={12} />
+                  Bring: {panel.recommendedPack.label}
+                </a>
+              )}
             </div>
+
+            {/* Every parameter the exec summary used to leave in prose, now a
+                labeled value (Juan, 2026-09-15: "if anything can be a
+                parameter it is stated as a parameter"). Status here is HQ's
+                own lead_status mirror, not the OS's behaviour-derived
+                lifecycle, which stays lower with Address and readiness. */}
+            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 rounded-md border border-[#E2DFD5] p-2.5 text-[13px]">
+              <Fact label="Last purchase" value={exactDaysAgo(panel.lastOrderAt)} />
+              <Fact label="Due purchase" value={dueInDays(panel.expectedReorderAt)} />
+              <Fact label="Lifetime value" value={panel.lifetimeRevenue != null ? money(panel.lifetimeRevenue) : null} />
+              <Fact label="Status" value={panel.leadStatus} />
+            </div>
+
+            {panel.purchases && (
+              <div className="mt-3 border-t border-[#E2DFD5] pt-3">
+                <div className="mb-1.5 flex items-baseline justify-between gap-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
+                  <span>Main purchases</span>
+                  <span className="normal-case tracking-normal">
+                    {panel.purchases.orderCount} order{panel.purchases.orderCount === 1 ? "" : "s"} · () is last 3 orders
+                  </span>
+                </div>
+                <ul className="flex flex-col divide-y divide-[#EDEBE3]">
+                  {panel.purchases.topItems.map((it) => (
+                    <li key={it.name} className="flex items-baseline justify-between gap-3 py-1 text-[13px]">
+                      <span className="min-w-0 truncate">{it.name}</span>
+                      <span className="shrink-0 tabular-nums text-[#5B6560]">
+                        ×{it.qty} <span className="text-[#8A928C]">· {money(it.revenueCents / 100)}</span>
+                        {it.last3Qty > 0 && <span className="text-[#8A928C]"> (×{it.last3Qty})</span>}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {panel.purchases.smallItemNames.length > 0 && (
+                  <div className="mt-1.5 text-[12px] text-[#8A928C]">
+                    Small amounts of {panel.purchases.smallItemNames.join(", ")}.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {enrichResult && !enriching && (
+              <div className="mt-2">
+                {enrichResult.ok ? (
+                  <SuccessNote
+                    title={enrichResult.wroteHours || enrichResult.wroteSummary ? "Enriched" : "Nothing new found"}
+                    detail={
+                      [
+                        enrichResult.wroteHours ? "Hours updated." : null,
+                        enrichResult.wroteSummary ? "Executive summary filled." : null,
+                        !enrichResult.wroteHours && !enrichResult.wroteSummary
+                          ? (enrichResult.skippedReason ?? "The website, Google Maps, and order history had nothing new to add.")
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" ")
+                    }
+                  />
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[12.5px] text-[#8A6D2F]">
+                    <Ico name="alert" size={12} />
+                    Enrich further failed: {enrichResult.error}
+                  </span>
+                )}
+              </div>
+            )}
 
             <div className="mt-3 flex flex-col gap-1.5">
               <Fact label="Address" value={address} />
-              <Fact label="Status" value={panel.lifecycle} />
-              <Fact label="Potential" value={panel.potentialJuan} />
               <Fact label="Lead readiness" value={panel.readiness ? READINESS_FACT_LABEL[panel.readiness] : null} />
-              <Fact label="Last order" value={panel.lastOrderAt ? daysAgo(panel.lastOrderAt) : null} />
             </div>
 
             {panel.businessHours && (
@@ -949,7 +1265,7 @@ function AccountPanel({
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-[12.5px] font-medium text-[#3D6B4A] hover:underline"
                 >
-                  <Ico name="external" size={12} />
+                  <Ico name="globe" size={12} />
                   Open website
                 </a>
               ) : (
@@ -986,18 +1302,25 @@ function AccountPanel({
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 text-[12.5px] font-medium text-[#5B6560] hover:text-[#14201B]"
                 >
-                  <Ico name="external" size={12} />
+                  <Ico name="hubspot" size={12} />
                   Open in HubSpot
                 </a>
               )}
               <ViewInOutbound accountId={panel.id} />
             </div>
 
-            {panel.lastActivity && (
-              <div className="mt-3 rounded-md bg-[#FAF9F5] p-2.5 text-[12.5px] text-[#5B6560]">
-                <span className="font-medium text-[#3D4A44] capitalize">{panel.lastActivity.kind}</span>{" "}
-                <span className="text-[#8A928C]">{daysAgo(panel.lastActivity.at)}</span>
-                {panel.lastActivity.detail && <div className="mt-0.5 line-clamp-2">{panel.lastActivity.detail}</div>}
+            {panel.activities.length > 0 && (
+              <div className="mt-3 flex flex-col gap-2 border-t border-[#E2DFD5] pt-3">
+                <span className="text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
+                  Meetings and calls
+                </span>
+                {panel.activities.map((act, i) => (
+                  <div key={`${act.at}-${i}`} className="rounded-md bg-[#FAF9F5] p-2.5 text-[12.5px] text-[#5B6560]">
+                    <span className="font-medium text-[#3D4A44] capitalize">{act.kind.replace(/_/g, " ")}</span>{" "}
+                    <span className="text-[#8A928C]">{daysAgo(act.at)}</span>
+                    {act.detail && <div className="mt-0.5 whitespace-pre-wrap">{act.detail}</div>}
+                  </div>
+                ))}
               </div>
             )}
 
@@ -1032,7 +1355,7 @@ function AccountPanel({
           key={item.id}
           accountIdHint={item.account_id}
           onFiled={onFiled}
-          lockKind="call"
+          defaultKind="call"
           initialText={`Called ${item.displayName} and spoke with: `}
         />
       </div>
@@ -1538,6 +1861,7 @@ export function SdrScreen({
                         onStatus={(status) => setStatus(it.id, status)}
                         onReschedule={(date) => reschedule(it.id, date)}
                         onFiled={(result) => filedFromRow(it.id, result)}
+                        todayIso={todayIso}
                       />
                     ))}
                   </ul>

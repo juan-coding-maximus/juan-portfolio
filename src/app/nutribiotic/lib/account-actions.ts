@@ -1,6 +1,7 @@
 "use server";
 
 import {
+  applyAccountFacts,
   getAccount,
   listActivities,
   listContacts,
@@ -59,4 +60,17 @@ export async function setPotentialJuan(id: string, grade: Tier | null): Promise<
  */
 export async function setReadiness(id: string, readiness: Readiness | null): Promise<void> {
   await setAccountReadiness(id, readiness);
+}
+
+/**
+ * A rep correcting the phone number by hand from the SDR panel, same "fix
+ * the record, not a note" rule as everywhere else (AGENTS.md, memory
+ * feedback_fix-root-cause-not-a-note). Routed through applyAccountFacts so it
+ * stamps enrichment_status.phone.source_tier = "manual_note", the same top
+ * rank a dictated visit/call note gets: a number Juan just heard or read off
+ * the door outranks whatever an old ERP import or a Places scrape has on
+ * file, and a later automated pass won't quietly overwrite it back.
+ */
+export async function setAccountPhone(id: string, phone: string): Promise<void> {
+  await applyAccountFacts(id, { business_hours: null, phone, email: null });
 }
