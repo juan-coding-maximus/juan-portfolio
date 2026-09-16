@@ -32,6 +32,12 @@ export type PlaceCandidate = {
   formattedAddress: string | null;
   street: string | null;
   city: string | null;
+  /** Neighborhood, display-only: distinct chain locations sharing one
+   * `city` (e.g. three Sprouts, all "Los Angeles") are otherwise
+   * indistinguishable in the candidate list. Never written to nb_accounts
+   * or the HubSpot company, city stays the real locality for territory
+   * routing (nutribiotic-territory-areas). */
+  neighborhood: string | null;
   state: string | null;
   postal: string | null;
   lat: number | null;
@@ -93,6 +99,7 @@ function toCandidate(place: RawPlace): PlaceCandidate {
     formattedAddress: place.formattedAddress ?? null,
     street: [component(place, "street_number"), component(place, "route")].filter(Boolean).join(" ") || null,
     city: component(place, "locality"),
+    neighborhood: component(place, "neighborhood") ?? component(place, "sublocality"),
     state: component(place, "administrative_area_level_1"),
     postal: component(place, "postal_code"),
     lat: place.location?.latitude ?? null,

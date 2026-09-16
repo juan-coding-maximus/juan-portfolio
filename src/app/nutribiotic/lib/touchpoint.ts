@@ -47,6 +47,7 @@ import {
   markRouteStopDoneForAccountToday,
   patchContact,
   type AccountFactsReport,
+  type Contact,
 } from "./dal";
 import { Blocked, runEngagement } from "./hubspot-engagement";
 import { ensurePortalCompanyForActivity } from "./hubspot-graduate";
@@ -175,6 +176,75 @@ type ParsedPerson = {
   phone: string | null;
   preferences: string | null;
 };
+
+/**
+ * File one parsed person against an account: update the existing contact if
+ * there is one, insert a new row otherwise. Matches by email first, then by
+ * name (mirrors hubspot-engagement.ts's matchPeople), because a front-desk
+ * contact is often re-mentioned by role ("they said they'd forward it") on a
+ * later visit with no name attached, and matching by name only misses that
+ * it is the same person nb_contacts already has, tried to insert them again,
+ * and hit nb_contacts_account_email_uniq (confirmed 2026-09-16, Modern
+ * Esthetics: frontdesk@modernesthetics.com already on file, name-only match
+ * missed it, the raw Postgres 409 reached Juan's screen and the whole
+ * touchpoint filing died with it).
+ *
+ * The insert is still wrapped: even with email matching, a race (two
+ * touchpoints for the same new contact landing together) can still hit the
+ * same unique constraint, and per Juan (2026-09-16) that must never fail the
+ * filing. A 23505 on this table can only mean "this account already has this
+ * email", i.e. the append already happened; treated as a no-op, not an error.
+ */
+async function reconcileContact(
+  accountId: string,
+  existing: Contact[],
+  p: ParsedPerson,
+): Promise<"added" | "updated" | "none"> {
+  const nameKey = (s: string | null) => (s ?? "").trim().toLowerCase();
+  const emailKey = (s: string | null) => (s ?? "").trim().toLowerCase();
+  const pEmail = emailKey(p.email);
+
+  const match =
+    (pEmail && existing.find((c) => emailKey(c.email) === pEmail)) ||
+    existing.find(
+      (c) =>
+        nameKey(c.first_name) === nameKey(p.first_name) &&
+        nameKey(c.last_name) === nameKey(p.last_name) &&
+        (nameKey(p.first_name) || nameKey(p.last_name)) !== "",
+    );
+
+  if (match) {
+    // Fill blanks only. A field the CRM already has is never overwritten by a parse.
+    const patch: Record<string, string | boolean> = {};
+    if (!match.title && p.title) patch.title = p.title;
+    if (!match.role_tag && p.role_tag) patch.role_tag = p.role_tag;
+    if (!match.email && p.email) patch.email = p.email;
+    if (!match.phone && p.phone) patch.phone = p.phone;
+    if (!match.is_decision_maker && p.is_decision_maker) patch.is_decision_maker = true;
+    if (Object.keys(patch).length === 0) return "none";
+    await patchContact(match.id, patch);
+    return "updated";
+  }
+
+  if (!p.first_name && !p.last_name && !p.title) return "none";
+  try {
+    await insertContact({
+      account_id: accountId,
+      first_name: p.first_name,
+      last_name: p.last_name,
+      title: p.title,
+      role_tag: p.role_tag,
+      is_decision_maker: p.is_decision_maker,
+      email: p.email,
+      phone: p.phone,
+    });
+    return "added";
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("nb_contacts_account_email_uniq") || msg.includes('"code":"23505"')) return "none";
+    throw e;
+  }
+}
 
 type ParsedCalendarAction = {
   kind: "meeting" | "reminder" | "visit";
@@ -953,39 +1023,9 @@ async function finishTouchpoint(input: {
   let peopleUpdated = 0;
 
   for (const p of parsed.people ?? []) {
-    const nameKey = (s: string | null) => (s ?? "").trim().toLowerCase();
-    const match = existing.data.find(
-      (c) =>
-        nameKey(c.first_name) === nameKey(p.first_name) &&
-        nameKey(c.last_name) === nameKey(p.last_name) &&
-        (nameKey(p.first_name) || nameKey(p.last_name)) !== "",
-    );
-
-    if (match) {
-      // Fill blanks only. A field the CRM already has is never overwritten by a parse.
-      const patch: Record<string, string | boolean> = {};
-      if (!match.title && p.title) patch.title = p.title;
-      if (!match.role_tag && p.role_tag) patch.role_tag = p.role_tag;
-      if (!match.email && p.email) patch.email = p.email;
-      if (!match.phone && p.phone) patch.phone = p.phone;
-      if (!match.is_decision_maker && p.is_decision_maker) patch.is_decision_maker = true;
-      if (Object.keys(patch).length > 0) {
-        await patchContact(match.id, patch);
-        peopleUpdated += 1;
-      }
-    } else if (p.first_name || p.last_name || p.title) {
-      await insertContact({
-        account_id: accountId,
-        first_name: p.first_name,
-        last_name: p.last_name,
-        title: p.title,
-        role_tag: p.role_tag,
-        is_decision_maker: p.is_decision_maker,
-        email: p.email,
-        phone: p.phone,
-      });
-      peopleAdded += 1;
-    }
+    const outcome = await reconcileContact(accountId, existing.data, p);
+    if (outcome === "added") peopleAdded += 1;
+    else if (outcome === "updated") peopleUpdated += 1;
   }
 
   const tp = input.existingTouchpointId
@@ -1306,37 +1346,9 @@ export async function resolveTouchpointToAccount(
   let peopleAdded = 0;
   let peopleUpdated = 0;
   for (const p of parsed.people ?? []) {
-    const nameKey = (s: string | null) => (s ?? "").trim().toLowerCase();
-    const match = existing.data.find(
-      (c) =>
-        nameKey(c.first_name) === nameKey(p.first_name) &&
-        nameKey(c.last_name) === nameKey(p.last_name) &&
-        (nameKey(p.first_name) || nameKey(p.last_name)) !== "",
-    );
-    if (match) {
-      const patch: Record<string, string | boolean> = {};
-      if (!match.title && p.title) patch.title = p.title;
-      if (!match.role_tag && p.role_tag) patch.role_tag = p.role_tag;
-      if (!match.email && p.email) patch.email = p.email;
-      if (!match.phone && p.phone) patch.phone = p.phone;
-      if (!match.is_decision_maker && p.is_decision_maker) patch.is_decision_maker = true;
-      if (Object.keys(patch).length > 0) {
-        await patchContact(match.id, patch);
-        peopleUpdated += 1;
-      }
-    } else if (p.first_name || p.last_name || p.title) {
-      await insertContact({
-        account_id: accountId,
-        first_name: p.first_name,
-        last_name: p.last_name,
-        title: p.title,
-        role_tag: p.role_tag,
-        is_decision_maker: p.is_decision_maker,
-        email: p.email,
-        phone: p.phone,
-      });
-      peopleAdded += 1;
-    }
+    const outcome = await reconcileContact(accountId, existing.data, p);
+    if (outcome === "added") peopleAdded += 1;
+    else if (outcome === "updated") peopleUpdated += 1;
   }
 
   // Same queue as the straight-through path above. This note parked as

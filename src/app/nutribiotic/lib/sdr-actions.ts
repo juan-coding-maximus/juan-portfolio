@@ -353,20 +353,33 @@ export async function addSdrScheduleItem(input: NewSdrScheduleItem): Promise<Sdr
  *
  * Scope (HARD RULE 2) is asserted inside insertSdrScheduleItem, against the
  * live row, not here against what the client sent.
+ *
+ * RETURNS A RESULT, NEVER THROWS. Next.js redacts a Server Action's thrown
+ * error message before it reaches the client (production strips it to a
+ * generic digest), which is exactly why the map card used to show a static
+ * "Could not queue it" no matter what actually went wrong (a real scope
+ * refusal from insertSdrScheduleItem read identically to a network blip).
+ * Catching here and handing the real reason back as data survives that
+ * boundary, the same pattern lib/engagement-actions.ts already uses for the
+ * HubSpot filing queue.
  */
 export async function addAccountToSdr(
   accountId: string,
   priority: SdrPriority,
   scheduledDate: string,
-): Promise<SdrScheduleItem> {
-  const row = await insertSdrScheduleItem({
-    account_id: accountId,
-    kind: "call",
-    scheduled_date: scheduledDate,
-    priority,
-  });
-  revalidatePath("/nutribiotic/sdr");
-  return row;
+): Promise<{ ok: true; row: SdrScheduleItem } | { ok: false; error: string }> {
+  try {
+    const row = await insertSdrScheduleItem({
+      account_id: accountId,
+      kind: "call",
+      scheduled_date: scheduledDate,
+      priority,
+    });
+    revalidatePath("/nutribiotic/sdr");
+    return { ok: true, row };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 /**

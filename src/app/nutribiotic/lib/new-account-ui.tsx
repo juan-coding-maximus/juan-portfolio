@@ -128,7 +128,13 @@ function PlacePill({
           className="min-w-0 flex-1 truncate text-left text-[12.5px] text-[#14201B] disabled:cursor-default"
         >
           {candidate.name}
-          {candidate.city && <span className="text-[#8A928C]"> · {candidate.city}</span>}
+          {/* Neighborhood over city when we have it: same-chain candidates
+              often share one city (three Sprouts, all "Los Angeles") and are
+              otherwise indistinguishable here. City is still what's stored on
+              the account, see places.ts. */}
+          {(candidate.neighborhood ?? candidate.city) && (
+            <span className="text-[#8A928C]"> · {candidate.neighborhood ?? candidate.city}</span>
+          )}
         </button>
         <button
           onClick={onYes}

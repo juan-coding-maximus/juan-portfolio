@@ -146,12 +146,20 @@ export async function linkTouchpointToExistingCompany(
   touchpointId: string,
   hubspotCompanyId: string,
 ): Promise<ResolveResult> {
-  const account = await getAccountByHubspotCompanyId(hubspotCompanyId);
-  if (!account) {
-    return {
-      ok: false,
-      error: "That company isn't linked to one of your accounts, so it can't be picked here.",
-    };
+  try {
+    const account = await getAccountByHubspotCompanyId(hubspotCompanyId);
+    if (!account) {
+      return {
+        ok: false,
+        error: "That company isn't linked to one of your accounts, so it can't be picked here.",
+      };
+    }
+    return await resolveTouchpointToAccount(touchpointId, account.id, account.name);
+  } catch (e) {
+    // Same contract as createBusinessFromPlace above: a raw DB/HubSpot error
+    // must never reach Juan as an unhandled server-action rejection. Tapping
+    // an existing-company match is supposed to be one tap, always resolving
+    // to either a filed note or a plain-English reason it didn't.
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
-  return resolveTouchpointToAccount(touchpointId, account.id, account.name);
 }

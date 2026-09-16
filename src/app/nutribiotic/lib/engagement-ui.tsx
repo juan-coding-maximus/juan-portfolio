@@ -4,11 +4,18 @@
  * The queue of logged activities that have not yet crossed into HubSpot.
  * Every activity, Juan's own dictated note or an enrichment finding, now
  * files itself the moment lib/touchpoint.ts records it, no click (see that
- * file's autoFileEngagement). What lands here is only the activities that
- * failed to auto-file: a scope block, a missing company link, a HubSpot
- * error. The preview is the exact same deterministic output
- * hubspot_notes.py would print (see lib/hubspot-engagement.ts), so Juan can
- * read why before retrying by hand.
+ * file's autoFileEngagement). This queue is the safety net for whatever
+ * didn't: it fires the same auto-file attempt again the instant it renders,
+ * for every activity regardless of who/what logged it (2026-09-16, Juan:
+ * "it should either file immediately or not at all", after actor==="juan"
+ * activities — the Visit tab, the clientos door whose /api/touchpoint call
+ * opts out of insert-time auto-file on purpose so this queue is the actual
+ * gate — sat forever behind a manual "File to HubSpot" button even when the
+ * note was already complete and clean). What's left on screen after that
+ * retry is only the activities that still failed: a scope block, a missing
+ * company link, a real HubSpot error. The preview is the exact same
+ * deterministic output hubspot_notes.py would print (see
+ * lib/hubspot-engagement.ts), so Juan can read why before retrying by hand.
  */
 
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -16,33 +23,17 @@ import { fileEngagement, previewEngagement, type EngagementOutcome } from "./eng
 import { Card, Ico } from "./ui";
 import type { EngagementActivity } from "./dal";
 
-const AUTO_FILE_ACTOR = "enrichment";
-
 export function EngagementQueue({ activities }: { activities: EngagementActivity[] }) {
   if (activities.length === 0) return null;
-  const auto = activities.filter((a) => a.actor === AUTO_FILE_ACTOR);
-  const manual = activities.filter((a) => a.actor !== AUTO_FILE_ACTOR);
   return (
     <section>
-      {auto.length > 0 && <AutoFiler activities={auto} />}
-      {manual.length > 0 && (
-        <>
-          <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8A928C]">
-            Ready to file to HubSpot
-          </h2>
-          <div className="flex flex-col gap-3">
-            {manual.map((a) => (
-              <EngagementRow key={a.id} activity={a} />
-            ))}
-          </div>
-        </>
-      )}
+      <AutoFiler activities={activities} />
     </section>
   );
 }
 
-/** Files enrichment activities the moment they land here, no card, no click.
- * A failure that Juan can't act on from here (a scope block, a plain
+/** Files every activity the moment it lands here, no card, no click. A
+ * failure that Juan can't act on from here (a scope block, a plain
  * HubSpot error, one already filed) is just noise on the screen he opens
  * first; only a failure that resolves to an actual "File to HubSpot" button
  * is worth a card. See EngagementRow's `actionableOnly`. */

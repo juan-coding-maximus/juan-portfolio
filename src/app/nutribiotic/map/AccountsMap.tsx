@@ -67,20 +67,23 @@ const SDR_PRIORITIES: { value: SdrPriority; label: string; tone: string }[] = [
 function AddToSdr({ accountId }: { accountId: string }) {
   const [open, setOpen] = useState(false);
   const [queued, setQueued] = useState<SdrPriority | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failReason, setFailReason] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function queue(priority: SdrPriority) {
-    setFailed(false);
+    setFailReason(null);
     startTransition(async () => {
-      try {
-        await addAccountToSdr(accountId, priority, laTodayIso());
+      const res = await addAccountToSdr(accountId, priority, laTodayIso());
+      if (res.ok) {
         setQueued(priority);
         setOpen(false);
-      } catch {
+      } else {
         // Never a silent success. The row either exists or it does not, and a
-        // card that closed itself would say it does.
-        setFailed(true);
+        // card that closed itself would say it does. The real reason, not a
+        // static "something went wrong": addAccountToSdr already turned
+        // whatever failed (a scope refusal, a Supabase error) into a message
+        // that survives the Server Action boundary.
+        setFailReason(res.error);
       }
     });
   }
@@ -120,8 +123,8 @@ function AddToSdr({ accountId }: { accountId: string }) {
           Add to SDR
         </button>
       )}
-      {failed && (
-        <div className="mt-1 text-[11.5px] text-[#8A2E2E]">Could not queue it. Nothing was scheduled.</div>
+      {failReason && (
+        <div className="mt-1 text-[11.5px] text-[#8A2E2E]">Not scheduled: {failReason}</div>
       )}
     </div>
   );

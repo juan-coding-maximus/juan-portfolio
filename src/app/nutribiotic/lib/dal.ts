@@ -1111,13 +1111,49 @@ export type NewContact = {
   hubspot_contact_id?: string | null;
 };
 
+/**
+ * A second person sharing the email a contact already on this account holds
+ * (a shared front-desk inbox, two people both "frontdesk@store.com") trips
+ * nb_contacts' account+email uniqueness and is real data, not a bug: it must
+ * never fail the whole touchpoint over a database constraint (Juan,
+ * 2026-09-16, "if existing company it should just append to that company in
+ * general"). On that one conflict, append this contact to the account it
+ * already belongs to by reusing the existing row instead of throwing; any
+ * other write failure still throws.
+ *
+ * NOT MATCHED BY EXACT CONSTRAINT NAME. Migration 0002 named the index
+ * `nb_contacts_account_email_uniq`; migration 0019 says it replaced that with
+ * `nb_contacts_account_person_uniq` to allow two named people at one shared
+ * inbox. The live conflict Juan actually hit 2026-09-16 (Modern Esthetics,
+ * frontdesk@modernesthetics.com) still reported the OLD name, which means
+ * 0019 never ran against this database, this project has migration drift
+ * worth reconciling separately (check_config_drift.py's job) and it should
+ * not be assumed a future migration run won't rename it again. Matching on
+ * "this table, this column, a uniqueness violation" rather than one exact
+ * name survives either state.
+ */
 export async function insertContact(input: NewContact): Promise<Contact> {
-  const [row] = await mutate<Contact>("nb_contacts", "POST", {
-    id: randId("c"),
-    origin: "manual",
-    ...input,
-  });
-  return row;
+  try {
+    const [row] = await mutate<Contact>("nb_contacts", "POST", {
+      id: randId("c"),
+      origin: "manual",
+      ...input,
+    });
+    return row;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const isEmailUniqueConflict = msg.includes('"code":"23505"') && /nb_contacts.*email.*uniq/i.test(msg);
+    if (input.email && isEmailUniqueConflict) {
+      const existing = await query<Contact>("nb_contacts", {
+        select: "*",
+        account_id: `eq.${input.account_id}`,
+      });
+      const email = input.email.trim().toLowerCase();
+      const hit = existing.data.find((c) => (c.email ?? "").trim().toLowerCase() === email);
+      if (hit) return hit;
+    }
+    throw e;
+  }
 }
 
 /** Fills blanks only. Never overwrites a field that already holds a value, so
