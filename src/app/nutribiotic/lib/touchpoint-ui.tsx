@@ -67,33 +67,22 @@ function writeDraft(value: string): void {
   }
 }
 
-function mtMimeType(): string {
-  if (typeof MediaRecorder === "undefined") return "";
-  for (const m of ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"]) {
-    if (MediaRecorder.isTypeSupported(m)) return m;
-  }
-  return "";
-}
-
 export type FiledTouchpoint = Extract<RecordTouchpointResult, { ok: true; needsAccount: false; needsNextStep: false }>;
 
-function fmtTimer(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-}
-
 /**
- * One capture surface, typed or spoken, for whatever just happened. Both
- * paths land in the same recordTouchpoint() extractor (see lib/touchpoint.ts),
- * so a typed note and a transcribed one are parsed identically; this
- * component is presentation only.
+ * One capture surface for whatever just happened: type it, optionally attach
+ * a photo, send. This component is presentation only; recordTouchpoint()
+ * (lib/touchpoint.ts) does the parsing.
  *
  * DELIBERATELY QUIET (2026-08-17, Juan: "it looks like a wall of text").
  * Earlier versions explained the pipeline in three separate paragraphs
  * before he'd typed a word. The only copy left is the placeholder and
- * whatever feedback a result actually produces. The record button carries
- * no label at all: red and round is the whole affordance, same convention
- * as every voice-memo and camera app.
+ * whatever feedback a result actually produces.
+ *
+ * Audio recording (dictate the note) was removed 2026-09-15: typing is the
+ * one path now. A photo attaches before the note is sent, held in
+ * `pendingPhoto` and uploaded onto the touchpoint the moment submit() knows
+ * its id, rather than after a following screen.
  */
 const KIND_OPTIONS = [
   { value: "meeting", label: "Meeting" },
@@ -164,36 +153,22 @@ export function TouchpointCapture({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const restoredRef = useRef(false);
 
-  const [voice, setVoice] = useState<"idle" | "recording" | "uploading" | "uploaded" | "error">("idle");
-  const [elapsedMs, setElapsedMs] = useState(0);
-  const [voiceError, setVoiceError] = useState<string | null>(null);
-  const recRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const t0Ref = useRef(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Photo attach (0060 / dir_67b159). A ref, not state, so it can gate the
-  // dismiss timer below without re-triggering router.refresh() on every
-  // upload phase change.
-  const photoBusyRef = useRef(false);
-  const [photoUiState, setPhotoUiState] = useState<"idle" | "uploading" | "attached" | "error">("idle");
+  // Photo attach, held in the composer until the note is sent (0060 /
+  // dir_67b159, moved ahead of submit): a rep decides "this needs a picture"
+  // while writing, not after. Uploaded onto the touchpoint the moment its id
+  // exists, whichever branch submit() lands in.
+  const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
+  const [photoUiState, setPhotoUiState] = useState<"idle" | "attached" | "uploading" | "sent" | "error">("idle");
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!success) return;
     router.refresh();
-    const t = setTimeout(() => {
-      // Still uploading a photo onto this note: let attachPhoto's own
-      // finally-block close the toast once the upload settles instead.
-      if (photoBusyRef.current) return;
-      setSuccess(null);
-    }, 2200);
+    const t = setTimeout(() => setSuccess(null), 2200);
     return () => clearTimeout(t);
   }, [success, router]);
 
   async function attachPhoto(touchpointId: string, file: File) {
-    photoBusyRef.current = true;
     setPhotoUiState("uploading");
     try {
       const form = new FormData();
@@ -202,23 +177,13 @@ export function TouchpointCapture({
       const res = await fetch("/nutribiotic/api/visits/attach", { method: "POST", body: form });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Attach failed.");
-      setPhotoUiState("attached");
+      setPhotoUiState("sent");
+      setTimeout(() => setPhotoUiState("idle"), 1500);
     } catch {
       setPhotoUiState("error");
-    } finally {
-      photoBusyRef.current = false;
-      setTimeout(() => {
-        setSuccess(null);
-        setPhotoUiState("idle");
-      }, 1200);
+      setTimeout(() => setPhotoUiState("idle"), 2500);
     }
   }
-
-  useEffect(() => {
-    if (voice !== "uploaded") return;
-    const t = setTimeout(() => setVoice("idle"), 1800);
-    return () => clearTimeout(t);
-  }, [voice]);
 
   const autosize = useCallback((el: HTMLTextAreaElement) => {
     el.style.height = "auto";
@@ -275,6 +240,8 @@ export function TouchpointCapture({
         // point of this screen.
         if (grade && res.accountId) void setPotentialJuan(res.accountId, grade);
         if (readiness && res.accountId) void setReadiness(res.accountId, readiness);
+        if (pendingPhoto) void attachPhoto(res.touchpoint_id, pendingPhoto);
+        setPendingPhoto(null);
         setText("");
         writeDraft("");
         setKind(lockKind ?? "meeting");
@@ -301,75 +268,12 @@ export function TouchpointCapture({
           if (grade) void setPotentialJuan(res.accountId, grade);
           if (readiness) void setReadiness(res.accountId, readiness);
         }
+        if (res.ok && pendingPhoto) void attachPhoto(res.touchpoint_id, pendingPhoto);
+        if (res.ok) setPendingPhoto(null);
         setResult(res);
       }
     });
   }
-
-  async function finishRecording() {
-    if (timerRef.current) clearInterval(timerRef.current);
-    const startedAt = new Date(t0Ref.current).toISOString();
-    const endedAt = new Date().toISOString();
-    const mime = recRef.current?.mimeType || "audio/webm";
-    const blob = new Blob(chunksRef.current, { type: mime });
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    recRef.current = null;
-    streamRef.current = null;
-    chunksRef.current = [];
-
-    if (blob.size < 1000) {
-      setVoice("error");
-      setVoiceError("Recording was empty.");
-      return;
-    }
-
-    setVoice("uploading");
-    try {
-      const form = new FormData();
-      form.set("audio", blob, "visit");
-      form.set("started_at", startedAt);
-      form.set("ended_at", endedAt);
-      if (accountIdHint) form.set("account_id_hint", accountIdHint);
-      const res = await fetch("/nutribiotic/api/visits/upload", { method: "POST", body: form });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || "Upload failed.");
-      setVoice("uploaded");
-    } catch (err) {
-      setVoice("error");
-      setVoiceError(err instanceof Error ? err.message : "Upload failed.");
-    }
-  }
-
-  async function startRecording() {
-    setVoiceError(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mime = mtMimeType();
-      const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
-      chunksRef.current = [];
-      t0Ref.current = Date.now();
-      rec.ondataavailable = (e) => {
-        if (e.data && e.data.size) chunksRef.current.push(e.data);
-      };
-      rec.onstop = finishRecording;
-      recRef.current = rec;
-      streamRef.current = stream;
-      rec.start(1000);
-      setVoice("recording");
-      setElapsedMs(0);
-      timerRef.current = setInterval(() => setElapsedMs(Date.now() - t0Ref.current), 1000);
-    } catch {
-      setVoice("error");
-      setVoiceError("Microphone unavailable or permission denied.");
-    }
-  }
-
-  function stopRecording() {
-    recRef.current?.stop();
-  }
-
-  const recording = voice === "recording";
-  const uploading = voice === "uploading";
 
   return (
     <div className="mx-auto w-full max-w-[600px]">
@@ -377,21 +281,8 @@ export function TouchpointCapture({
         {success ? (
           // The confirmation beat: tappable to skip the wait and start the
           // next one immediately, otherwise clears itself (see the effect
-          // above) once the lists below have had a chance to refresh. A
-          // plain div, not a button, because the photo-attach control below
-          // is its own interactive element and HTML forbids nesting one
-          // button inside another.
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => {
-              if (!photoBusyRef.current) setSuccess(null);
-            }}
-            onKeyDown={(e) => {
-              if ((e.key === "Enter" || e.key === " ") && !photoBusyRef.current) setSuccess(null);
-            }}
-            className="block w-full cursor-pointer text-left"
-          >
+          // above) once the lists below have had a chance to refresh.
+          <button type="button" onClick={() => setSuccess(null)} className="block w-full cursor-pointer text-left">
             <SuccessNote
               title={`Logged${success.accountName ? `: ${success.accountName}` : ""}`}
               detail={success.summary}
@@ -435,42 +326,8 @@ export function TouchpointCapture({
                 </>
               }
             />
-          </div>
+          </button>
         ) : null}
-        {success && (
-          <div className="mt-2 flex items-center gap-2 border-t border-[#E2DFD5] pt-2">
-            <input
-              ref={photoInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                e.target.value = "";
-                if (file && success) void attachPhoto(success.touchpoint_id, file);
-              }}
-            />
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                photoInputRef.current?.click();
-              }}
-              disabled={photoUiState === "uploading"}
-              className="flex items-center gap-1.5 rounded-md border border-[#E2DFD5] px-2.5 py-1 text-[12px] font-medium text-[#5B6560] transition-colors hover:bg-[#F7F6F1] disabled:opacity-60"
-            >
-              <Ico name={photoUiState === "attached" ? "check" : "camera"} size={13} />
-              {photoUiState === "uploading"
-                ? "Attaching…"
-                : photoUiState === "attached"
-                  ? "Attached"
-                  : photoUiState === "error"
-                    ? "Failed, try again"
-                    : "Attach a photo"}
-            </button>
-          </div>
-        )}
         {!success && (
           <>
             {!lockKind && <div className="mb-3 flex gap-1.5">
@@ -509,29 +366,8 @@ export function TouchpointCapture({
                 autoCapitalize="sentences"
                 autoCorrect="on"
                 spellCheck
-                className="min-h-[132px] w-full resize-none border-none bg-transparent p-0 pr-14 text-[16px] leading-relaxed text-[#14201B] placeholder:text-[#A9AFA9] focus:outline-none"
+                className="min-h-[132px] w-full resize-none border-none bg-transparent p-0 text-[16px] leading-relaxed text-[#14201B] placeholder:text-[#A9AFA9] focus:outline-none"
               />
-
-              {recording && (
-                <span className="pointer-events-none absolute bottom-1 right-[60px] text-[12.5px] font-medium tabular-nums text-[#8A2E2E]">
-                  {fmtTimer(elapsedMs)}
-                </span>
-              )}
-
-              <button
-                onClick={recording ? stopRecording : startRecording}
-                disabled={uploading}
-                aria-label={recording ? "Stop recording" : "Record a visit"}
-                className={`absolute bottom-0 right-0 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white shadow-sm transition-all disabled:opacity-50 ${
-                  recording ? "scale-105 bg-[#B23B3B]" : "bg-[#8A2E2E] hover:opacity-90"
-                }`}
-              >
-                {uploading ? (
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                ) : (
-                  <Ico name={recording ? "stop" : "mic"} size={17} />
-                )}
-              </button>
             </div>
 
             {/* Potential and New company sit BELOW the textarea on purpose.
@@ -606,14 +442,48 @@ export function TouchpointCapture({
             </div>
 
             <div className="mt-3 flex items-center justify-between gap-3">
-              <span className="min-h-[1em] text-[12px] leading-relaxed text-[#8A6D2F]">
-                {voice === "uploaded" ? "Recording sent, transcribing." : voiceError}
-              </span>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) setPendingPhoto(file);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  aria-label={pendingPhoto ? "Photo attached, tap to replace" : "Add a photo"}
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                    pendingPhoto
+                      ? "border-[#14201B] bg-[#14201B] text-[#F7F6F1]"
+                      : "border-[#E2DFD5] bg-transparent text-[#5B6560] hover:bg-[#FAF9F5]"
+                  }`}
+                >
+                  <Ico name="camera" size={17} />
+                </button>
+                <span className="min-h-[1em] text-[12px] leading-relaxed text-[#8A6D2F]">
+                  {photoUiState === "uploading" && "Attaching photo…"}
+                  {photoUiState === "error" && "Photo failed to attach."}
+                  {photoUiState === "idle" && pendingPhoto && "1 photo, sends with this note."}
+                </span>
+              </div>
               <button
                 onClick={submit}
                 disabled={pending || !text.trim()}
-                className="shrink-0 rounded-md bg-[#14201B] px-4 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-30"
+                aria-label="Log this note"
+                className="flex shrink-0 items-center gap-2 rounded-full bg-[#14201B] px-6 py-3 text-[14.5px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-30"
               >
+                {pending ? (
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                ) : (
+                  <Ico name="send" size={18} />
+                )}
                 {pending ? "Logging…" : "Log"}
               </button>
             </div>

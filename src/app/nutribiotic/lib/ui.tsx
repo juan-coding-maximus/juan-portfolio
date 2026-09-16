@@ -72,6 +72,7 @@ const ICONS: Record<string, ReactNode> = {
   imessage: <><path d="M8 2.4c3.5 0 6.2 2.3 6.2 5.2S11.5 12.8 8 12.8c-.6 0-1.2-.07-1.7-.2l-2.9 1.6.6-2.6C2.7 10.6 1.8 9.2 1.8 7.6 1.8 4.7 4.5 2.4 8 2.4Z" /></>,
   plus: <><path d="M8 2.6v10.8M2.6 8h10.8" /></>,
   camera: <><path d="M2.4 5.4h2.2l1-1.6h4.8l1 1.6h2.2v7.2H2.4z" /><circle cx="8" cy="9" r="2.3" /></>,
+  send: <><path d="M13.6 2.4 2.4 7.2l4.4 1.8 1.8 4.4 5-11z" /><path d="M6.8 9 13.6 2.4" /></>,
   gauge: <><circle cx="8" cy="8.6" r="5.8" /><path d="M8 8.6 10.6 6M5.4 8.6h5.2" strokeLinecap="round" /></>,
   receipt: <><path d="M4 2.4h8v11.2l-1.4-1-1.4 1-1.2-1-1.2 1-1.4-1-1.4 1z" /><path d="M6 5.6h4M6 8h4M6 10.4h2.6" /></>,
   search: <><circle cx="6.9" cy="6.9" r="4.3" /><path d="m13.2 13.2-3.3-3.3" strokeLinecap="round" /></>,
