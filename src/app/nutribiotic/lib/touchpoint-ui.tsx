@@ -37,11 +37,13 @@ const GRADE_TITLE: Record<string, string> = {
  * on the same call/visit, converges into lib/priority.ts's 0-100 score as a
  * stated point adjustment (see READINESS_ADJUSTMENT there), never silently.
  */
-const READINESS_OPTIONS: { value: Readiness; label: string; title: string }[] = [
-  { value: "urgent", label: "Urgent", title: "Urgent · ready now, +20 to priority" },
-  { value: "hot", label: "Hot", title: "Hot · close, +10 to priority" },
-  { value: "normal", label: "Normal", title: "Normal · no change to priority" },
-  { value: "cold", label: "Cold", title: "Cold · not close, -10 to priority" },
+// Icon, not a word, per option (Juan, 2026-09-15): four states read faster as
+// a shape and a color than as four labels competing for the same row.
+const READINESS_OPTIONS: { value: Readiness; icon: string; title: string; activeClass: string }[] = [
+  { value: "urgent", icon: "urgent", title: "Urgent · ready now, +20 to priority", activeClass: "bg-[#9C4A44] text-[#F7F6F1]" },
+  { value: "hot", icon: "hot", title: "Hot · close, +10 to priority", activeClass: "bg-[#A8703D] text-[#F7F6F1]" },
+  { value: "normal", icon: "dot", title: "Normal · no change to priority", activeClass: "bg-[#14201B] text-[#F7F6F1]" },
+  { value: "cold", icon: "snowflake", title: "Cold · not close, -10 to priority", activeClass: "bg-[#5C7E8C] text-[#F7F6F1]" },
 ];
 
 /** Survives a gate redirect, an iOS eviction, or a version-skew reload. The
@@ -98,6 +100,7 @@ export function TouchpointCapture({
   accountIdHint,
   onFiled,
   lockKind,
+  defaultKind,
   initialText,
 }: {
   accountIdHint?: string | null;
@@ -113,6 +116,12 @@ export function TouchpointCapture({
    * set, the kind selector never renders and every submit sends this kind,
    * touched or not. */
   lockKind?: KindOption;
+  /** Same box, 2026-09-15: Juan still wants a toggle here, not a hidden lock,
+   *  a call sometimes turns into a real sit-down meeting worth logging as
+   *  one. Pre-selects this kind (pills stay visible, unlike lockKind) and, if
+   *  he never taps another pill, still sends it: a visible default he could
+   *  see and didn't change is his call, not a silent guess. */
+  defaultKind?: KindOption;
   /** SDR's call log, 2026-09-08: "Called X and spoke with: " pre-typed so
    *  Juan only has to add what was actually said. Applied once, on mount
    *  (this component is keyed per schedule item in sdr-ui.tsx, so a new
@@ -123,7 +132,7 @@ export function TouchpointCapture({
 }) {
   const router = useRouter();
   const [text, setText] = useState("");
-  const [kind, setKind] = useState<KindOption>(lockKind ?? "meeting");
+  const [kind, setKind] = useState<KindOption>(lockKind ?? defaultKind ?? "meeting");
   // WHETHER HE ACTUALLY PICKED, as opposed to leaving the default sitting there.
   // This toggle used to send its value on every submit, so "meeting" was forced
   // onto every note whether or not he touched it, and the extractor's own read
@@ -132,7 +141,7 @@ export function TouchpointCapture({
   // kind to choose, but even once it does, an untouched default would keep
   // overriding it. His explicit pick still wins (a rep's own word for what just
   // happened outranks a model's guess); an untouched default now stays quiet.
-  const [kindTouched, setKindTouched] = useState(Boolean(lockKind));
+  const [kindTouched, setKindTouched] = useState(Boolean(lockKind ?? defaultKind));
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<RecordTouchpointResult | null>(null);
   // A clean file (matched, no follow-up needed) gets its own confirmation
@@ -244,8 +253,8 @@ export function TouchpointCapture({
         setPendingPhoto(null);
         setText("");
         writeDraft("");
-        setKind(lockKind ?? "meeting");
-        setKindTouched(Boolean(lockKind));
+        setKind(lockKind ?? defaultKind ?? "meeting");
+        setKindTouched(Boolean(lockKind ?? defaultKind));
         setGrade(null);
         setReadiness_(null);
         setNewCompany(false);
@@ -357,9 +366,16 @@ export function TouchpointCapture({
                 ref={textareaRef}
                 value={text}
                 onChange={(e) => {
-                  setText(e.target.value);
-                  writeDraft(e.target.value);
+                  const value = e.target.value;
+                  setText(value);
+                  writeDraft(value);
                   autosize(e.target);
+                  // Typing before picking a kind is itself a pick: Meeting,
+                  // the state `kind` already starts at, is what a rep means
+                  // by default when they just start writing (Juan,
+                  // 2026-09-15). Never fires with lockKind, which never
+                  // shows this selector and is already touched on mount.
+                  if (!kindTouched && !lockKind && value.trim()) setKindTouched(true);
                 }}
                 placeholder="What just happened?"
                 rows={5}
@@ -426,15 +442,14 @@ export function TouchpointCapture({
                       key={opt.value}
                       type="button"
                       aria-pressed={active}
+                      aria-label={opt.title}
                       title={opt.title}
                       onClick={() => setReadiness_(active ? null : opt.value)}
-                      className={`rounded-md px-2.5 py-1.5 text-[12.5px] font-medium transition-colors ${
-                        active
-                          ? "bg-[#14201B] text-[#F7F6F1]"
-                          : "bg-[#ECEAE1] text-[#3D4A44] hover:bg-[#E2DFD5]"
+                      className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
+                        active ? opt.activeClass : "bg-[#ECEAE1] text-[#3D4A44] hover:bg-[#E2DFD5]"
                       }`}
                     >
-                      {opt.label}
+                      <Ico name={opt.icon} size={15} />
                     </button>
                   );
                 })}
@@ -513,7 +528,7 @@ export function TouchpointCapture({
             // a loggable screen was reloading the page.
             setText("");
             writeDraft("");
-            setKind(lockKind ?? "meeting");
+            setKind(lockKind ?? defaultKind ?? "meeting");
             setGrade(null);
             setReadiness_(null);
             setNewCompany(false);
@@ -531,7 +546,7 @@ export function TouchpointCapture({
             // Same clear-and-reset as AccountMatchResolver's onResolved above.
             setText("");
             writeDraft("");
-            setKind(lockKind ?? "meeting");
+            setKind(lockKind ?? defaultKind ?? "meeting");
             setGrade(null);
             setReadiness_(null);
             setNewCompany(false);

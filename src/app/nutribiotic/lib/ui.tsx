@@ -35,10 +35,44 @@ const ICONS: Record<string, ReactNode> = {
   pin: <><path d="M8 14s4.6-4.2 4.6-7.4A4.6 4.6 0 0 0 3.4 6.6C3.4 9.8 8 14 8 14Z" /><circle cx="8" cy="6.5" r="1.7" /></>,
   wand: <><path d="M3 13 11 5M9.6 3.4l.5 1.3 1.3.5-1.3.5-.5 1.3-.5-1.3-1.3-.5 1.3-.5zM13 8.4l.35.9.9.35-.9.35-.35.9-.35-.9-.9-.35.9-.35z" /></>,
   alert: <><path d="M8 2.6 14.2 13H1.8L8 2.6Z" /><path d="M8 6.6v3M8 11.4h.01" /></>,
+  // Lead readiness pills (touchpoint-ui.tsx), a plain exclamation, no
+  // triangle, so it reads as "urgent" rather than "alert" (Juan, 2026-09-15).
+  urgent: <><path d="M8 2.8v6.4M8 12.2h.01" strokeLinecap="round" /></>,
+  // Three parallel vertical ripples, the visual "hot" a hazard-orange
+  // exclamation would not read as.
+  hot: (
+    <>
+      <path d="M4.6 2.6c1.4 1.7-1.4 3.4 0 5.1c1.4 1.7-1.4 3.4 0 5.1" />
+      <path d="M8 2.6c1.4 1.7-1.4 3.4 0 5.1c1.4 1.7-1.4 3.4 0 5.1" />
+      <path d="M11.4 2.6c1.4 1.7-1.4 3.4 0 5.1c1.4 1.7-1.4 3.4 0 5.1" />
+    </>
+  ),
+  dot: <circle cx="8" cy="8" r="2.6" fill="currentColor" stroke="none" />,
+  snowflake: (
+    <>
+      <path d="M1.3 8h13.4M8 1.3v13.4" />
+      <path d="M13.3 10.7 10.7 8 13.3 5.3" />
+      <path d="M2.7 5.3 5.3 8 2.7 10.7" />
+      <path d="M10.7 2.7 8 6.7 5.3 2.7" />
+      <path d="M5.3 13.3 8 9.3 10.7 13.3" />
+    </>
+  ),
   check: <><path d="m3 8.4 3.2 3.2L13 4.8" /></>,
   close: <><path d="m3.6 3.6 8.8 8.8M12.4 3.6l-8.8 8.8" /></>,
   mail: <><path d="M2.4 4.2h11.2v7.6H2.4z" /><path d="m2.4 4.6 5.6 4 5.6-4" /></>,
   globe: <><circle cx="8" cy="8" r="6.2" /><path d="M1.8 8h12.4M8 1.8c2.1 1.9 2.1 10.5 0 12.4M8 1.8c-2.1 1.9-2.1 10.5 0 12.4" /></>,
+  // HubSpot's own sprocket mark (three nodes, not the O of the wordmark) so
+  // the "Open in HubSpot" link reads as the actual product at a glance
+  // instead of a generic external-link arrow (Juan, 2026-09-15).
+  hubspot: (
+    <>
+      <path d="M8 6.6V3.2M5.4 8.9 3 10.3M10.6 8.9 13 10.3" />
+      <circle cx="8" cy="2.2" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="2.2" cy="11.6" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="13.8" cy="11.6" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="8" cy="9.2" r="2.4" />
+    </>
+  ),
   instagram: (
     <>
       <rect x="2.4" y="2.4" width="11.2" height="11.2" rx="3" />
@@ -79,6 +113,7 @@ const ICONS: Record<string, ReactNode> = {
   more: <><circle cx="4" cy="8" r="1.15" fill="currentColor" stroke="none" /><circle cx="8" cy="8" r="1.15" fill="currentColor" stroke="none" /><circle cx="12" cy="8" r="1.15" fill="currentColor" stroke="none" /></>,
   // Drag handle (2026-08-25): a 2x3 dot grid, the standard "grab this" glyph,
   // distinct from "more" (its 1x3 row) at a glance in the same small control row.
+  edit: <><path d="M10.6 2.6 13.4 5.4 5.2 13.6H2.4v-2.8Z" /><path d="M9.2 4 12 6.8" /></>,
   grip: (
     <>
       <circle cx="6" cy="4.5" r="1.05" fill="currentColor" stroke="none" />
@@ -520,7 +555,7 @@ export function ReachLinks({
     <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] ${className}`}>
       {hubspotId ? (
         <a href={HUBSPOT_COMPANY_URL(hubspotId)} target="_blank" rel="noopener noreferrer" className={link}>
-          <Ico name="external" size={12} />
+          <Ico name="hubspot" size={12} />
           HubSpot
         </a>
       ) : (
