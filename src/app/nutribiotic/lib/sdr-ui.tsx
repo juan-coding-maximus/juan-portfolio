@@ -25,10 +25,17 @@ import {
   searchSdrAccounts,
   searchSdrClients,
   updateSdrScheduleStatus,
-  type QuickEnrichResult,
   type SdrAccountPanel,
   type SdrSearchHit,
 } from "./sdr-actions";
+// Imported straight from its own module, not re-exported through
+// sdr-actions.ts: a `export type { X }` re-export inside a "use server" file
+// deterministically crashed every SDR panel open in production (Turbopack's
+// action-export scan does not treat that re-export form as type-only, so the
+// bundled actions reference a binding that TypeScript already erased, a
+// ReferenceError on every single call, not a flaky-network blip). See
+// sdr-actions.ts's own import of this type for the same reasoning.
+import type { QuickEnrichResult } from "./quick-enrich";
 import type { PriorityBook, SdrPriority, SdrScheduleItem, Tier } from "./dal";
 import { AccountFilterBar } from "./filter-bar";
 import {

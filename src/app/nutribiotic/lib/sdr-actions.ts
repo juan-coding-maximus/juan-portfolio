@@ -31,8 +31,6 @@ import {
 import type { Readiness } from "./priority";
 import { enrichAccountQuickly, type QuickEnrichResult } from "./quick-enrich";
 
-export type { QuickEnrichResult };
-
 export type SdrSearchHit = {
   accountId: string;
   accountName: string;
