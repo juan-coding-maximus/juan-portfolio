@@ -8,7 +8,8 @@ import type { Tier } from "./dal";
 import type { Readiness } from "./priority";
 import { AccountMatchResolver } from "./new-account-ui";
 import { NextStepResolver } from "./next-step-ui";
-import { recordTouchpoint, type RecordTouchpointResult } from "./touchpoint";
+import { ReviewCard } from "./review-ui";
+import { previewTouchpoint, type RecordTouchpointResult, type TouchpointDraft } from "./touchpoint";
 import { Ico, SuccessNote } from "./ui";
 
 /**
@@ -21,9 +22,9 @@ import { Ico, SuccessNote } from "./ui";
  * would overwrite HQ's grade with a classification Juan did not mean. They stay
  * available on the account card, where there is room to read what they mean.
  */
-const VISIT_GRADES: Tier[] = ["A", "B", "C", "D", "E"];
+export const VISIT_GRADES: Tier[] = ["A", "B", "C", "D", "E"];
 
-const GRADE_TITLE: Record<string, string> = {
+export const GRADE_TITLE: Record<string, string> = {
   A: "A · very big",
   B: "B · big",
   C: "C · medium",
@@ -39,7 +40,7 @@ const GRADE_TITLE: Record<string, string> = {
  */
 // Icon, not a word, per option (Juan, 2026-09-15): four states read faster as
 // a shape and a color than as four labels competing for the same row.
-const READINESS_OPTIONS: { value: Readiness; icon: string; title: string; activeClass: string }[] = [
+export const READINESS_OPTIONS: { value: Readiness; icon: string; title: string; activeClass: string }[] = [
   { value: "urgent", icon: "urgent", title: "Urgent · ready now, +20 to priority", activeClass: "bg-[#9C4A44] text-[#F7F6F1]" },
   { value: "hot", icon: "hot", title: "Hot · close, +10 to priority", activeClass: "bg-[#A8703D] text-[#F7F6F1]" },
   { value: "normal", icon: "dot", title: "Normal · no change to priority", activeClass: "bg-[#14201B] text-[#F7F6F1]" },
@@ -168,6 +169,14 @@ export function TouchpointCapture({
   // exists, whichever branch submit() lands in.
   const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
   const [photoUiState, setPhotoUiState] = useState<"idle" | "attached" | "uploading" | "sent" | "error">("idle");
+
+  // The 5s review-before-commit screen (Juan, 2026-09-15): set only for the
+  // one case that used to file to HubSpot the instant Log was pressed with
+  // no human in the loop at all. See touchpoint.ts's previewTouchpoint doc
+  // for why every other outcome (field note, needs-account, needs-next-step,
+  // error) never sets this and instead flows through exactly as it always
+  // has.
+  const [draft, setDraft] = useState<TouchpointDraft | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -233,39 +242,58 @@ export function TouchpointCapture({
     textareaRef.current?.focus({ preventScroll: true });
   }, [autosize, initialText]);
 
+  /** The one clean landing, whether it came straight through or through the
+   *  review card below. */
+  function handleFiled(res: FiledTouchpoint) {
+    // The grade goes on only once the note has landed and named its
+    // account, so a failed file never leaves a grade on the wrong record.
+    // Not awaited: it reaches HubSpot on the sync worker's own 60-second
+    // cycle either way, and making the rep wait for it would undo the
+    // point of this screen.
+    if (grade && res.accountId) void setPotentialJuan(res.accountId, grade);
+    if (readiness && res.accountId) void setReadiness(res.accountId, readiness);
+    if (pendingPhoto) void attachPhoto(res.touchpoint_id, pendingPhoto);
+    setPendingPhoto(null);
+    setDraft(null);
+    setText("");
+    writeDraft("");
+    setKind(lockKind ?? defaultKind ?? "meeting");
+    setKindTouched(Boolean(lockKind ?? defaultKind));
+    setGrade(null);
+    setReadiness_(null);
+    setNewCompany(false);
+    requestAnimationFrame(() => {
+      if (textareaRef.current) {
+        autosize(textareaRef.current);
+        textareaRef.current.focus({ preventScroll: true });
+      }
+    });
+    setSuccess(res);
+    onFiled?.(res);
+  }
+
   function submit() {
     const value = text;
     if (!value.trim() || pending) return;
     startTransition(async () => {
-      const res = await recordTouchpoint(value, accountIdHint, null, {
+      const preview = await previewTouchpoint(value, accountIdHint, {
         kindOverride: kindTouched ? kind : undefined,
         forceNewAccount: newCompany,
       });
+      if (!preview.ok) {
+        setResult(preview);
+        return;
+      }
+      if (preview.needsReview) {
+        // Held on screen for the review card below; nothing has been
+        // written anywhere yet. The photo, if any, waits with it, still in
+        // `pendingPhoto`, and attaches once handleFiled actually runs.
+        setDraft(preview.draft);
+        return;
+      }
+      const res = preview.result;
       if (res.ok && !res.needsAccount && !res.needsNextStep) {
-        // The grade goes on only once the note has landed and named its
-        // account, so a failed file never leaves a grade on the wrong record.
-        // Not awaited: it reaches HubSpot on the sync worker's own 60-second
-        // cycle either way, and making the rep wait for it would undo the
-        // point of this screen.
-        if (grade && res.accountId) void setPotentialJuan(res.accountId, grade);
-        if (readiness && res.accountId) void setReadiness(res.accountId, readiness);
-        if (pendingPhoto) void attachPhoto(res.touchpoint_id, pendingPhoto);
-        setPendingPhoto(null);
-        setText("");
-        writeDraft("");
-        setKind(lockKind ?? defaultKind ?? "meeting");
-        setKindTouched(Boolean(lockKind ?? defaultKind));
-        setGrade(null);
-        setReadiness_(null);
-        setNewCompany(false);
-        requestAnimationFrame(() => {
-          if (textareaRef.current) {
-            autosize(textareaRef.current);
-            textareaRef.current.focus({ preventScroll: true });
-          }
-        });
-        setSuccess(res);
-        onFiled?.(res);
+        handleFiled(res);
       } else {
         // Parked (needs an account, or an account but no stated next step) or
         // failed: the text stays in the box AND in storage. This is the case
@@ -337,7 +365,17 @@ export function TouchpointCapture({
             />
           </button>
         ) : null}
-        {!success && (
+        {draft && (
+          <ReviewCard
+            draft={draft}
+            grade={grade}
+            onGradeChange={setGrade}
+            readiness={readiness}
+            onReadinessChange={setReadiness_}
+            onCommitted={handleFiled}
+          />
+        )}
+        {!success && !draft && (
           <>
             {!lockKind && <div className="mb-3 flex gap-1.5">
               {KIND_OPTIONS.map((opt) => (

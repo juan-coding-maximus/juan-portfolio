@@ -33,6 +33,7 @@ import {
   finalizeTouchpointAccount,
   finalizeTouchpointNextStep,
   getAccount,
+  getPriorityBook,
   getTouchpointById,
   insertActivity,
   insertCloseSignal,
@@ -637,6 +638,29 @@ export async function recordTouchpoint(
     return { ok: false, error: `Parse failed: ${err instanceof Error ? err.message : String(err)}` };
   }
 
+  return continueTouchpoint(text, parsed, accountsRes, accountIdHint, occurredAt, autoFileHubspot, opts, now);
+}
+
+/**
+ * Everything recordTouchpoint does once a `parsed` result exists, whether
+ * that came from its own extraction call above or from previewTouchpoint's
+ * (below): the kind override, the field-note/needs-account/needs-next-step
+ * branches, and the straight-through file. Split out 2026-09-15 so the new
+ * review-before-commit flow can run the SAME extraction once, hold the
+ * result on screen for Juan to read and edit, and then run this exact tail
+ * rather than re-parsing the text a second time (which would cost a second
+ * model call and risk the preview and the commit quietly disagreeing).
+ */
+async function continueTouchpoint(
+  text: string,
+  parsed: ParsedTouchpoint,
+  accountsRes: Awaited<ReturnType<typeof listAccountsForMatching>>,
+  accountIdHint: string | null | undefined,
+  occurredAt: string | null | undefined,
+  autoFileHubspot: boolean,
+  opts: { kindOverride?: "meeting" | "call" | "email" | "field_note"; forceNewAccount?: boolean },
+  now = new Date(),
+): Promise<RecordTouchpointResult> {
   // The rep's own Meeting/Call/Email pick (touchpoint-ui.tsx's toggle) always
   // wins over the model's kind guess, the same way an explicit account pick
   // always wins over account_confidence above: it decides which typed
@@ -1027,6 +1051,196 @@ async function finishTouchpoint(input: {
     ...hubspot,
     accountFacts,
   };
+}
+
+/**
+ * The one case that used to go straight to HubSpot with no human in the
+ * loop at all: a matched account (his own pick, or the model's own "high"
+ * confidence) with a stated next step. Field notes never touch HubSpot to
+ * begin with; needs_account and needs_next_step already stop at their own
+ * dedicated screen (AccountMatchResolver / NextStepResolver) before either
+ * one ever reaches finishTouchpoint. Those three keep working exactly as
+ * they always have; only this one path gets a hold-and-review step, since
+ * it is the one that previously had none (Juan, 2026-09-15, after a note
+ * filed to HubSpot he expected to be asked about first).
+ */
+export type TouchpointDraft = {
+  rawText: string;
+  accountIdHint: string | null;
+  kind: "meeting" | "call" | "email";
+  hubspotSummary: string;
+  nextStep: string;
+  contact: { firstName: string | null; lastName: string | null; title: string | null; phone: string | null; email: string | null } | null;
+  /** What the agency queues on its own once this commits: return visits,
+   *  agency directives, outreach asks, account-fact fills. Plain sentences,
+   *  not a control -- editing what happens next means editing nextStep or
+   *  the note itself, not this list. */
+  automationNotes: string[];
+  accountId: string;
+  accountName: string;
+  /** lib/priority.ts's live 0-100 score, the same number the map pin and the
+   *  SDR row already show. Null when the account has no measured input yet,
+   *  a real gap, never a guess. */
+  priorityScore: number | null;
+  priorityBand: "now" | "soon" | "later" | "unscored" | null;
+  /** Opaque to the caller: sent back to commitTouchpointDraft verbatim, with
+   *  overrides applied, so the commit runs the exact extraction this draft
+   *  was built from rather than parsing the text a second time. */
+  raw: ParsedTouchpoint;
+};
+
+export type PreviewResult =
+  | { ok: true; needsReview: true; draft: TouchpointDraft }
+  | { ok: true; needsReview: false; result: RecordTouchpointResult }
+  | { ok: false; error: string };
+
+export async function previewTouchpoint(
+  rawText: string,
+  accountIdHint?: string | null,
+  opts: { kindOverride?: "meeting" | "call" | "email" | "field_note"; forceNewAccount?: boolean } = {},
+): Promise<PreviewResult> {
+  const text = rawText.trim();
+  if (!text) return { ok: false, error: "Nothing to record." };
+  if (!client) return { ok: false, error: "ANTHROPIC_API_KEY is not configured on this deployment." };
+
+  // The priority book (dal.ts's getPriorityBook, the same whole-book
+  // computation the map pin and SDR row read) runs alongside the extraction
+  // call rather than after it: it does not depend on the parsed text at
+  // all, and the model call is already the slow part of this round trip, so
+  // this adds no visible wait of its own.
+  const [accountsRes, priorityBook] = await Promise.all([listAccountsForMatching(), getPriorityBook()]);
+  const candidates = accountsRes.data.map((a) => ({ id: a.account_id, name: a.name, city: null as string | null }));
+  if (candidates.length === 0) return { ok: false, error: "No accounts to match against yet." };
+
+  const now = new Date();
+  let parsed: ParsedTouchpoint;
+  try {
+    const msg = await client.messages.create({
+      model: "claude-sonnet-5",
+      max_tokens: 1500,
+      system: systemPrompt(now.toISOString(), candidates),
+      messages: [{ role: "user", content: text }],
+      tools: [EXTRACT_TOOL],
+      tool_choice: { type: "tool", name: "extract_touchpoint" },
+    });
+    const toolUse = msg.content.find((b) => b.type === "tool_use");
+    if (!toolUse || toolUse.type !== "tool_use") {
+      return { ok: false, error: "Could not parse that note. Try rephrasing." };
+    }
+    parsed = toolUse.input as ParsedTouchpoint;
+  } catch (err) {
+    return { ok: false, error: `Parse failed: ${err instanceof Error ? err.message : String(err)}` };
+  }
+
+  if (opts.kindOverride) {
+    parsed.activity.kind = opts.kindOverride === "email" ? "email_out" : opts.kindOverride;
+  }
+
+  const resolvedAccountId = opts.forceNewAccount
+    ? null
+    : accountIdHint || (parsed.account_confidence === "high" ? parsed.account_id : null);
+  const isReviewable =
+    parsed.activity.kind !== "field_note" && Boolean(resolvedAccountId) && Boolean(parsed.next_step && parsed.next_step.trim());
+
+  if (!isReviewable) {
+    const result = await continueTouchpoint(text, parsed, accountsRes, accountIdHint, null, true, opts, now);
+    return { ok: true, needsReview: false, result };
+  }
+
+  const accountId = resolvedAccountId!;
+  const account = accountsRes.data.find((a) => a.account_id === accountId);
+  const accountName = account?.name ?? "";
+  const priority = priorityBook.byId.get(accountId) ?? null;
+  const p0 = parsed.people?.[0] ?? null;
+
+  const automationNotes: string[] = [];
+  if ((parsed.calendar_actions?.length ?? 0) > 0) {
+    automationNotes.push(
+      `${parsed.calendar_actions.length} return visit${parsed.calendar_actions.length === 1 ? "" : "s"} queued for the route planner`,
+    );
+  }
+  if (parsed.directives?.length) {
+    automationNotes.push(`${parsed.directives.length} agency directive${parsed.directives.length === 1 ? "" : "s"} queued`);
+  }
+  if (parsed.outreach_asks?.length) {
+    automationNotes.push(`${parsed.outreach_asks.length} outreach ask${parsed.outreach_asks.length === 1 ? "" : "s"} sent to Outbound`);
+  }
+  if (parsed.account_facts?.business_hours || parsed.account_facts?.phone || parsed.account_facts?.email) {
+    automationNotes.push("Business hours, phone, or email updated on the account");
+  }
+  if (parsed.activity.outcome === "closed") {
+    automationNotes.push("Flags the account as possibly closed, for HQ to review");
+  }
+
+  const draft: TouchpointDraft = {
+    rawText: text,
+    accountIdHint: accountIdHint ?? null,
+    kind: parsed.activity.kind === "email_out" ? "email" : (parsed.activity.kind as "meeting" | "call"),
+    hubspotSummary: parsed.activity.hubspot_summary || parsed.activity.detail,
+    nextStep: parsed.next_step ?? "",
+    contact: p0
+      ? { firstName: p0.first_name, lastName: p0.last_name, title: p0.title, phone: p0.phone, email: p0.email }
+      : null,
+    automationNotes,
+    accountId,
+    accountName,
+    priorityScore: priority?.score ?? null,
+    priorityBand: priority?.band ?? null,
+    raw: parsed,
+  };
+
+  return { ok: true, needsReview: true, draft };
+}
+
+/**
+ * The 5-second review's "Looks good" (or its own silent timeout): runs the
+ * exact same continueTouchpoint tail recordTouchpoint always has, over the
+ * draft's already-extracted `parsed`, patched with whatever Juan changed on
+ * screen. An untouched field is not in `overrides` at all, never sent back
+ * as its own unchanged value, so a draft nobody edited commits byte-identical
+ * to what previewTouchpoint built.
+ */
+export async function commitTouchpointDraft(
+  draft: TouchpointDraft,
+  overrides: {
+    hubspotSummary?: string;
+    nextStep?: string;
+    contact?: { firstName: string | null; lastName: string | null; title: string | null; phone: string | null; email: string | null };
+  } = {},
+): Promise<Extract<RecordTouchpointResult, { ok: true; needsAccount: false; needsNextStep: false }>> {
+  const parsed = draft.raw;
+  if (overrides.hubspotSummary !== undefined) parsed.activity.hubspot_summary = overrides.hubspotSummary;
+  if (overrides.nextStep !== undefined) parsed.next_step = overrides.nextStep;
+  if (overrides.contact) {
+    const c = overrides.contact;
+    if (parsed.people[0]) {
+      parsed.people[0] = { ...parsed.people[0], first_name: c.firstName, last_name: c.lastName, title: c.title, phone: c.phone, email: c.email };
+    } else if (c.firstName || c.lastName || c.title || c.phone || c.email) {
+      parsed.people = [
+        {
+          first_name: c.firstName,
+          last_name: c.lastName,
+          title: c.title,
+          role_tag: null,
+          is_decision_maker: false,
+          email: c.email,
+          phone: c.phone,
+          preferences: null,
+        },
+        ...parsed.people,
+      ];
+    }
+  }
+
+  return finishTouchpoint({
+    accountId: draft.accountId,
+    accountName: draft.accountName,
+    parsed,
+    occurredAt: null,
+    autoFileHubspot: true,
+    rawText: draft.rawText,
+    accountMatchConfidence: draft.accountIdHint ? "high" : parsed.account_confidence,
+  });
 }
 
 export type ResolveResult =
