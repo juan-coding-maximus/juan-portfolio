@@ -15,8 +15,9 @@ import { Ico, SuccessNote } from "./ui";
  * quick note.
  *
  * NOTHING HERE SENDS, same as every other button on this page. Each is a deep
- * link that opens the app Juan sends from with the message pre-filled: mailto:
- * into his mail client, sms: into Messages, wa.me into WhatsApp. The OS cannot
+ * link that opens the app Juan sends from with the message pre-filled: an
+ * Outlook Web compose link into his mailbox (same deep link as DraftActions'
+ * "Open in Outlook"), sms: into Messages, wa.me into WhatsApp. The OS cannot
  * see whether he pressed send on any of them, and does not claim to.
  *
  * A CHANNEL WITH NOTHING ON FILE DOES NOT RENDER. No greyed button, no
@@ -36,6 +37,7 @@ export function QuickReach({
   const greetName = reach.contactFirstName ?? reach.name;
   const body = `Hi ${greetName},\n\nThank you,\nJuan`;
   const wa = toWhatsAppPhone(reach.phone);
+  const outlook = reach.email ? owaComposeLink(reach.email, reach.name, body) : null;
 
   const cls =
     "flex items-center gap-1.5 rounded-md border border-[#D8D4C8] px-3 py-2 text-[13px] font-medium text-[#3D4A44] transition-colors hover:bg-[#FAF9F5]";
@@ -47,13 +49,8 @@ export function QuickReach({
         own account.
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
-        {reach.email && (
-          <a
-            href={`mailto:${reach.email}?subject=${encodeURIComponent(reach.name)}&body=${encodeURIComponent(body)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cls}
-          >
+        {outlook && (
+          <a href={outlook.href} target="_blank" rel="noopener noreferrer" className={cls}>
             <Ico name="mail" size={13} />
             Email
           </a>
@@ -147,7 +144,7 @@ function owaQuery(params: Record<string, string>): string {
     .join("&");
 }
 
-function owaComposeLink(toEmail: string, subject: string | null, body: string): { href: string; bodyOmitted: boolean } {
+export function owaComposeLink(toEmail: string, subject: string | null, body: string): { href: string; bodyOmitted: boolean } {
   const base = "https://outlook.cloud.microsoft/mail/deeplink/compose?";
   const withBodyParams: Record<string, string> = { to: toEmail, body };
   if (subject) withBodyParams.subject = subject;

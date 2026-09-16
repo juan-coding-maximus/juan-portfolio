@@ -14,6 +14,7 @@
 import { useEffect, useState, useTransition } from "react";
 import type { Account, Activity, Contact, PurchaseLine, PurchaseOrder, Tier } from "./dal";
 import { setPotentialJuan } from "./account-actions";
+import { owaComposeLink } from "./outbound-ui";
 import { useRoute } from "./route-context";
 import { TouchpointCapture } from "./touchpoint-ui";
 import {
@@ -160,7 +161,7 @@ function PotentialGrade({
 // (2026-08-05) and listing it twice would make the same link look like two.
 const SOCIAL_LINKS = (a: Account) =>
   [
-    a.email && { href: `mailto:${a.email}`, label: a.email, icon: "mail" as const },
+    a.email && { href: owaComposeLink(a.email, null, "").href, label: a.email, icon: "mail" as const },
     a.instagram_url && { href: a.instagram_url, label: "Instagram", icon: "instagram" as const },
     a.facebook_url && { href: a.facebook_url, label: "Facebook", icon: "facebook" as const },
     a.linkedin_url && { href: a.linkedin_url, label: "LinkedIn", icon: "linkedin" as const },
@@ -318,7 +319,12 @@ export function AccountDetailBody({
                     </div>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12.5px] text-[#5B6560]">
                       {c.email && (
-                        <a href={`mailto:${c.email}`} className="underline-offset-2 hover:underline">
+                        <a
+                          href={owaComposeLink(c.email, null, "").href}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="underline-offset-2 hover:underline"
+                        >
                           {c.email}
                         </a>
                       )}
