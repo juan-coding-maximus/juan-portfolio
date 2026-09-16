@@ -644,77 +644,66 @@ function ScheduleRow({
 
   return (
     <li
-      className={`flex flex-wrap items-center gap-2 rounded-md border p-2 ${active ? "border-[#14201B] bg-[#FAF9F5]" : "border-[#E2DFD5]"} ${done ? "opacity-60" : ""} ${skipped ? "opacity-40" : ""}`}
+      className={`flex flex-col gap-1 rounded-md border p-2 ${active ? "border-[#14201B] bg-[#FAF9F5]" : "border-[#E2DFD5]"} ${done ? "opacity-60" : ""} ${skipped ? "opacity-40" : ""}`}
     >
-      <button onClick={onSelect} className="min-w-0 flex-1 text-left">
-        <div className="flex items-baseline gap-1.5">
-          {/* The number that put this row where it is, printed on the row
-              rather than only explaining itself in the panel above. */}
-          {item.priorityScore !== null && (
-            <span
-              className={`shrink-0 rounded px-1 py-0.5 text-[10.5px] font-medium tabular-nums ${
-                item.priorityBand === "now" ? "bg-[#F3E3C6] text-[#8A6D2F]" : "bg-[#ECEAE1] text-[#5B6560]"
+      {/* Row 1: name + the actions, top-aligned rather than centered against
+          the whole card (Juan, 2026-09-15: the hours pill and the buttons
+          used to share one crowded line and the pill wrapped mid-sentence).
+          Kept short on purpose, hours/reason get their own full-width line
+          below so they're never squeezed by the button row's fixed width. */}
+      <div className="flex items-start justify-between gap-2">
+        <button onClick={onSelect} className="min-w-0 flex-1 text-left">
+          <div className="flex items-baseline gap-1.5">
+            {/* The number that put this row where it is, printed on the row
+                rather than only explaining itself in the panel above. */}
+            {item.priorityScore !== null && (
+              <span
+                className={`shrink-0 rounded px-1 py-0.5 text-[10.5px] font-medium tabular-nums ${
+                  item.priorityBand === "now" ? "bg-[#F3E3C6] text-[#8A6D2F]" : "bg-[#ECEAE1] text-[#5B6560]"
+                }`}
+              >
+                {item.priorityScore}
+              </span>
+            )}
+            <div className="truncate text-[13px] font-medium text-[#14201B]">{item.displayName}</div>
+          </div>
+          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] uppercase tracking-[0.08em] text-[#8A928C]">
+            <span>{item.kind}</span>
+            {/* Juan's own call, when he made one. A row nobody prioritised shows
+                nothing here rather than a default that would speak for him. */}
+            {item.priority && (
+              <span className={`rounded px-1 py-0.5 text-[10px] font-medium ${PRIORITY_CHIP[item.priority]}`}>
+                {item.priority}
+              </span>
+            )}
+            {item.status !== "pending" && <span>· {item.status}</span>}
+          </div>
+        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          {item.displayPhone && (
+            <a
+              href={`tel:${item.displayPhone.replace(/[^0-9+]/g, "")}`}
+              className="flex items-center gap-1 rounded-md bg-[#8A2E2E] px-2 py-1 text-[11.5px] font-medium text-white hover:opacity-90"
+              title={`Call ${item.displayPhone}`}
+            >
+              <Ico name="phone" size={11} />
+              Call
+            </a>
+          )}
+          {!done && !skipped && item.account_id && (
+            /* Only for a row that IS an account. A cold prospect has no
+               nb_accounts row to put on a route, and 0061 made that column
+               nullable precisely so the OS would not invent one. */
+            <button
+              onClick={() => setRouting((v) => !v)}
+              title="Put this account on a day's route"
+              className={`flex h-6 w-6 items-center justify-center rounded-md border text-[#5B6560] hover:bg-[#F7F6F1] ${
+                routing ? "border-[#14201B]" : "border-[#E2DFD5]"
               }`}
             >
-              {item.priorityScore}
-            </span>
+              <Ico name="route" size={12} />
+            </button>
           )}
-          <div className="truncate text-[13px] font-medium text-[#14201B]">{item.displayName}</div>
-        </div>
-        <div className="mt-0.5 flex items-center gap-1.5 text-[11px] uppercase tracking-[0.08em] text-[#8A928C]">
-          <span>{item.kind}</span>
-          {/* Juan's own call, when he made one. A row nobody prioritised shows
-              nothing here rather than a default that would speak for him. */}
-          {item.priority && (
-            <span className={`rounded px-1 py-0.5 text-[10px] font-medium ${PRIORITY_CHIP[item.priority]}`}>
-              {item.priority}
-            </span>
-          )}
-          {item.status !== "pending" && <span>· {item.status}</span>}
-        </div>
-        {/* Open now / closes-at / opens-at, right on the row: this is what
-            decides whether "call them next" means now or later today (Juan,
-            2026-09-09). Renders nothing when the account carries no hours,
-            never a guess. */}
-        {item.businessHours && (
-          <div className="mt-1">
-            <OpenBadge businessHours={item.businessHours} />
-          </div>
-        )}
-        {/* Why it is ranked here, in words. The rail is narrow, so it clamps
-            to two lines; the full sentence is the title. A score with no
-            visible reason is the black box 0035 refused to build. */}
-        {item.priorityReason && (
-          <div className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-[#8A928C]" title={item.priorityReason}>
-            {item.priorityReason}
-          </div>
-        )}
-      </button>
-      <div className="flex shrink-0 items-center gap-1">
-        {item.displayPhone && (
-          <a
-            href={`tel:${item.displayPhone.replace(/[^0-9+]/g, "")}`}
-            className="flex items-center gap-1 rounded-md bg-[#8A2E2E] px-2 py-1 text-[11.5px] font-medium text-white hover:opacity-90"
-            title={`Call ${item.displayPhone}`}
-          >
-            <Ico name="phone" size={11} />
-            Call
-          </a>
-        )}
-        {!done && !skipped && item.account_id && (
-          /* Only for a row that IS an account. A cold prospect has no
-             nb_accounts row to put on a route, and 0061 made that column
-             nullable precisely so the OS would not invent one. */
-          <button
-            onClick={() => setRouting((v) => !v)}
-            title="Put this account on a day's route"
-            className={`flex h-6 w-6 items-center justify-center rounded-md border text-[#5B6560] hover:bg-[#F7F6F1] ${
-              routing ? "border-[#14201B]" : "border-[#E2DFD5]"
-            }`}
-          >
-            <Ico name="route" size={12} />
-          </button>
-        )}
         {!done && !skipped && (
           <>
             {/* Move this one to another day. Opens the picker rather than
@@ -750,7 +739,24 @@ function ScheduleRow({
             </button>
           </>
         )}
+        </div>
       </div>
+
+      {/* Row 2: open-now and why-ranked, on their own full-width line now
+          rather than squeezed beside the button row (Juan, 2026-09-15: "not
+          optimized space"). One line, truncated, not a 2-line clamp that cut
+          mid-word; the full sentence is still the title. Renders nothing when
+          there's neither, never an empty row. */}
+      {(item.businessHours || item.priorityReason) && (
+        <button onClick={onSelect} className="flex min-w-0 items-center gap-1.5 text-left">
+          {item.businessHours && <OpenBadge businessHours={item.businessHours} />}
+          {item.priorityReason && (
+            <span className="min-w-0 truncate text-[11px] leading-snug text-[#8A928C]" title={item.priorityReason}>
+              {item.priorityReason}
+            </span>
+          )}
+        </button>
+      )}
 
       {routing && item.account_id && <AddToRoute accountId={item.account_id} onClose={() => setRouting(false)} />}
 
