@@ -739,7 +739,7 @@ function Testimonial({
 }: { quote: React.ReactNode; name: string; role: string; linkedin: string; photo: string }) {
   return (
     <div className="mt-5 flex gap-5 rounded-2xl border border-[#284A3C] bg-[#0e1813] p-5">
-      <img src={photo} alt={name} className="h-24 w-24 sm:h-28 sm:w-28 shrink-0 rounded-full object-cover" />
+      <img src={photo} alt={name} className="h-32 w-32 sm:h-40 sm:w-40 shrink-0 self-center rounded-full object-cover" />
       <div>
         <FiveStars />
         <div className="mt-3 space-y-4 text-sm italic text-[#F2EFE6]/80">{quote}</div>
@@ -865,7 +865,7 @@ function CaseStudies() {
       logo: { src: "/img/logos/metaba.png", alt: "Metaba Health" },
       tag: "INVESTOR READINESS · 0→1 GO-TO-MARKET",
       role: "Founding Go-To-Market Operator · 1 year 2 months",
-      title: "I led Go To Market for a diagnostics startup, closing the first deals to become investor-ready.",
+      title: "I led Go To Market for a diagnostics startup, closing its first deals.",
       body: (
         <>
           <ul className="space-y-3">
@@ -988,7 +988,7 @@ function CaseStudies() {
                     <img
                       src={c.logo.src}
                       alt={c.logo.alt}
-                      className={`w-auto object-contain rounded-2xl mb-5 ${c.logo.tall ? "h-40 md:h-48" : "h-12"}`}
+                      className={`w-auto object-contain rounded-2xl mb-5 ${c.logo.tall ? "h-40 md:h-48" : "h-[4.5rem]"}`}
                     />
                     <p className="text-xs tracking-[0.25em] text-[#C9A24B] uppercase mb-3">
                       {c.tag}
@@ -1043,23 +1043,6 @@ function CapIcon({ shape }: { shape: string }) {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      {shape === "flask" && (
-        <>
-          <path d="M10 3h4" />
-          <path d="M10 3v6L4.5 18.5A2 2 0 0 0 6.3 21h11.4a2 2 0 0 0 1.8-2.5L14 9V3" />
-          <path d="M7.5 15h9" />
-        </>
-      )}
-      {shape === "nodes" && (
-        <>
-          <circle cx="5" cy="6" r="2.5" />
-          <circle cx="19" cy="6" r="2.5" />
-          <circle cx="12" cy="18" r="2.5" />
-          <path d="M7.5 6h9" />
-          <path d="M6.2 8.2l4.6 7.6" />
-          <path d="M17.8 8.2l-4.6 7.6" />
-        </>
-      )}
       {shape === "trajectory" && (
         <>
           <path d="M3 20c5 0 10-3 15-12" />
@@ -1067,17 +1050,36 @@ function CapIcon({ shape }: { shape: string }) {
           <circle cx="3.5" cy="20" r="1.5" />
         </>
       )}
-      {shape === "link" && (
+      {shape === "youtube" && (
         <>
-          <path d="M9 15l6-6" />
-          <path d="M11 6.5l2-2a4 4 0 0 1 5.7 5.7l-2 2" />
-          <path d="M13 17.5l-2 2a4 4 0 0 1-5.7-5.7l2-2" />
+          <path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17" />
+          <path d="m10 15 5-3-5-3z" />
         </>
       )}
-      {shape === "pin" && (
+      {shape === "microscope" && (
         <>
-          <path d="M12 21s-6.5-5.4-6.5-10.5a6.5 6.5 0 0 1 13 0C18.5 15.6 12 21 12 21z" />
-          <circle cx="12" cy="10.5" r="2.5" />
+          <path d="M6 18h8" />
+          <path d="M3 22h18" />
+          <path d="M14 22a7 7 0 1 0 0-14h-1" />
+          <path d="M9 14h2" />
+          <path d="M9 12a2 2 0 0 1-2-2V6h6v4a2 2 0 0 1-2 2Z" />
+          <path d="M12 6V3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3" />
+        </>
+      )}
+      {shape === "doctor" && (
+        <>
+          <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6 6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3" />
+          <path d="M8 15v1a6 6 0 0 0 6 6 6 6 0 0 0 6-6v-4" />
+          <circle cx="20" cy="10" r="2" />
+        </>
+      )}
+      {shape === "handshake" && (
+        <>
+          <path d="m11 17 2 2a1 1 0 1 0 3-3" />
+          <path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4" />
+          <path d="m21 3 1 11h-2" />
+          <path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3" />
+          <path d="M3 4h8" />
         </>
       )}
     </svg>
@@ -1094,25 +1096,25 @@ function Capabilities() {
     },
     {
       num: "02",
-      icon: "nodes",
+      icon: "youtube",
       title: "Marketing & social strategy",
       desc: "One plan across LinkedIn, Instagram, TikTok, YouTube, and Facebook, from long-form video to short clips.",
     },
     {
       num: "03",
-      icon: "flask",
+      icon: "microscope",
       title: "Science-fluent messaging & content",
       desc: "I turn dense science into messaging each audience actually reads, clinician, investor, or patient, sharpened until it earns their attention.",
     },
     {
       num: "04",
-      icon: "link",
+      icon: "doctor",
       title: "KOLs & creator partnerships",
       desc: "Doctors, researchers, and creators who vouch for the science, sourced and kept warm.",
     },
     {
       num: "05",
-      icon: "pin",
+      icon: "handshake",
       title: "Business development, cold to close",
       desc: "Research the account, cold-source the decision-maker, book the meeting, close or move on. Every account tracked to a decision.",
     },
@@ -1122,12 +1124,9 @@ function Capabilities() {
     <section className="px-6 md:px-12 lg:px-20 py-16 md:py-24 border-t border-[#F2EFE6]/10">
       <div className="max-w-7xl mx-auto">
         <Reveal>
-          <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-3">
+          <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-8 md:mb-12">
             How I help your team.
           </h2>
-          <p className="font-display italic text-lg text-[#F2EFE6]/55 mb-8 md:mb-12">
-            From complex science, to the right message, in front of the people who fund it.
-          </p>
         </Reveal>
         {/* Olympic rings layout: 3 on top, 2 offset below (lg+). Mobile: 1-col, sm: 2-col */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-5">
