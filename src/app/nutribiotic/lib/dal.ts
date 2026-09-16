@@ -201,6 +201,12 @@ async function mutate<T>(
    *  this is the report-draft upsert, which asks PostgREST to merge on the
    *  primary key rather than fail on a row that already exists. */
   prefer = "return=representation",
+  /** True only for a write that is safe to send twice: a PATCH that sets a
+   *  specific id to a specific value (setSdrScheduleStatus, e.g.) rather than
+   *  a POST that creates a new row. Re-sending a lost-response PATCH lands on
+   *  the same final state; re-sending a lost-response POST risks a second
+   *  touchpoint. Default false keeps every other caller's one-shot behavior. */
+  idempotent = false,
 ): Promise<T[]> {
   await verifySession();
 
@@ -213,21 +219,26 @@ async function mutate<T>(
     if (v !== undefined) params.set(k, String(v));
   }
 
-  // Writes never auto-retry: a POST/PATCH whose response is lost to a
-  // handoff may have already landed, and re-sending it risks a second
-  // touchpoint or a second write rather than a lost one. The timeout alone
-  // still stops it from hanging past the moment he's looked back at the
-  // road; a failed write surfaces plainly and he tries again on purpose.
-  const res = await fetchWithTimeout(`${SB_URL}/rest/v1/${table}?${params}`, {
-    method,
-    headers: {
-      apikey: SB_KEY,
-      Authorization: `Bearer ${SB_KEY}`,
-      "Content-Type": "application/json",
-      Prefer: prefer,
+  // Writes auto-retry only when the caller has marked them idempotent: a
+  // POST/PATCH whose response is lost to a handoff may have already landed,
+  // and re-sending a POST risks a second touchpoint. The timeout alone still
+  // stops it from hanging past the moment he's looked back at the road; a
+  // failed non-idempotent write surfaces plainly and he tries again on
+  // purpose.
+  const res = await fetchWithTimeout(
+    `${SB_URL}/rest/v1/${table}?${params}`,
+    {
+      method,
+      headers: {
+        apikey: SB_KEY,
+        Authorization: `Bearer ${SB_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: prefer,
+      },
+      body: JSON.stringify(body),
     },
-    body: JSON.stringify(body),
-  });
+    { retries: idempotent ? 1 : 0 },
+  );
 
   if (!res.ok) {
     throw new Error(`Supabase ${table} ${method} -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
@@ -1786,7 +1797,18 @@ export async function setSdrScheduleStatus(
 ): Promise<SdrScheduleItem> {
   const patch: Record<string, unknown> = { status };
   if (completedActivityId !== undefined) patch.completed_activity_id = completedActivityId;
-  const [row] = await mutate<SdrScheduleItem>("nb_sdr_schedule", "PATCH", patch, { id: `eq.${id}` });
+  // Idempotent: this id's status ends at the same value whether the PATCH
+  // lands once or twice, so a lost response on a bad connection is worth one
+  // retry rather than leaving "Mark done" silently unsaved (Juan, 2026-09-16:
+  // it needs to still say done the next time he loads the page).
+  const [row] = await mutate<SdrScheduleItem>(
+    "nb_sdr_schedule",
+    "PATCH",
+    patch,
+    { id: `eq.${id}` },
+    "return=representation",
+    true,
+  );
   return row;
 }
 

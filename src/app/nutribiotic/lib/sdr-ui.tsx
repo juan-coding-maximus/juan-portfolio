@@ -627,6 +627,7 @@ function ScheduleRow({
   onReschedule,
   onFiled,
   todayIso,
+  statusError,
 }: {
   item: SdrDayItem;
   active: boolean;
@@ -643,6 +644,12 @@ function ScheduleRow({
    *  (nextWeekdays) count from the same today the rest of the queue does,
    *  never the browser's own UTC clock. */
   todayIso: string;
+  /** Set only when the last Mark done/Skip write actually failed to save
+   *  (SdrScreen's setStatus already reverted the row locally when this is
+   *  set, so `item.status` here is back to whatever it truly is in the
+   *  database). Juan, 2026-09-16: a done that silently didn't save is worse
+   *  than one that visibly needs a second tap. */
+  statusError?: string;
 }) {
   const done = item.status === "done";
   const skipped = item.status === "skipped";
@@ -764,6 +771,17 @@ function ScheduleRow({
             </span>
           )}
         </button>
+      )}
+
+      {/* Only ever set right after a Mark done/Skip write actually failed
+          (SdrScreen's setStatus already reverted item.status back to what
+          the database really has, so the row above already reads as
+          pending again, not a lie sitting on top of this note). */}
+      {statusError && (
+        <div className="flex items-center gap-1.5 text-[11px] text-[#8A6D2F]">
+          <Ico name="alert" size={11} />
+          <span>{statusError}</span>
+        </div>
       )}
 
       {routing && item.account_id && <AddToRoute accountId={item.account_id} onClose={() => setRouting(false)} />}
@@ -1412,13 +1430,18 @@ function AccountPanel({
         <div className="mb-2 text-[12px] uppercase tracking-[0.1em] text-[#8A928C]">Log this call</div>
         {/* Keyed per item: a fresh TouchpointCapture instance per selection,
             so the "Called X and spoke with: " template is right for whoever
-            is on the line, not whoever he was calling before. */}
+            is on the line, not whoever he was calling before. autoFocus off
+            (Juan, 2026-09-16, phone screenshot): tapping a prospect to look
+            at it, not to log yet, should scroll here (panelRef above already
+            does that) without the keyboard shoving the account info off
+            screen the moment it lands. */}
         <TouchpointCapture
           key={item.id}
           accountIdHint={item.account_id}
           onFiled={onFiled}
           defaultKind="call"
           initialText={`Called ${item.displayName} and spoke with: `}
+          autoFocus={false}
         />
       </div>
     </div>
@@ -1714,10 +1737,31 @@ export function SdrScreen({
     setStatus(id, "done", result.activityId ?? undefined);
   }
 
-  function setStatus(id: string, status: "done" | "skipped", completedActivityId?: number) {
+  /** Per-row "the write failed" flag (Juan, 2026-09-16: a row that read as
+   *  done had gone back to pending on the next page load, on a bad
+   *  connection). The optimistic move still happens instantly, same as
+   *  before; the difference is what happens when the actual PATCH doesn't
+   *  land, even after setSdrScheduleStatus's own retry: this now reverts the
+   *  row and says so, in place, rather than leaving a "done" on screen that
+   *  the database never agreed to and that vanishes on the next real load. */
+  const [statusErrors, setStatusErrors] = useState<Record<string, string>>({});
+
+  async function setStatus(id: string, status: "done" | "skipped", completedActivityId?: number) {
+    const prevItem = items.find((it) => it.id === id);
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, status, completed_activity_id: completedActivityId ?? it.completed_activity_id } : it)));
+    setStatusErrors((prev) => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
     if (active?.id === id) setActive(null);
-    void updateSdrScheduleStatus(id, status, completedActivityId);
+    try {
+      await updateSdrScheduleStatus(id, status, completedActivityId);
+    } catch {
+      setItems((prev) => prev.map((it) => (it.id === id && prevItem ? { ...it, status: prevItem.status, completed_activity_id: prevItem.completed_activity_id } : it)));
+      setStatusErrors((prev) => ({ ...prev, [id]: `Couldn't save "${status}". Try again.` }));
+    }
   }
 
   /* Optimistic, same as setStatus: the row moves in the rail immediately and
@@ -1888,7 +1932,16 @@ export function SdrScreen({
               if (pd !== 0) return pd;
               return (b.priorityScore ?? -1) - (a.priorityScore ?? -1);
             });
-          const groups = groupByArea(dayItems, areas);
+          // Done/skipped rows leave the area groups entirely and sink to one
+          // flat pile at the very bottom of the day (Juan, 2026-09-16: "make
+          // it go bottom of the list"). Before this they only sank within
+          // their own area's cluster, the sort at line ~1928 above, which on
+          // a 3-4 row area barely read as "the bottom" at all. Still their own
+          // ScheduleRow, so Mark done stays a one-tap toggle if he re-opens
+          // one by mistake; just no area header over a pile that's finished.
+          const pendingItems = dayItems.filter((it) => it.status === "pending");
+          const doneItems = dayItems.filter((it) => it.status !== "pending");
+          const groups = groupByArea(pendingItems, areas);
           return (
             <div key={iso} className="rounded-lg border border-[#E2DFD5] bg-white p-3">
               <div className="mb-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#5B6560]">
@@ -1924,11 +1977,35 @@ export function SdrScreen({
                         onReschedule={(date) => reschedule(it.id, date)}
                         onFiled={(result) => filedFromRow(it.id, result)}
                         todayIso={todayIso}
+                        statusError={statusErrors[it.id]}
                       />
                     ))}
                   </ul>
                 </div>
               ))}
+              {doneItems.length > 0 && (
+                <div className="mt-2 border-t border-[#EFEDE5] pt-2">
+                  <div className="mb-1 flex items-center gap-1.5 text-[11px] uppercase tracking-[0.08em] text-[#8A928C]">
+                    <span>Done</span>
+                    <span className="tabular-nums text-[#B4B9B3]">{doneItems.length}</span>
+                  </div>
+                  <ul className="flex flex-col gap-1.5">
+                    {doneItems.map((it) => (
+                      <ScheduleRow
+                        key={it.id}
+                        item={it}
+                        active={active?.id === it.id}
+                        onSelect={() => setActive(it)}
+                        onStatus={(status) => setStatus(it.id, status)}
+                        onReschedule={(date) => reschedule(it.id, date)}
+                        onFiled={(result) => filedFromRow(it.id, result)}
+                        todayIso={todayIso}
+                        statusError={statusErrors[it.id]}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              )}
               <div className="mt-2">
                 <AddToDayForm date={iso} onAdded={addItem} />
               </div>

@@ -119,6 +119,7 @@ export function TouchpointCapture({
   lockKind,
   defaultKind,
   initialText,
+  autoFocus = true,
 }: {
   accountIdHint?: string | null;
   /** Fires once, right after a clean file (matched, no follow-up needed).
@@ -146,6 +147,14 @@ export function TouchpointCapture({
    *  who he's calling), and only when there's no saved draft to restore, a
    *  half-typed note always wins over a fresh template. */
   initialText?: string;
+  /** Default true: raise the keyboard the moment this mounts, the right call
+   *  when landing here IS the intent (the "+" row composer, ClientOS,
+   *  /visit's blank composer). SDR's account panel (Juan, 2026-09-16) sets
+   *  this false: tapping a prospect to look at it, on a phone, should land
+   *  scrolled to the account, not with the keyboard already up and half the
+   *  screen he just asked to see covered by it. The draft/template text still
+   *  restores either way, only the forced focus is skipped. */
+  autoFocus?: boolean;
 }) {
   const router = useRouter();
   const [text, setText] = useState("");
@@ -225,7 +234,8 @@ export function TouchpointCapture({
   }, []);
 
   /**
-   * Restore a draft, then put the caret in the box.
+   * Restore a draft, then put the caret in the box, but only raise the
+   * keyboard when `autoFocus` says landing here IS the intent.
    *
    * The focus call is deliberately NOT an `autoFocus` attribute. iOS Safari,
    * standalone web apps included, ignores focus that does not originate in a
@@ -235,6 +245,12 @@ export function TouchpointCapture({
    * case, since /nutribiotic and both tiles all land here) it does raise the
    * keyboard. `preventScroll` keeps the card from jumping under a thumb that
    * is already moving toward it.
+   *
+   * SDR's account panel is the one caller that passes `autoFocus={false}`
+   * (Juan, 2026-09-16, on a phone screenshot): tapping a prospect just to
+   * look at it landed with the keyboard already up, covering the account
+   * info he tapped in to see. The draft/template text still restores either
+   * way; only the forced `.focus()` is skipped.
    */
   useEffect(() => {
     if (restoredRef.current) return;
@@ -255,8 +271,8 @@ export function TouchpointCapture({
         textareaRef.current.setSelectionRange(initialText.length, initialText.length);
       });
     }
-    textareaRef.current?.focus({ preventScroll: true });
-  }, [autosize, initialText, accountIdHint]);
+    if (autoFocus) textareaRef.current?.focus({ preventScroll: true });
+  }, [autosize, initialText, accountIdHint, autoFocus]);
 
   /** The one clean landing, whether it came straight through or through the
    *  review card below. */
