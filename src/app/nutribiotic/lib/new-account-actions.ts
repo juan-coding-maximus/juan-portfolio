@@ -19,18 +19,21 @@ import { resolveTouchpointToAccount, type ResolveResult } from "./touchpoint";
 export type BusinessSearchOutcome = { ok: true; candidates: PlaceCandidate[] } | { ok: false; error: string };
 
 /**
- * A NEW STORE IS USUALLY NEAR THE LAST ONE (Juan, 2026-08-26). When today
- * already has a logged stop with a known address, that address biases the
- * Places search -- see places.ts's `near`. No same-day stop yet, or that
- * stop's account has no coordinate: falls back to the county-wide search
- * unchanged, same as before this existed.
+ * A NEW STORE IS USUALLY NEAR WHERE JUAN IS STANDING (sharpened 2026-09-15:
+ * was "near the last logged stop", 2026-08-26). `near`, when the caller has
+ * it, is the rep's own phone GPS at the moment he searched, read client-side
+ * and passed in (browser geolocation isn't available on the server); it
+ * always wins when present, since it is closer to true than any account's
+ * stored address could be. No GPS (denied, unavailable, or he searched from
+ * the Mac): falls back to today's last logged stop, same as before this
+ * existed. Neither: the plain county-wide search, unbiased.
  */
-export async function searchNewBusiness(query: string): Promise<BusinessSearchOutcome> {
+export async function searchNewBusiness(query: string, near?: { lat: number; lng: number } | null): Promise<BusinessSearchOutcome> {
   const q = query.trim();
   if (!q) return { ok: false, error: "Type a business name to search." };
   try {
-    const last = await getLastVisitedLocationToday();
-    const candidates = await searchPlaces(q, 3, last ? { lat: last.lat, lng: last.lng } : undefined);
+    const bias = near ?? (await getLastVisitedLocationToday());
+    const candidates = await searchPlaces(q, 3, bias ?? undefined);
     if (candidates.length === 0) return { ok: false, error: `No Google Places result for "${q}".` };
     return { ok: true, candidates };
   } catch (e) {

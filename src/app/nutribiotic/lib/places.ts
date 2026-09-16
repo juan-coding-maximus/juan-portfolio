@@ -119,25 +119,30 @@ const CALIFORNIA_BOUNDS = {
   high: { latitude: 42.1, longitude: -114.0 },
 };
 
-/**
- * Radius for a proximity-biased search (Juan's ask 2026-08-26): a business
- * he's naming for the first time today is usually a few doors down from
- * wherever he already was, not somewhere else in the county. 15 miles is wide
- * enough to cover a whole cluster/day of driving without being so wide it
- * stops meaning anything.
- */
-const NEAR_RADIUS_METERS = 24_140; // 15 miles
+/** Great-circle distance in km, for ranking Places results by proximity. */
+function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const R = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const la1 = (a.lat * Math.PI) / 180;
+  const la2 = (b.lat * Math.PI) / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
 
 /**
  * Top few candidates for a free-text query ("XCEL Wellness, Huntington Beach, CA").
  *
- * `near`, when given, biases results toward that point (see dal.ts's
- * getLastVisitedLocationToday) with Places' `locationBias`, a soft nudge, not
- * a filter -- a real match named accurately still surfaces even if it's
- * outside the circle. Places' request accepts locationBias OR
- * locationRestriction, never both, so a caller with a bias point trades the
- * hard California rectangle for the soft circle; a caller with none keeps the
- * original county-wide restriction unchanged.
+ * CALIFORNIA IS A HARD RULE, ALWAYS (Juan, 2026-09-15), not traded away for
+ * proximity. Places' request accepts locationBias OR locationRestriction,
+ * never both, so a caller with a `near` point used to swap the hard
+ * California rectangle for a soft bias circle instead. This now keeps
+ * locationRestriction on every call and gets proximity a different way: when
+ * `near` is given (the rep's live GPS at search time, falling back to
+ * dal.ts's getLastVisitedLocationToday), it asks Places for more candidates
+ * than it needs and sorts them by real distance to `near`, so the closest
+ * real match to where Juan is standing right now is first, and every result
+ * is still guaranteed to be in California.
  */
 export async function searchPlaces(
   query: string,
@@ -146,6 +151,8 @@ export async function searchPlaces(
 ): Promise<PlaceCandidate[]> {
   const key = process.env.NB_PLACES_API_KEY ?? "";
   if (!key) throw new PlacesError("NB_PLACES_API_KEY is not configured on this deployment.");
+
+  const fetchCount = near ? Math.min(Math.max(maxResults * 3, 10), 20) : maxResults;
 
   const res = await fetch(PLACES_URL, {
     method: "POST",
@@ -156,12 +163,10 @@ export async function searchPlaces(
     },
     body: JSON.stringify({
       textQuery: query,
-      maxResultCount: maxResults,
+      maxResultCount: fetchCount,
       languageCode: "en",
       regionCode: "US",
-      ...(near
-        ? { locationBias: { circle: { center: { latitude: near.lat, longitude: near.lng }, radius: NEAR_RADIUS_METERS } } }
-        : { locationRestriction: { rectangle: CALIFORNIA_BOUNDS } }),
+      locationRestriction: { rectangle: CALIFORNIA_BOUNDS },
     }),
     cache: "no-store",
   });
@@ -170,5 +175,14 @@ export async function searchPlaces(
     throw new PlacesError(`Places HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
   }
   const data = (await res.json()) as { places?: RawPlace[] };
-  return (data.places ?? []).map(toCandidate);
+  let candidates = (data.places ?? []).map(toCandidate);
+
+  if (near) {
+    candidates = candidates
+      .map((c) => ({ c, d: c.lat != null && c.lng != null ? haversineKm(near, { lat: c.lat, lng: c.lng }) : Infinity }))
+      .sort((x, y) => x.d - y.d)
+      .map((x) => x.c);
+  }
+
+  return candidates.slice(0, maxResults);
 }

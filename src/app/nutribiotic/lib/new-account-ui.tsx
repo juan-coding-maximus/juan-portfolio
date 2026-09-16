@@ -21,6 +21,8 @@
  */
 
 import { useEffect, useState, useTransition } from "react";
+import { GoogleMap, MarkerF, useLoadScript } from "@react-google-maps/api";
+import { getAreaForPoint } from "./area-actions";
 import { setPotentialJuan, setReadiness } from "./account-actions";
 import type { Tier } from "./dal";
 import type { Readiness } from "./priority";
@@ -34,6 +36,33 @@ import {
 import { resolveTouchpointToAccount, type ResolveResult } from "./touchpoint";
 import type { PlaceCandidate } from "./places";
 import { Ico, SuccessNote } from "./ui";
+
+/**
+ * A candidate's own pin, scrollable and zoomable, so Juan can tell whether
+ * this is really the storefront in front of him before he taps YES! (his
+ * ask, 2026-09-15). Shown only while its bubble is expanded, never all three
+ * at once: three live Maps embeds on a phone screen at a doorway is the kind
+ * of weight the Visit screen's own "reads nothing, streams nothing" doctrine
+ * exists to avoid (see visit/page.tsx).
+ */
+function PlacePreviewMap({ lat, lng }: { lat: number; lng: number }) {
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const { isLoaded, loadError } = useLoadScript({ googleMapsApiKey: apiKey ?? "" });
+  if (loadError) return <div className="px-1 py-2 text-[12px] text-[#8A6D2F]">Map failed to load.</div>;
+  if (!isLoaded) return <div className="px-1 py-2 text-[12px] text-[#8A928C]">Loading map…</div>;
+  return (
+    <div className="mt-1.5 overflow-hidden rounded-md border border-[#E2DFD5]">
+      <GoogleMap
+        center={{ lat, lng }}
+        zoom={16}
+        mapContainerStyle={{ width: "100%", height: "200px" }}
+        options={{ disableDefaultUI: true, zoomControl: true, gestureHandling: "greedy" }}
+      >
+        <MarkerF position={{ lat, lng }} />
+      </GoogleMap>
+    </div>
+  );
+}
 
 /** One rounded chip: a name to confirm and the YES! that confirms it. */
 function MatchPill({
@@ -66,6 +95,56 @@ function MatchPill({
   );
 }
 
+/**
+ * A Places candidate's own pill: the name is a button that reveals its map
+ * underneath (Juan, 2026-09-15, "so I can know if it's the right one before
+ * saying yes"), YES! still confirms immediately without opening anything.
+ * Own component rather than a MatchPill option: the Client Match pill above
+ * points at an existing OS account, which carries no Places coordinate to
+ * show a map for.
+ */
+function PlacePill({
+  candidate,
+  expanded,
+  onToggleMap,
+  onYes,
+  pending,
+  disabled,
+}: {
+  candidate: PlaceCandidate;
+  expanded: boolean;
+  onToggleMap: () => void;
+  onYes: () => void;
+  pending: boolean;
+  disabled: boolean;
+}) {
+  return (
+    <div className={expanded ? "w-full" : ""}>
+      <div className="flex items-center gap-2 rounded-full border border-[#E2DFD5] bg-white py-1 pl-3 pr-1.5">
+        <button
+          type="button"
+          onClick={onToggleMap}
+          disabled={candidate.lat == null || candidate.lng == null}
+          className="min-w-0 flex-1 truncate text-left text-[12.5px] text-[#14201B] disabled:cursor-default"
+        >
+          {candidate.name}
+          {candidate.city && <span className="text-[#8A928C]"> · {candidate.city}</span>}
+        </button>
+        <button
+          onClick={onYes}
+          disabled={pending || disabled}
+          className="shrink-0 rounded-full bg-[#14201B] px-2.5 py-1 text-[11.5px] font-semibold tracking-wide text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
+        >
+          {pending ? "..." : "YES!"}
+        </button>
+      </div>
+      {expanded && candidate.lat != null && candidate.lng != null && (
+        <PlacePreviewMap lat={candidate.lat} lng={candidate.lng} />
+      )}
+    </div>
+  );
+}
+
 export function AccountMatchResolver({
   touchpointId,
   nameGuess,
@@ -93,24 +172,53 @@ export function AccountMatchResolver({
   const [search, setSearch] = useState<BusinessSearchOutcome | null>(null);
   const [searching, startSearch] = useTransition();
   const [query, setQuery] = useState(nameGuess ?? "");
-  const [manualOpen, setManualOpen] = useState(false);
+  const [mapOpenId, setMapOpenId] = useState<string | null>(null);
 
   const [created, setCreated] = useState<CreateBusinessOutcome | null>(null);
   const [creatingId, setCreatingId] = useState<string | null>(null);
   const [creating, startCreate] = useTransition();
+  // The exact candidate YES! was pressed on, held only for the success
+  // screen's address/area lines below: `created` itself carries the account
+  // that resulted, not the street address or coordinate it was built from.
+  const [pickedPlace, setPickedPlace] = useState<PlaceCandidate | null>(null);
+  const [pickedArea, setPickedArea] = useState<string | null>(null);
 
   const [linkingId, setLinkingId] = useState<string | null>(null);
   const [linking, startLink] = useTransition();
 
-  // The 3 Places candidates load the moment this mounts, from the name Juan
-  // already said. Nothing to type before there's something to tap.
+  // Where Juan is standing right now (his ask, 2026-09-15), read once on
+  // mount. Silent on denial/timeout: searchNewBusiness falls back to today's
+  // last logged stop on its own when this never arrives. `ready` gates the
+  // first search so it fires with real GPS when GPS shows up in time,
+  // instead of racing it and usually losing.
+  const [nearMe, setNearMe] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationReady, setLocationReady] = useState(false);
   useEffect(() => {
-    if (!nameGuess || search) return;
+    if (!("geolocation" in navigator)) {
+      queueMicrotask(() => setLocationReady(true));
+      return;
+    }
+    const done = (coords?: { lat: number; lng: number }) => {
+      if (coords) setNearMe(coords);
+      setLocationReady(true);
+    };
+    navigator.geolocation.getCurrentPosition(
+      (pos) => done({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => done(),
+      { enableHighAccuracy: true, timeout: 2500, maximumAge: 60_000 },
+    );
+  }, []);
+
+  // The 3 Places candidates load the moment this mounts (once GPS has had
+  // its chance to arrive), from the name Juan already said. Nothing to type
+  // before there's something to tap.
+  useEffect(() => {
+    if (!nameGuess || search || !locationReady) return;
     startSearch(async () => {
-      setSearch(await searchNewBusiness(nameGuess));
+      setSearch(await searchNewBusiness(nameGuess, nearMe));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nameGuess]);
+  }, [nameGuess, locationReady]);
 
   /** The grade the rep picked at the door, now that there is an account to put
    * it on. Fire-and-forget, same as the capture card: the sync worker carries
@@ -169,6 +277,7 @@ export function AccountMatchResolver({
 
   function pick(place: PlaceCandidate, force = false) {
     setCreatingId(place.placeId);
+    setPickedPlace(place);
     startCreate(async () => {
       const res = await createBusinessFromPlace(touchpointId, place, { force });
       setCreated(res);
@@ -176,11 +285,26 @@ export function AccountMatchResolver({
     });
   }
 
+  // The success screen's "greater area" line (Juan, 2026-09-15), looked up
+  // once the create actually lands: a candidate Juan never confirmed never
+  // needs the area computed, so this waits for `created`, not `pickedPlace`.
+  useEffect(() => {
+    if (!created?.ok || pickedPlace?.lat == null || pickedPlace?.lng == null) return;
+    let live = true;
+    void getAreaForPoint(pickedPlace.lat, pickedPlace.lng).then((area) => {
+      if (live) setPickedArea(area?.label ?? null);
+    });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [created]);
+
   function doManualSearch() {
     if (!query.trim() || searching) return;
     startSearch(async () => {
       setCreated(null);
-      setSearch(await searchNewBusiness(query));
+      setSearch(await searchNewBusiness(query, nearMe));
     });
   }
 
@@ -230,27 +354,45 @@ export function AccountMatchResolver({
       created.peopleUpdated > 0 && `${created.peopleUpdated} contact${created.peopleUpdated === 1 ? "" : "s"} updated`,
     ].filter((f): f is string => Boolean(f));
 
+    // The big screen (Juan, 2026-09-15): name, street, and greater area up
+    // top, in that order of size, because those are the three things worth
+    // reading at a glance to confirm this really is the door he just walked
+    // out of. Everything the old compact SuccessNote said (HubSpot filing,
+    // the new-company facts) still follows below, just smaller.
+    const street = pickedPlace?.street ?? pickedPlace?.formattedAddress ?? null;
+    const areaLine = [pickedPlace?.city, pickedArea].filter(Boolean).join(" · ") || null;
     return (
       <div className="mt-3">
         <button onClick={() => onResolved?.()} className="block w-full text-left">
-          <SuccessNote
-            title={`Created ${created.accountName} and filed the visit`}
-            detail={created.summary}
-            hubspotFiled={created.hubspotFiled}
-            hubspotId={created.hubspotNoteId}
-            hubspotError={created.hubspotError}
-            meta={
-              <>
-                <div className="mt-1.5 text-[12px] text-[#8A928C]">{facts.join(", ")}</div>
-                {created.routeDirectives > 0 && (
-                  <div className="mt-1.5 text-[12px] text-[#8A928C]">
-                    {created.routeDirectives} return visit{created.routeDirectives === 1 ? "" : "s"} queued for the route planner
-                  </div>
-                )}
-                <div className="mt-1.5 text-[11px] uppercase tracking-[0.1em] text-[#A9AFA9]">Tap for the next one</div>
-              </>
-            }
-          />
+          <div className="rounded-lg border border-[#E2DFD5] bg-white p-4">
+            <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.14em] text-[#2C6A46]">
+              <Ico name="check" size={12} />
+              Logged
+            </div>
+            <div className="mt-1.5 font-[family-name:var(--font-fraunces)] text-[22px] font-semibold leading-tight text-[#14201B]">
+              {created.accountName}
+            </div>
+            {street && <div className="mt-1 text-[14px] text-[#5B6560]">{street}</div>}
+            {areaLine && <div className="mt-0.5 text-[12.5px] text-[#8A928C]">{areaLine}</div>}
+
+            <div className="mt-3 border-t border-[#EDEBE3] pt-3">
+              {created.hubspotFiled !== undefined && (
+                <div className={`flex items-center gap-1.5 text-[12px] ${created.hubspotFiled ? "text-[#8A928C]" : "text-[#8A6D2F]"}`}>
+                  <Ico name={created.hubspotFiled ? "check" : "alert"} size={11} />
+                  {created.hubspotFiled
+                    ? `Filed to HubSpot${created.hubspotNoteId ? ` (${created.hubspotNoteId})` : ""}.`
+                    : `Not filed to HubSpot yet: ${created.hubspotError ?? "unknown error"}. It's waiting in the queue below to retry.`}
+                </div>
+              )}
+              <div className="mt-1.5 text-[12px] text-[#8A928C]">{facts.join(", ")}</div>
+              {created.routeDirectives > 0 && (
+                <div className="mt-1.5 text-[12px] text-[#8A928C]">
+                  {created.routeDirectives} return visit{created.routeDirectives === 1 ? "" : "s"} queued for the route planner
+                </div>
+              )}
+              <div className="mt-1.5 text-[11px] uppercase tracking-[0.1em] text-[#A9AFA9]">Tap for the next one</div>
+            </div>
+          </div>
         </button>
       </div>
     );
@@ -271,17 +413,37 @@ export function AccountMatchResolver({
       )}
 
       <div>
-        <div className="mb-1.5 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">New Client:</div>
+        {/* Eyebrow, search box, and Search button in one row (Juan,
+            2026-09-15): the manual search is not a fallback hidden behind a
+            toggle any more, it's always right there. */}
+        <div className="flex items-center gap-2">
+          <span className="shrink-0 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">New client:</span>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && doManualSearch()}
+            placeholder="Business name"
+            className="min-w-0 flex-1 rounded-md border border-[#E2DFD5] bg-white px-3 py-1.5 text-[13px] text-[#14201B] placeholder:text-[#A9AFA9] focus:border-[#14201B] focus:outline-none"
+          />
+          <button
+            onClick={doManualSearch}
+            disabled={searching || !query.trim()}
+            className="shrink-0 rounded-md bg-[#14201B] px-3 py-1.5 text-[12.5px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
+          >
+            {searching ? "..." : "Search"}
+          </button>
+        </div>
 
-        {searching && !search && <div className="text-[12.5px] text-[#8A928C]">Looking up nearby businesses…</div>}
+        {searching && !search && <div className="mt-2 text-[12.5px] text-[#8A928C]">Looking up nearby businesses…</div>}
 
         {search?.ok && (
-          <div className="flex flex-wrap gap-2">
+          <div className="mt-2 flex flex-wrap gap-2">
             {search.candidates.map((c) => (
-              <MatchPill
+              <PlacePill
                 key={c.placeId}
-                label={c.name}
-                sub={c.city}
+                candidate={c}
+                expanded={mapOpenId === c.placeId}
+                onToggleMap={() => setMapOpenId((id) => (id === c.placeId ? null : c.placeId))}
                 onYes={() => pick(c)}
                 pending={creating && creatingId === c.placeId}
                 disabled={matching || linking || (creating && creatingId !== c.placeId)}
@@ -290,7 +452,7 @@ export function AccountMatchResolver({
           </div>
         )}
 
-        {search && !search.ok && <div className="text-[12.5px] text-[#8A6D2F]">{search.error}</div>}
+        {search && !search.ok && <div className="mt-2 text-[12.5px] text-[#8A6D2F]">{search.error}</div>}
 
         {created && !created.ok && (
           <div className="mt-2 rounded-md border border-[#E5D9BF] bg-[#FBF6E9] px-3 py-2.5 text-[13px] text-[#8A6D2F]">
@@ -326,33 +488,6 @@ export function AccountMatchResolver({
                 )}
               </>
             )}
-          </div>
-        )}
-
-        <button
-          onClick={() => setManualOpen((v) => !v)}
-          className="mt-2 flex items-center gap-1 text-[12px] text-[#8A928C] underline-offset-2 hover:underline"
-        >
-          <Ico name={manualOpen ? "chevron-up" : "chevron-down"} size={11} />
-          Search a different name
-        </button>
-
-        {manualOpen && (
-          <div className="mt-2 flex items-center gap-2">
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && doManualSearch()}
-              placeholder="Business name"
-              className="min-w-0 flex-1 rounded-md border border-[#E2DFD5] bg-white px-3 py-2 text-[13.5px] text-[#14201B] placeholder:text-[#A9AFA9] focus:border-[#14201B] focus:outline-none"
-            />
-            <button
-              onClick={doManualSearch}
-              disabled={searching || !query.trim()}
-              className="shrink-0 rounded-md bg-[#14201B] px-3.5 py-2 text-[13px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
-            >
-              {searching ? "Searching..." : "Search"}
-            </button>
           </div>
         )}
       </div>
