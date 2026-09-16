@@ -103,7 +103,7 @@ export default function Page() {
       {/* 4. How I help */}
       <Capabilities />
       {/* 5. About + CTA */}
-      <AskMyClone />
+      <AskMeAnything />
       <About />
       <CTA />
       <Footer />
@@ -726,7 +726,7 @@ function FiveStars() {
   return (
     <div className="flex items-center gap-0.5" aria-label="5 out of 5 stars">
       {Array.from({ length: 5 }).map((_, i) => (
-        <svg key={i} width="13" height="13" viewBox="0 0 24 24" fill="#C9A24B" aria-hidden="true">
+        <svg key={i} width="20" height="20" viewBox="0 0 24 24" fill="#C9A24B" aria-hidden="true">
           <path d="M12 2.5l2.9 6.4 6.9.7-5.2 4.7 1.6 6.8L12 17.6l-6.2 3.5 1.6-6.8-5.2-4.7 6.9-.7z" />
         </svg>
       ))}
@@ -738,11 +738,11 @@ function Testimonial({
   quote, name, role, linkedin, photo,
 }: { quote: React.ReactNode; name: string; role: string; linkedin: string; photo: string }) {
   return (
-    <div className="mt-5 flex gap-4 rounded-2xl border border-[#284A3C] bg-[#0e1813] p-5">
-      <img src={photo} alt={name} className="h-12 w-12 shrink-0 rounded-full object-cover" />
+    <div className="mt-5 flex gap-5 rounded-2xl border border-[#284A3C] bg-[#0e1813] p-5">
+      <img src={photo} alt={name} className="h-24 w-24 sm:h-28 sm:w-28 shrink-0 rounded-full object-cover" />
       <div>
         <FiveStars />
-        <p className="mt-2 text-sm italic text-[#F2EFE6]/80">{quote}</p>
+        <div className="mt-3 space-y-4 text-sm italic text-[#F2EFE6]/80">{quote}</div>
         <p className="mt-3 text-xs uppercase tracking-widest text-[#C9A24B]/80">
           <a href={linkedin} target="_blank" rel="noopener noreferrer" className="hover:underline">{name}</a>
           {" "}· {role}
@@ -775,12 +775,7 @@ function CaseBullet({ children }: { children: React.ReactNode }) {
 }
 
 function Social({ name }: { name: "YouTube" | "LinkedIn" | "Facebook" | "Instagram" }) {
-  const cls =
-    name === "YouTube" ? "text-[#FF0000]/70" :
-    name === "LinkedIn" ? "text-[#0A66C2]/80" :
-    name === "Facebook" ? "text-[#1877F2]/75" :
-    "text-[#E1306C]/70";
-  return <span className={cls}>{name}</span>;
+  return <span className="text-[#C9A24B]/75">{name}</span>;
 }
 
 function CaseStudies() {
@@ -792,7 +787,7 @@ function CaseStudies() {
     {
       id: "case-usc",
       logo: { src: "/img/logos/usc-brain.png", alt: "USC Center for Personalized Brain Health" },
-      tag: "MARKETING & SOCIAL STRATEGY · USC · HIPAA SECURE · COMPLIANT SCIENTIFIC CLAIMS",
+      tag: "HIPAA COMPLIANCE · NUANCED SCIENTIFIC CLAIMS",
       role: "Marketing & Social Strategy · 1 year 1 month",
       title: "I joined a world‑class Alzheimer's center to get their science out of the journals and into the world, loud and clear.",
       body: (
@@ -870,7 +865,7 @@ function CaseStudies() {
       logo: { src: "/img/logos/metaba.png", alt: "Metaba Health" },
       tag: "INVESTOR READINESS · 0→1 GO-TO-MARKET",
       role: "Founding Go-To-Market Operator · 1 year 2 months",
-      title: "I built the investor deck and website for a 0→1 diagnostics startup, then closed the first clients myself.",
+      title: "I led Go To Market for a diagnostics startup, closing the first deals to become investor-ready.",
       body: (
         <>
           <ul className="space-y-3">
@@ -895,7 +890,12 @@ function CaseStudies() {
           <Testimonial
             quote={
               <>
-                &ldquo;What really sets him apart is that once he understands the high-level goals and objectives, he immediately breaks them down into a concrete list of tasks and action items to begin moving the project forward. He&apos;s great at bridging the gap between idea and execution.&rdquo; &ldquo;He is someone who truly cares about both the quality of his work and the people he collaborates with.&rdquo;
+                <p>
+                  &ldquo;What really sets Juan apart is that once he understands the high-level goals and objectives, he immediately breaks them down into a concrete list of tasks and action items to begin moving the project forward. He&apos;s great at bridging the gap between idea and execution.&rdquo;
+                </p>
+                <p>
+                  &ldquo;Juan is someone who truly cares about both the quality of his work and the people he collaborates with.&rdquo;
+                </p>
               </>
             }
             name="Philip Sell"
@@ -910,9 +910,9 @@ function CaseStudies() {
     {
       id: "case-aura",
       logo: { src: "/img/logos/aura-fragrance-science.png", alt: "Your Aura Fragrance Science", tall: true },
-      tag: "FROM USC RESEARCH TO A CPG BRAND",
+      tag: "USC RESEARCH TO A CPG BRAND",
       role: "Founder · 1 year 3 months",
-      title: "I bootstrapped a personalized perfume company into 5 figures of revenue.",
+      title: "I bootstrapped a scientific perfume company into 5 figures of revenue.",
       body: (
         <>
           <ul className="space-y-3">
@@ -945,7 +945,7 @@ function CaseStudies() {
       logo: { src: "/img/logos/nutribiotic-white.png", alt: "NutriBiotic" },
       tag: "BRAND STRATEGY · SALES PLAYBOOK",
       role: "Field Sales Manager · 3 months · present",
-      title: "I map the enterprise buyer experience and steer our brand strategy and sales towards it.",
+      title: "I map the enterprise buyer experience and steer our brand strategy towards it.",
       body: (
         <ul className="space-y-3">
           <CaseBullet>
@@ -954,12 +954,14 @@ function CaseStudies() {
             , and write the sales playbook the whole company, including 30+ outside salespeople, runs on.
           </CaseBullet>
           <CaseBullet>
-            Build the scientific marketing behind the brand: claims-led collateral that proves product validity and cuts friction to buy.{" "}
-            <strong className="text-[#C9A24B] font-medium">40 new accounts in under 40 days</strong>
-            , 10 converted to paying clients.
+            Build the scientific marketing behind the brand:{" "}
+            <strong className="text-[#C9A24B] font-medium">claims-led collateral that proves product validity</strong>
+            {" "}and cuts the friction to buy.
           </CaseBullet>
           <CaseBullet>
-            Set the growth strategy on the CRM with custom AI agents: optimized territory routes, logged visits, next touchpoints. Coached the Northern California rep onto the system, raising his daily visits from 6 to 9.
+            Set the growth strategy on the CRM with custom AI agents: optimized territory routes, logged visits, next touchpoints.{" "}
+            <strong className="text-[#C9A24B] font-medium">Connected agentic workflows</strong>
+            {" "}take the manual work out of the brand&apos;s day-to-day processes.
           </CaseBullet>
         </ul>
       ),
@@ -986,7 +988,7 @@ function CaseStudies() {
                     <img
                       src={c.logo.src}
                       alt={c.logo.alt}
-                      className={`w-auto object-contain rounded-2xl mb-5 ${c.logo.tall ? "h-24" : "h-12"}`}
+                      className={`w-auto object-contain rounded-2xl mb-5 ${c.logo.tall ? "h-40 md:h-48" : "h-12"}`}
                     />
                     <p className="text-xs tracking-[0.25em] text-[#C9A24B] uppercase mb-3">
                       {c.tag}
@@ -1088,13 +1090,13 @@ function Capabilities() {
       num: "01",
       icon: "trajectory",
       title: "Investor readiness",
-      desc: "The deck, the website, and the science in plain words, ready before the first investor meeting. I built Metaba Health's new investor deck and investor website.",
+      desc: "The deck, the website, and the science in plain words, ready before the first investor meeting.",
     },
     {
       num: "02",
       icon: "nodes",
       title: "Marketing & social strategy",
-      desc: "One plan across LinkedIn, Instagram, TikTok, YouTube, and Facebook, from long-form video to short clips. At USC, the audience tripled in 8 months.",
+      desc: "One plan across LinkedIn, Instagram, TikTok, YouTube, and Facebook, from long-form video to short clips.",
     },
     {
       num: "03",
@@ -1106,13 +1108,13 @@ function Capabilities() {
       num: "04",
       icon: "link",
       title: "KOLs & creator partnerships",
-      desc: "Doctors, researchers, and creators who vouch for the science: 20+ KOLs at Biotech Connection LA, 400+ creators at Superbiome.",
+      desc: "Doctors, researchers, and creators who vouch for the science, sourced and kept warm.",
     },
     {
       num: "05",
       icon: "pin",
       title: "Business development, cold to close",
-      desc: "Research the account, cold-source the decision-maker, book the meeting, close or move on. I have run this motion on 200+ accounts, every one tracked to a decision.",
+      desc: "Research the account, cold-source the decision-maker, book the meeting, close or move on. Every account tracked to a decision.",
     },
   ];
 
@@ -1162,121 +1164,29 @@ function Capabilities() {
 }
 
 /* ====================================================
-   6. ASK MY CLONE
+   6. ASK ME ANYTHING
 ==================================================== */
-type Message = { role: "user" | "assistant"; content: string };
-
-
-function AskMyClone() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
-  const [streaming, setStreaming] = useState(false);
-  const [extraContext, setExtraContext] = useState("");
-  const containerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const scrollChatToBottom = () => {
-    const el = containerRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  };
-
-  useEffect(() => {
-    if (messages.length > 0) scrollChatToBottom();
-  }, [messages]);
-
-  async function send(text: string) {
-    if (!text.trim() || streaming) return;
-    const trimmed = text.trim();
-
-    // "I am Juan — ..." updates the AI's live context for this session
-    if (/^i am juan\b/i.test(trimmed)) {
-      const memo = trimmed.replace(/^i am juan[\s\-–—]*/i, "").trim();
-      if (memo) {
-        setExtraContext(prev => prev ? `${prev}\n${memo}` : memo);
-        setMessages(prev => [
-          ...prev,
-          { role: "assistant", content: `✓ Got it, context updated.` },
-        ]);
-      }
-      setInput("");
-      return;
-    }
-
-    const userMsg: Message = { role: "user", content: trimmed };
-    const next = [...messages, userMsg];
-    setMessages(next);
-    setInput("");
-    setStreaming(true);
-
-    // placeholder for streaming text
-    setMessages([...next, { role: "assistant", content: "" }]);
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000); // 15s hard timeout
-
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: next, extraContext }),
-        signal: controller.signal,
-      });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      if (!res.body) throw new Error("No stream body");
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let full = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        full += decoder.decode(value, { stream: true });
-        setMessages([...next, { role: "assistant", content: full }]);
-      }
-
-      // if we got nothing at all, show fallback
-      if (!full.trim()) throw new Error("Empty response");
-
-    } catch (err: unknown) {
-      const isTimeout = err instanceof Error && err.name === "AbortError";
-      setMessages([
-        ...next,
-        {
-          role: "assistant",
-          content: isTimeout
-            ? "Took too long. Try again or email juan.arenas.rec@gmail.com."
-            : "Couldn't reach the AI. Email me directly: juan.arenas.rec@gmail.com.",
-        },
-      ]);
-    } finally {
-      clearTimeout(timeout);
-      setStreaming(false);
-    }
-  }
-
+function AskMeAnything() {
   return (
     <section className="px-6 md:px-12 lg:px-20 py-16 md:py-24 border-t border-[#F2EFE6]/10">
-      <div className="max-w-7xl mx-auto grid lg:grid-cols-4 gap-6 items-stretch">
-
-        {/* Left — primary contact */}
-        <Reveal className="lg:col-span-2 flex flex-col h-full">
+      <div className="max-w-7xl mx-auto text-center">
+        <Reveal>
           <h2 className="font-display text-[clamp(2rem,4vw,3rem)] mb-10">
             Ask me anything.
           </h2>
-          <div className="flex-1" />
-          <div className="flex gap-4 sm:gap-10 items-end">
+        </Reveal>
+        <Reveal delay={100}>
+          <div className="flex gap-8 sm:gap-16 items-end justify-center">
             {/* LinkedIn */}
             <a
               href="https://linkedin.com/in/juanarenasmartin"
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex flex-col items-center gap-3 text-[#F2EFE6]/35 hover:text-[#0A66C2] transition-all duration-300"
+              className="group flex flex-col items-center gap-3 text-[#F2EFE6]/35 hover:text-[#7FA6C7] transition-all duration-300"
             >
               <svg
                 viewBox="0 0 24 24" fill="currentColor"
-                className="w-16 h-16 sm:w-24 sm:h-24 transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_14px_#0A66C2)]"
+                className="w-20 h-20 sm:w-28 sm:h-28 transition-all duration-300 group-hover:scale-110 group-hover:[filter:drop-shadow(0_0_14px_rgba(127,166,199,0.45))]"
               >
                 <path d="M20.447 20.452H16.89v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a1.975 1.975 0 1 1 0-3.95 1.975 1.975 0 0 1 0 3.95zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
               </svg>
@@ -1285,11 +1195,11 @@ function AskMyClone() {
             {/* iMessage */}
             <a
               href="sms:+13237753850"
-              className="group flex flex-col items-center gap-3 text-[#F2EFE6]/35 hover:text-[#34C759] transition-all duration-300"
+              className="group flex flex-col items-center gap-3 text-[#F2EFE6]/35 hover:text-[#86C79B] transition-all duration-300"
             >
               <svg
                 viewBox="0 0 24 24" fill="currentColor"
-                className="w-16 h-16 sm:w-24 sm:h-24 transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_14px_#34C759)]"
+                className="w-20 h-20 sm:w-28 sm:h-28 transition-all duration-300 group-hover:scale-110 group-hover:[filter:drop-shadow(0_0_14px_rgba(134,199,155,0.45))]"
               >
                 <path d="M12 2C6.477 2 2 6.477 2 12c0 2.1.644 4.05 1.747 5.667L2 22l4.333-1.747A9.955 9.955 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/>
               </svg>
@@ -1302,129 +1212,23 @@ function AskMyClone() {
             >
               <svg
                 viewBox="0 0 24 24"
-                className="w-16 h-16 sm:w-24 sm:h-24 transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_14px_rgba(255,255,255,0.5))]"
+                className="w-20 h-20 sm:w-28 sm:h-28 transition-all duration-300 group-hover:scale-110 group-hover:[filter:drop-shadow(0_0_14px_rgba(242,239,230,0.35))]"
               >
                 {/* envelope body */}
                 <path
                   d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2z"
-                  className="fill-[#F2EFE6]/35 group-hover:fill-white transition-colors duration-300"
+                  className="fill-[#F2EFE6]/35 group-hover:fill-[#E8E4DA] transition-colors duration-300"
                 />
                 {/* V flap */}
                 <path
                   d="M20 8l-8 5-8-5V6l8 5 8-5v2z"
-                  className="fill-[#F2EFE6]/35 group-hover:fill-[#FF3B30] transition-colors duration-300"
+                  className="fill-[#F2EFE6]/35 group-hover:fill-[#D98A84] transition-colors duration-300"
                 />
               </svg>
-              <span className="text-xs uppercase tracking-widest text-[#F2EFE6]/35 group-hover:text-white transition-colors duration-300">Email</span>
+              <span className="text-xs uppercase tracking-widest text-[#F2EFE6]/35 group-hover:text-[#E8E4DA] transition-colors duration-300">Email</span>
             </a>
           </div>
         </Reveal>
-
-        {/* Right — AI sidekick */}
-        <Reveal delay={100} className="lg:col-span-2">
-          {/* alien mascot + label */}
-          <div className="flex items-center gap-3 mb-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/img/claude-robot.png"
-              alt="AI assistant"
-              width={44}
-              height={44}
-              style={{ mixBlendMode: "screen" }}
-              className="object-contain"
-            />
-            <p className="text-sm text-[#F2EFE6]/55 italic">
-              I trained this chatbot to answer like me. Try it out!
-            </p>
-          </div>
-          <div className="rounded-2xl border border-[#284A3C] bg-[#0e1813] flex flex-col overflow-hidden">
-            {/* message thread */}
-            <div ref={containerRef} className="flex-1 overflow-y-auto min-h-[200px] max-h-[340px] p-5 space-y-4">
-              {messages.length === 0 ? null : (
-                messages.map((m, i) => {
-                  const hasText = m.role === "assistant" && m.content.includes("[TEXT_ME_BUTTON]");
-                  const hasEmail = m.role === "assistant" && m.content.includes("[EMAIL_ME_BUTTON]");
-                  const hasLinkedIn = m.role === "assistant" && m.content.includes("[LINKEDIN_ME_BUTTON]");
-                  const displayContent = m.content
-                    .replace("[TEXT_ME_BUTTON]", "")
-                    .replace("[EMAIL_ME_BUTTON]", "")
-                    .replace("[LINKEDIN_ME_BUTTON]", "")
-                    .trimEnd();
-                  return (
-                    <div key={i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
-                      <div
-                        className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                          m.role === "user"
-                            ? "bg-[#284A3C] text-[#F2EFE6]"
-                            : "bg-[#1a2e24] text-[#F2EFE6]/90 font-display text-base"
-                        }`}
-                      >
-                        <span className="whitespace-pre-wrap">{displayContent}</span>
-                        {m.role === "assistant" && streaming && i === messages.length - 1 && m.content === "" && (
-                          <span className="inline-block w-2 h-4 bg-[#C9A24B] ml-1 animate-pulse rounded-sm" />
-                        )}
-                        {m.role === "assistant" && streaming && i === messages.length - 1 && m.content !== "" && (
-                          <span className="inline-block w-1.5 h-4 bg-[#C9A24B]/70 ml-0.5 animate-pulse rounded-sm align-middle" />
-                        )}
-                      </div>
-                      {(hasText || hasEmail || hasLinkedIn) && !streaming && (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {hasText && (
-                            <a
-                              href="sms:+13237753850"
-                              className="inline-block rounded-full bg-[#C9A24B] text-[#13201A] px-5 py-2 text-xs font-medium uppercase tracking-widest hover:bg-[#d8b563] transition-colors"
-                            >
-                              Text me
-                            </a>
-                          )}
-                          {hasEmail && (
-                            <a
-                              href="mailto:juan.arenas.rec@gmail.com"
-                              className="inline-block rounded-full border border-[#C9A24B] text-[#C9A24B] px-5 py-2 text-xs font-medium uppercase tracking-widest hover:bg-[#C9A24B]/10 transition-colors"
-                            >
-                              Email me
-                            </a>
-                          )}
-                          {hasLinkedIn && (
-                            <a
-                              href="https://linkedin.com/in/juanarenasmartin"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-block rounded-full border border-[#9FC4AE] text-[#9FC4AE] px-5 py-2 text-xs font-medium uppercase tracking-widest hover:bg-[#9FC4AE]/10 transition-colors"
-                            >
-                              LinkedIn
-                            </a>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            {/* input bar */}
-            <div className="border-t border-[#284A3C] px-4 py-3 flex gap-3 items-center">
-              <input
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && send(input)}
-                placeholder="Ask AI Juan here:"
-                disabled={streaming}
-                className="flex-1 bg-transparent text-base sm:text-sm text-[#F2EFE6] placeholder-[#F2EFE6]/30 outline-none disabled:opacity-50"
-              />
-              <button
-                onClick={() => send(input)}
-                disabled={!input.trim() || streaming}
-                className="rounded-full bg-[#C9A24B] text-[#13201A] px-4 py-1.5 text-xs font-medium uppercase tracking-widest hover:bg-[#d8b563] transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-              >
-                {streaming ? "…" : "Send"}
-              </button>
-            </div>
-          </div>
-        </Reveal>
-
       </div>
     </section>
   );
@@ -1483,11 +1287,11 @@ function About() {
                 href="https://linkedin.com/in/juanarenasmartin"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group flex flex-col items-center gap-2 text-[#F2EFE6]/35 hover:text-[#0A66C2] transition-all duration-300"
+                className="group flex flex-col items-center gap-2 text-[#F2EFE6]/35 hover:text-[#7FA6C7] transition-all duration-300"
               >
                 <svg
-                  width="44" height="44" viewBox="0 0 24 24" fill="currentColor"
-                  className="transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_10px_#0A66C2)]"
+                  width="60" height="60" viewBox="0 0 24 24" fill="currentColor"
+                  className="transition-all duration-300 group-hover:scale-110 group-hover:[filter:drop-shadow(0_0_10px_rgba(127,166,199,0.45))]"
                 >
                   <path d="M20.447 20.452H16.89v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a1.975 1.975 0 1 1 0-3.95 1.975 1.975 0 0 1 0 3.95zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
                 </svg>
@@ -1496,11 +1300,11 @@ function About() {
               {/* iMessage */}
               <a
                 href="sms:+13237753850"
-                className="group flex flex-col items-center gap-2 text-[#F2EFE6]/35 hover:text-[#34C759] transition-all duration-300"
+                className="group flex flex-col items-center gap-2 text-[#F2EFE6]/35 hover:text-[#86C79B] transition-all duration-300"
               >
                 <svg
-                  width="44" height="44" viewBox="0 0 24 24" fill="currentColor"
-                  className="transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_10px_#34C759)]"
+                  width="60" height="60" viewBox="0 0 24 24" fill="currentColor"
+                  className="transition-all duration-300 group-hover:scale-110 group-hover:[filter:drop-shadow(0_0_10px_rgba(134,199,155,0.45))]"
                 >
                   <path d="M12 2C6.477 2 2 6.477 2 12c0 2.1.644 4.05 1.747 5.667L2 22l4.333-1.747A9.955 9.955 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/>
                 </svg>
@@ -1512,19 +1316,19 @@ function About() {
                 className="group flex flex-col items-center gap-2 transition-all duration-300"
               >
                 <svg
-                  width="44" height="44" viewBox="0 0 24 24"
-                  className="transition-all duration-300 group-hover:scale-125 group-hover:[filter:drop-shadow(0_0_10px_rgba(255,255,255,0.5))]"
+                  width="60" height="60" viewBox="0 0 24 24"
+                  className="transition-all duration-300 group-hover:scale-110 group-hover:[filter:drop-shadow(0_0_10px_rgba(242,239,230,0.35))]"
                 >
                   <path
                     d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2z"
-                    className="fill-[#F2EFE6]/35 group-hover:fill-white transition-colors duration-300"
+                    className="fill-[#F2EFE6]/35 group-hover:fill-[#E8E4DA] transition-colors duration-300"
                   />
                   <path
                     d="M20 8l-8 5-8-5V6l8 5 8-5v2z"
                     className="fill-[#F2EFE6]/35 group-hover:fill-[#FF3B30] transition-colors duration-300"
                   />
                 </svg>
-                <span className="text-xs uppercase tracking-widest text-[#F2EFE6]/35 group-hover:text-white transition-colors duration-300">Email</span>
+                <span className="text-xs uppercase tracking-widest text-[#F2EFE6]/35 group-hover:text-[#E8E4DA] transition-colors duration-300">Email</span>
               </a>
             </div>
           </div>
@@ -1547,8 +1351,8 @@ function CTA() {
       <div className="relative max-w-4xl mx-auto text-center">
         <Reveal>
           <h2 className="font-display text-[clamp(2.2rem,5vw,3.6rem)] leading-tight">
-            Raising soon?{" "}
-            <span className="italic text-[#9FC4AE]">Get the science seen first.</span>
+            Shine the spotlight{" "}
+            <span className="italic text-[#9FC4AE]">on your company.</span>
           </h2>
         </Reveal>
         <Reveal delay={120}>
