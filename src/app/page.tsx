@@ -1351,8 +1351,8 @@ function CTA() {
       <div className="relative max-w-4xl mx-auto text-center">
         <Reveal>
           <h2 className="font-display text-[clamp(2.2rem,5vw,3.6rem)] leading-tight">
-            Shine the spotlight{" "}
-            <span className="italic text-[#9FC4AE]">on your company.</span>
+            Shine the spotlight
+            <span className="block italic text-[#9FC4AE]">on your company.</span>
           </h2>
         </Reveal>
         <Reveal delay={120}>
