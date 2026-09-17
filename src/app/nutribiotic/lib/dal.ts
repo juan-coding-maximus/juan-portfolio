@@ -4517,9 +4517,11 @@ export async function getAllTimeMetrics(): Promise<AllTimeMetrics | null> {
  *    cadence as its window (load_orders.py --rollup), which is the righter
  *    call for routing but isn't "purchased last 12mo," which is what he asked
  *    for here.
- *  - totalProspects: nb_accounts.lifecycle='prospect' in his book -- no
- *    order on file at all, load_orders.py's only other lifecycle a fresh
- *    import can land on.
+ *  - totalProspects: every account in his book (hubspot_owner_id = Juan),
+ *    full stop (corrected 2026-09-17: it had been narrowed to
+ *    nb_accounts.lifecycle='prospect', i.e. accounts with zero orders on
+ *    file, which undercounted -- Juan's ask was every one of the 400+
+ *    potential clients in the territory, not just the never-ordered slice).
  *  - ordersThroughMe / ordersThroughMeRevenue: nb_order_emails, the ledger
  *    order_email_capture.py builds by scanning his own sends to
  *    orders@nutribiotic.com (message_id-deduped) and pricing each line
@@ -4537,18 +4539,16 @@ export async function getBookMetrics(): Promise<BookMetrics | null> {
   if (!isConfigured()) return null;
   try {
     const cutoff = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const [active, prospects, orders] = await Promise.all([
+    const [active, book, orders] = await Promise.all([
       raw<{ id: string }>(
         `nb_accounts?select=id&hubspot_owner_id=eq.${JUAN_OWNER_ID}&last_order_at=gte.${cutoff}`,
       ),
-      raw<{ id: string }>(
-        `nb_accounts?select=id&hubspot_owner_id=eq.${JUAN_OWNER_ID}&lifecycle=eq.prospect`,
-      ),
+      raw<{ id: string }>(`nb_accounts?select=id&hubspot_owner_id=eq.${JUAN_OWNER_ID}`),
       raw<{ total_revenue: number | null }>("nb_order_emails?select=total_revenue"),
     ]);
     return {
       activeClients: active.length,
-      totalProspects: prospects.length,
+      totalProspects: book.length,
       ordersThroughMe: orders.length,
       ordersThroughMeRevenue: orders.reduce((sum, o) => sum + (Number(o.total_revenue) || 0), 0),
     };
