@@ -79,7 +79,7 @@ function MatchPill({
   disabled: boolean;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-full border border-[#E2DFD5] bg-white py-1 pl-3 pr-1.5">
+    <div className="flex min-w-0 max-w-full items-center gap-2 rounded-full border border-[#E2DFD5] bg-white py-1 pl-3 pr-1.5">
       <span className="min-w-0 truncate text-[12.5px] text-[#14201B]">
         {label}
         {sub && <span className="text-[#8A928C]"> · {sub}</span>}
@@ -119,8 +119,8 @@ function PlacePill({
   disabled: boolean;
 }) {
   return (
-    <div className={expanded ? "w-full" : ""}>
-      <div className="flex items-center gap-2 rounded-full border border-[#E2DFD5] bg-white py-1 pl-3 pr-1.5">
+    <div className={expanded ? "w-full" : "min-w-0 max-w-full"}>
+      <div className="flex min-w-0 max-w-full items-center gap-2 rounded-full border border-[#E2DFD5] bg-white py-1 pl-3 pr-1.5">
         <button
           type="button"
           onClick={onToggleMap}
