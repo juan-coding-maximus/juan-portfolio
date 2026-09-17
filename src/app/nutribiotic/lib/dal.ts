@@ -4529,7 +4529,10 @@ export async function getAllTimeMetrics(): Promise<AllTimeMetrics | null> {
  *  - ordersThroughMe / ordersThroughMeRevenue: nb_order_emails, the ledger
  *    order_email_capture.py builds by scanning his own sends to
  *    orders@nutribiotic.com (message_id-deduped) and pricing each line
- *    against the real price list -- count and $ total, all time.
+ *    against the real price list -- count and $ total, all time. Excludes
+ *    no_charge rows (migration 0077, Juan 2026-09-17: "the car stock orders
+ *    are not revenue" -- a real order, but neither a paying client nor
+ *    revenue).
  */
 export type BookMetrics = {
   activeClients: number;
@@ -4548,7 +4551,7 @@ export async function getBookMetrics(): Promise<BookMetrics | null> {
         `nb_accounts?select=id&hubspot_owner_id=eq.${JUAN_OWNER_ID}&last_order_at=gte.${cutoff}`,
       ),
       raw<{ id: string }>(`nb_accounts?select=id&hubspot_owner_id=eq.${JUAN_OWNER_ID}`),
-      raw<{ total_revenue: number | null }>("nb_order_emails?select=total_revenue"),
+      raw<{ total_revenue: number | null }>("nb_order_emails?select=total_revenue&no_charge=eq.false"),
     ]);
     return {
       activeClients: active.length,
