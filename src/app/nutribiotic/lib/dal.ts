@@ -2615,6 +2615,11 @@ export type MapAccount = {
      cadence is actually known. */
   expected_reorder_at: string | null;
   expected_reorder_days: number | null;
+  /* The earliest real visit/call/text/email on this account (nb_v_account_
+     first_touch, migration 0078: visit/call/text/email_out/email_in, corrected
+     and enriched rows dropped). Feeds the map's pin-chronology numbers, never
+     a display fact on its own. Null = never touched, still a prospect. */
+  first_touch_at: string | null;
 };
 
 /**
@@ -2637,8 +2642,10 @@ export type MapAccount = {
  * one table.
  */
 export async function listOwnerAccounts(): Promise<Result<MapAccount>> {
-  const [result, grades, mix, stages] = await Promise.all([
-    query<Omit<MapAccount, "tier" | "top_category_12m" | "top_category_lifetime" | "lead_stage">>("nb_accounts", {
+  const [result, grades, mix, stages, firstTouch] = await Promise.all([
+    query<
+      Omit<MapAccount, "tier" | "top_category_12m" | "top_category_lifetime" | "lead_stage" | "first_touch_at">
+    >("nb_accounts", {
       select:
         "id,name,street,city,state,postal,lat,lng,phone,website,channel,lifecycle,do_not_visit,chain_excluded,practice_excluded,hubspot_company_id,origin,area,lead_status,readiness,last_order_at,trailing_12m_revenue,lifetime_revenue,expected_reorder_at,expected_reorder_days",
       // hubspot_owner_id, not owner_name: owner_name is free text mirrored from
@@ -2673,10 +2680,19 @@ export async function listOwnerAccounts(): Promise<Result<MapAccount>> {
     raw<{ account_id: string; lead_stage: LeadStage }>(
       "nb_v_account_lead_stage?select=account_id,lead_stage&limit=2000",
     ),
+    // 0078. Map pin chronology: the earliest real visit/call/text/email per
+    // account. One row per touched account, computed server-side for the
+    // same reason top_category and lead_stage are: shipping every activity
+    // row to re-derive one timestamp client-side is the egress the
+    // department was suspended over once (2026-09-02).
+    raw<{ account_id: string; first_touch_at: string }>(
+      "nb_v_account_first_touch?select=account_id,first_touch_at&limit=2000",
+    ),
   ]);
   const tierById = new Map(grades.map((t) => [t.account_id, t.potential_grade]));
   const mixById = new Map(mix.map((m) => [m.account_id, m]));
   const stageById = new Map(stages.map((s) => [s.account_id, s.lead_stage]));
+  const firstTouchById = new Map(firstTouch.map((f) => [f.account_id, f.first_touch_at]));
   return {
     ...result,
     data: result.data.map((a) => ({
@@ -2685,6 +2701,7 @@ export async function listOwnerAccounts(): Promise<Result<MapAccount>> {
       top_category_12m: mixById.get(a.id)?.top_category_12m ?? null,
       top_category_lifetime: mixById.get(a.id)?.top_category_lifetime ?? null,
       lead_stage: stageById.get(a.id) ?? null,
+      first_touch_at: firstTouchById.get(a.id) ?? null,
     })),
   };
 }

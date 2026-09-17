@@ -629,6 +629,23 @@ export function AccountsMap({
     [visibleAccounts, filters, priorityById],
   );
 
+  /* THE PIN CHRONOLOGY (Juan, 2026-09-17): "numbers instead of red pins ...
+     a number that shows the chronology of my visits and calls." first_touch_at
+     (nb_v_account_first_touch, migration 0078) is the earliest visit, call,
+     text/WhatsApp (both file as kind='text'), or email on the account --
+     email to NutriBiotic HQ never lands there in the first place, since HQ
+     has no matching customer contact for the poller to file against. Ranked
+     over `filtered`, not every account in the book, so the numbers re-run
+     whenever an area/tier/stage chip narrows the map, same as routeNum
+     re-runs over the day's own stops. Untouched accounts (still prospects)
+     get no number, same rule the flat-blue prospect colour already states. */
+  const touchSeqById = useMemo(() => {
+    const touched = filtered
+      .filter((a) => a.first_touch_at)
+      .sort((a, b) => new Date(a.first_touch_at!).getTime() - new Date(b.first_touch_at!).getTime());
+    return new Map(touched.map((a, i) => [a.id, i + 1]));
+  }, [filtered]);
+
   const jitteredById = useMemo(() => jitteredPositions(filtered), [filtered]);
 
   // How many each hide-toggle is currently hiding, for its own label. Not a
@@ -1121,6 +1138,12 @@ export function AccountsMap({
             // own mirror, set independently of whether anyone has called).
             const potential = !prospect && a.tier ? POTENTIAL_COLOR[a.tier] : undefined;
             const routeNum = showRouteChain ? routeNumberById.get(a.id) : undefined;
+            // The route number wins while a route is charted (that's today's
+            // plan); otherwise a touched account carries its chronology
+            // number on its own colour, so the pin still reads area/tier/
+            // prospect at a glance. See touchSeqById above.
+            const touchNum = routeNum ? undefined : touchSeqById.get(a.id);
+            const pinNum = routeNum ?? touchNum;
             return (
               <MarkerF
                 key={a.id}
@@ -1130,10 +1153,10 @@ export function AccountsMap({
                   setSelectedStop(null);
                   setSelected(a);
                 }}
-                zIndex={routeNum ? 5 : potential ? 3 : 2}
+                zIndex={routeNum ? 5 : touchNum ? 4 : potential ? 3 : 2}
                 icon={{
                   path: google.maps.SymbolPath.CIRCLE,
-                  scale: routeNum ? 11 : potential ? 7 : 6,
+                  scale: routeNum ? 11 : touchNum ? 9 : potential ? 7 : 6,
                   fillColor: routeNum
                     ? "#14201B"
                     : prospect
@@ -1141,11 +1164,11 @@ export function AccountsMap({
                       : potential ?? ((a.area && areaById.get(a.area)?.color) || "#5B6560"),
                   fillOpacity: 1,
                   strokeColor: "#F7F6F1",
-                  strokeWeight: routeNum ? 2 : 1.5,
+                  strokeWeight: pinNum ? 2 : 1.5,
                 }}
                 label={
-                  routeNum
-                    ? { text: String(routeNum), color: "#F7F6F1", fontSize: "11px", fontWeight: "700" }
+                  pinNum
+                    ? { text: String(pinNum), color: "#F7F6F1", fontSize: "11px", fontWeight: "700" }
                     : undefined
                 }
               />
