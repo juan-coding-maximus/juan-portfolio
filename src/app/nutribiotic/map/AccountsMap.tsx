@@ -231,6 +231,49 @@ function isProspect(a: Pick<MapAccount, "lead_stage">): boolean {
 }
 
 /**
+ * geocode.py corroborates on street number + postal/city, not suite number,
+ * so two different tenants at the same address (a strip mall, a medical
+ * building) land on the exact same lat/lng returned by Places. Left alone
+ * they draw as one stacked pin with no visual sign a second account is under
+ * it. This spreads any such group into a small ring around their shared
+ * point, in real meters, so the separation shows up once you zoom to street
+ * level and simply vanishes (sub-pixel) at a zoom where it would be noise.
+ * Purely a display offset: routing, "add to route", and everything else
+ * downstream still uses the account's true a.lat/a.lng.
+ */
+const COINCIDENT_JITTER_METERS = 12;
+const METERS_PER_DEG_LAT = 111_320;
+function jitteredPositions<T extends { id: string; lat: number; lng: number }>(
+  items: readonly T[],
+): Map<string, { lat: number; lng: number }> {
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    // ~1m grid: Places-level coincidence, not two accounts that merely share
+    // a zip. Real jitter for real duplicates only.
+    const key = `${item.lat.toFixed(5)},${item.lng.toFixed(5)}`;
+    const group = groups.get(key);
+    if (group) group.push(item);
+    else groups.set(key, [item]);
+  }
+  const result = new Map<string, { lat: number; lng: number }>();
+  for (const group of groups.values()) {
+    if (group.length === 1) continue; // no offset unless it's actually coincident
+    const metersPerDegLng = METERS_PER_DEG_LAT * Math.cos((group[0].lat * Math.PI) / 180);
+    // Widen the ring as the pile-up grows so a 5-account building doesn't
+    // just make a denser dot.
+    const radius = COINCIDENT_JITTER_METERS * (1 + Math.floor(group.length / 6));
+    group.forEach((item, i) => {
+      const angle = (2 * Math.PI * i) / group.length;
+      result.set(item.id, {
+        lat: item.lat + (radius * Math.sin(angle)) / METERS_PER_DEG_LAT,
+        lng: item.lng + (radius * Math.cos(angle)) / metersPerDegLng,
+      });
+    });
+  }
+  return result;
+}
+
+/**
  * One account's priority, computed by lib/priority.ts on the server. Score is
  * never null here: map/page.tsx drops unscored accounts from the object
  * entirely, so "absent" and "not scored" are the same state and neither can be
@@ -585,6 +628,8 @@ export function AccountsMap({
       ),
     [visibleAccounts, filters, priorityById],
   );
+
+  const jitteredById = useMemo(() => jitteredPositions(filtered), [filtered]);
 
   // How many each hide-toggle is currently hiding, for its own label. Not a
   // filter chip because neither is exploratory the way those are: these
@@ -1079,7 +1124,7 @@ export function AccountsMap({
             return (
               <MarkerF
                 key={a.id}
-                position={{ lat: a.lat, lng: a.lng }}
+                position={jitteredById.get(a.id) ?? { lat: a.lat, lng: a.lng }}
                 opacity={a.do_not_visit ? 0.45 : 1}
                 onClick={() => {
                   setSelectedStop(null);
@@ -1348,7 +1393,7 @@ export function AccountsMap({
 
           {selected && (
             <InfoWindowF
-              position={{ lat: selected.lat, lng: selected.lng }}
+              position={jitteredById.get(selected.id) ?? { lat: selected.lat, lng: selected.lng }}
               onCloseClick={() => setSelected(null)}
             >
               <div className="min-w-[190px] max-w-[240px] p-1 text-[13px] text-[#14201B]">
