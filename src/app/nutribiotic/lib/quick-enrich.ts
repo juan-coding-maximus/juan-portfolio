@@ -73,17 +73,17 @@ const ENRICH_TOOL = {
       current_state: {
         type: ["string", "null"],
         description:
-          "One sentence naming the actual angle a rep opens the call with: what kind of business this really is and the specific context that changes how to sell it (e.g. a supplement retailer operating inside a gym, a pharmacy already carrying one line but not another), grounded only in the evidence given, meetings and calls weighted highest. Null if the evidence is too thin to say anything specific.",
+          "One sentence naming the actual angle a rep opens the call with: what kind of business this really is and the specific context that changes how to sell it (e.g. a supplement retailer operating inside a gym, a pharmacy already carrying one line but not another), grounded only in the evidence given, meetings and calls weighted highest and used first whenever any exist. Never a restatement of a Places business-status flag or a bare order-count fact (e.g. 'listed as OPERATIONAL' or 'has no orders on file' said on its own, with nothing else, is not an angle). Null, not a restated fact, if the evidence is too thin to say anything a rep couldn't already see on this screen.",
       },
       future_state: {
         type: ["string", "null"],
         description:
-          "One sentence naming a SPECIFIC opportunity implied directly by a gap in the evidence given (a lapsed product line, a category their site or reviews mention that they don't currently order from us). Never a generic pitch line. Null if no specific gap is evidenced.",
+          "One sentence naming a SPECIFIC opportunity implied directly by a gap in the evidence given (a lapsed product line, a category their site, reviews, or a meeting mention that they don't currently order from us). Never a generic pitch line, and never just 'they have zero orders so there is upside'; that is the same fact as current_state restated as an opportunity, not a new one. Null if no specific gap is evidenced.",
       },
       impact: {
         type: ["string", "null"],
         description:
-          "One sentence on what closing that gap is worth, grounded in the numbers already given (revenue, order cadence) where available, otherwise tied to a concrete detail in the evidence. Null if current_state and future_state are both null.",
+          "One sentence on what closing that gap is worth, grounded in the numbers already given (revenue, order cadence) where available, otherwise tied to a concrete detail in the evidence, ideally a meeting detail (something said, a stated intent, a stated objection). Never a generic 'this represents new revenue from an untapped account' line; that is true of every account with zero orders and says nothing about this one. Null if current_state and future_state are both null, or if all that's left to say is that generic line.",
       },
     },
     required: ["hours_found_on_website", "hours", "current_state", "future_state", "impact"],
@@ -235,13 +235,17 @@ export async function enrichAccountQuickly(accountId: string): Promise<QuickEnri
         "You are doing a 30-second field-rep lookup on one account right before a call, using ONLY the evidence blocks in the " +
         "user message. Never invent a fact, hour, product, or opportunity that is not present in that evidence. Extract hours " +
         "only if the website text states them explicitly; Google Places' own hours are applied separately and are not yours to " +
-        "restate. The meetings-and-calls block is the highest-quality evidence given, real words from the account, not a scrape: " +
-        "when it conflicts with the website or Places, believe the meetings block. The gap summary (current_state/future_state/" +
-        "impact) must each name something concrete drawn from the evidence (an actual product, an actual lapsed order, an actual " +
-        "website, Places, or meeting detail), never a generic sales line. current_state should read as a real angle a rep can " +
-        "open with, naming what kind of business this actually is and where it sits (e.g. 'a nutrition specialty shop inside a " +
-        "gym' or 'a pharmacy that already carries the vitamin line but not GSE'), not a bare fact restated. If the evidence does " +
-        "not support a specific, honest claim, return null for that field rather than write something plausible-sounding. " +
+        "restate. The meetings-and-calls block is the highest-quality evidence given, real words from the account, not a scrape, " +
+        "and IS Juan's own recent experience with this business: build the gap summary from it first whenever it has anything " +
+        "usable, and only fall back to the website/Places/purchase-history blocks to fill in what the meetings didn't cover. " +
+        "When meetings conflict with the website or Places, believe the meetings block. The gap summary (current_state/" +
+        "future_state/impact) must each name something concrete a rep does not already see elsewhere on this screen (this " +
+        "account already shows its own order count, last-order date, and Places status as separate facts, so restating any of " +
+        "those, in any words, is not a summary, it's noise). A sentence whose only content is a business-status flag ('listed as " +
+        "OPERATIONAL') or a bare zero-orders fact ('has no orders on file', 'represents entirely new revenue from an untapped " +
+        "account') is exactly the kind of generic filler to avoid: it is true of hundreds of other accounts and gives no edge on " +
+        "this one. If the evidence (beyond a meeting) gives you nothing more specific than that, return null, never that generic " +
+        "sentence; a blank field a rep skips past in a second beats a full field that wastes their time. " +
         "If you name a date in any field, write it the way a rep would say it out loud (e.g. 'Feb 16, 2026'), never as " +
         "digits-and-dashes (never '2026-02-16').",
       messages: [{ role: "user", content: evidence }],

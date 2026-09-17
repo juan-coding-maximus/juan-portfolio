@@ -352,13 +352,13 @@ export function AccountDetailBody({
         {gap && (
           <Card>
             <div className="mb-3 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
-              The gap
+              Summary
             </div>
             <dl className="flex flex-col gap-3 text-[14px]">
               {[
-                ["Where they are now", a.current_state],
-                ["Where they could be", a.future_state],
-                ["What the gap costs them", a.impact],
+                ["Now", a.current_state],
+                ["Opening", a.future_state],
+                ["Impact", a.impact],
               ].map(([label, val]) =>
                 val ? (
                   <div key={label as string}>
@@ -427,16 +427,21 @@ export function AccountDetailBody({
           );
         })()}
 
-        {/* History. Append-only, so this is the real record. */}
+        {/* History. Append-only, so this is the real record. Internal/system
+            rows (corrections, geocode notes, import notes, admin log lines,
+            all direction:"internal" per HARD RULE 16) never happened with
+            the account and just eat time reading real notes, so they stay in
+            the ledger (audit) but never render here (Juan, 2026-09-16). */}
         <section>
           <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8A928C]">
             History
           </h2>
-          {acts.length === 0 ? (
-            <Empty>No activity logged.</Empty>
-          ) : (
+          {(() => {
+            const realActs = acts.filter((t) => t.direction !== "internal");
+            if (realActs.length === 0) return <Empty>No activity logged.</Empty>;
+            return (
             <ul className="divide-y divide-[#EDEBE3] overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
-              {acts.map((t) => (
+              {realActs.map((t) => (
                 <li key={t.id} className="flex flex-col gap-1 px-4 py-2.5 text-[13.5px]">
                   <span className="flex items-baseline gap-3">
                     <span className="w-[86px] shrink-0 text-[12px] text-[#8A928C]">
@@ -455,7 +460,8 @@ export function AccountDetailBody({
                 </li>
               ))}
             </ul>
-          )}
+            );
+          })()}
         </section>
       </div>
 
