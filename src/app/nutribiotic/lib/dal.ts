@@ -35,6 +35,7 @@
 
 import "server-only";
 import { cache } from "react";
+import { unstable_cache, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { hasAccess } from "./devices";
 import { hasWidgetToken } from "./session";
@@ -503,6 +504,13 @@ export async function getAccount(id: string): Promise<Result<Account>> {
 /** Sets or clears Juan's own potential read (see Account.potential_juan). Local only, in nb_accounts; never touches HubSpot itself, see the column's own comment above for how it gets there. */
 export async function setAccountPotentialJuan(id: string, grade: Tier | null): Promise<Account | null> {
   const rows = await mutate<Account>("nb_accounts", "PATCH", { potential_juan: grade }, { id: `eq.${id}` });
+  // The priority book's 5-minute cache (getPriorityBook, "priority-book" tag)
+  // exists so a load with nothing new doesn't recompute the whole 649-row
+  // book. Tier is a real input to that score (up to ~30 points), so THIS
+  // edit -- the one Juan just made himself -- has to skip the window: he
+  // should never wonder whether the SDR list caught up yet with a tap he
+  // watched land a second ago.
+  updateTag("priority-book");
   return rows[0] ?? null;
 }
 
@@ -514,6 +522,10 @@ export async function setAccountReadiness(id: string, readiness: Readiness | nul
     { readiness, readiness_set_at: readiness ? new Date().toISOString() : null },
     { id: `eq.${id}` },
   );
+  // Same reasoning as setAccountPotentialJuan: readiness is a flat +/-20/10
+  // point shift on the priority score, and Juan setting it is the exact
+  // moment "the list should already know this" matters most.
+  updateTag("priority-book");
   return rows[0] ?? null;
 }
 
@@ -2201,6 +2213,59 @@ async function raw<T>(path: string): Promise<T[]> {
   return (await res.json()) as T[];
 }
 
+/**
+ * Same shape as raw(), cached for 5 minutes under the "priority-book" tag
+ * instead of read fresh every time (Juan, 2026-09-16: the priority book's
+ * force-dynamic, no-store reads recompute the whole book, a Supabase round
+ * trip, on EVERY /nutribiotic/sdr and /nutribiotic/map load, when most of the
+ * book hasn't moved since the last one).
+ *
+ * unstable_cache, NOT a tagged fetch() (next: {revalidate, tags}), because
+ * both /nutribiotic/sdr and /nutribiotic/map declare `dynamic = "force-dynamic"`,
+ * which Next's own docs describe as equivalent to forcing every fetch() in
+ * the route to `{cache: "no-store", next: {revalidate: 0}}" -- a per-call
+ * `next.revalidate` here would have been silently ignored. unstable_cache is
+ * a separate cache keyed on its own arguments, immune to the route's fetch
+ * defaults, which is exactly why it exists for a route that has to stay
+ * dynamic overall. verifyReadAccess() stays OUTSIDE the cached function on
+ * purpose: Next forbids reading cookies (which hasAccess/hasWidgetToken do)
+ * from inside a cached scope.
+ *
+ * THE BALANCE: most accounts sit still for days, so a short cache window
+ * makes the common "nothing changed" load instant instead of re-fetching and
+ * re-scoring 649 rows every time. The two inputs Juan actually acts on while
+ * looking at this list, potential grade and readiness, tag their own write
+ * (setAccountPotentialJuan/setAccountReadiness below) with updateTag, which
+ * expires the tag immediately and makes the very next read wait for fresh
+ * data -- the "read-your-own-writes" case this is for -- rather than
+ * revalidateTag's stale-while-revalidate default, which would still show
+ * Juan the OLD grade for one more page load right after he just set it.
+ * Only a change from somewhere else (the HubSpot sync loop, another rep's
+ * touch) can sit stale for up to 5 minutes, same tradeoff as the jsonb sync
+ * elsewhere in this app.
+ */
+const fetchPriorityBookRaw = unstable_cache(
+  async (path: string): Promise<unknown> => {
+    const res = await fetchWithTimeout(
+      `${SB_URL}/rest/v1/${path}`,
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Accept: "application/json" } },
+      { retries: 1 },
+    );
+    if (!res.ok) {
+      throw new Error(`Supabase ${path} -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    }
+    return res.json();
+  },
+  ["nb-priority-book-raw"],
+  { tags: ["priority-book"], revalidate: 300 },
+);
+
+async function rawCached<T>(path: string): Promise<T[]> {
+  await verifyReadAccess();
+  if (!isConfigured()) return [];
+  return fetchPriorityBookRaw(path) as Promise<T[]>;
+}
+
 export async function listImportBatches(): Promise<ImportBatch[]> {
   return raw<ImportBatch>("nb_import_batches?select=*&order=loaded_at.desc&limit=50");
 }
@@ -2319,7 +2384,7 @@ export async function getPriorityBook(): Promise<PriorityBook> {
   if (!isConfigured()) return empty;
 
   const [accounts, grades, drafts, touches] = await Promise.all([
-    raw<{
+    rawCached<{
       id: string;
       name: string;
       lifecycle: string | null;
@@ -2359,16 +2424,16 @@ export async function getPriorityBook(): Promise<PriorityBook> {
         // Mother's Market) were never chain_excluded, so they are unaffected.
         "&lifecycle=neq.waypoint&closed_at=is.null&chain_excluded=eq.false&limit=2000",
     ),
-    raw<{ account_id: string; potential_grade: string | null }>(
+    rawCached<{ account_id: string; potential_grade: string | null }>(
       "nb_v_account_potential?select=account_id,potential_grade&limit=2000",
     ),
-    raw<{ account_id: string | null; urgency: number | null; urgency_reason: string | null }>(
+    rawCached<{ account_id: string | null; urgency: number | null; urgency_reason: string | null }>(
       "nb_outbound_drafts?select=account_id,urgency,urgency_reason&status=eq.pending&limit=500",
     ),
     // HARD RULE 18: every counting surface reads the effective view, not the
     // append-only table, so a touchpoint filed on the wrong account and then
     // corrected does not keep making that account look freshly worked.
-    raw<{ account_id: string; at: string }>(
+    rawCached<{ account_id: string; at: string }>(
       "nb_v_activities_effective?select=account_id,at&corrected=is.false&order=at.desc&limit=2000",
     ),
   ]);
