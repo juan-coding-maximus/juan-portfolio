@@ -29,9 +29,9 @@ function kb(bytes: number): string {
 
 function Bar({ done, total }: { done: number; total: number }) {
   return (
-    <div className="h-px w-full bg-cream/15">
+    <div className="h-1.5 w-full rounded-full bg-cream/12">
       <div
-        className="h-px bg-gold transition-[width] duration-300"
+        className="h-1.5 rounded-full bg-gold transition-[width] duration-300"
         style={{ width: `${(done / total) * 100}%` }}
       />
     </div>
@@ -132,19 +132,19 @@ export default function PriorityGame() {
           {ranked.length} rules, {kb(bytesLow)} marked low
         </p>
 
-        <ol className="mt-10 space-y-px">
+        <ol className="mt-8 space-y-2">
           {ranked.map((c) => (
             <li
               key={c.slug}
-              className="flex items-baseline gap-4 border-b border-cream/10 py-2.5"
+              className="flex items-center gap-4 rounded-2xl border border-cream/10 bg-cream/[0.04] px-4 py-3"
             >
               <span
-                className={`w-7 shrink-0 text-right font-display text-lg ${
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-display text-base ${
                   scores[c.slug] >= 8
-                    ? "text-gold"
+                    ? "bg-gold text-ink"
                     : scores[c.slug] <= 4
-                      ? "text-cream/35"
-                      : "text-cream"
+                      ? "bg-cream/10 text-cream/50"
+                      : "bg-sage/25 text-cream"
                 }`}
               >
                 {scores[c.slug]}
@@ -166,7 +166,7 @@ export default function PriorityGame() {
             <button
               onClick={submit}
               disabled={sent === "sending"}
-              className="rounded-full bg-gold px-6 py-2.5 text-sm font-medium text-ink transition hover:bg-gold/85 disabled:opacity-50"
+              className="rounded-full bg-gold px-8 py-3.5 text-base font-medium text-ink transition hover:bg-gold/85 active:scale-95 disabled:opacity-50"
             >
               {sent === "sending" ? "Sending" : "Send to the Librarian"}
             </button>
@@ -198,59 +198,58 @@ export default function PriorityGame() {
   }
 
   return (
-    <div className="mx-auto flex min-h-[100dvh] w-full max-w-2xl flex-col px-4">
-      <div className="pt-8">
-        <div className="mb-3 flex items-baseline justify-between text-xs text-cream/40">
-          <span>
-            {at + 1} of {cards.length}
-          </span>
-          <span>{kb(card.bytes)}</span>
-        </div>
+    <div className="mx-auto w-full max-w-3xl px-4 pb-10 pt-6 sm:pt-10">
+      <div className="mb-5 flex items-center gap-4">
+        <span className="shrink-0 text-sm text-cream/45">
+          {at + 1} of {cards.length}
+        </span>
         <Bar done={at} total={cards.length} />
+        <span className="shrink-0 text-sm text-cream/45">{kb(card.bytes)}</span>
       </div>
 
-      <div className="flex flex-1 flex-col justify-center py-10">
-        <p className="text-xs tracking-wide text-gold/80">
+      <div className="rounded-3xl border border-cream/10 bg-cream/[0.04] p-6 sm:p-9">
+        <p className="text-[13px] text-gold">
           {ENFORCEMENT_LABEL[card.enforcement] ?? card.enforcement}
         </p>
-        <h1 className="mt-3 font-display text-3xl leading-tight text-cream sm:text-4xl">
+        <h1 className="mt-3 font-display text-[28px] leading-tight text-cream sm:text-4xl">
           {card.title}
         </h1>
-        <p className="mt-5 text-[15px] leading-relaxed text-cream/90 sm:text-base">{card.rule}</p>
+        <p className="mt-5 text-[15px] leading-relaxed text-cream/90 sm:text-[17px]">{card.rule}</p>
         {card.why && (
-          <p className="mt-4 border-l border-cream/15 pl-4 text-sm leading-relaxed text-sage">
+          <p className="mt-5 rounded-2xl bg-ink/50 p-4 text-sm leading-relaxed text-sage sm:text-[15px]">
             {card.why}
           </p>
         )}
       </div>
 
-      <div className="sticky bottom-0 bg-ink pb-8 pt-3">
-        <div className="grid grid-cols-10 gap-1">
-          {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-            <button
-              key={n}
-              onClick={() => score(n)}
-              className={`rounded py-3 font-display text-base transition ${
-                scores[card.slug] === n
-                  ? "bg-gold text-ink"
-                  : "bg-cream/8 text-cream/80 hover:bg-cream/15"
-              }`}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
-        <div className="mt-3 flex items-center justify-between text-xs text-cream/35">
-          <span>Cut it</span>
-          {at > 0 ? (
-            <button onClick={() => setAt((i) => i - 1)} className="hover:text-cream">
-              Back
-            </button>
-          ) : (
-            <span />
-          )}
-          <span>Keep it sharp</span>
-        </div>
+      <div className="mt-7 grid grid-cols-5 gap-2.5 sm:grid-cols-10 sm:gap-3">
+        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+          <button
+            key={n}
+            onClick={() => score(n)}
+            aria-label={`Score ${n}`}
+            className={`aspect-square rounded-full font-display text-xl transition active:scale-95 sm:text-2xl ${
+              scores[card.slug] === n
+                ? "bg-gold text-ink"
+                : "bg-cream/10 text-cream hover:bg-sage hover:text-ink"
+            }`}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-4 flex items-center justify-between text-sm">
+        <span className="text-cream/45">Cut it</span>
+        {at > 0 && (
+          <button
+            onClick={() => setAt((i) => i - 1)}
+            className="rounded-full border border-cream/20 px-4 py-1.5 text-cream/70 transition hover:border-cream/50 hover:text-cream"
+          >
+            Back
+          </button>
+        )}
+        <span className="text-cream/45">Keep it sharp</span>
       </div>
     </div>
   );
