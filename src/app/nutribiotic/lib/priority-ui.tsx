@@ -132,13 +132,9 @@ function ActionLink({ result }: { result: PriorityResult }) {
 export function PriorityPanel({
   book,
   limit = 8,
-  surface,
 }: {
   book: PriorityBook;
   limit?: number;
-  /** Which page is rendering it, named in the footer so the coverage line
-   *  cannot be mistaken for a claim about a different screen's data. */
-  surface: "map" | "sdr" | "outbound";
 }) {
   const rows = book.ranked.slice(0, limit);
   if (rows.length === 0) return null;
@@ -184,17 +180,6 @@ export function PriorityPanel({
           </li>
         ))}
       </ul>
-
-      {/* What the ranking could not see. Stated on the surface rather than
-          left for someone to discover, because a rep who does not know the
-          cadence is unknown on 92% of the book will read a low viability
-          score as a judgement instead of as a gap. */}
-      <p className="mt-2 text-[11.5px] leading-snug text-[#8A928C]">
-        Scored from real order dollars, HQ potential, open-draft urgency, last touch and reorder cadence.{" "}
-        {coverage.withRevenue} accounts carry a revenue figure, {coverage.withCadence} carry a measured reorder cycle,{" "}
-        {coverage.withUrgency} have a graded open draft. Anything missing lowers confidence rather than scoring zero.
-        {surface === "outbound" ? " Draft urgency still leads this queue; priority only breaks ties inside a tier." : ""}
-      </p>
     </section>
   );
 }

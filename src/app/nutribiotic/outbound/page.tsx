@@ -31,14 +31,16 @@ import {
   listDrafts,
   listMarketingFiles,
   listOwnerAccounts,
+  listOwnerContactNames,
   listOwnerContactPhones,
   isConfigured,
 } from "../lib/dal";
+import { AccountLink } from "../lib/modal";
 import { ManualEmailComposer } from "../lib/manual-email-ui";
 import { ChannelLabel, DraftActions, QuickReach, type ChannelKind } from "../lib/outbound-ui";
 import { OutreachComposer } from "../lib/outreach-ui";
 import { PriorityChip, PriorityPanel } from "../lib/priority-ui";
-import { Card, Empty, PageHead, daysAgo } from "../lib/ui";
+import { Card, Empty, Ico, PageHead, daysAgo } from "../lib/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -58,10 +60,11 @@ export default async function Outbound({
   // buttons below. Null when the id is not in Juan's book, which is a real
   // scope answer and not an error state.
   const quickReach = accountFilter ? await getQuickReach(accountFilter) : null;
-  const [res, accountsResult, contacts, files, priority] = await Promise.all([
+  const [res, accountsResult, contacts, contactNames, files, priority] = await Promise.all([
     listDrafts(),
     listOwnerAccounts(),
     listOwnerContactPhones(),
+    listOwnerContactNames(),
     listMarketingFiles(),
     getPriorityBook(),
   ]);
@@ -90,23 +93,26 @@ export default async function Outbound({
 
   const filteredAccount = accountFilter ? accounts.find((a) => a.id === accountFilter) : null;
   /*
-   * URGENCY STILL LEADS. listDrafts() already returned the queue in urgency
-   * order (2 · 1 · 0 · ungraded last, created_at desc inside a tier, migration
-   * 0035). Account priority is layered UNDER that, never over it: what the
-   * conversation said is a fact about this specific thread and outranks a
-   * ranking computed from the account's history. So this only decides which of
-   * two drafts in the SAME urgency tier Juan opens first, which is exactly the
-   * tie the created_at fallback was resolving arbitrarily before. A draft on an
-   * unscored account keeps its place rather than sinking, same rule as an
-   * ungraded urgency: not scored is not zero.
+   * FIT NUMBER LEADS (Juan, 2026-09-16, replacing the prior urgency-first
+   * order below). A draft he pulls to the top of its account's fit score has
+   * to actually render at the top of this list, not sit under every
+   * "needs a reply today"/"soon" tag from an unrelated thread. Urgency is
+   * only the tiebreaker inside the same fit score now, not the other way
+   * around. An unscored account (-1) sorts after every graded one, same as
+   * an ungraded urgency: not scored is not zero.
+   *
+   * (Previously: urgency led and fit only broke ties inside a tier, on the
+   * reasoning that what a conversation said outranks a history-derived
+   * score. Juan overrode that after a fit-100 draft for NHC/Letty stayed
+   * buried under ungraded-urgency older threads.)
    */
   const ordered = [...res.data].sort((a, b) => {
-    const ua = typeof a.urgency === "number" ? a.urgency : -1;
-    const ub = typeof b.urgency === "number" ? b.urgency : -1;
-    if (ua !== ub) return ub - ua;
     const pa = a.account_id ? (priority.byId.get(a.account_id)?.score ?? -1) : -1;
     const pb = b.account_id ? (priority.byId.get(b.account_id)?.score ?? -1) : -1;
-    return pb - pa;
+    if (pa !== pb) return pb - pa;
+    const ua = typeof a.urgency === "number" ? a.urgency : -1;
+    const ub = typeof b.urgency === "number" ? b.urgency : -1;
+    return ub - ua;
   });
   const drafts = accountFilter ? ordered.filter((d) => d.account_id === accountFilter) : ordered;
 
@@ -117,12 +123,20 @@ export default async function Outbound({
   for (const a of accounts) if (a.phone) phoneByAccount.set(a.id, a.phone);
   for (const c of contacts) if (c.phone && !phoneByAccount.has(c.account_id)) phoneByAccount.set(c.account_id, c.phone);
 
+  // account -> every named contact on file (phone or not), so a draft card
+  // shows who we actually know at that account, not just who we can text.
+  const contactNamesByAccount = new Map<string, string[]>();
+  for (const c of contactNames) {
+    const name = [c.first_name, c.last_name].filter(Boolean).join(" ").trim();
+    if (!name) continue;
+    const list = contactNamesByAccount.get(c.account_id) ?? [];
+    list.push(name);
+    contactNamesByAccount.set(c.account_id, list);
+  }
+
   return (
     <>
-      <PageHead
-        title="Outbound"
-        sub="Draft a WhatsApp or iMessage and open it pre-filled, or work through drafts waiting on you. Nothing on this screen sends anything."
-      />
+      <PageHead title="Outbound" />
 
       {/* Scoped view from SDR's "View in Outbound" button: one account, what's
           already queued for them, nothing else on the screen to scan past. */}
@@ -139,7 +153,7 @@ export default async function Outbound({
 
       {/* The same ranked list Map and SDR carry, so "what is worth my time" is
           answered wherever Juan already is instead of on a fourth screen. */}
-      {!accountFilter && <PriorityPanel book={priority} surface="outbound" limit={6} />}
+      {!accountFilter && <PriorityPanel book={priority} limit={6} />}
 
       {!accountFilter && (
         <div className="mb-6">
@@ -202,6 +216,20 @@ export default async function Outbound({
                       {d.to_name ? `${d.to_name} · ` : ""}
                       {d.to_email}
                     </span>
+                  )}
+                  {d.account_id && (contactNamesByAccount.get(d.account_id)?.length ?? 0) > 0 && (
+                    <span className="text-[12px] text-[#8A928C]" title="Contacts on file for this account">
+                      {contactNamesByAccount.get(d.account_id)!.join(", ")}
+                    </span>
+                  )}
+                  {d.account_id && (
+                    <AccountLink
+                      id={d.account_id}
+                      className="inline-flex items-center gap-1 text-[12px] font-medium text-[#5B6560] hover:text-[#14201B]"
+                    >
+                      <Ico name="external" size={12} />
+                      Account
+                    </AccountLink>
                   )}
                   <span className="text-[12px] text-[#8A928C]">{daysAgo(d.created_at)}</span>
                   {/* The reason the queue is in this order. Shown only for the
