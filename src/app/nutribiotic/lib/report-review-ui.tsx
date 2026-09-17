@@ -523,11 +523,6 @@ export function ReportReview({
               {pending ? "Saving…" : "Save and republish"}
             </button>
           </div>
-
-          <p className="mt-4 text-[11.5px] leading-relaxed text-[#8A928C]">
-            Nothing is emailed. This report lives here, and saving republishes the PDF in place, so
-            what you see is always the latest version. Edit it whenever it stops matching the day.
-          </p>
         </>
       )}
     </section>
@@ -747,11 +742,6 @@ export function WeeklyReportReview({
       )}
 
       {saved && <div className="mb-4"><SuccessNote title={saved} /></div>}
-
-      <p className="mt-4 text-[11.5px] leading-relaxed text-[#8A928C]">
-        Nothing is emailed. The week&rsquo;s rollup lives here and rebuilds from whatever the days below say,
-        so correcting a day corrects this too.
-      </p>
     </section>
   );
 }

@@ -4507,6 +4507,56 @@ export async function getAllTimeMetrics(): Promise<AllTimeMetrics | null> {
   }
 }
 
+/** The book, /nutribiotic/reports (Juan's ask, 2026-09-17). Four facts that
+ *  aren't in the daily/weekly ledger above because they're not "what
+ *  happened this period," they're "where the book stands right now":
+ *
+ *  - activeClients: accounts in his book with an order in the trailing 365
+ *    days (last_order_at), read directly rather than through nb_accounts.
+ *    lifecycle='active' -- that column uses each account's OWN reorder
+ *    cadence as its window (load_orders.py --rollup), which is the righter
+ *    call for routing but isn't "purchased last 12mo," which is what he asked
+ *    for here.
+ *  - totalProspects: nb_accounts.lifecycle='prospect' in his book -- no
+ *    order on file at all, load_orders.py's only other lifecycle a fresh
+ *    import can land on.
+ *  - ordersThroughMe / ordersThroughMeRevenue: nb_order_emails, the ledger
+ *    order_email_capture.py builds by scanning his own sends to
+ *    orders@nutribiotic.com (message_id-deduped) and pricing each line
+ *    against the real price list -- count and $ total, all time.
+ */
+export type BookMetrics = {
+  activeClients: number;
+  totalProspects: number;
+  ordersThroughMe: number;
+  ordersThroughMeRevenue: number;
+};
+
+export async function getBookMetrics(): Promise<BookMetrics | null> {
+  await verifySession();
+  if (!isConfigured()) return null;
+  try {
+    const cutoff = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const [active, prospects, orders] = await Promise.all([
+      raw<{ id: string }>(
+        `nb_accounts?select=id&hubspot_owner_id=eq.${JUAN_OWNER_ID}&last_order_at=gte.${cutoff}`,
+      ),
+      raw<{ id: string }>(
+        `nb_accounts?select=id&hubspot_owner_id=eq.${JUAN_OWNER_ID}&lifecycle=eq.prospect`,
+      ),
+      raw<{ total_revenue: number | null }>("nb_order_emails?select=total_revenue"),
+    ]);
+    return {
+      activeClients: active.length,
+      totalProspects: prospects.length,
+      ordersThroughMe: orders.length,
+      ordersThroughMeRevenue: orders.reduce((sum, o) => sum + (Number(o.total_revenue) || 0), 0),
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Today in Los Angeles, which is the day the report is about. Never the
  *  server's date: Vercel runs UTC, and after 17:00 LA those disagree. */
 export function reportDateLA(): string {

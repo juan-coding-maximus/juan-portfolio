@@ -9,6 +9,7 @@
 import { PageHead, Card, Ico } from "../lib/ui";
 import {
   getAllTimeMetrics,
+  getBookMetrics,
   getHomeEndpoint,
   getReportDraft,
   listPlaybookReports,
@@ -41,6 +42,23 @@ const METRIC_TILES: Array<{ key: NumericMetricKey; label: string; fmt?: (n: numb
   { key: "accountsClosed", label: "Accounts confirmed closed" },
 ];
 
+// The book, as it stands right now rather than what happened this period
+// (Juan's ask, 2026-09-17). See getBookMetrics for what each figure counts.
+const BOOK_TILES: Array<{
+  key: keyof NonNullable<Awaited<ReturnType<typeof getBookMetrics>>>;
+  label: string;
+  fmt?: (n: number) => string;
+}> = [
+  { key: "activeClients", label: "Active clients (12mo)" },
+  { key: "totalProspects", label: "Total book prospects" },
+  { key: "ordersThroughMe", label: "Orders placed through Juan" },
+  {
+    key: "ordersThroughMeRevenue",
+    label: "Revenue through Juan",
+    fmt: (n) => `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
+  },
+];
+
 export default async function ReportsIndex({
   searchParams,
 }: {
@@ -60,13 +78,14 @@ export default async function ReportsIndex({
   // Every date has one (2026-09-03); it used to be null on a Fri/Sat/Sun pick.
   const weekWindow = weekWindowFor(selectedDate);
 
-  const [reports, archive, draft, home, allTime, weeklyDraft, archivedDailyUrl, archivedWeeklyUrl] =
+  const [reports, archive, draft, home, allTime, bookMetrics, weeklyDraft, archivedDailyUrl, archivedWeeklyUrl] =
     await Promise.all([
       listPlaybookReports().catch(() => []),
       listPlaybookReportArchive().catch((): PlaybookReportArchive => ({ reports: [], truncated: {} })),
       getReportDraft(selectedDate, "daily").catch(() => null),
       getHomeEndpoint().catch(() => null),
       getAllTimeMetrics().catch(() => null),
+      getBookMetrics().catch(() => null),
       weekWindow ? getReportDraft(weekWindow.end, "weekly").catch(() => null) : Promise.resolve(null),
       // The published artifact for this day/week (2026-08-28, Juan:
       // "I need to be able to see what was sent, which you should refer to
@@ -83,10 +102,7 @@ export default async function ReportsIndex({
 
   return (
     <>
-      <PageHead
-        title="Reports"
-        sub="Tonight's report before it goes out, then the latest daily and weekly PDFs and every prior one."
-      />
+      <PageHead title="Reports" />
 
       {/* ALL-TIME DASHBOARD (migration 0048). Juan's ask 2026-08-28: cumulative
           totals above the individual reports, since a single daily report only
@@ -107,6 +123,22 @@ export default async function ReportsIndex({
               <Card key={t.key} className="p-3.5 text-center">
                 <div className="font-[family-name:var(--font-fraunces)] text-[22px] leading-none font-semibold tracking-tight tabular-nums">
                   {(t.fmt ?? String)(allTime[t.key])}
+                </div>
+                <div className="mt-1.5 text-[11px] leading-snug text-[#5B6560]">{t.label}</div>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {bookMetrics && (
+        <section className="mb-7">
+          <div className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">The book</div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {BOOK_TILES.map((t) => (
+              <Card key={t.key} className="p-3.5 text-center">
+                <div className="font-[family-name:var(--font-fraunces)] text-[22px] leading-none font-semibold tracking-tight tabular-nums">
+                  {(t.fmt ?? String)(bookMetrics[t.key])}
                 </div>
                 <div className="mt-1.5 text-[11px] leading-snug text-[#5B6560]">{t.label}</div>
               </Card>
@@ -279,17 +311,9 @@ export default async function ReportsIndex({
             </div>
           </details>
         ) : (
-          <p className="mt-3 text-[11.5px] text-[#8A928C]">
-            Archive: empty so far, every report before 2026-08-23 was pruned by the old
-            delete-on-publish behavior. Starts filling in from the next daily/weekly run onward.
-          </p>
+          <p className="mt-3 text-[11.5px] text-[#8A928C]">No archived reports yet.</p>
         )}
       </section>
-
-      <p className="mt-2 max-w-[70ch] text-[12.5px] leading-relaxed text-[#8A928C]">
-        Read straight from Supabase storage. Every run archives rather than replaces: the cards
-        above show the latest of each kind, the Archive disclosure holds the rest.
-      </p>
     </>
   );
 }
