@@ -2173,10 +2173,19 @@ export type ImportBatch = {
 async function raw<T>(path: string): Promise<T[]> {
   await verifyReadAccess();
   if (!isConfigured()) return [];
-  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
-    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Accept: "application/json" },
-    cache: "no-store",
-  });
+  // Same fetchWithTimeout as query() above, one retry: this is a read, and
+  // getPriorityBook() (the Top Opportunities / Beauty / Small Grocery /
+  // Sports Nutrition rail) calls it straight from a Server Component with no
+  // try/catch around it, so an uncaught throw here was the same class of bug
+  // as the account panel's crash, just for the whole SDR page instead of one
+  // row (Juan asked, 2026-09-16, whether these lists refresh; they do, live,
+  // on every page load -- this just stops a bad connection from turning that
+  // live read into a blank page).
+  const res = await fetchWithTimeout(
+    `${SB_URL}/rest/v1/${path}`,
+    { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Accept: "application/json" }, cache: "no-store" },
+    { retries: 1 },
+  );
   if (!res.ok) {
     throw new Error(`Supabase ${path} -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
   }
