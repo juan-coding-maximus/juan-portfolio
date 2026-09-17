@@ -30,6 +30,7 @@ import {
   type PurchaseOrder,
 } from "./dal";
 import { searchPlaces, type PlaceCandidate } from "./places";
+import { exactDate } from "./ui";
 
 const client = process.env.ANTHROPIC_API_KEY ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) : null;
 
@@ -144,7 +145,11 @@ function buildPurchaseDigest(orders: PurchaseOrder[], lines: PurchaseLine[]): st
   const productText = topProducts.map(([name, v]) => `${name} ($${v.revenue.toFixed(0)} lifetime)`).join("; ");
   return (
     `Purchase history: ${orders.length} orders on file, $${totalRevenue.toFixed(0)} lifetime revenue, ` +
-    `last order ${lastOrder.ordered_at.slice(0, 10)}. Products bought: ${productText || "none itemized"}.`
+    // Human dates in, human dates out (Juan, 2026-09-16): the model echoes
+    // whatever date shape it's shown straight into current_state/future_state
+    // ("...most recently on 2026-02-16."), so a raw ISO string here is a raw
+    // ISO string baked into the stored summary forever.
+    `last order ${exactDate(lastOrder.ordered_at.slice(0, 10))}. Products bought: ${productText || "none itemized"}.`
   );
 }
 
@@ -158,7 +163,7 @@ function buildMeetingDigest(activities: Activity[]): string {
   if (real.length === 0) return "Meetings and calls on file: none yet.";
   const lines = real
     .slice(0, 8)
-    .map((act) => `${act.kind} ${act.at.slice(0, 10)}: ${act.detail ?? "no detail logged"}`);
+    .map((act) => `${act.kind} ${exactDate(act.at.slice(0, 10))}: ${act.detail ?? "no detail logged"}`);
   return `Meetings and calls on file, HIGHEST QUALITY SOURCE (real, said by the account, not a scrape):\n${lines.join("\n")}`;
 }
 
@@ -236,7 +241,9 @@ export async function enrichAccountQuickly(accountId: string): Promise<QuickEnri
         "website, Places, or meeting detail), never a generic sales line. current_state should read as a real angle a rep can " +
         "open with, naming what kind of business this actually is and where it sits (e.g. 'a nutrition specialty shop inside a " +
         "gym' or 'a pharmacy that already carries the vitamin line but not GSE'), not a bare fact restated. If the evidence does " +
-        "not support a specific, honest claim, return null for that field rather than write something plausible-sounding.",
+        "not support a specific, honest claim, return null for that field rather than write something plausible-sounding. " +
+        "If you name a date in any field, write it the way a rep would say it out loud (e.g. 'Feb 16, 2026'), never as " +
+        "digits-and-dashes (never '2026-02-16').",
       messages: [{ role: "user", content: evidence }],
       tools: [ENRICH_TOOL],
       tool_choice: { type: "tool", name: "quick_enrich_account" },

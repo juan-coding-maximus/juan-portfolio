@@ -1128,14 +1128,18 @@ function AccountPanel({
             {!item.account_id && (
               <div className="mt-0.5 text-[12px] text-[#8A928C]">New prospect, not yet an account</div>
             )}
-            {panel && (panel.channel !== "unknown" || panel.currentState || panel.quirks) && (
+            {/* Channel only, no currentState here (2026-09-16, Juan: two
+                summaries on screen, keep the longer one): the boxed summary
+                a few lines down already opens with panel.currentState in
+                full, so repeating it here duplicated the exact same
+                sentence twice above the fold. Quirks still fills the gap
+                when there is no channel and no summary yet to show. */}
+            {panel && (panel.channel !== "unknown" || (!panel.currentState && panel.quirks)) && (
               <div className="mt-0.5 text-[12.5px] text-[#5B6560]">
                 {panel.channel !== "unknown" ? panel.channel.replace(/_/g, " ") : ""}
-                {panel.currentState
-                  ? `${panel.channel !== "unknown" ? " · " : ""}${panel.currentState}`
-                  : panel.quirks
-                    ? `${panel.channel !== "unknown" ? " · " : ""}${panel.quirks}`
-                    : ""}
+                {!panel.currentState && panel.quirks
+                  ? `${panel.channel !== "unknown" ? " · " : ""}${panel.quirks}`
+                  : ""}
               </div>
             )}
           </div>
