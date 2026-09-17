@@ -144,15 +144,22 @@ function owaQuery(params: Record<string, string>): string {
     .join("&");
 }
 
-export function owaComposeLink(toEmail: string, subject: string | null, body: string): { href: string; bodyOmitted: boolean } {
+export function owaComposeLink(
+  toEmail: string,
+  subject: string | null,
+  body: string,
+  bccEmail?: string | null,
+): { href: string; bodyOmitted: boolean } {
   const base = "https://outlook.cloud.microsoft/mail/deeplink/compose?";
   const withBodyParams: Record<string, string> = { to: toEmail, body };
   if (subject) withBodyParams.subject = subject;
+  if (bccEmail) withBodyParams.bcc = bccEmail;
   const full = base + owaQuery(withBodyParams);
   if (full.length <= COMPOSE_URL_LIMIT) return { href: full, bodyOmitted: false };
 
   const withoutBodyParams: Record<string, string> = { to: toEmail };
   if (subject) withoutBodyParams.subject = subject;
+  if (bccEmail) withoutBodyParams.bcc = bccEmail;
   return { href: base + owaQuery(withoutBodyParams), bodyOmitted: true };
 }
 
@@ -163,6 +170,11 @@ export type DraftLite = {
   subject: string | null;
   body_md: string;
   to_email: string | null;
+  /** Baked into the compose deep-link's bcc param (migration 0076). Order
+   *  drafts set this to Juan's Gmail so order_email_capture.py sees a copy
+   *  the moment he sends from Outlook -- Outlook itself hands nothing back
+   *  to this OS on its own. Null for every other draft kind. */
+  bcc_email?: string | null;
 };
 
 export type ChannelKind = "email" | "whatsapp" | "imessage";
@@ -236,7 +248,7 @@ export function DraftActions({
   const [error, setError] = useState<string | null>(null);
   const waPhone = toWhatsAppPhone(phone);
   const finalBody = draft.body_md + attachmentNote(attached);
-  const outlook = draft.to_email ? owaComposeLink(draft.to_email, draft.subject, finalBody) : null;
+  const outlook = draft.to_email ? owaComposeLink(draft.to_email, draft.subject, finalBody, draft.bcc_email) : null;
   const hasPath = Boolean(draft.to_email || waPhone);
 
   async function decide(status: "sent" | "dismissed") {

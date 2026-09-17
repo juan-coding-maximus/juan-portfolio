@@ -1050,6 +1050,10 @@ export type Draft = {
   body_md: string;
   to_email: string | null;
   to_name: string | null;
+  /** Compose deep-link's bcc param (migration 0076) -- order drafts carry
+   *  Juan's Gmail so order_email_capture.py sees a copy once he sends from
+   *  Outlook. Null on every other draft kind. */
+  bcc_email: string | null;
   play_key: string | null;
   status: string;
   created_at: string;
