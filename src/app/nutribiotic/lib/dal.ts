@@ -1354,10 +1354,11 @@ export async function attachTouchpointPhoto(
   const name = `${touchpointId}_${Date.now().toString(36)}${ext}`;
   const uploaded = await uploadFile(photo.bytes, photo.mimeType, day.id, name);
 
-  const res = await fetch(`${SB_URL}/rest/v1/nb_touchpoints?select=attachments&id=eq.${touchpointId}&limit=1`, {
-    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Accept: "application/json" },
-    cache: "no-store",
-  });
+  const res = await fetchWithTimeout(
+    `${SB_URL}/rest/v1/nb_touchpoints?select=attachments&id=eq.${touchpointId}&limit=1`,
+    { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Accept: "application/json" }, cache: "no-store" },
+    { retries: 1 },
+  );
   if (!res.ok) {
     throw new Error(`Supabase nb_touchpoints -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
   }
@@ -1861,7 +1862,11 @@ export async function claimEmailMessage(input: {
     throw new Error("Cannot write to nb_email_poll_log: no data source configured.");
   }
 
-  const res = await fetch(`${SB_URL}/rest/v1/nb_email_poll_log`, {
+  // No retry: this POST's whole point is "did THIS attempt win the unique
+  // claim on message_id" (a 409 means someone else, or an earlier attempt of
+  // ours, already holds it). Retrying could hit our own just-lost-response
+  // success as a 409 and wrongly report the claim as failed.
+  const res = await fetchWithTimeout(`${SB_URL}/rest/v1/nb_email_poll_log`, {
     method: "POST",
     headers: {
       apikey: SB_KEY,
@@ -2079,7 +2084,10 @@ export async function uploadVisitAudio(bytes: ArrayBuffer, contentType: string, 
     .toString(36)
     .slice(2, 6)}.${ext}`;
 
-  const res = await fetch(`${SB_URL}/storage/v1/object/${VISIT_AUDIO_BUCKET}/${path}`, {
+  // No retry: a re-POST to this same generated path, if the first attempt's
+  // bytes actually landed and only the response was lost, hits Storage's own
+  // "already exists" rather than a clean upload.
+  const res = await fetchWithTimeout(`${SB_URL}/storage/v1/object/${VISIT_AUDIO_BUCKET}/${path}`, {
     method: "POST",
     headers: {
       apikey: SB_KEY,
@@ -2113,10 +2121,11 @@ export async function insertVisitRecording(input: {
 export async function getVisitRecording(id: string): Promise<VisitRecording | null> {
   await verifySession();
   if (!isConfigured()) return null;
-  const res = await fetch(`${SB_URL}/rest/v1/nb_visit_recordings?select=*&id=eq.${id}&limit=1`, {
-    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Accept: "application/json" },
-    cache: "no-store",
-  });
+  const res = await fetchWithTimeout(
+    `${SB_URL}/rest/v1/nb_visit_recordings?select=*&id=eq.${id}&limit=1`,
+    { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Accept: "application/json" }, cache: "no-store" },
+    { retries: 1 },
+  );
   if (!res.ok) {
     throw new Error(`Supabase nb_visit_recordings -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
   }
@@ -3290,16 +3299,21 @@ export async function setRouteMileageDay(day: string, patch: Partial<RouteMileag
   if (hasAnyKey) next[day] = merged;
   else delete next[day];
 
-  const res = await fetch(`${SB_URL}/rest/v1/nb_ui_prefs?id=eq.1`, {
-    method: "PATCH",
-    headers: {
-      apikey: SB_KEY,
-      Authorization: `Bearer ${SB_KEY}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
+  // Idempotent: same row id, same computed body either way it lands.
+  const res = await fetchWithTimeout(
+    `${SB_URL}/rest/v1/nb_ui_prefs?id=eq.1`,
+    {
+      method: "PATCH",
+      headers: {
+        apikey: SB_KEY,
+        Authorization: `Bearer ${SB_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({ route_mileage: next, updated_at: new Date().toISOString() }),
     },
-    body: JSON.stringify({ route_mileage: next, updated_at: new Date().toISOString() }),
-  });
+    { retries: 1 },
+  );
   if (!res.ok) {
     throw new Error(`Supabase nb_ui_prefs PATCH -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
   }
@@ -3352,16 +3366,21 @@ export async function setLastLocation(lat: number, lng: number): Promise<void> {
   }
 
   const at = new Date().toISOString();
-  const res = await fetch(`${SB_URL}/rest/v1/nb_ui_prefs?id=eq.1`, {
-    method: "PATCH",
-    headers: {
-      apikey: SB_KEY,
-      Authorization: `Bearer ${SB_KEY}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
+  // Idempotent: same row id, same fix either way it lands.
+  const res = await fetchWithTimeout(
+    `${SB_URL}/rest/v1/nb_ui_prefs?id=eq.1`,
+    {
+      method: "PATCH",
+      headers: {
+        apikey: SB_KEY,
+        Authorization: `Bearer ${SB_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({ last_location: { lat, lng, at }, updated_at: at }),
     },
-    body: JSON.stringify({ last_location: { lat, lng, at }, updated_at: at }),
-  });
+    { retries: 1 },
+  );
   if (!res.ok) {
     throw new Error(`Supabase nb_ui_prefs PATCH -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
   }
@@ -3394,16 +3413,21 @@ export async function setLastRouteOdo(value: string): Promise<void> {
     throw new Error("Unauthorized.");
   }
   if (!isConfigured()) throw new Error("Cannot write odometer: no data source configured.");
-  const res = await fetch(`${SB_URL}/rest/v1/nb_ui_prefs?id=eq.1`, {
-    method: "PATCH",
-    headers: {
-      apikey: SB_KEY,
-      Authorization: `Bearer ${SB_KEY}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
+  // Idempotent: same row id, same reading either way it lands.
+  const res = await fetchWithTimeout(
+    `${SB_URL}/rest/v1/nb_ui_prefs?id=eq.1`,
+    {
+      method: "PATCH",
+      headers: {
+        apikey: SB_KEY,
+        Authorization: `Bearer ${SB_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({ last_route_odo: { value, at: new Date().toISOString() }, updated_at: new Date().toISOString() }),
     },
-    body: JSON.stringify({ last_route_odo: { value, at: new Date().toISOString() }, updated_at: new Date().toISOString() }),
-  });
+    { retries: 1 },
+  );
   if (!res.ok) {
     throw new Error(`Supabase nb_ui_prefs PATCH -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
   }
@@ -3803,12 +3827,13 @@ export const readConfig = cache(async <T>(key: string): Promise<T | null> => {
   if (!isConfigured()) return null;
 
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `${SB_URL}/rest/v1/nb_config?select=value&key=eq.${encodeURIComponent(key)}&limit=1`,
       {
         headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Accept: "application/json" },
         cache: "no-store",
       },
+      { retries: 1 },
     );
     if (!res.ok) return null;
     const rows = (await res.json()) as Array<{ value: T }>;
@@ -3869,7 +3894,11 @@ function receipt(obj: unknown): Record<string, unknown> {
 export async function logHubspotCall(row: HubspotLogRow): Promise<void> {
   try {
     if (!isConfigured()) return;
-    await fetch(`${SB_URL}/rest/v1/nb_hubspot_sync_log`, {
+    // No retry: a log append has no unique key to dedupe on, so a re-send
+    // after a lost response would double the row rather than heal anything.
+    // The timeout alone still keeps a hung request from stalling the caller
+    // past the "never throws" contract above.
+    await fetchWithTimeout(`${SB_URL}/rest/v1/nb_hubspot_sync_log`, {
       method: "POST",
       headers: {
         apikey: SB_KEY,
@@ -3948,16 +3977,21 @@ function reportLabel(kind: "daily" | "weekly", name: string): string {
  *  dates (ISO year-month-day). Not exported: both functions below build on
  *  this one list call rather than each hitting Storage separately. */
 async function listReportObjectsByKind(): Promise<Record<"daily" | "weekly", string[]>> {
-  const listRes = await fetch(`${SB_URL}/storage/v1/object/list/${REPORTS_BUCKET}`, {
-    method: "POST",
-    headers: {
-      apikey: SB_KEY,
-      Authorization: `Bearer ${SB_KEY}`,
-      "Content-Type": "application/json",
+  // POST verb, but a read: listing a bucket has no side effect, safe to retry.
+  const listRes = await fetchWithTimeout(
+    `${SB_URL}/storage/v1/object/list/${REPORTS_BUCKET}`,
+    {
+      method: "POST",
+      headers: {
+        apikey: SB_KEY,
+        Authorization: `Bearer ${SB_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prefix: "", limit: 100, sortBy: { column: "name", order: "desc" } }),
+      cache: "no-store",
     },
-    body: JSON.stringify({ prefix: "", limit: 100, sortBy: { column: "name", order: "desc" } }),
-    cache: "no-store",
-  });
+    { retries: 1 },
+  );
   if (!listRes.ok) return { daily: [], weekly: [] };
   const objects = (await listRes.json()) as Array<{ name: string }>;
   return {
@@ -3970,7 +4004,9 @@ async function signReportNames(names: string[]): Promise<PlaybookReport[]> {
   const signed = await Promise.all(
     names.map(async (name) => {
       const kind = name.startsWith("daily-") ? ("daily" as const) : ("weekly" as const);
-      const signRes = await fetch(
+      // POST verb, but minting a signed URL has no persisted side effect
+      // either, safe to retry.
+      const signRes = await fetchWithTimeout(
         `${SB_URL}/storage/v1/object/sign/${REPORTS_BUCKET}/${encodeURIComponent(name)}`,
         {
           method: "POST",
@@ -3982,6 +4018,7 @@ async function signReportNames(names: string[]): Promise<PlaybookReport[]> {
           body: JSON.stringify({ expiresIn: 300 }),
           cache: "no-store",
         },
+        { retries: 1 },
       );
       if (!signRes.ok) return null;
       const { signedURL } = (await signRes.json()) as { signedURL: string };
@@ -4061,18 +4098,24 @@ export type MarketingFile = {
 };
 
 async function listMarketingFolder(folder: "marketing" | "field" | "fact_cards"): Promise<MarketingFile[]> {
-  const listRes = await fetch(`${SB_URL}/storage/v1/object/list/${MARKETING_BUCKET}`, {
-    method: "POST",
-    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ prefix: `${folder}/`, limit: 200, sortBy: { column: "name", order: "asc" } }),
-    cache: "no-store",
-  });
+  // Both calls below are POST verbs but reads/generates, no persisted side
+  // effect either way, safe to retry once on a dropped connection.
+  const listRes = await fetchWithTimeout(
+    `${SB_URL}/storage/v1/object/list/${MARKETING_BUCKET}`,
+    {
+      method: "POST",
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ prefix: `${folder}/`, limit: 200, sortBy: { column: "name", order: "asc" } }),
+      cache: "no-store",
+    },
+    { retries: 1 },
+  );
   if (!listRes.ok) return [];
   const objects = (await listRes.json()) as Array<{ name: string }>;
 
   const files: MarketingFile[] = [];
   for (const obj of objects) {
-    const signRes = await fetch(
+    const signRes = await fetchWithTimeout(
       // `folder` is a fixed, ASCII-safe path segment; only the filename gets
       // encoded. Encoding the two together (encodeURIComponent on the whole
       // "folder/name" string) turns the internal "/" into "%2F", which gets
@@ -4086,6 +4129,7 @@ async function listMarketingFolder(folder: "marketing" | "field" | "fact_cards")
         body: JSON.stringify({ expiresIn: 300 }),
         cache: "no-store",
       },
+      { retries: 1 },
     );
     if (!signRes.ok) continue;
     const { signedURL } = (await signRes.json()) as { signedURL: string };
@@ -4145,17 +4189,21 @@ export async function findMarketingFile(hint: string): Promise<{ label: string; 
   await verifySession();
   if (!isConfigured()) return null;
   try {
-    const listRes = await fetch(`${SB_URL}/storage/v1/object/list/${MARKETING_BUCKET}`, {
-      method: "POST",
-      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ prefix: "marketing/", limit: 200, sortBy: { column: "name", order: "asc" } }),
-      cache: "no-store",
-    });
+    const listRes = await fetchWithTimeout(
+      `${SB_URL}/storage/v1/object/list/${MARKETING_BUCKET}`,
+      {
+        method: "POST",
+        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ prefix: "marketing/", limit: 200, sortBy: { column: "name", order: "asc" } }),
+        cache: "no-store",
+      },
+      { retries: 1 },
+    );
     if (!listRes.ok) return null;
     const objects = (await listRes.json()) as Array<{ name: string }>;
     const match = objects.find((o) => o.name.toLowerCase().includes(hint.toLowerCase()));
     if (!match) return null;
-    const signRes = await fetch(
+    const signRes = await fetchWithTimeout(
       `${SB_URL}/storage/v1/object/sign/${MARKETING_BUCKET}/marketing/${encodeURIComponent(match.name)}`,
       {
         method: "POST",
@@ -4163,6 +4211,7 @@ export async function findMarketingFile(hint: string): Promise<{ label: string; 
         body: JSON.stringify({ expiresIn: 300 }),
         cache: "no-store",
       },
+      { retries: 1 },
     );
     if (!signRes.ok) return null;
     const { signedURL } = (await signRes.json()) as { signedURL: string };
@@ -4197,6 +4246,31 @@ export async function listOwnerContactPhones(): Promise<OutreachContact[]> {
   const ids = accounts.map((a) => a.id).join(",");
   return raw<OutreachContact>(
     `nb_contacts?select=id,account_id,first_name,last_name,title,phone&account_id=in.(${ids})&phone=not.is.null`,
+  );
+}
+
+export type OwnerContactName = {
+  id: string;
+  account_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  title: string | null;
+};
+
+/** Every named contact across Juan's whole book, phone or not, for the
+ *  Outbound queue's "who's on file here" strip next to each draft. Unlike
+ *  listOwnerContactPhones (built for wa.me links), this one only prints
+ *  names, so it isn't filtered to a phone on record. */
+export async function listOwnerContactNames(): Promise<OwnerContactName[]> {
+  await verifySession();
+  if (!isConfigured()) return [];
+  const accounts = await raw<{ id: string }>(
+    `nb_accounts?select=id&hubspot_owner_id=eq.${JUAN_OWNER_ID}&closed_at=is.null`,
+  );
+  if (!accounts.length) return [];
+  const ids = accounts.map((a) => a.id).join(",");
+  return raw<OwnerContactName>(
+    `nb_contacts?select=id,account_id,first_name,last_name,title&account_id=in.(${ids})&order=is_decision_maker.desc,last_name.asc`,
   );
 }
 
@@ -4469,7 +4543,7 @@ export async function saveReportDraftPayload(dateISO: string, payload: ReportPay
  *  real artifact, map and all, rather than a second rendering of the data. */
 export async function signReportPreview(name: string): Promise<string | null> {
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `${SB_URL}/storage/v1/object/sign/${REPORTS_BUCKET}/${encodeURIComponent(name)}`,
       {
         method: "POST",
@@ -4477,6 +4551,7 @@ export async function signReportPreview(name: string): Promise<string | null> {
         body: JSON.stringify({ expiresIn: 900 }),
         cache: "no-store",
       },
+      { retries: 1 },
     );
     if (!res.ok) return null;
     const { signedURL } = (await res.json()) as { signedURL: string };
