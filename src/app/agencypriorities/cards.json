@@ -1,0 +1,355 @@
+{
+  "cards": [
+    {
+      "slug": "feedback_desktop-artifact-shortcut",
+      "title": "Desktop artifact shortcut standard",
+      "enforcement": "review",
+      "type": "feedback",
+      "rule": "Juan's standard way of keeping an always-current link to a published artifact is a `.webloc` file on his Desktop (matching his existing pattern: Hunter.webloc, Nutri email.webloc, etc.), not a downloaded PDF, since a `.webloc` stays live while a PDF freezes at publish time. 2026-08-31, on the Field OS Roadmap artifact, he asked for the full standard treatment:",
+      "why": "Why: a plain `.webloc` with its default icon and a `.webloc`-suffixed name reads as a leftover technical artifact sitting on the Desktop rather than a considered shortcut; matching his existing icon-and-hidden-extension convention makes it fit the same shelf as his other app shortcuts.",
+      "session_note": "ABSOLUTE: every artifact gets a Desktop .webloc, desktop_shortcut.py",
+      "bytes": 7211
+    },
+    {
+      "slug": "feedback_artifacts-in-my-style",
+      "title": "Artifacts in my style",
+      "enforcement": "review",
+      "type": "feedback",
+      "rule": "Juan on the Osmotic Ventures identity artifact, 2026-09-03: \"I love it.\" Then the standing preferences for every artifact \"in my style\" from now on:",
+      "why": "Why: the artifact is his operating surface for the project, not a report; it has to launch work and show exactly where he is needed. He wants them to keep getting better on their own, at scale, rather than being rewritten by hand one at a time. How to apply: default for every plan/report artifact; no need to ask. Related: [[reference_agency-visual]], [[pm-department]], [[feedback_desktop-artifact-shortcut]], [[feedback_explicit-names-not-evocative]].",
+      "session_note": "2 goals + sourced facts + agency:// link sheet; OS tokens, Desktop shortcut",
+      "bytes": 4276
+    },
+    {
+      "slug": "design",
+      "title": "Design/UI skill stack",
+      "enforcement": "context",
+      "type": "reference",
+      "rule": "Standing rule (Juan, 2026-06-20): for anything that needs UI and is not trivial, reach for the design skills below BEFORE hand-rolling markup. Non-trivial = new UI, redesign, a dashboard, a landing page, a real component, motion/animation, or \"make this look good.\" Trivial (a copy tweak, one CSS value, a tiny fix) does not need them. Juan curates these from Instagram reels he DMs into @youraurafragrance; this stack is meant to be the default toolkit so agency UI stops looking AI-generated.",
+      "why": "",
+      "session_note": "STANDING RULE: use design skills before hand-rolling any non-trivial UI",
+      "bytes": 3020
+    },
+    {
+      "slug": "feedback_no-monospace-eyebrows",
+      "title": "No monospace eyebrows",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "On the Field OS Roadmap artifact, 2026-08-31: I'd set every small uppercase label (section eyebrows, phase kickers, table headers, YOU/ME/BOTH tag pills, the byline row) in JetBrains Mono. Juan's reaction: \"I don't like that eyebrow design, looks very computer generated and code like and mathematic like zeros and ones.\" He offered three acceptable replacements: a sans face, a tall/skinny display serif, or the same serif already used for titles. I replaced every instance with the title serif (Fraunces, set in italic) for true eyebrows/section labels, and with the body sans (Inter) for tags and the data table header, dropping the mono font entirely from that page.",
+      "why": "Why: a monospace uppercase label is a strong, specific AI-generated-dashboard tell, distinct from the general \"sans default, serif sparingly\" rule in [[feedback_official-docs-tone-typography]]. That rule is about which face carries body copy vs. titles; this is narrower. The eyebrow-density note is separate: even in the right typeface, leaning on eyebrow/kicker labels as a structural crutch is itself a generic-design tell.",
+      "session_note": "ABSOLUTE: monospace forbidden agency-wide; eyebrow/kicker labels sparingly",
+      "bytes": 2975
+    },
+    {
+      "slug": "feedback_do-it-yourself-dont-hand-back",
+      "title": "Do it yourself",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "Juan, 2026-09-13, mid the iMessage bridge setup: \"remember that my preference is that you do these things yourself. remember forever.\" Said right after he asked to \"open it on my screen\" and then clarified he meant the actual Settings screen he'd have to work in, not just the artifact.",
+      "why": "Why: he would rather I drive the mouse/keyboard through a native app's UI (via System Events, screenshots to verify state, System Events clicks with correct point-vs-pixel coordinates on Retina) than write him a numbered list and wait for him to click through it himself. A written plan is the fallback, not the first move, when the step is something an agent CAN physically do on this Mac (a Settings pane, a form, a toggle), as opposed to a true human-only wall (typing a password, entering a 2FA code that arrived on a device I can't read, an irreversible send/payment).",
+      "session_note": "ABSOLUTE: drive the app yourself; find a fix before reporting a wall",
+      "bytes": 2887
+    },
+    {
+      "slug": "feedback_cv-format",
+      "title": "CV format",
+      "enforcement": "review",
+      "type": "feedback",
+      "rule": "Remove the summary line: Delete \"Pharmaceutical & Clinical Sales \u00b7 Pharmacology Background \u00b7 Physician Territory\" completely. Do not replace it with anything.",
+      "why": "Why: This line was redundant with the full CV content and looked like a rejected headline. Better to go straight into substance.",
+      "session_note": "no tagline; summary 3-4 lines; every skill category gets bullets",
+      "bytes": 2765
+    },
+    {
+      "slug": "feedback_compounding-enrichment-effort",
+      "title": "Compounding enrichment effort",
+      "enforcement": "review",
+      "type": "feedback",
+      "rule": "Every lookup an agent does should compound, not just answer the one narrow question it was dispatched for. A Places call or web search run to settle one field (a channel, a closure, a category) routinely surfaces other real facts, a phone, a website, a street address, a decision-maker's name. Those get written the same turn, to every place they belong (the OS table AND HubSpot AND a new contact where a person was found), never discarded because they weren't the day's assignment.",
+      "why": "Why: Juan's own words, 2026-09-04, in response to the NutriBiotic channel-classification work: \"all of this entail and searching should always be compounding effort... the tool used should be logged, and all of the findings should go into their specific locations, where they matter most.\" A concrete miss prompted it: an enricher run reported writing provenance (`nb_accounts.enrichment_status`) but the ledger came back empty on spot-check, so the \"log the tool\" half is not optional narration, it is the thing that failed once already.",
+      "session_note": "route every incidental finding to OS + HubSpot, not only what was asked",
+      "bytes": 2742
+    },
+    {
+      "slug": "feedback_no-explanatory-ui-subtext",
+      "title": "No explanatory UI subtext",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "In a live app screen (not a document/deck/PDF), don't add a subtext line that explains what the user is already looking at. If a screen needs a caption to be understood, that's a sign the UI itself isn't clear enough, fix the UI, don't paper over it with prose.",
+      "why": "Why: Juan, on the NutriBiotic Outbound page (2026-09-16), asked to remove the page's intro line (\"Draft a WhatsApp or iMessage and open it pre-filled...\") and the \"Work This First\" panel's scoring-methodology footnote: \"I don't really like subtexts that explain what you're looking at because you're already looking at it. Just make it so obvious that you don't need text.\"",
+      "session_note": "ABSOLUTE: no caption explaining a screen or how to use it, reads as AI",
+      "bytes": 2706
+    },
+    {
+      "slug": "feedback_lead-with-action-bold-ask",
+      "title": "Lead with action, bold the ask",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "Juan, 2026-08-31 (nutribiotic session): \"you tell me waaay to much. lead with action in your responses. What do you need me to do in Bold text. remember as agency wide.\"",
+      "why": "Why: he is the gate and the reader of outcomes, not an audience for process (P6, concise comms). Explaining the journey to the fix, hiccups included, competes with the fix itself for his attention, and a resolved hiccup carries zero decision value for him.",
+      "session_note": "action/outcome first line, cut narration, **bold** the ask",
+      "bytes": 2693
+    },
+    {
+      "slug": "feedback_explicit-names-not-evocative",
+      "title": "Explicit names, not evocative",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "Every name Juan sees, an artifact title, a Desktop shortcut, a PDF, a report, a document heading, must say what the thing is, plainly enough that he knows what he is looking at without opening it or remembering the conversation that produced it.",
+      "why": "Why: a name is a wayfinding label, not a headline. These names sit in an artifact gallery beside dozens of others, on a Desktop beside app shortcuts, in a folder months later. An evocative title reads as clever in the moment it is written and as noise in every context it is actually used in. He should never have to open a thing to find out what it is. This is also the same instinct as [[feedback_lead-with-action-bold-ask]]: the useful content goes first, the framing comes after, if at all.",
+      "session_note": "ABSOLUTE: name a deliverable for what it IS, not an evocative title",
+      "bytes": 2515
+    },
+    {
+      "slug": "feedback_env-editing",
+      "title": "Secrets and .env are never Juan's",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "Standing order set 2026-08-18, agency-wide, no exceptions. Juan never wants to deal with `.env` files, secret rotation, or key management. Not \"prefers not to\": he said he does not care how important it is. Handing him one of these is a failure of the task, not a safe default.",
+      "why": "Why: it is the same rule as [[feedback_automate-housekeeping]] and [[feedback_minimize-juans-manual-work]] applied to credentials, and it is the part of the job he finds most alien. Related: [[feedback_never-screenshot-a-secret]] (still absolute: never render or print a secret value anywhere), [[reference_vercel-hobby-author-gate]].",
+      "session_note": "ABSOLUTE: agent rotates keys + edits .env end to end, silently",
+      "bytes": 2479
+    },
+    {
+      "slug": "feedback-jobhunt-filler-preapproved-answers",
+      "title": "feedback-jobhunt-filler-preapproved-answers",
+      "enforcement": "review",
+      "type": "feedback",
+      "rule": "The jobhunt Filler fills work authorization, EEO/demographics, and salary expectation from `jobhunt/memory/profile/application_answers.json` instead of stopping to ask each time. It still stops at: CAPTCHA, an EAD-expiration-date field specifically, SSN/government-ID, driver's-license attestations not covered by the answer file, and always the final Submit click.",
+      "why": "Why: Juan, 2026-07-09: \"Don't stop for sensitive information. You know it. I'll review before the final submit as per the gates.\" He wants the mid-fill friction gone; Gate 2 (his review before clicking Submit) is the actual check on these fields, not a per-application interrupt.",
+      "session_note": "",
+      "bytes": 2461
+    },
+    {
+      "slug": "feedback_bound-every-append",
+      "title": "Bound every append",
+      "enforcement": "review",
+      "type": "feedback",
+      "rule": "Every append needs its bound written in the same commit as the append. Not later, not \"we'll add retention when it matters\". By the time it matters it is an incident.",
+      "why": "Why: this has now bitten three times, in three different substrates. 1. Postgres, 2026-08-12. `nb_hubspot_sync_log` reached 615 MB of a 650 MB database. The header had always claimed responses were truncated; they never were. Fixed with trimmed receipts, but no retention job was added, so it kept growing at ~12,000 rows/day until 2026-09-03. 2. Network, 2026-09-02. The 60s sync worker re-read all 559 accounts twice a cycle. Nobody had bounded reads either, and the org was suspended at ~22 GB against a 5 GB egress cap. See [[nutribiotic-supabase-egress]]. 3. Disk, 2026-09-03. launchd `StandardOutPath` logs had never been truncated; `nutribiotic-assign-areas.log` was 5.5 MB of \"0 account(s) moved\". `bridges/rotate_logs.py` now trims nightly.",
+      "session_note": "STANDING RULE: anything that appends gets its bound written in the same change",
+      "bytes": 2432
+    },
+    {
+      "slug": "feedback_no-warning-box-styling",
+      "title": "No warning-box styling",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "Never use a rust-colored, icon-plus-colored-background \"warning sign\" box (an info-circle or triangle icon in a tinted rounded panel) to flag an open question, an unconfirmed fact, or a data gap in an artifact. Fold that content into plain paragraph text instead, with a bold lead phrase for emphasis if needed, no icon, no background tint, no border.",
+      "why": "Why: Flagged directly on the NutriBiotic Whale Hunting and NB Market Segmentation artifacts (2026-09-04): \"remove these warning signs and remember that i dont like this kind of thing in my designs.\" The pattern (classes named `.contact.open`, `.gapnote`, `.callout` in the shared artifact CSS) reads as alarming for information that is often just a routine open question, not an emergency. It also over-uses rust, which `resources/artifacts/STANDARD.md` itself reserves for \"the one cliff or warning,\" so a page with a dozen rust boxes has already diluted its own signal before a reader gets to the real cliff.",
+      "session_note": "no rust/warning alert boxes in artifacts; fold the content into prose",
+      "bytes": 2248
+    },
+    {
+      "slug": "feedback-new-prospect-data-to-os-immediately",
+      "title": "feedback-new-prospect-data-to-os-immediately",
+      "enforcement": "review",
+      "type": "feedback",
+      "rule": "The moment new factual info exists on a prospect (a phone number, address, confirmed business name from enrichment/lookup), it goes into the department's OS account data immediately, not just into a chat reply or a route label. Juan's words (2026-09-08): \"this is the standard when we start a new client, I want their data to go to the OS account data as soon as we have anything new.\"",
+      "why": "Why: he wants the OS to be the live, queryable record, not a report he has to manually transcribe from later. A prospect found on a cold-walk route stays a disposable label otherwise.",
+      "session_note": "",
+      "bytes": 2117
+    },
+    {
+      "slug": "feedback-fix-root-cause-not-a-note",
+      "title": "feedback-fix-root-cause-not-a-note",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "When a record is wrong (a mis-kinded activity, a bad field, a wrong classification), the fix is to correct the record itself, not bolt an explanatory note onto it and call it done. Juan's words (2026-09-08, on a Call vs Meeting mistake in NutriBiotic HubSpot/OS): \"this is the main way to fix things is to change the root cause not add a note and thats it.\"",
+      "why": "Why: a note-only fix leaves the wrong classification standing everywhere it's read (dashboards, feeds, counts) and only the reader who happens to open that specific note ever learns the truth. It also compounds: a prior attempt at this exact fix (2026-08-20) added a correction note in HubSpot but never touched the OS's own correction ledger, so the activity feed kept showing \"Call\" for 20 days until Juan caught it a second time.",
+      "session_note": "",
+      "bytes": 2077
+    },
+    {
+      "slug": "feedback_no-unknown-language",
+      "title": "No unknown-language",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "On the OS (juanarenas.bio/nutribiotic and its siblings), a field with no data renders as absent (the row/card doesn't appear, or a value is left out), never as explanatory placeholder text like \"unknown\", \"not known\", \"not diagnosed yet\", \"Name not known\".",
+      "why": "Why: Juan's standing rule, restated 2026-08-06 after \"unknown\" showed as a literal channel value under an account title and a full paragraph explained an undiagnosed Gap Selling state. Placeholder prose reads as the app narrating its own ignorance back at the rep mid-field, which is noise at the exact moment they need signal.",
+      "session_note": "a missing field renders absent, never \"unknown\"/placeholder prose",
+      "bytes": 2069
+    },
+    {
+      "slug": "feedback_confirm-button-success-note",
+      "title": "Confirm + success note",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "Standing agency-wide UI rule: any one-tap confirm control (a candidate pill, a \"YES!\" button, an \"Approve\" button, anything that writes real data on a single tap without a form) must be followed by a visible success note, inline, in the exact surface the tap happened on. Never a silent success and never a toast that can be missed.",
+      "why": "Why: Juan, 2026-08-19, describing the NutriBiotic Visit tab: he wants a tap that changes real data (a client match, a new-business create) to visibly confirm it happened, not just clear the UI or leave him guessing. He called out the success-note pattern specifically as something to keep and generalize: \"I've seen that success notes are important so keep this idea of buttons with success notes upon use.\"",
+      "session_note": "ABSOLUTE: every one-tap confirm ends in inline SuccessNote",
+      "bytes": 1990
+    },
+    {
+      "slug": "feedback-my-style-means-os-playbook",
+      "title": "feedback-my-style-means-os-playbook",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "When Juan says \"my style\" (or similar shorthand) for a NutriBiotic deliverable, it refers to the live `/nutribiotic` OS's own design system, the one running in `portfolio/src/app/nutribiotic/lib/ui.tsx` (Card, PageHead, Ico, TierChip) and rendered at `/nutribiotic/playbook`. He said so explicitly 2026-08-13: \"nutribiotic OS style (refer to playbook when I say something like this)\".",
+      "why": "Why: Individual print pieces in `12-field-materials/` sometimes drift to their own bespoke, more muted palette for print-specific reasons (e.g. the offer sheets dialed the green back because \"the color was too much\" for that specific piece, per that folder's README). That per-document decision does NOT override the OS system as the default reference whenever Juan invokes \"my style\" without further qualification.",
+      "session_note": "",
+      "bytes": 1959
+    },
+    {
+      "slug": "feedback_no-document-change-history",
+      "title": "No document change history",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "A document states the current best understanding, full stop. It never tells the reader how it changed across drafts: no \"retire the X claim,\" no \"the range in earlier material,\" no \"replaces earlier pricing,\" no \"version 2,\" no \"previously we said,\" no changelog or \"what's new\" block. An outdated figure is replaced by the current sourced figure silently, not flagged as superseded.",
+      "why": "Why: Juan on the Metri Bio Marketing Guide (2026-09-13): \"nothing on meta data of this document so don't record how this document has been changed over its drafts and that's something that you should remember for the whole agency is that I don't want you to tell me in the document how the document has changed. I just want you to put the most latest updated version. That is most accurate to our understanding now.\" The guide had a row saying to \"retire the 70% to 80% claim\" and a caption citing \"a tertiary source that matches the range in earlier material.\"",
+      "session_note": "ABSOLUTE: never record draft history/\"retired\" meta in a deliverable",
+      "bytes": 1924
+    },
+    {
+      "slug": "feedback-call-prep-no-meta-no-sourcing",
+      "title": "feedback-call-prep-no-meta-no-sourcing",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "Call-prep artifacts (chuleta, discovery-call prep, meeting crib sheets) cut two things on sight:",
+      "why": "Why: On the Oscar/Plameca discovery-call prep (2026-09-15), Juan cut both explicitly: \"no quiero esto... nunca\" for the framework-narration line on the Sandler up-front-contract grid, and \"never say where info is from in call prep, rarely ever do i want it.\"",
+      "session_note": "",
+      "bytes": 1903
+    },
+    {
+      "slug": "eisenhower-todos-safety",
+      "title": "eisenhower-todos-safety",
+      "enforcement": "review",
+      "type": "feedback",
+      "rule": "ABSOLUTE: when making UI changes to any overview HTML file (agency-overview.html, jobhunt/dashboard/overview.html, jobhunt/dashboard/mission-control.html), NEVER strip or overwrite the content between `<!--TODOS:START-->` and `<!--TODOS:END-->`. Preserve both markers exactly; leave the body empty or with placeholder tasks if needed -- sync_graph.py will repopulate from Supabase.",
+      "why": "Why: This happened twice. Two root-cause failure modes: 1. `replace_region` silently did nothing when markers were stripped by a UI rewrite -- tasks appeared gone without any error. 2. If Supabase returns `[]` (0 results) instead of `None`, the safety check `if todos is not None` passed and wiped the matrix.",
+      "session_note": "",
+      "bytes": 1731
+    },
+    {
+      "slug": "feedback_short-matter-of-fact-titles",
+      "title": "Short matter-of-fact titles",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "Titles and headlines (the h1 on a document page, a cover title, a section header) must be short and matter-of-fact: a product name or a plain noun phrase, not a full sentence selling the reader on why the page matters.",
+      "why": "Why: Juan called out the long descriptive-sentence headlines directly (\"the titles are way too long... this is a standing rule to make titles shorter and more matter-of-fact\"). A long headline reads as marketing copy narrating the page instead of naming what's on it.",
+      "session_note": "ABSOLUTE: headlines are a short noun phrase, never marketing prose",
+      "bytes": 1720
+    },
+    {
+      "slug": "feedback_icons-not-emojis",
+      "title": "Icons, not emojis",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "ABSOLUTE, agency-wide: never use emojis (\ud83e\uddf4\ud83c\udf39\ud83d\udca7\u2734\ufe0f etc.) anywhere in any product UI. Always use high-quality, editorial, styled icons instead, hand-drawn SVG line/silhouette glyphs in the brand ink, consistent stroke weight, crisp at any size.",
+      "why": "Why: emojis render inconsistently across platforms and read as cheap/unstyled; they break the luxury, editorial feel Juan wants (reference: clean line-art flacon, not the OS bottle emoji).",
+      "session_note": "ABSOLUTE: never emojis in a UI; use styled SVG icons",
+      "bytes": 1666
+    },
+    {
+      "slug": "feedback_no-no-questions-asked",
+      "title": "No \"no questions asked\"",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "Never use the phrase \"no questions asked\" anywhere in NutriBiotic sales collateral, including next to the 60-day money-back guarantee it was originally paired with (`promo.ts`'s `FRICTION_REMOVERS`).",
+      "why": "Why: Juan said this in an earlier session (repeated 2026-09-04 while reviewing `12-field-materials/v1 GSE Short Draft.pdf`'s ordering-facts row) and had to repeat it, so it needs to stick this time. Reads as a stock sales cliche, in the same family as the phrases he already flags in [[feedback_lean-sales-collateral-copy]].",
+      "session_note": "never print that phrase in NutriBiotic collateral, guarantee or not",
+      "bytes": 1467
+    },
+    {
+      "slug": "feedback_no-em-dash",
+      "title": "No em dash",
+      "enforcement": "script",
+      "type": "feedback",
+      "rule": "Never use the em dash character (\u2014, U+2014) anywhere in the agency. At all. Ever. This is absolute, not a style preference. It applies to every surface: website copy, code comments, commit messages, chat/Telegram replies, memory files, docs, drafts, everything. The en dash used as a punctuation separator is out too; when a sentence needs a break, use a comma, a colon, a period, or a middot (\u00b7) for title/label separators.",
+      "why": "Why: Juan finds the em dash an obvious \"AI wrote this\" tell and dislikes it; banning it keeps the agency's voice human. It also matches the existing taste gate.",
+      "session_note": "ABSOLUTE: never an em dash anywhere; style_check.py refuses the publish",
+      "bytes": 1440
+    },
+    {
+      "slug": "feedback_first-person-own-documents",
+      "title": "First person in his own documents",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "Any artifact or document that is Juan's own operating material, not a report handed to him by someone else, speaks in his voice: \"I,\" \"my,\" \"mine,\" never \"Juan carries,\" \"Juan's book,\" \"ask NutriBiotic HQ whether their historical contact still exists\" written about him from outside. This extends to interactive UI copy inside the document too: a link-sheet gate marker reads \"My hand / I send it,\" not \"Your hand / You send it.\"",
+      "why": "Why: Instructed directly, 2026-09-04, while consolidating the NutriBiotic segmentation and Whale Hunting artifacts: \"speak from I not from Juan 3rd person.\"",
+      "session_note": "his own operating docs speak as I/my, never third-person \"Juan\"",
+      "bytes": 1438
+    },
+    {
+      "slug": "feedback_subtext-five-words-max",
+      "title": "Subtext five words max",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "Every subtext under a heading (section ledes, deks, card subtitles, chart captions used as subtitles) is at most five words and never a run-on sentence. Longer ones get cut to the point or deleted.",
+      "why": "Why: Juan on the Metri Bio plan (2026-09-13): \"the subtexts are too long and look ai so remember that in general for the agency, no subtexts with the words run on or any subtext longer than 5 words.\" Examples he rejected: \"Proof is already in place. The plan builds the other four before the first meeting.\" Replacements that passed: \"Four to build by April.\" / \"Yield against effort.\" / \"Reviewed every month.\"",
+      "session_note": "ABSOLUTE: any lede/subtitle under a heading is at most 5 words",
+      "bytes": 1273
+    },
+    {
+      "slug": "feedback_never-say-ship",
+      "title": "Never say ship",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "Never use \"ship\", \"shipping\", \"ships\", or \"shipped\" in any deliverable, deck, doc, post, or message. This is agency-wide and absolute, alongside [[feedback_no-em-dash]] and [[feedback_icons-not-emojis]]. Use \"out\", \"live\", \"published\", \"delivered\", \"goes out\" instead.",
+      "why": "Why: It is software jargon leaking into non-software work, and it is one of the clearest tells that a model wrote the copy.",
+      "session_note": "ABSOLUTE: never the word ship/shipping/ships in anything Juan produces",
+      "bytes": 1223
+    },
+    {
+      "slug": "feedback_page-numbers-only-over-three-pages",
+      "title": "Page numbers only over 3 pages",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "Only print a page number (e.g. \"01 / 2\", \"02 / 02\") in a document's header or footer when the document has more than three pages. A 1, 2, or 3-page piece carries no page-number chrome at all.",
+      "why": "Why: Juan (2026-09-04), stated as an agency-wide rule while reviewing the CD/Zinc one-pager and the GSE Short Draft: on a short document the count is dead weight, not orientation a reader needs.",
+      "session_note": "agency-wide: no page-number chrome on a 1-3 page document",
+      "bytes": 1223
+    },
+    {
+      "slug": "feedback_no-five-star-percentage",
+      "title": "Collateral content rules",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "Never print the \"X% five star\" figure next to an Amazon star rating in any NutriBiotic sales collateral. Show the star rating (e.g. \"4.7 out of 5\") and the review count only.",
+      "why": "Why: Juan (2026-09-04): \"the % of five-star is not needed. its a shitty metric, never use it.\" He considers it noise next to the plain average rating.",
+      "session_note": "ABSOLUTE: no \"% five star\", no \"no questions asked\"; read reviews before quoting",
+      "bytes": 1141
+    },
+    {
+      "slug": "feedback_never-abbreviate-wholesale",
+      "title": "Never abbreviate wholesale",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "Never print \"whsl.\" in any NutriBiotic field-materials document, not even in space-constrained contexts like order-form table column headers. Always spell out \"Wholesale\"/\"wholesale\" in full.",
+      "why": "Why: Juan explicitly overrode a prior judgment call where \"Whsl.\" was kept as a standard spreadsheet-style abbreviation in the Order Form's compact table headers (reasoning: different context from the per-card price display he'd originally flagged). He rejected that distinction \u2014 the rule is absolute, no exceptions for tight table layouts.",
+      "session_note": "ABSOLUTE: no \"whsl.\", widen the column instead",
+      "bytes": 985
+    },
+    {
+      "slug": "no-signin-guard",
+      "title": "no-signin-guard",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "Never add `alert(\"Sign in to ...\")` or any blocking sign-in guard on actions (Confirm, Decline, etc.) that are only reachable once the user is already logged in and seeing live data.",
+      "why": "Why: Juan has been shown this alert multiple times while already authenticated. The guard is logically impossible (if the button is visible, the user is signed in) and extremely frustrating.",
+      "session_note": "",
+      "bytes": 962
+    },
+    {
+      "slug": "commit-push-same-turn-always",
+      "title": "commit-push-same-turn-always",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "Commit and push changes in the same turn they're made, as a standing default, not only when explicitly asked that turn and not only for [[feedback_keep-assistant-current]]'s narrower \"anything Assistant reads\" case.",
+      "why": "",
+      "session_note": "",
+      "bytes": 946
+    },
+    {
+      "slug": "no-spark-icon",
+      "title": "no-spark-icon",
+      "enforcement": "context",
+      "type": "feedback",
+      "rule": "Never use the `spark` icon (or any sparkle/star-burst shape) anywhere in the agency UI.",
+      "why": "Why: Juan has rejected it repeatedly and it is permanently banned.",
+      "session_note": "",
+      "bytes": 895
+    }
+  ],
+  "total_bytes": 75559
+}
