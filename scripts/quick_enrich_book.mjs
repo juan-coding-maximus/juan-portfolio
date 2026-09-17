@@ -51,6 +51,7 @@ const LIMIT = parseInt(flag("limit", "2000"), 10);
 const CONCURRENCY = parseInt(flag("concurrency", "6"), 10);
 const DRY = process.argv.includes("--dry");
 const DEBUG = process.argv.includes("--debug");
+const ONLY_IDS = flag("ids", null)?.split(",").map((s) => s.trim()).filter(Boolean) ?? null;
 
 async function sbGet(table, params) {
   const res = await fetch(`${SB_URL}/rest/v1/${table}?${new URLSearchParams(params)}`, {
@@ -150,6 +151,17 @@ async function fetchWebsiteText(rawUrl) {
   }
 }
 
+// Human dates in, human dates out (Juan, 2026-09-16): the model echoes
+// whatever date shape it's shown straight into current_state/future_state,
+// so a raw ISO string here is a raw ISO string baked into the stored summary
+// forever. Ported from lib/ui.ts's exactDate.
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function exactDate(iso) {
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  return `${MONTHS[m - 1]} ${d}, ${y}`;
+}
+
 function buildPurchaseDigest(orders, lines) {
   if (orders.length === 0) return "Purchase history: no orders on file.";
   const totalRevenue = orders.reduce((s, o) => s + o.revenue_cents, 0) / 100;
@@ -166,7 +178,7 @@ function buildPurchaseDigest(orders, lines) {
   const productText = top.map(([n, v]) => `${n} ($${v.revenue.toFixed(0)} lifetime)`).join("; ");
   return (
     `Purchase history: ${orders.length} orders on file, $${totalRevenue.toFixed(0)} lifetime revenue, ` +
-    `last order ${lastOrder.ordered_at.slice(0, 10)}. Products bought: ${productText || "none itemized"}.`
+    `last order ${exactDate(lastOrder.ordered_at)}. Products bought: ${productText || "none itemized"}.`
   );
 }
 
@@ -176,7 +188,7 @@ function buildPurchaseDigest(orders, lines) {
 function buildMeetingDigest(activities) {
   const real = activities.filter((a) => a.origin !== "enriched" && (a.kind === "call" || a.kind === "meeting"));
   if (real.length === 0) return "Meetings and calls on file: none yet.";
-  const lines = real.slice(0, 8).map((a) => `${a.kind} ${a.at.slice(0, 10)}: ${a.detail ?? "no detail logged"}`);
+  const lines = real.slice(0, 8).map((a) => `${a.kind} ${exactDate(a.at)}: ${a.detail ?? "no detail logged"}`);
   return `Meetings and calls on file, HIGHEST QUALITY SOURCE (real, said by the account, not a scrape):\n${lines.join("\n")}`;
 }
 
@@ -197,17 +209,17 @@ const ENRICH_TOOL = {
       current_state: {
         type: ["string", "null"],
         description:
-          "One sentence naming the actual angle a rep opens the call with: what kind of business this really is and the specific context that changes how to sell it (e.g. a supplement retailer operating inside a gym, a pharmacy already carrying one line but not another), grounded only in the evidence given, meetings and calls weighted highest. Null if the evidence is too thin to say anything specific.",
+          "One sentence naming the actual angle a rep opens the call with: what kind of business this really is and the specific context that changes how to sell it (e.g. a supplement retailer operating inside a gym, a pharmacy already carrying one line but not another), grounded only in the evidence given, meetings and calls weighted highest and used first whenever any exist. Never a restatement of a Places business-status flag or a bare order-count fact (e.g. 'listed as OPERATIONAL' or 'has no orders on file' said on its own, with nothing else, is not an angle). Null, not a restated fact, if the evidence is too thin to say anything a rep couldn't already see on this screen.",
       },
       future_state: {
         type: ["string", "null"],
         description:
-          "One sentence naming a SPECIFIC opportunity implied directly by a gap in the evidence given (a lapsed product line, a category their site or reviews mention that they don't currently order from us). Never a generic pitch line. Null if no specific gap is evidenced.",
+          "One sentence naming a SPECIFIC opportunity implied directly by a gap in the evidence given (a lapsed product line, a category their site, reviews, or a meeting mention that they don't currently order from us). Never a generic pitch line, and never just 'they have zero orders so there is upside'; that is the same fact as current_state restated as an opportunity, not a new one. Null if no specific gap is evidenced.",
       },
       impact: {
         type: ["string", "null"],
         description:
-          "One sentence on what closing that gap is worth, grounded in the numbers already given (revenue, order cadence) where available, otherwise tied to a concrete detail in the evidence. Null if current_state and future_state are both null.",
+          "One sentence on what closing that gap is worth, grounded in the numbers already given (revenue, order cadence) where available, otherwise tied to a concrete detail in the evidence, ideally a meeting detail (something said, a stated intent, a stated objection). Never a generic 'this represents new revenue from an untapped account' line; that is true of every account with zero orders and says nothing about this one. Null if current_state and future_state are both null, or if all that's left to say is that generic line.",
       },
     },
     required: ["hours_found_on_website", "hours", "current_state", "future_state", "impact"],
@@ -254,12 +266,19 @@ async function enrichOne(account) {
       "You are doing a 30-second field-rep lookup on one account right before a call, using ONLY the evidence blocks in the " +
       "user message. Never invent a fact, hour, product, or opportunity that is not present in that evidence. Extract hours " +
       "only if the website text states them explicitly; Google Places' own hours are applied separately and are not yours to " +
-      "restate. The meetings-and-calls block is the highest-quality evidence given, real words from the account, not a scrape: " +
-      "when it conflicts with the website or Places, believe the meetings block. The gap summary (current_state/future_state/" +
-      "impact) must each name something concrete drawn from the evidence (an actual product, an actual lapsed order, an actual " +
-      "website, Places, or meeting detail), never a generic sales line. current_state should read as a real angle a rep can " +
-      "open with, naming what kind of business this actually is and where it sits, not a bare fact restated. If the evidence " +
-      "does not support a specific, honest claim, return null for that field rather than write something plausible-sounding.",
+      "restate. The meetings-and-calls block is the highest-quality evidence given, real words from the account, not a scrape, " +
+      "and IS Juan's own recent experience with this business: build the gap summary from it first whenever it has anything " +
+      "usable, and only fall back to the website/Places/purchase-history blocks to fill in what the meetings didn't cover. " +
+      "When meetings conflict with the website or Places, believe the meetings block. The gap summary (current_state/" +
+      "future_state/impact) must each name something concrete a rep does not already see elsewhere on this screen (this " +
+      "account already shows its own order count, last-order date, and Places status as separate facts, so restating any of " +
+      "those, in any words, is not a summary, it's noise). A sentence whose only content is a business-status flag ('listed as " +
+      "OPERATIONAL') or a bare zero-orders fact ('has no orders on file', 'represents entirely new revenue from an untapped " +
+      "account') is exactly the kind of generic filler to avoid: it is true of hundreds of other accounts and gives no edge on " +
+      "this one. If the evidence (beyond a meeting) gives you nothing more specific than that, return null, never that generic " +
+      "sentence; a blank field a rep skips past in a second beats a full field that wastes their time. " +
+      "If you name a date in any field, write it the way a rep would say it out loud (e.g. 'Feb 16, 2026'), never as " +
+      "digits-and-dashes (never '2026-02-16').",
     messages: [{ role: "user", content: evidence }],
     tools: [ENRICH_TOOL],
     tool_choice: { type: "tool", name: "quick_enrich_account" },
@@ -328,14 +347,18 @@ async function enrichOne(account) {
 async function main() {
   const qualifying = await sbGet("nb_accounts", {
     select: "id,name,channel,lifecycle,street,city,state,postal,lat,lng,website,enrichment_status,current_state,future_state,impact",
-    hubspot_owner_id: `eq.${JUAN_OWNER_ID}`,
-    chain_excluded: "eq.false",
-    practice_excluded: "eq.false",
-    closed_at: "is.null",
-    lifecycle: "neq.waypoint",
-    current_state: "is.null",
-    future_state: "is.null",
-    impact: "is.null",
+    ...(ONLY_IDS
+      ? { id: `in.(${ONLY_IDS.join(",")})` }
+      : {
+          hubspot_owner_id: `eq.${JUAN_OWNER_ID}`,
+          chain_excluded: "eq.false",
+          practice_excluded: "eq.false",
+          closed_at: "is.null",
+          lifecycle: "neq.waypoint",
+          current_state: "is.null",
+          future_state: "is.null",
+          impact: "is.null",
+        }),
     limit: String(LIMIT),
   });
 
