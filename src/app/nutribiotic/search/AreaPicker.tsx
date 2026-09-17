@@ -32,6 +32,27 @@ import { Ico } from "../lib/ui";
 
 export type Pin = { lat: number; lng: number };
 
+/** One found place, plotted as a read-only pin once a search has run. Distinct
+ *  from Pin (the shape Juan is drawing): this one is never dragged or removed,
+ *  it only opens the place's own Google Maps page in a new tab. */
+export type ResultPin = {
+  key: string;
+  lat: number | null;
+  lng: number | null;
+  name: string | null;
+  address: string | null;
+  placesId: string | null;
+};
+
+/** The exact link format Google documents for opening one place by id:
+ *  https://developers.google.com/maps/documentation/urls/get-started#search-action */
+export function mapsUrl(r: { name: string | null; address: string | null; placesId: string | null }): string {
+  const query = encodeURIComponent(r.name || r.address || "place");
+  return r.placesId
+    ? `https://www.google.com/maps/search/?api=1&query=${query}&query_place_id=${encodeURIComponent(r.placesId)}`
+    : `https://www.google.com/maps/search/?api=1&query=${query}`;
+}
+
 const CONTAINER_STYLE = { width: "100%", height: "100%" };
 
 /* The territory's own centre of gravity, used only as an opening frame when
@@ -75,12 +96,16 @@ export function AreaPicker({
   pins,
   onChange,
   disabled,
+  results = [],
 }: {
   pins: Pin[];
   onChange: (next: Pin[]) => void;
   /** True while a stage is in flight. The shape that produced the list on
    *  screen must not move underneath it. */
   disabled: boolean;
+  /** What the last search found, plotted as read-only pins (Juan, 2026-09-16:
+   *  "the places should pop with pins here"). Empty before the first search. */
+  results?: ResultPin[];
 }) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const { isLoaded, loadError } = useLoadScript({ googleMapsApiKey: apiKey ?? "" });
@@ -262,6 +287,29 @@ export function AreaPicker({
               title={`Pin ${i + 1}. Drag to move it, click to remove it.`}
             />
           ))}
+
+          {/* What the last search found. Read-only: a tap opens the place's own
+              Google Maps page in a new tab rather than doing anything to the
+              drawn area. */}
+          {results.map((r) =>
+            r.lat == null || r.lng == null ? null : (
+              <MarkerF
+                key={`result:${r.key}`}
+                position={{ lat: r.lat, lng: r.lng }}
+                onClick={() => window.open(mapsUrl(r), "_blank", "noopener,noreferrer")}
+                icon={{
+                  path: google.maps.SymbolPath.CIRCLE,
+                  scale: 6,
+                  fillColor: "#A0762C",
+                  fillOpacity: 1,
+                  strokeColor: "#F7F6F1",
+                  strokeWeight: 1.5,
+                }}
+                title={`${r.name ?? "Open in Google Maps"} · click to open in Google Maps`}
+                zIndex={2}
+              />
+            ),
+          )}
         </GoogleMap>
 
         {pins.length === 0 && (
@@ -277,6 +325,13 @@ export function AreaPicker({
           <span className="font-medium text-[#14201B]">{pins.length}</span> pin
           {pins.length === 1 ? "" : "s"}
           {span != null && <> · {span.toFixed(1)} km across</>}
+          {results.length > 0 && (
+            <>
+              {" "}
+              · <span className="font-medium text-[#A0762C]">{results.length}</span> found, click
+              a dot for Google Maps
+            </>
+          )}
         </span>
         {pins.length > 0 && pins.length < 3 && <span>{3 - pins.length} more to close the area.</span>}
       </div>

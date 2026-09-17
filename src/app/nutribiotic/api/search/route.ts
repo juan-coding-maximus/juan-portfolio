@@ -97,6 +97,12 @@ export const dynamic = "force-dynamic";
  *  truncated list says so on screen rather than looking like the whole answer. */
 const MAX_CANDIDATES = 60;
 
+/** The bound on a "Find all" run: the box is being split until nothing in it
+ *  is still at Google's ceiling, so the point of the click is a complete list,
+ *  not a 60-row sample of one. Still a real cap, so an enormous drawn area
+ *  cannot turn one click into an unbounded payload. */
+const MAX_CANDIDATES_DEEP = 300;
+
 /** A bound on what one click can spend and one click can append. Both are
  *  Juan-facing numbers: the UI disables the button past them rather than
  *  silently trimming his selection. */
@@ -226,7 +232,23 @@ export async function POST(req: Request) {
       /* A density cap, not a location filter: keeps the top N by triage score
          per 1mi x 1mi cell rather than dropping anything for where it sits. */
       max_per_sq_mile: Math.round(num(body.max_per_sq_mile, 0, 0, 100)),
-      max_candidates: MAX_CANDIDATES,
+      /* Both or neither: a day with no time, or a time with no day, filters
+         nothing. day is 0=Sunday..6=Saturday, matching Places' own period.open.day
+         and JS Date.getDay(), so the browser sends it straight through. */
+      open_day:
+        typeof body.open_day === "number" && typeof body.open_time === "string"
+          ? Math.round(num(body.open_day, 0, 0, 6))
+          : null,
+      open_time:
+        typeof body.open_time === "string" && typeof body.open_day === "number"
+          ? body.open_time.trim().slice(0, 5)
+          : null,
+      /* "Find all" (Juan, 2026-09-16): opens the auto-split's safety valve much
+         further so a box still at Google's 60-result ceiling keeps dividing
+         until none of it is, rather than stopping at the click-sized budget
+         every other search uses. */
+      deep: body.deep === true,
+      max_candidates: body.deep === true ? MAX_CANDIDATES_DEEP : MAX_CANDIDATES,
     };
   } else if (stage === "enrich") {
     const picked = candidates(body.candidates, MAX_ENRICH);

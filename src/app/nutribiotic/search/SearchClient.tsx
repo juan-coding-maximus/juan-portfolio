@@ -51,9 +51,10 @@
  * happen rather than dressing itself up as an alert.
  */
 
-import { Fragment, useCallback, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Ico, SuccessNote } from "../lib/ui";
-import { AreaPicker, type Pin } from "./AreaPicker";
+import { useModal } from "../lib/modal";
+import { AreaPicker, mapsUrl, type Pin } from "./AreaPicker";
 
 /* ------------------------------------------------------------------ *
  * one shared set of surface tokens, so the console reads as one tool  *
@@ -85,6 +86,9 @@ export type Candidate = {
   website: string | null;
   website_raw: string | null;
   places_id: string | null;
+  lat: number | null;
+  lng: number | null;
+  hours_today: string | null;
   places_rating: number | null;
   places_rating_count: number | null;
   triage_score: number;
@@ -175,6 +179,45 @@ const RUNNING_LINE: Record<Exclude<Busy, null>, string> = {
   land: "Adding them from your Mac",
 };
 
+/** Sunday-first, matching Google's own period.open.day and JS Date.getDay(). */
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** A drop reason off the script is a precise, internal string ("already in the
+ *  book (matcher: merge (0.579))", "inside the bounding box, outside the drawn
+ *  area"). This turns it into the one plain sentence Juan needs, never the
+ *  mechanism behind it. Unrecognized reasons still show, capitalized, rather
+ *  than disappearing, so a new drop reason on the script side is never silently
+ *  hidden here. */
+function humanizeDropReason(key: string): string {
+  if (key === "permanently closed") return "Permanently closed on Google";
+  if (key === "already a customer") return "Already a customer";
+  if (key.startsWith("already in the book")) return "Already in your book";
+  const excludedCategory = key.match(/^excluded category \((.+)\)$/);
+  if (excludedCategory) return `Excluded category: ${excludedCategory[1]}`;
+  const excludedChain = key.match(/^excluded chain \((.+)\)$/);
+  if (excludedChain) return `Excluded chain: ${excludedChain[1]}`;
+  if (key.startsWith("state ")) return "Outside California";
+  if (key === "city outside the territory areas") return "Outside your territory";
+  if (key.includes("coordinates")) return "No location on file";
+  if (key === "inside the bounding box, outside the drawn area") return "Outside the area you drew";
+  if (/^outside the .*radius$/.test(key)) return "Outside the radius";
+  if (key === "no phone (require_phone)") return "No phone number listed";
+  if (key === "no website (require_website)") return "No website listed";
+  const underReviews = key.match(/^under (\d+) reviews$/);
+  if (underReviews) return `Fewer than ${underReviews[1]} reviews`;
+  const underPhotos = key.match(/^under (\d+) photo/);
+  if (underPhotos) return `Fewer than ${underPhotos[1]} photos`;
+  if (key === "no rating (min_rating)") return "No rating on Google";
+  const underStars = key.match(/^under ([\d.]+) stars$/);
+  if (underStars) return `Under ${underStars[1]} stars`;
+  const triage = key.match(/^triage < (.+)$/);
+  if (triage) return `Low score (under ${triage[1]})`;
+  if (key === "hours not listed on Google") return "Hours not listed on Google";
+  if (key.startsWith("closed at ")) return key.charAt(0).toUpperCase() + key.slice(1);
+  if (/^thinned, over \d+ per sq mi$/.test(key)) return "Too many similar places nearby";
+  return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function SearchClient() {
@@ -205,6 +248,13 @@ export function SearchClient() {
   const [chainInput, setChainInput] = useState("");
   const [minPhotos, setMinPhotos] = useState("");
   const [maxPerSqMile, setMaxPerSqMile] = useState("");
+
+  /* Open Day & Time (Juan, 2026-09-16): off unless a day is picked. "today"
+     resolves against the browser's own clock at search time, not once at
+     mount, so a tab left open overnight still means today when he clicks. */
+  const [openDay, setOpenDay] = useState<"" | "today" | number>("");
+  const [openTime, setOpenTime] = useState("18:00");
+  const [deepRun, setDeepRun] = useState(false);
 
   const [rows, setRows] = useState<Candidate[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -346,11 +396,14 @@ export function SearchClient() {
     setSuggestBusy(false);
   }
 
-  async function runSearch() {
+  async function runSearch(deep = false) {
     setBusy("search");
+    setDeepRun(deep);
     setFailure(null);
     setLandMeta(null);
     setEnrichMeta(null);
+    // "today" resolves against the browser's clock right now, not at mount.
+    const day = openDay === "" ? null : openDay === "today" ? new Date().getDay() : openDay;
     const reply = await post("search", {
       category: query.trim(),
       polygon: pins,
@@ -365,6 +418,9 @@ export function SearchClient() {
       chain_names: chainNames,
       min_photos: minPhotos.trim() ? Number.parseInt(minPhotos, 10) : 0,
       max_per_sq_mile: maxPerSqMile.trim() ? Number.parseInt(maxPerSqMile, 10) : 0,
+      open_day: day,
+      open_time: day == null ? null : openTime,
+      deep,
     });
     if (reply) {
       setMeta(reply);
@@ -473,8 +529,26 @@ export function SearchClient() {
     );
   }
 
+  const resultPins = useMemo(
+    () =>
+      sorted.map((r) => ({
+        key: r.key,
+        lat: r.lat,
+        lng: r.lng,
+        name: r.name,
+        address: r.address,
+        placesId: r.places_id,
+      })),
+    [sorted],
+  );
+
   return (
     <div className="flex flex-col gap-4">
+      {/* SEARCH OUR BOOK. Above the area search, always visible: finding an
+          account Juan already has is a different question from sweeping for a
+          new one, and it should never wait on drawing an area first. */}
+      <BookSearch />
+
       {/* THE QUERY BAR. One line, the whole width, the thing you type in first.
           Everything else on this screen narrows what it returns. */}
       <div className={`${panel} p-3`}>
@@ -494,8 +568,18 @@ export function SearchClient() {
               className="w-full rounded-md border border-[#E2DFD5] bg-[#FAF9F5] py-2.5 pl-9 pr-3 text-[14px] text-[#14201B] placeholder:text-[#A9AFA9] focus:border-[#14201B] focus:outline-none"
             />
           </div>
-          <button type="button" onClick={runSearch} disabled={!canSearch} className={primaryBtn}>
-            {busy === "search" ? "Searching..." : "Search this area"}
+          <button type="button" onClick={() => runSearch()} disabled={!canSearch} className={primaryBtn}>
+            {busy === "search" && !deepRun ? "Searching..." : "Search this area"}
+          </button>
+          <button
+            type="button"
+            onClick={() => runSearch(true)}
+            disabled={!canSearch}
+            className={secondaryBtn}
+            title="Keeps dividing any part of the area still at Google's 60-result cap until none of it is left. Slower and uses more Places calls, for a complete list."
+          >
+            <Ico name="search" size={13} />
+            {busy === "search" && deepRun ? "Finding everything..." : "Find all"}
           </button>
         </div>
       </div>
@@ -504,7 +588,7 @@ export function SearchClient() {
           two because it is the control that decides most of the answer. */}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="h-[460px] lg:h-[520px]">
-          <AreaPicker pins={pins} onChange={setPins} disabled={busy !== null} />
+          <AreaPicker pins={pins} onChange={setPins} disabled={busy !== null} results={resultPins} />
         </div>
 
         <div className={`${panel} flex h-fit flex-col`}>
@@ -519,7 +603,7 @@ export function SearchClient() {
           </button>
 
           <div className={filtersOpen ? "flex flex-col gap-3 p-3" : "hidden"}>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className={labelCls} htmlFor="min-reviews">
                   Min reviews
@@ -544,40 +628,58 @@ export function SearchClient() {
                   onChange={(e) => setMinRating(e.target.value)}
                 />
               </div>
-            </div>
-
-            <div>
-              <label className={labelCls} htmlFor="min-triage">
-                Min triage score
-              </label>
-              <input
-                id="min-triage"
-                className={inputCls}
-                inputMode="numeric"
-                value={minTriage}
-                onChange={(e) => setMinTriage(e.target.value)}
-              />
+              <div>
+                <label className={labelCls} htmlFor="min-triage">
+                  Min score
+                </label>
+                <input
+                  id="min-triage"
+                  className={inputCls}
+                  inputMode="numeric"
+                  value={minTriage}
+                  onChange={(e) => setMinTriage(e.target.value)}
+                />
+              </div>
             </div>
 
             <div className="flex flex-col gap-2 border-t border-[#EFEDE5] pt-3">
-              <Check
-                checked={requirePhone}
-                onChange={setRequirePhone}
-                label="Must have a phone"
-                hint="The SDR queue is a list of numbers to call."
-              />
-              <Check
-                checked={requireWebsite}
-                onChange={setRequireWebsite}
-                label="Must have a website"
-                hint="Look further reads the site. With no site there is nothing to read."
-              />
-              <Check
-                checked={narrowType}
-                onChange={setNarrowType}
-                label="Let Google filter the category"
-                hint="Sends the mapped Places type on the search itself, so a nail salon never comes back from a medical-spa sweep."
-              />
+              <Check checked={requirePhone} onChange={setRequirePhone} label="Must have a phone" />
+              <Check checked={requireWebsite} onChange={setRequireWebsite} label="Must have a website" />
+              <Check checked={narrowType} onChange={setNarrowType} label="Let Google filter the category" />
+            </div>
+
+            <div className="flex flex-col gap-2 border-t border-[#EFEDE5] pt-3">
+              <label className={labelCls}>Open at</label>
+              <div className="flex gap-1.5">
+                <select
+                  className={inputCls}
+                  value={openDay}
+                  onChange={(e) =>
+                    setOpenDay(
+                      e.target.value === ""
+                        ? ""
+                        : e.target.value === "today"
+                          ? "today"
+                          : Number(e.target.value),
+                    )
+                  }
+                >
+                  <option value="">Any day</option>
+                  <option value="today">Today</option>
+                  {WEEKDAYS.map((d, i) => (
+                    <option key={d} value={i}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="time"
+                  className={inputCls}
+                  value={openTime}
+                  onChange={(e) => setOpenTime(e.target.value)}
+                  disabled={openDay === ""}
+                />
+              </div>
             </div>
 
             <div className="flex flex-col gap-2 border-t border-[#EFEDE5] pt-3">
@@ -655,12 +757,7 @@ export function SearchClient() {
             </div>
 
             <div className="flex flex-col gap-2 border-t border-[#EFEDE5] pt-3">
-              <Check
-                checked={chainExclude}
-                onChange={setChainExclude}
-                label="Exclude known chains"
-                hint="Off by default. Drops a place whose name matches one listed below."
-              />
+              <Check checked={chainExclude} onChange={setChainExclude} label="Exclude known chains" />
               {chainExclude && (
                 <>
                   {chainNames.length > 0 && (
@@ -735,10 +832,6 @@ export function SearchClient() {
                   onChange={(e) => setMaxPerSqMile(e.target.value)}
                 />
               </div>
-              <span className="col-span-2 text-[11.5px] leading-snug text-[#8A928C]">
-                Off by default. When set, keeps only the top-triage businesses per square mile so a
-                dense block does not crowd out the rest of the area.
-              </span>
             </div>
           </div>
         </div>
@@ -838,6 +931,112 @@ export function SearchClient() {
   );
 }
 
+type BookResult = { id: string; name: string; area: string | null; tier: string | null };
+
+const BOOK_RESULT_LIMIT = 5;
+
+/** Lowercase, punctuation folded to spaces, whitespace collapsed, so "Dr. Pure
+ *  Nature" and "dr pure" are substrings of each other's normal form without
+ *  Juan having to type a period he doesn't feel like typing. */
+function normalizeBookName(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[.,'’&/-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * "Search our book": find an account Juan already has, by name, without
+ * needing an exact spelling. Separate from the category search below it,
+ * because it answers a different question ("do I already have this one")
+ * rather than "what's out there".
+ *
+ * SEARCHES A LIST FETCHED ONCE, IN MEMORY, the same idiom as
+ * map/ClientSearchField.tsx: instant per keystroke and one request for the
+ * whole session rather than one per keystroke.
+ */
+function BookSearch() {
+  const { open, prefetch } = useModal();
+  const [book, setBook] = useState<BookResult[]>([]);
+  const [q, setQ] = useState("");
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/nutribiotic/api/search/book")
+      .then((res) => res.json())
+      .then((json: { ok: boolean; results?: BookResult[] }) => {
+        if (!cancelled && json.ok) setBook(json.results ?? []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const results = useMemo(() => {
+    const query = normalizeBookName(q);
+    if (query.length < 2) return [];
+    const hits: { r: BookResult; rank: number; nameLen: number }[] = [];
+    for (const r of book) {
+      const name = normalizeBookName(r.name || "");
+      const at = name.indexOf(query);
+      if (at < 0) continue;
+      const wordStart = at === 0 || name[at - 1] === " ";
+      hits.push({ r, rank: wordStart ? 0 : 1, nameLen: name.length });
+    }
+    hits.sort((a, b) => a.rank - b.rank || a.nameLen - b.nameLen);
+    return hits.slice(0, BOOK_RESULT_LIMIT).map((h) => h.r);
+  }, [book, q]);
+
+  return (
+    <div className={`${panel} relative p-3`}>
+      <div className="relative">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8A928C]">
+          <Ico name="search" size={15} />
+        </span>
+        <input
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setShow(true);
+          }}
+          onFocus={() => setShow(true)}
+          onBlur={() => setTimeout(() => setShow(false), 150)}
+          placeholder="Search our book: a client, a company, a person"
+          aria-label="Search accounts already in the book"
+          className="w-full rounded-md border border-[#E2DFD5] bg-[#FAF9F5] py-2.5 pl-9 pr-3 text-[14px] text-[#14201B] placeholder:text-[#A9AFA9] focus:border-[#14201B] focus:outline-none"
+        />
+      </div>
+
+      {show && q.trim().length >= 2 && (
+        <div className="absolute inset-x-3 top-full z-20 mt-1 overflow-hidden rounded-md border border-[#E2DFD5] bg-white shadow-lg">
+          {results.length === 0 && (
+            <div className="px-3 py-2.5 text-[12.5px] text-[#8A928C]">Nothing in the book matches.</div>
+          )}
+          {results.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              onPointerDown={() => prefetch(r.id)}
+              onClick={() => {
+                open(r.id);
+                setShow(false);
+                setQ("");
+              }}
+              className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-[13px] hover:bg-[#FAF9F5]"
+            >
+              <span className="truncate font-medium text-[#14201B]">{r.name}</span>
+              {r.area && <span className="shrink-0 text-[11.5px] text-[#8A928C]">{r.area}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * Where the run is, in one muted line.
  *
@@ -870,25 +1069,20 @@ function Check({
   checked,
   onChange,
   label,
-  hint,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   label: string;
-  hint: string;
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-2">
+    <label className="flex cursor-pointer items-center gap-2">
       <input
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 accent-[#14201B]"
+        className="accent-[#14201B]"
       />
-      <span>
-        <span className="block text-[12.5px] text-[#3D4A44]">{label}</span>
-        <span className="block text-[11.5px] leading-snug text-[#8A928C]">{hint}</span>
-      </span>
+      <span className="text-[12.5px] text-[#3D4A44]">{label}</span>
     </label>
   );
 }
@@ -906,7 +1100,17 @@ function RunBar({
 }) {
   const search = meta.stages?.search ?? {};
   const triage = meta.stages?.triage ?? {};
-  const dropped = Object.entries(triage.dropped ?? {}).sort((a, b) => b[1] - a[1]);
+  const dropped = useMemo(() => {
+    // Several raw reasons ("already in the book (matcher: merge (0.579))",
+    // "already in the book (phone)", ...) collapse to the same plain sentence;
+    // their counts are summed rather than shown as three confusing lines.
+    const byLabel = new Map<string, number>();
+    for (const [why, n] of Object.entries(triage.dropped ?? {})) {
+      const label = humanizeDropReason(why);
+      byLabel.set(label, (byLabel.get(label) ?? 0) + n);
+    }
+    return [...byLabel.entries()].sort((a, b) => b[1] - a[1]);
+  }, [triage.dropped]);
   const ceiling = (search.hit_google_ceiling ?? []).length > 0;
   const [open, setOpen] = useState(false);
   const e = enrich?.enrich;
@@ -1086,7 +1290,21 @@ function ResultsTable({
                       </div>
                     </td>
                     <td className={`${td} max-w-[230px] text-[12.5px] text-[#5B6560]`}>
-                      {r.address}
+                      <div className="flex items-start justify-between gap-1.5">
+                        <span>{r.address}</span>
+                        {(r.lat != null || r.places_id) && (
+                          <a
+                            href={mapsUrl({ name: r.name, address: r.address, placesId: r.places_id })}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Open in Google Maps"
+                            className="shrink-0 text-[#8A928C] hover:text-[#14201B]"
+                          >
+                            <Ico name="external" size={11} />
+                          </a>
+                        )}
+                      </div>
+                      {r.hours_today && <div className="mt-0.5 text-[11.5px] text-[#8A928C]">{r.hours_today}</div>}
                     </td>
                     <td className={`${td} whitespace-nowrap text-[12.5px]`}>
                       {r.phone && (

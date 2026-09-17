@@ -128,7 +128,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
   );
 }
 
-function useModal(): ModalCtx {
+export function useModal(): ModalCtx {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error("AccountLink must be used inside ModalProvider (see layout.tsx)");
   return ctx;
