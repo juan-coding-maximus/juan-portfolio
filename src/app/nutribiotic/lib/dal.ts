@@ -5036,3 +5036,107 @@ export async function getSearchJobResult(id: string): Promise<Record<string, unk
   );
   return rows[0]?.result ?? null;
 }
+
+// ---------------------------------------------------------------------------
+// nb_matrix_items · the Matrix screen's hand-kept board (0082)
+// ---------------------------------------------------------------------------
+//
+// Juan, 2026-09-18: the Matrix should hold projects and immediate to-dos he
+// adds by hand or through a visit log, not the account book. This is that
+// board, entirely separate from matrix.ts's placeOnMatrix() (which still
+// places accounts by their priority.ts score for the Clients screen). An
+// item's quadrant is I/II/III/IV, the same letters and sense as QUADRANTS in
+// matrix.ts. Its effort/yield are a second, independent pair of facts Juan
+// sets by hand, since a thing can be urgent-and-unimportant while also being
+// low effort and low yield, or important-and-not-urgent while high effort and
+// high yield: the quadrant does not imply the scatter position.
+
+export type MatrixQuadrant = "I" | "II" | "III" | "IV";
+
+export type MatrixTask = {
+  id: string;
+  text: string;
+  description: string | null;
+  quadrant: MatrixQuadrant;
+  effort: number | null;
+  yield_score: number | null;
+  done: boolean;
+  done_at: string | null;
+  source: string;
+  created_at: string;
+};
+
+const MATRIX_TASK_COLUMNS =
+  "id,text,description,quadrant,effort,yield_score,done,done_at,source,created_at";
+
+/** Every open task, oldest first within its quadrant so the board reads as a
+ *  running list rather than reshuffling on every load. */
+export async function getOpenMatrixTasks(): Promise<MatrixTask[]> {
+  return raw<MatrixTask>(
+    `nb_matrix_items?select=${MATRIX_TASK_COLUMNS}&done=eq.false&order=created_at.asc`,
+  );
+}
+
+/** The success list: what he has already cleared, most recent first. Bounded
+ *  the same way DoneSection's session log is (HARD RULE bound-every-append):
+ *  this is a glance-back at recent wins, not the durable record, which stays
+ *  in the row itself for as long as it lives. */
+const DONE_LIST_CAP = 60;
+
+export async function getDoneMatrixTasks(): Promise<MatrixTask[]> {
+  return raw<MatrixTask>(
+    `nb_matrix_items?select=${MATRIX_TASK_COLUMNS}&done=eq.true&order=done_at.desc&limit=${DONE_LIST_CAP}`,
+  );
+}
+
+/** New task, dropped straight into the quadrant whose + he tapped. */
+export async function addMatrixTask(
+  quadrant: MatrixQuadrant,
+  text: string,
+  opts: { description?: string | null; effort?: number | null; yield_score?: number | null; source?: string } = {},
+): Promise<MatrixTask> {
+  const [row] = await mutate<MatrixTask>(
+    "nb_matrix_items",
+    "POST",
+    {
+      quadrant,
+      text,
+      description: opts.description ?? null,
+      effort: opts.effort ?? null,
+      yield_score: opts.yield_score ?? null,
+      source: opts.source ?? "manual",
+    },
+    { select: MATRIX_TASK_COLUMNS },
+  );
+  return row;
+}
+
+/** Check it off: it leaves the quadrant and lands in the success list. */
+export async function setMatrixTaskDone(id: string, done: boolean): Promise<MatrixTask> {
+  const [row] = await mutate<MatrixTask>(
+    "nb_matrix_items",
+    "PATCH",
+    { done, done_at: done ? new Date().toISOString() : null },
+    { id: `eq.${id}`, select: MATRIX_TASK_COLUMNS },
+    "return=representation",
+    true,
+  );
+  return row;
+}
+
+/** Place (or move) the dot: effort and yield, 0-1, set by hand. */
+export async function setMatrixTaskPosition(
+  id: string,
+  effort: number,
+  yield_score: number,
+): Promise<MatrixTask> {
+  const [row] = await mutate<MatrixTask>(
+    "nb_matrix_items",
+    "PATCH",
+    { effort, yield_score },
+    { id: `eq.${id}`, select: MATRIX_TASK_COLUMNS },
+    "return=representation",
+    true,
+  );
+  return row;
+}
