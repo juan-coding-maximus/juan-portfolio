@@ -22,18 +22,20 @@ export const CUSTOM_STOP_LABEL: Record<CustomStopKind, string> = {
   stop: "Stop",
 };
 
-const ICONS: Record<string, ReactNode> = {
+// Exported so a page's Home Screen tile and share-image (see lib/tile-marks.tsx)
+// can draw the exact same glyph as its own nav item, never a re-encoded copy.
+export const ICONS: Record<string, ReactNode> = {
   today: <><circle cx="8" cy="8" r="6.2" /><path d="M8 4.6V8l2.3 1.4" /></>,
   pipeline: <><path d="M2 4h12M4 8h8M6 12h4" /></>,
   accounts: <><rect x="2.2" y="3" width="11.6" height="10" rx="1.4" /><path d="M2.2 6.4h11.6M6 6.4V13" /></>,
   route: <><circle cx="4" cy="4" r="1.8" /><circle cx="12" cy="12" r="1.8" /><path d="M4 5.8v3.4a2.8 2.8 0 0 0 2.8 2.8h3.4" /></>,
-  outbound: <><path d="M2.4 4.2h11.2v7.6H2.4z" /><path d="m2.4 4.6 5.6 4 5.6-4" /></>,
+  outbound: <g><path d="M2.4 4.2h11.2v7.6H2.4z" /><path d="m2.4 4.6 5.6 4 5.6-4" /></g>,
   support: <><circle cx="8" cy="8" r="6.2" /><path d="M6.3 6.3a1.8 1.8 0 1 1 2.3 2.3c-.5.2-.6.6-.6 1M8 11.4h.01" /></>,
   metrics: <><path d="M2.5 13V8.4M6.2 13V4.2M9.8 13V6.8M13.5 13V3" /></>,
   matrix: <><rect x="2.4" y="2.4" width="11.2" height="11.2" rx="1.2" /><path d="M8 2.4v11.2M2.4 8h11.2" /></>,
   clock: <><circle cx="8" cy="8" r="6.2" /><path d="M8 4.6V8l2.3 1.4" /></>,
-  "phone-arrow": <><path d="M5.6 2.6H3.4c-.7 0-1.3.6-1.2 1.3.3 5.2 4.7 9.6 9.9 9.9.7.1 1.3-.5 1.3-1.2v-2.2l-2.8-.9-1.2 1.4a9.4 9.4 0 0 1-4.1-4.1l1.4-1.2z" /><path d="M9.8 2.6h3.6v3.6" /><path d="M13.4 2.6 9.6 6.4" /></>,
-  pin: <><path d="M8 14s4.6-4.2 4.6-7.4A4.6 4.6 0 0 0 3.4 6.6C3.4 9.8 8 14 8 14Z" /><circle cx="8" cy="6.5" r="1.7" /></>,
+  "phone-arrow": <g><path d="M5.6 2.6H3.4c-.7 0-1.3.6-1.2 1.3.3 5.2 4.7 9.6 9.9 9.9.7.1 1.3-.5 1.3-1.2v-2.2l-2.8-.9-1.2 1.4a9.4 9.4 0 0 1-4.1-4.1l1.4-1.2z" /><path d="M9.8 2.6h3.6v3.6" /><path d="M13.4 2.6 9.6 6.4" /></g>,
+  pin: <g><path d="M8 14s4.6-4.2 4.6-7.4A4.6 4.6 0 0 0 3.4 6.6C3.4 9.8 8 14 8 14Z" /><circle cx="8" cy="6.5" r="1.7" /></g>,
   wand: <><path d="M3 13 11 5M9.6 3.4l.5 1.3 1.3.5-1.3.5-.5 1.3-.5-1.3-1.3-.5 1.3-.5zM13 8.4l.35.9.9.35-.9.35-.35.9-.35-.9-.9-.35.9-.35z" /></>,
   alert: <><path d="M8 2.6 14.2 13H1.8L8 2.6Z" /><path d="M8 6.6v3M8 11.4h.01" /></>,
   // Lead readiness pills (touchpoint-ui.tsx), a plain exclamation, no
@@ -87,7 +89,7 @@ const ICONS: Record<string, ReactNode> = {
   stop: <><rect x="3.2" y="3.2" width="9.6" height="9.6" rx="1.6" /></>,
   review: <><path d="M3.4 2.6h9.2v10.8H3.4z" /><path d="M5.8 6.2h4.4M5.8 8.6h4.4M5.8 11h2.6" /></>,
   flag: <><path d="M3.8 14.2V2.2" /><path d="M3.8 2.8h8.4l-1.9 2.8 1.9 2.8H3.8" /></>,
-  book: <><path d="M8 3.4C6.9 2.5 5 2.2 3 2.2v10.2c2 0 3.9.3 5 1.2 1.1-.9 3-1.2 5-1.2V2.2c-2 0-3.9.3-5 1.2Z" /><path d="M8 3.4v10.2" /></>,
+  book: <g><path d="M8 3.4C6.9 2.5 5 2.2 3 2.2v10.2c2 0 3.9.3 5 1.2 1.1-.9 3-1.2 5-1.2V2.2c-2 0-3.9.3-5 1.2Z" /><path d="M8 3.4v10.2" /></g>,
   locate: <><circle cx="8" cy="8" r="2.3" /><path d="M8 1.6v2.5M8 11.9v2.5M1.6 8h2.5M11.9 8h2.5" /></>,
   // Route reordering (0029). Bare chevrons, no shaft: at 13px a full arrow
   // turns to mud, and these sit four-abreast in a row of small controls.

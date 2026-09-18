@@ -50,6 +50,15 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // The share card iMessage (and every other social scraper) fetches when a
+  // nutribiotic link is shared, same reasoning and same stakes as apple-icon
+  // above: the fetch carries no cookie, so without this a shared link's
+  // preview card would be a 307 to the gate instead of the page's own brand
+  // mark. Brand marks with no data behind them.
+  if (/\/opengraph-image(\.[a-z0-9]+)?$/.test(pathname)) {
+    return NextResponse.next();
+  }
+
   // The three Home Screen manifests, for the same reason and with the same
   // stakes: iOS fetches a manifest while installing a tile, and a manifest that
   // 307s to the gate is a tile installed with the gate's name and the gate's
