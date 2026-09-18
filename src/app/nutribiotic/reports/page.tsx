@@ -10,6 +10,7 @@ import { PageHead, Card, Ico } from "../lib/ui";
 import {
   getAllTimeMetrics,
   getBookMetrics,
+  getCollateralPipeline,
   getHomeEndpoint,
   getReportDraft,
   listPlaybookReports,
@@ -78,7 +79,7 @@ export default async function ReportsIndex({
   // Every date has one (2026-09-03); it used to be null on a Fri/Sat/Sun pick.
   const weekWindow = weekWindowFor(selectedDate);
 
-  const [reports, archive, draft, home, allTime, bookMetrics, weeklyDraft, archivedDailyUrl, archivedWeeklyUrl] =
+  const [reports, archive, draft, home, allTime, bookMetrics, collateral, weeklyDraft, archivedDailyUrl, archivedWeeklyUrl] =
     await Promise.all([
       listPlaybookReports().catch(() => []),
       listPlaybookReportArchive().catch((): PlaybookReportArchive => ({ reports: [], truncated: {} })),
@@ -86,6 +87,7 @@ export default async function ReportsIndex({
       getHomeEndpoint().catch(() => null),
       getAllTimeMetrics().catch(() => null),
       getBookMetrics().catch(() => null),
+      getCollateralPipeline().catch(() => null),
       weekWindow ? getReportDraft(weekWindow.end, "weekly").catch(() => null) : Promise.resolve(null),
       // The published artifact for this day/week (2026-08-28, Juan:
       // "I need to be able to see what was sent, which you should refer to
@@ -314,6 +316,85 @@ export default async function ReportsIndex({
           <p className="mt-3 text-[11.5px] text-[#8A928C]">No archived reports yet.</p>
         )}
       </section>
+
+      {/* SALES COLLATERAL PIPELINE. Replaces the static "Collateral Roadmap"
+          claude.ai artifact (2026-09-11): that had to be hand-regenerated
+          every time the queue moved, this reads live off nb-marketing so a
+          "ready" or "next" item picks up its real signed PDF the moment
+          sync_marketing_files.py syncs it, no page edit required. The stage
+          each item is in is still Juan's own call (getCollateralPipeline),
+          updated 2026-09-18. */}
+      {collateral && (
+        <section className="mb-7">
+          <div className="mb-2 flex items-baseline justify-between gap-2">
+            <div className="text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">Sales collateral</div>
+            <div className="text-[11px] text-[#8A928C]">updated {collateral.updated}</div>
+          </div>
+          <div className="grid gap-3.5 md:grid-cols-2">
+            <Card className="flex h-full flex-col gap-2">
+              <span className="font-[family-name:var(--font-fraunces)] text-[16.5px] font-semibold tracking-tight">
+                Ready for review
+              </span>
+              <ul className="space-y-1.5">
+                {collateral.ready.map((c) => (
+                  <li key={c.name} className="flex items-baseline justify-between gap-3 text-[13px]">
+                    <span className="text-[#1B1E15]">{c.name}</span>
+                    {c.url ? (
+                      <a
+                        href={c.url}
+                        className="shrink-0 font-medium text-[#2C6A46] underline decoration-[#2C6A46]/40 underline-offset-2 hover:decoration-[#2C6A46]"
+                      >
+                        Open PDF
+                      </a>
+                    ) : (
+                      <span className="shrink-0 text-[#8A928C]">Not synced</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+
+            <Card className="flex h-full flex-col gap-2">
+              <span className="font-[family-name:var(--font-fraunces)] text-[16.5px] font-semibold tracking-tight">
+                Next up
+              </span>
+              <ul className="space-y-1.5">
+                {collateral.next.map((c) => (
+                  <li key={c.name} className="flex items-baseline justify-between gap-3 text-[13px]">
+                    <span className="text-[#1B1E15]">{c.name}</span>
+                    {c.url ? (
+                      <a
+                        href={c.url}
+                        className="shrink-0 font-medium text-[#2C6A46] underline decoration-[#2C6A46]/40 underline-offset-2 hover:decoration-[#2C6A46]"
+                      >
+                        Open draft
+                      </a>
+                    ) : (
+                      <span className="shrink-0 text-[#8A928C]">Not synced</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </div>
+
+          {collateral.ideas.length > 0 && (
+            <Card className="mt-3.5 flex flex-col gap-2.5">
+              <span className="font-[family-name:var(--font-fraunces)] text-[16.5px] font-semibold tracking-tight">
+                Field ideas for HQ
+              </span>
+              <ul className="space-y-2">
+                {collateral.ideas.map((c) => (
+                  <li key={c.name} className="text-[13px] leading-relaxed">
+                    <span className="font-medium text-[#1B1E15]">{c.name}.</span>{" "}
+                    <span className="text-[#5B6560]">{c.note}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+        </section>
+      )}
     </>
   );
 }

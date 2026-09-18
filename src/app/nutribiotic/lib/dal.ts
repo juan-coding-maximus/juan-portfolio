@@ -4414,6 +4414,67 @@ export async function listMarketingFiles(): Promise<MarketingFile[]> {
   }
 }
 
+/* ----------------------------------------------------------------------
+ * COLLATERAL PIPELINE. Which stage each sales-collateral document is in
+ * (ready for review, next up, or a field idea not yet a document) is Juan's
+ * own call, not something derivable from the bucket, so it's a short literal
+ * list here. Whether a "ready" or "next" item actually has a synced PDF IS
+ * derivable, from the live nb-marketing bucket via listMarketingFiles(), so
+ * that part is cross-referenced rather than a URL that would go stale the
+ * next time sync_marketing_files.py runs. Updated 2026-09-18 from Juan's own
+ * status: Vitamin C+D3+Zinc, Electro-C, Best Sellers and the Spa Partner
+ * Guide (medspa) are ready for review; both GSE pieces are next.
+ * ------------------------------------------------------------------- */
+
+export type CollateralItem = { name: string; file?: string; note?: string };
+
+const COLLATERAL_READY: CollateralItem[] = [
+  { name: "Vitamin C + D3 + Zinc", file: "Vitamin CD3Zinc.pdf" },
+  { name: "Electro-C", file: "Electro-C.pdf" },
+  { name: "Best Sellers", file: "Best Sellers.pdf" },
+  { name: "Spa Partner Guide (medspa)", file: "Spa Partner Guide.pdf" },
+];
+
+const COLLATERAL_NEXT: CollateralItem[] = [
+  { name: "GSE Data Sheet (long form)", file: "GSE Data Sheet.pdf" },
+  { name: "GSE Quick Guide (short form)", file: "GSE Quick Guide.pdf" },
+];
+
+// Not documents yet: new-product and format ideas from the field, logged
+// here so they don't live only in a chat, and carried into hq-asks.html for
+// HQ. Never a claim about NutriBiotic's plans, only what Juan is proposing.
+const COLLATERAL_IDEAS: CollateralItem[] = [
+  {
+    name: "Vegan Power Pro",
+    note: "A complete vegan protein blending rice and pea protein plus lecithin, kept simple without being a one-ingredient label.",
+  },
+  {
+    name: "Skincare clinic testers",
+    note: "Small tester sizes of the skincare line for clinics, replacing the 8oz bottles that are too large to hand out and test at scale.",
+  },
+];
+
+export type CollateralPipeline = {
+  updated: string;
+  ready: Array<CollateralItem & { url: string | null }>;
+  next: Array<CollateralItem & { url: string | null }>;
+  ideas: CollateralItem[];
+};
+
+/** Never throws, same degrade-honestly rule as listMarketingFiles: a bucket
+ *  miss just means no PDF link, the pipeline list still renders. */
+export async function getCollateralPipeline(): Promise<CollateralPipeline> {
+  const files = await listMarketingFiles().catch(() => []);
+  const urlFor = (file?: string) =>
+    file ? (files.find((f) => f.folder === "field" && f.name === file)?.url ?? null) : null;
+  return {
+    updated: "2026-09-18",
+    ready: COLLATERAL_READY.map((c) => ({ ...c, url: urlFor(c.file) })),
+    next: COLLATERAL_NEXT.map((c) => ({ ...c, url: urlFor(c.file) })),
+    ideas: COLLATERAL_IDEAS,
+  };
+}
+
 /**
  * Finds one marketing PDF whose filename contains `hint` (case-insensitive),
  * in the "marketing" folder only, and signs just that one file. Distinct from
