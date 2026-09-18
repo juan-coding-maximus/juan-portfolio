@@ -58,6 +58,16 @@ import Anthropic from "@anthropic-ai/sdk";
 // imported by scripts/repair-ask-drafts.mts under `node --experimental-strip-types`,
 // which resolves real files and will not guess an extension.
 import { EMAIL_VOICE } from "./email-voice.generated.ts";
+import {
+  BANNED,
+  BODY_LIMIT,
+  BODY_LIMIT_WHY,
+  FILLER,
+  FILLER_WHY,
+  SIGNATURE_BLOCK,
+  SIGNATURE_TAIL_LINES,
+  SIGNATURE_WHY,
+} from "./email-style-rules.generated.ts";
 
 export type AskContact = {
   id: string;
@@ -182,73 +192,26 @@ export function asksCollide(a: string, b: string): boolean {
 // The grounding gate. Deterministic, and it has the last word.
 // ---------------------------------------------------------------------------
 
-/** Style that is never Juan's, enforced rather than requested. The em dash is
- *  a hard rule across the whole agency (jobhunt/scripts/style_check.py refuses
- *  a publish over one), and "ship" is a word he does not use.
- *
- *  Where a dash would go he writes a spaced hyphen, which the voice file
- *  documents in his own hand: "Let me know your preferred place - I'll be out
- *  in the field so I can adjust my schedule." That is allowed here on purpose.
- *
- *  THE BUZZWORDS ARE STEMMED. "Circling back in November, like we agreed" was
- *  the subject of a real queued draft, and a bare /circle back/ let it through. */
-const BANNED = [
-  { re: /[—–]/, why: "an em dash" },
-  { re: /\bship(s|ped|ping|ment|ments)?\b/i, why: "the word ship" },
-  { re: /no questions asked/i, why: "the phrase no questions asked" },
-  {
-    re: /\b(circl(e|es|ed|ing)\s+back|touch(es|ed|ing)?\s+base|move\s+the\s+needle|game.?changer|best.in.class|thought leader|synergy|cutting.edge|leverag(e|es|ed|ing)|utiliz(e|es|ed|ing)|spearhead(s|ed|ing)?)\b/i,
-    why: "a buzzword",
-  },
-  { re: /\bhi\s+there\b/i, why: '"Hi there", a greeting addressed to nobody' },
-  { re: /!/, why: "an exclamation mark" },
-];
-
 /**
- * Sentences that would read the same for any account in the book.
+ * The absolute style rules are NOT WRITTEN HERE any more (2026-09-18).
  *
- * Each one of these is contentless by construction: strike it and the email
- * loses nothing a customer could act on. They are listed rather than judged
- * because a model writing a short polite email reaches for them every time,
- * and "the prompt said not to" has never once been an enforcement mechanism.
+ * They lived twice, once in this file and once in
+ * bridges/nutribiotic/lib/draft_style.py, kept together by a sentence in a
+ * comment promising that a rule added to one would be added to the other. They
+ * had drifted within a day: this side knew "no questions asked" and python did
+ * not, python knew "facilitate" and this side did not, and five filler phrases
+ * here had never reached python.
  *
- * Narrow on purpose. "Let me know what quantities work" is a real ask and is
- * not here; only the empty forms of it are.
+ * One source now, nutribiotic/config/email_style_rules.json, read directly by
+ * python and carried here by scripts/sync_email_voice.py because Vercel cannot
+ * see the agency repo. nutribiotic/tests/style_parity.py fails when this copy
+ * is stale or when the two engines disagree about a real string.
+ *
+ * What stays in this file is everything that needs the source note in hand: an
+ * invented number, a greeting naming somebody not on file, a body that says
+ * nothing about this account. None of those can be written as a pattern over
+ * the text, and this is the only side holding the note.
  */
-const FILLER = [
-  /let me know (if you (have any|need)|what other|how you(')?d like to proceed)/i,
-  /if you have any questions/i,
-  /(feel free|do not hesitate|don't hesitate) to (reach out|contact|ask|call)/i,
-  /reach out with any questions/i,
-  /to move forward/i,
-  /at your earliest convenience/i,
-  /looking forward to hearing (from you|back)/i,
-  /i hope (this|all|you)\b[^.]{0,40}\b(well|finds you)/i,
-  /hope all is well/i,
-  /just wanted to (follow up|check in|reach out|touch)/i,
-  /please advise/i,
-  /thanks in advance/i,
-  /any other information you need/i,
-];
-
-/**
- * The sign-off is his first name, alone.
- *
- * EMAIL-VOICE.md, from the corpus: "my first name alone. 'Juan', not 'Juan
- * Arenas': the full block is my auto signature, not something I type." Two
- * queued drafts ended in a typed-out "Juan Arenas Martin / NutriBiotic", which
- * is his mail client's job and reads like a form letter when a draft carries
- * it twice.
- *
- * A signature line is short and is not a sentence, which is what keeps this off
- * a real closing line like "NutriBiotic is made in Lakeport."
- */
-const SIGNATURE_BLOCK = /^\s*(juan\s+arenas[\w\s.]{0,20}|nutribiotic[\w\s,]{0,20})\s*$/i;
-
-/** How long an email written from one ask may get. A composed follow-up is
- *  four or five short sentences; past this, the model is filling space, and
- *  filled space is where invented facts live. */
-const BODY_LIMIT = 1200;
 
 /**
  * Everything the composed text is allowed to know, flattened. A number that is
@@ -377,17 +340,17 @@ export function styleFailure(subject: string, body: string, sources: string[]): 
 
   for (const f of FILLER) {
     const m = text.match(f);
-    if (m) return `the draft used a line that says nothing ("${m[0].trim()}")`;
+    if (m) return `the draft used ${FILLER_WHY} ("${m[0].trim()}")`;
   }
 
-  // A typed-out signature. His mail client adds the block; a draft that carries
-  // one sends it twice.
-  const tail = body.trimEnd().split("\n").slice(-3);
+  // A typed-out signature, looked for only where a signature goes. His mail
+  // client adds the block; a draft that carries one sends it twice.
+  const tail = body.trimEnd().split("\n").slice(-SIGNATURE_TAIL_LINES);
   for (const line of tail) {
-    if (SIGNATURE_BLOCK.test(line)) return "the draft typed out a signature block instead of signing off Juan";
+    if (SIGNATURE_BLOCK.test(line)) return `the draft used ${SIGNATURE_WHY}`;
   }
 
-  if (body.length > BODY_LIMIT) return "the draft ran longer than an answer to one ask should";
+  if (body.length > BODY_LIMIT) return BODY_LIMIT_WHY;
 
   return specificityFailure(body, sources);
 }
