@@ -1,9 +1,11 @@
 /**
- * The planning horizon: today's field days rolling ten weekdays deep, always
- * Monday-Friday. NOT boxed into "this week" or "next week" -- Juan's ask
+ * The planning horizon: today's field days rolling ten days deep, every day
+ * of the week. NOT boxed into "this week" or "next week" -- Juan's ask
  * 2026-08-24: postponing off Thursday hit a wall with only four Mon-Thu tabs.
  * A rolling horizon has no wall. It just slides forward one day at a time as
  * the calendar does, so there is always somewhere to postpone a stop to.
+ * Saturday and Sunday count as field days too (Juan, 2026-09-18): both the
+ * route and the SDR queue are plannable any day, not just Monday-Friday.
  *
  * Pure, no I/O, and deliberately NOT tagged "server-only": dal.ts (server)
  * and route-context.tsx (client) both need this, and a value import of
@@ -47,10 +49,9 @@ function weekdayIsoOf(iso: string): number {
 }
 
 /**
- * The next `count` weekdays (Monday-Friday only, weekends skipped), starting
- * today if today is a weekday, else the coming Monday. Always real field days
- * out from right now -- there is no "this week" or "next week" box for the
- * horizon to fall off the edge of.
+ * The next `count` days starting today, every day of the week included.
+ * Always real field days out from right now -- there is no "this week" or
+ * "next week" box for the horizon to fall off the edge of.
  */
 export function planningHorizonDates(count: number = PLANNING_HORIZON_DAYS): string[] {
   const { iso } = laToday();
@@ -58,8 +59,7 @@ export function planningHorizonDates(count: number = PLANNING_HORIZON_DAYS): str
   const cursor = new Date(Date.UTC(y, m - 1, d));
   const out: string[] = [];
   while (out.length < count) {
-    const dow = cursor.getUTCDay();
-    if (dow !== 0 && dow !== 6) out.push(cursor.toISOString().slice(0, 10));
+    out.push(cursor.toISOString().slice(0, 10));
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
   return out;

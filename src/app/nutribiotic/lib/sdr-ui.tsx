@@ -137,18 +137,12 @@ function dayLabel(iso: string, todayIso: string): string {
   return `${weekday} · ${md}`;
 }
 
-/** The next `count` weekdays after `todayIso`, Saturday and Sunday skipped
- *  outright rather than offered as one-tap options nobody works (Juan,
- *  2026-09-15: quick-move buttons for "move to another day"). */
-function nextWeekdays(todayIso: string, count: number): string[] {
+/** The next `count` days after `todayIso`, every day of the week included
+ *  (Juan, 2026-09-18: Saturday and Sunday are plannable field days, not
+ *  skipped from the quick-move buttons for "move to another day"). */
+function nextDays(todayIso: string, count: number): string[] {
   const out: string[] = [];
-  let n = 1;
-  while (out.length < count) {
-    const iso = addDaysIso(todayIso, n);
-    const dow = new Date(`${iso}T00:00:00`).getDay();
-    if (dow !== 0 && dow !== 6) out.push(iso);
-    n++;
-  }
+  for (let n = 1; out.length < count; n++) out.push(addDaysIso(todayIso, n));
   return out;
 }
 
@@ -641,7 +635,7 @@ function ScheduleRow({
    *  onFiled does. */
   onFiled: (result: FiledTouchpoint) => void;
   /** The server-resolved LA date, so the "move to another day" quick picks
-   *  (nextWeekdays) count from the same today the rest of the queue does,
+   *  (nextDays) count from the same today the rest of the queue does,
    *  never the browser's own UTC clock. */
   todayIso: string;
   /** Set only when the last Mark done/Skip write actually failed to save
@@ -807,14 +801,13 @@ function ScheduleRow({
 
       {moving && (
         <div className="flex w-full flex-col gap-1.5 border-t border-[#EFEDE5] pt-2">
-          {/* Four one-tap days, next weekdays only (Juan, 2026-09-15): moving
-              a call almost always means tomorrow or one of the next few
-              working days, and typing a date for that is the slow path. Skips
-              Saturday/Sunday outright rather than offering a day nobody
-              works. The date input below stays for the real exception, an
-              overnight trip or a specific far-out day. */}
+          {/* Four one-tap days, the next four days including Saturday and
+              Sunday (Juan, 2026-09-18): moving a call almost always means
+              tomorrow or one of the next few days, and typing a date for that
+              is the slow path. The date input below stays for the real
+              exception, an overnight trip or a specific far-out day. */}
           <div className="grid grid-cols-4 gap-1">
-            {nextWeekdays(todayIso, 4).map((iso, i) => (
+            {nextDays(todayIso, 4).map((iso, i) => (
               <button
                 key={iso}
                 type="button"

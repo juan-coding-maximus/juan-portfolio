@@ -14,8 +14,9 @@
  * trigger's own bounding rect, escapes that ancestor's clip.
  *
  * `days`/`active` come straight from useRoute() -- the same rolling
- * ten-weekday horizon DayTabs renders, so a stop can never be moved onto a
- * day that is not itself a tab.
+ * ten-day horizon DayTabs renders (Saturday and Sunday included, Juan
+ * 2026-09-18), so a stop can never be moved onto a day that is not itself a
+ * tab.
  */
 
 import { useLayoutEffect, useRef, useState } from "react";
