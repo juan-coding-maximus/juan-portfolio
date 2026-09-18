@@ -136,12 +136,12 @@
       "slug": "feedback_short-matter-of-fact-titles",
       "title": "Short matter-of-fact titles",
       "enforcement": "context",
-      "scope": "writing,ui",
+      "scope": "always",
       "type": "feedback",
       "rule": "Titles and headlines (page h1, cover title, section header) are short and matter-of-fact: a product name or a plain noun phrase, never a full sentence selling the reader on why the page matters.",
       "why": "Why: Juan: \"the titles are way too long... this is a standing rule to make titles shorter and more matter-of-fact.\" A long headline reads as marketing copy narrating the page instead of naming what's on it.",
       "session_note": "ABSOLUTE: headlines are a short noun phrase, never marketing prose",
-      "bytes": 1256
+      "bytes": 1252
     },
     {
       "slug": "feedback_compounding-enrichment-effort",
@@ -191,12 +191,12 @@
       "slug": "feedback_subtext-five-words-max",
       "title": "Subtext five words max",
       "enforcement": "context",
-      "scope": "ui,writing",
+      "scope": "always",
       "type": "feedback",
       "rule": "Every subtext under a heading (section ledes, deks, card subtitles, chart captions used as subtitles) is at most five words and never a run-on sentence. Longer ones get cut to the point or deleted.",
       "why": "Why: Juan on the Metri Bio plan (2026-09-13): \"no subtexts with the words run on or any subtext longer than 5 words,\" they \"look ai.\" Passed examples: \"Four to build by April.\" / \"Yield against effort.\"",
       "session_note": "ABSOLUTE: any lede/subtitle under a heading is at most 5 words",
-      "bytes": 1074
+      "bytes": 1070
     },
     {
       "slug": "feedback-new-prospect-data-to-os-immediately",
@@ -246,12 +246,12 @@
       "slug": "feedback_no-unknown-language",
       "title": "No unknown-language",
       "enforcement": "context",
-      "scope": "ui,writing",
+      "scope": "always",
       "type": "feedback",
       "rule": "A field with no data renders as absent (omit the row/section), never as placeholder text like \"unknown\" or \"not known yet.\" A true zero/count states the plain fact (\"$0,\" \"No activity logged\"), that's not epistemic hedging. Exception: action-prompt chips like \"No site on file\" / \"No phone on file\" (`ReachLinks`) are a deliberate different pattern telling the rep what to go find, not banned by this rule.",
       "why": "Why: Juan: placeholder prose reads as the app narrating its own ignorance back at the rep mid-field, noise at the exact moment they need signal.",
       "session_note": "a missing field renders absent, never \"unknown\"/placeholder prose",
-      "bytes": 968
+      "bytes": 964
     },
     {
       "slug": "feedback_no-monospace-eyebrows",
@@ -268,12 +268,12 @@
       "slug": "feedback_never-say-ship",
       "title": "Never say ship",
       "enforcement": "context",
-      "scope": "writing,ui",
+      "scope": "always",
       "type": "feedback",
       "rule": "Never use \"ship\", \"shipping\", \"ships\", or \"shipped\" in any deliverable, deck, doc, post, or message. Use \"out\", \"live\", \"published\", \"delivered\", \"goes out\" instead.",
       "why": "Why: Juan (2026-08-27, on a Metri Bio marketing deck): \"don't use the word ship, this is not coding... this reads like AI.\" It's software jargon leaking into non-software work, one of the clearest AI tells.",
       "session_note": "ABSOLUTE: never the word ship/shipping/ships in anything Juan produces",
-      "bytes": 929
+      "bytes": 925
     },
     {
       "slug": "no-spark-icon",
@@ -353,6 +353,17 @@
       "bytes": 587
     },
     {
+      "slug": "commit-push-same-turn-always",
+      "title": "commit-push-same-turn-always",
+      "enforcement": "context",
+      "scope": "always",
+      "type": "feedback",
+      "rule": "Commit and push in the same turn as any verified edit, unasked, across every repo and submodule, not only when explicitly requested that turn.",
+      "why": "Why: Juan: \"always in one turn,\" after an edit sat uncommitted until asked separately.",
+      "session_note": "",
+      "bytes": 569
+    },
+    {
       "slug": "eisenhower-todos-safety",
       "title": "eisenhower-todos-safety",
       "enforcement": "review",
@@ -362,18 +373,7 @@
       "why": "",
       "session_note": "",
       "bytes": 569
-    },
-    {
-      "slug": "commit-push-same-turn-always",
-      "title": "commit-push-same-turn-always",
-      "enforcement": "context",
-      "scope": "code",
-      "type": "feedback",
-      "rule": "Commit and push in the same turn as any verified edit, unasked, across every repo and submodule, not only when explicitly requested that turn.",
-      "why": "Why: Juan: \"always in one turn,\" after an edit sat uncommitted until asked separately.",
-      "session_note": "",
-      "bytes": 567
     }
   ],
-  "total_bytes": 45067
+  "total_bytes": 45053
 }
