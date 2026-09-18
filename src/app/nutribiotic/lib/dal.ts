@@ -108,6 +108,35 @@ const verifyReadAccess = cache(async (): Promise<true> => {
 type QueryOpts = Record<string, string | number | undefined>;
 
 /**
+ * POSTGREST STOPS AT 1000 ROWS AND SAYS NOTHING.
+ *
+ * `db-max-rows` caps every response, and a capped response is shaped exactly
+ * like a complete one: 200 OK, a JSON array, no header anyone reads, no error.
+ * On 2026-09-18 nb_order_lines held 9,703 rows with 1,176 of them on a single
+ * account, so that account's purchase history had been quietly missing 176
+ * lines, and nb_orders at 1,357 meant the same for revenue. The python side
+ * (bridges/nutribiotic/lib/sb.py) was fixed the same day and this is the same
+ * fix, so the two halves of the OS read the database the same way.
+ *
+ * PAGING IS LAZY, WHICH IS WHAT KEEPS IT CHEAP. A read only asks for a second
+ * page when the first came back EXACTLY full, because that is the only case
+ * where more rows can exist. Every read under the cap, which is almost all of
+ * them, still costs exactly one request. That matters: this app runs on Vercel
+ * against a Supabase project that was suspended once for egress (2026-09-02).
+ *
+ * AN EXPLICIT `limit` OR `offset` IS OBEYED LITERALLY, one request, no paging.
+ * A caller asking for the newest 20 gets 20, and the ~30 bounded reads in this
+ * file are untouched by any of this.
+ */
+const PAGE_SIZE = 1000;
+
+/** A ceiling, so a mistake reads 25,000 rows and then SAYS SO rather than
+ *  walking a table forever on a serverless function's clock. Chosen against
+ *  the real shape of this database: its largest table is nb_order_lines at
+ *  9,703 rows, so this is roughly 2.5x headroom. */
+const MAX_PAGES = 25;
+
+/**
  * A bare `fetch` has no timeout: on a dropped or degraded cellular link (SDR
  * is built to be read at a light, mid-route) it can hang well past the
  * moment Juan has already looked back at the road, and a single dropped LTE
@@ -141,6 +170,101 @@ async function fetchWithTimeout(
   }
 }
 
+/** One request, exactly as asked. Reads are safe to retry: a GET that never
+ *  reached the server, or whose response was lost to a handoff, costs nothing
+ *  to repeat. */
+async function fetchPage<T>(table: string, params: URLSearchParams): Promise<T[]> {
+  const res = await fetchWithTimeout(
+    `${SB_URL}/rest/v1/${table}?${params}`,
+    {
+      headers: {
+        apikey: SB_KEY,
+        Authorization: `Bearer ${SB_KEY}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    },
+    { retries: 1 },
+  );
+
+  if (!res.ok) {
+    throw new Error(`Supabase ${table} -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  }
+  return (await res.json()) as T[];
+}
+
+/**
+ * Every row a caller asked for, however many pages that takes.
+ *
+ * `want` is Infinity for "all of them", or the caller's own limit when that
+ * limit is above the server cap. A limit at or under the cap never reaches
+ * here: it is one request, obeyed literally.
+ *
+ * THE FIRST PAGE IS THE ONLY ONE MOST READS EVER MAKE, because a second is
+ * fetched only when the first came back exactly full. Under the cap this is
+ * byte-for-byte the request it always was.
+ *
+ * ORDER IS WHAT MAKES PAGE TWO SOUND. Without a total order the database may
+ * return one row on both pages and another on neither, so a walk that has to
+ * continue is restarted under a deterministic order rather than continued
+ * under none. The restart costs one request in the rare case and buys an
+ * answer that is actually complete. A caller that already ordered keeps its
+ * own ordering, which is the usual case and costs nothing.
+ */
+async function fetchEveryPage<T>(table: string, params: URLSearchParams, want = Infinity): Promise<T[]> {
+  const firstSize = Math.min(PAGE_SIZE, want);
+  const first = await fetchPage<T>(table, withRange(params, firstSize, 0));
+  if (first.length < firstSize || first.length >= want) return first.slice(0, want);
+
+  const ordered = new URLSearchParams(params);
+  if (!ordered.has("order")) ordered.set("order", "id.asc");
+
+  const out: T[] = [];
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const size = Math.min(PAGE_SIZE, want - out.length);
+    const rows = await fetchPage<T>(table, withRange(ordered, size, page * PAGE_SIZE));
+    out.push(...rows);
+    if (rows.length < size || out.length >= want) return out;
+  }
+  throw new Error(
+    `Supabase ${table}: more than ${MAX_PAGES * PAGE_SIZE} rows for one read. ` +
+      "Refusing to keep walking: narrow the filter or pass an explicit limit.",
+  );
+}
+
+function withRange(params: URLSearchParams, limit: number, offset: number): URLSearchParams {
+  const next = new URLSearchParams(params);
+  next.set("limit", String(limit));
+  next.set("offset", String(offset));
+  return next;
+}
+
+/**
+ * The one decision both read helpers share: does this read fit in a single
+ * request, or does it have to be walked.
+ *
+ * A LIMIT ABOVE THE CAP IS NOT A LIMIT, IT IS A WISH. Asking for 2000 rows
+ * returns 1000 and no complaint, which is how four cached reads in this file
+ * came to carry `limit=2000` while being able to deliver at most half of it.
+ * So the cap, not the caller's number, decides whether to page.
+ *
+ * An `offset` is left exactly as written: a caller doing its own windowing
+ * owns the window.
+ */
+async function readRows<T>(table: string, params: URLSearchParams): Promise<T[]> {
+  if (params.has("offset")) return fetchPage<T>(table, params);
+
+  const asked = params.get("limit");
+  if (asked === null) return fetchEveryPage<T>(table, params);
+
+  const want = Number(asked);
+  if (!Number.isFinite(want) || want <= PAGE_SIZE) return fetchPage<T>(table, params);
+
+  const rest = new URLSearchParams(params);
+  rest.delete("limit");
+  return fetchEveryPage<T>(table, rest, want);
+}
+
 async function query<T extends { origin?: Origin }>(
   table: string,
   opts: QueryOpts = {},
@@ -158,26 +282,7 @@ async function query<T extends { origin?: Origin }>(
     if (v !== undefined) params.set(k, String(v));
   }
 
-  // Reads are safe to retry: a GET that never reached the server or whose
-  // response was lost to a handoff cost nothing to repeat.
-  const res = await fetchWithTimeout(
-    `${SB_URL}/rest/v1/${table}?${params}`,
-    {
-      headers: {
-        apikey: SB_KEY,
-        Authorization: `Bearer ${SB_KEY}`,
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    },
-    { retries: 1 },
-  );
-
-  if (!res.ok) {
-    throw new Error(`Supabase ${table} -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
-  }
-
-  const data = (await res.json()) as T[];
+  const data = await readRows<T>(table, params);
   const origins = [...new Set(data.map((r) => r.origin).filter(Boolean))] as Origin[];
 
   // The guarantee this guards is specifically synthetic-vs-real (a synthetic row
@@ -368,12 +473,14 @@ export async function listAccounts(
  * account so a rep logging a call never gets told a current client is new.
  */
 export async function listAccountsForMatching(): Promise<Result<TierRow>> {
+  // No ceiling: this is "every real account", and a matcher that stops at the
+  // thousandth would tell Juan a current client is new. The 1000 that used to
+  // sit here was the server's own cap written out as if it were a decision.
   return query<TierRow>("nb_v_account_tier", {
     select: "*",
     hubspot_owner_id: `eq.${JUAN_OWNER_ID}`,
     closed_at: "is.null",
     lifecycle: "neq.waypoint",
-    limit: 1000,
   });
 }
 
@@ -389,7 +496,6 @@ export async function listBookPlaces(): Promise<Result<BookPlace>> {
     select: "id,city,state",
     hubspot_owner_id: `eq.${JUAN_OWNER_ID}`,
     closed_at: "is.null",
-    limit: 1000,
   });
 }
 
@@ -2260,15 +2366,8 @@ async function raw<T>(path: string): Promise<T[]> {
   // row (Juan asked, 2026-09-16, whether these lists refresh; they do, live,
   // on every page load -- this just stops a bad connection from turning that
   // live read into a blank page).
-  const res = await fetchWithTimeout(
-    `${SB_URL}/rest/v1/${path}`,
-    { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Accept: "application/json" }, cache: "no-store" },
-    { retries: 1 },
-  );
-  if (!res.ok) {
-    throw new Error(`Supabase ${path} -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
-  }
-  return (await res.json()) as T[];
+  const [table, search = ""] = path.split("?");
+  return readRows<T>(table, new URLSearchParams(search));
 }
 
 /**
@@ -2304,15 +2403,12 @@ async function raw<T>(path: string): Promise<T[]> {
  */
 const fetchPriorityBookRaw = unstable_cache(
   async (path: string): Promise<unknown> => {
-    const res = await fetchWithTimeout(
-      `${SB_URL}/rest/v1/${path}`,
-      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Accept: "application/json" } },
-      { retries: 1 },
-    );
-    if (!res.ok) {
-      throw new Error(`Supabase ${path} -> HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
-    }
-    return res.json();
+    // Through the same pager as every other read (readRows), because these
+    // paths are exactly the ones that asked for `limit=2000` and were being
+    // handed 1000. Whatever it costs in requests is paid once per 5 minutes,
+    // not once per page load, which is the whole point of this cache.
+    const [table, search = ""] = path.split("?");
+    return readRows<unknown>(table, new URLSearchParams(search));
   },
   ["nb-priority-book-raw"],
   { tags: ["priority-book"], revalidate: 300 },
@@ -2717,7 +2813,10 @@ export async function listOwnerAccounts(): Promise<Result<MapAccount>> {
          a working GO button. See migration 0026. */
       closed_at: "is.null",
       order: "name.asc",
-      limit: 1000,
+      // Every pin on the map, with no ceiling. See listAccountsForMatching:
+      // the 1000 that was here was the server's cap, not a product decision,
+      // and a map that silently stops drawing at the thousandth account is
+      // indistinguishable from an account that does not exist.
     }),
     raw<{ account_id: string; potential_grade: Tier }>(
       "nb_v_account_potential?select=account_id,potential_grade&limit=1000",
