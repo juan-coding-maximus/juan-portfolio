@@ -41,18 +41,14 @@ import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "rea
 import { createPortal } from "react-dom";
 import type { RouteEndpoint } from "../lib/dal";
 import { searchRouteAddresses } from "../lib/stop-actions";
+import { matches } from "../lib/search-match";
 import { Ico } from "../lib/ui";
 
 const HOME_WORDS = ["home", "apartment", "house"];
 
 function matchesHome(home: RouteEndpoint, q: string): boolean {
   if (!q) return true;
-  const needle = q.toLowerCase();
-  return (
-    HOME_WORDS.some((w) => w.startsWith(needle)) ||
-    home.label.toLowerCase().includes(needle) ||
-    home.address.toLowerCase().includes(needle)
-  );
+  return matches(q, { name: home.label, also: [home.address, ...HOME_WORDS] });
 }
 
 export function RouteEndpointField({

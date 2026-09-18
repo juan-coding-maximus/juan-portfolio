@@ -2,10 +2,14 @@
 
 import { useState } from "react";
 import { AttachmentButton, attachmentNote } from "./attachments-ui";
-import type { MarketingFile } from "./dal";
+import type { Draft, MarketingFile } from "./dal";
+import { AccountLink } from "./modal";
 import { decideDraft, type DraftSentResult } from "./outbound-actions";
 import { imessageLink, toWhatsAppPhone, waLink } from "./outreach-ui";
-import { Ico, SuccessNote } from "./ui";
+import { PriorityChip } from "./priority-ui";
+import type { PriorityResult } from "./priority";
+import { DoneSection, ResolvingRow, useDoneLog } from "./queue-ui";
+import { Card, Empty, Ico, SuccessNote, daysAgo } from "./ui";
 
 /**
  * The three ways to say one short thing to one account, when the queue has
@@ -80,6 +84,157 @@ export function QuickReach({
         </p>
       )}
     </div>
+  );
+}
+
+/** One draft, with everything the card prints already resolved server side.
+ *  Plain data only: this crosses into a client component. */
+export type DraftRow = {
+  draft: Draft;
+  /** Best phone on file for the account (its own line, else a named contact's
+   *  cell), so any draft can offer WhatsApp regardless of how it was made. */
+  phone: string | null;
+  /** Who we actually know at that account, printed on the card. */
+  contactNames: string[];
+  accountName: string | null;
+  priority: PriorityResult | null;
+};
+
+/**
+ * The "Waiting on you" list, client-owned so a handled draft can leave it.
+ *
+ * ORDER IS THE SERVER'S, UNTOUCHED. outbound/page.tsx ranks by fit score with
+ * urgency as the tiebreak (Juan, 2026-09-16, after a fit-100 draft stayed
+ * buried under older ungraded-urgency threads). This component only decides
+ * which rows are still open, never where they sit.
+ */
+export function DraftQueue({
+  rows,
+  files,
+  synthetic,
+  emptyMessage,
+}: {
+  rows: DraftRow[];
+  files: MarketingFile[];
+  synthetic: boolean;
+  emptyMessage: string;
+}) {
+  // Which rows have finished leaving. Resolution state itself lives in the
+  // card, so a row that errors is untouched here and stays put.
+  const [gone, setGone] = useState<Set<string>>(new Set());
+  const [resolved, setResolved] = useState<Record<string, "Sent" | "Dismissed">>({});
+  const { done, log } = useDoneLog();
+
+  const open = rows.filter((r) => !gone.has(r.draft.id));
+
+  return (
+    <>
+      {open.length === 0 ? (
+        <Empty>{emptyMessage}</Empty>
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {open.map((row) => (
+            <li key={row.draft.id}>
+              <ResolvingRow
+                resolved={Boolean(resolved[row.draft.id])}
+                onGone={() => {
+                  const outcome = resolved[row.draft.id];
+                  setGone((prev) => new Set(prev).add(row.draft.id));
+                  if (outcome) {
+                    log({
+                      id: row.draft.id,
+                      label: row.accountName ?? row.draft.subject ?? "Draft",
+                      outcome,
+                    });
+                  }
+                }}
+              >
+                <DraftCard
+                  row={row}
+                  files={files}
+                  synthetic={synthetic}
+                  onResolved={(outcome) => setResolved((prev) => ({ ...prev, [row.draft.id]: outcome }))}
+                />
+              </ResolvingRow>
+            </li>
+          ))}
+        </ul>
+      )}
+      <DoneSection entries={done} />
+    </>
+  );
+}
+
+function DraftCard({
+  row,
+  files,
+  synthetic,
+  onResolved,
+}: {
+  row: DraftRow;
+  files: MarketingFile[];
+  synthetic: boolean;
+  onResolved: (outcome: "Sent" | "Dismissed") => void;
+}) {
+  const d = row.draft;
+  return (
+    <Card>
+      <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <ChannelLabel channel={d.preferred_channel ?? (d.channel as ChannelKind)} preferred={Boolean(d.preferred_channel)} />
+        {d.subject && <span className="text-[14px] font-medium">{d.subject}</span>}
+        {d.to_email && (
+          <span className="text-[12px] text-[#8A928C]">
+            {d.to_name ? `${d.to_name} · ` : ""}
+            {d.to_email}
+          </span>
+        )}
+        {row.contactNames.length > 0 && (
+          <span className="text-[12px] text-[#8A928C]" title="Contacts on file for this account">
+            {row.contactNames.join(", ")}
+          </span>
+        )}
+        {d.account_id && (
+          <AccountLink
+            id={d.account_id}
+            className="inline-flex items-center gap-1 text-[12px] font-medium text-[#5B6560] hover:text-[#14201B]"
+          >
+            <Ico name="external" size={12} />
+            Account
+          </AccountLink>
+        )}
+        <span className="text-[12px] text-[#8A928C]">{daysAgo(d.created_at)}</span>
+        {/* The reason the queue is in this order. Shown only for the two tiers
+            that mean "do something", so the screen stays quiet, and carrying
+            its own evidence in the tooltip: a priority with no stated reason is
+            one nobody can correct. */}
+        {(d.urgency === 2 || d.urgency === 1) && (
+          <span
+            className={
+              d.urgency === 2
+                ? "rounded bg-[#F3E3C6] px-1.5 py-0.5 text-[11px] font-medium text-[#8A6D2F]"
+                : "rounded border border-[#DAD7CC] px-1.5 py-0.5 text-[11px] text-[#5B6560]"
+            }
+            title={d.urgency_reason ?? undefined}
+          >
+            {d.urgency === 2 ? "needs a reply today" : "soon"}
+          </span>
+        )}
+        {/* The account's own priority, second to the urgency chip beside it and
+            printed the same way: a number that carries its evidence sentence,
+            never a bare grade. */}
+        {d.account_id && <PriorityChip result={row.priority ?? undefined} compact />}
+        {d.play_key && (
+          <span
+            className="rounded bg-[#ECEAE1] px-1.5 py-0.5 text-[11px] text-[#3D4A44]"
+            title="Which play produced this draft. Recorded so reply rates can be compared by approach."
+          >
+            {d.play_key.replace(/_/g, " ")}
+          </span>
+        )}
+      </div>
+      <p className="max-w-[76ch] text-[13.5px] leading-relaxed whitespace-pre-wrap text-[#3D4A44]">{d.body_md}</p>
+      <DraftActions draft={d} phone={row.phone} files={files} synthetic={synthetic} onResolved={onResolved} />
+    </Card>
   );
 }
 
@@ -225,11 +380,17 @@ export function DraftActions({
   phone,
   files,
   synthetic,
+  onResolved,
 }: {
   draft: DraftLite;
   phone: string | null;
   files: MarketingFile[];
   synthetic: boolean;
+  /** Fires only on a write the server confirmed. The list above uses it to
+   *  start this card's exit (lib/queue-ui.tsx): the confirmation below is a
+   *  beat, not a resting state, and a handled draft does not belong in a queue
+   *  of things waiting on you (Juan, 2026-09-17). An error never calls it. */
+  onResolved?: (outcome: "Sent" | "Dismissed") => void;
 }) {
   const [attached, setAttached] = useState<MarketingFile[]>([]);
   // Decided locally, not just server-revalidated: `decideDraft` used to be a
@@ -264,6 +425,7 @@ export function DraftActions({
       );
       setSentResult(result);
       setDecided(status);
+      onResolved?.(status === "sent" ? "Sent" : "Dismissed");
     } catch (e) {
       setError(e instanceof Error ? e.message : "That didn't go through, try again.");
     } finally {
@@ -272,7 +434,11 @@ export function DraftActions({
   }
 
   if (decided === "dismissed") {
-    return <div className="mt-3.5 text-[12px] text-[#8A928C]">Dismissed.</div>;
+    return (
+      <div className="mt-3.5">
+        <SuccessNote title="Dismissed" />
+      </div>
+    );
   }
 
   if (decided === "sent") {

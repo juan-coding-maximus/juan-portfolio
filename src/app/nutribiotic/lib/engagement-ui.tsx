@@ -20,7 +20,8 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { fileEngagement, previewEngagement, type EngagementOutcome } from "./engagement-actions";
-import { Card, Ico } from "./ui";
+import { ResolvingRow } from "./queue-ui";
+import { Card, Ico, SuccessNote } from "./ui";
 import type { EngagementActivity } from "./dal";
 
 export function EngagementQueue({ activities }: { activities: EngagementActivity[] }) {
@@ -40,6 +41,10 @@ export function EngagementQueue({ activities }: { activities: EngagementActivity
 function AutoFiler({ activities }: { activities: EngagementActivity[] }) {
   const fired = useRef(new Set<number>());
   const [failed, setFailed] = useState<EngagementActivity[]>([]);
+  // Rows that have since filed by hand and finished their exit. A card whose
+  // whole job was "this one still needs filing" has no reason to stay once it
+  // is filed (Juan, 2026-09-17).
+  const [gone, setGone] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     for (const a of activities) {
@@ -51,11 +56,17 @@ function AutoFiler({ activities }: { activities: EngagementActivity[] }) {
     }
   }, [activities]);
 
-  if (failed.length === 0) return null;
+  const open = failed.filter((a) => !gone.has(a.id));
+  if (open.length === 0) return null;
   return (
     <div className="mb-3 flex flex-col gap-3">
-      {failed.map((a) => (
-        <EngagementRow key={a.id} activity={a} actionableOnly />
+      {open.map((a) => (
+        <EngagementRow
+          key={a.id}
+          activity={a}
+          actionableOnly
+          onGone={() => setGone((prev) => new Set(prev).add(a.id))}
+        />
       ))}
     </div>
   );
@@ -69,9 +80,12 @@ function AutoFiler({ activities }: { activities: EngagementActivity[] }) {
 function EngagementRow({
   activity,
   actionableOnly = false,
+  onGone,
 }: {
   activity: EngagementActivity;
   actionableOnly?: boolean;
+  /** Called once the row has confirmed the filing and finished leaving. */
+  onGone?: () => void;
 }) {
   const [preview, setPreview] = useState<EngagementOutcome | null>(null);
   const [filed, setFiled] = useState<EngagementOutcome | null>(null);
@@ -99,7 +113,13 @@ function EngagementRow({
 
   if (actionableOnly && !interacted && !hasAction) return null;
 
+  // Filed by hand: confirm, then go. Only a filing the server confirmed
+  // (`wrote`) counts; an error or a scope block keeps the card exactly where
+  // it is, because that is work still to do.
+  const filedNow = Boolean(filed?.ok && filed.result.wrote);
+
   return (
+    <ResolvingRow resolved={filedNow} onGone={() => onGone?.()}>
     <Card>
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-[13.5px] font-medium">{(activity.kind || "").replace(/_/g, " ")}</span>
@@ -154,9 +174,12 @@ function EngagementRow({
           )}
 
           {shown.result.wrote ? (
-            <div className="mt-3 flex items-center gap-1.5 text-[13px] text-[#2C6A46]">
-              <Ico name="check" size={13} />
-              Filed as {shown.result.otype.toLowerCase()} {shown.result.noteId}
+            <div className="mt-3">
+              <SuccessNote
+                title={`Filed: ${shown.result.accountName}`}
+                hubspotFiled
+                hubspotId={shown.result.noteId}
+              />
             </div>
           ) : (
             <button
@@ -170,5 +193,6 @@ function EngagementRow({
         </>
       )}
     </Card>
+    </ResolvingRow>
   );
 }

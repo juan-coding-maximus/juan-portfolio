@@ -17,14 +17,14 @@
  * a reload of the Search screen should not mean a fresh full-book read.
  */
 import { hasAccess } from "../../../lib/devices";
-import { listAccountsForMatching, type TierRow } from "../../../lib/dal";
+import { listAccountsForMatching, listBookPlaces, type TierRow } from "../../../lib/dal";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const CACHE_MS = 60_000;
 
-let cache: { at: number; rows: TierRow[] } | null = null;
+let cache: { at: number; rows: TierRow[]; where: Map<string, { city: string | null; state: string | null }> } | null = null;
 
 export async function GET() {
   if (!(await hasAccess())) {
@@ -33,8 +33,15 @@ export async function GET() {
 
   try {
     if (!cache || Date.now() - cache.at >= CACHE_MS) {
-      const res = await listAccountsForMatching();
-      cache = { at: Date.now(), rows: res.data ?? [] };
+      // The city rides along because the box is searched by name AND place,
+      // and the tier view has no city column of its own. One extra read per
+      // cache window, not per keystroke.
+      const [res, places] = await Promise.all([listAccountsForMatching(), listBookPlaces()]);
+      cache = {
+        at: Date.now(),
+        rows: res.data ?? [],
+        where: new Map((places.data ?? []).map((p) => [p.id, { city: p.city, state: p.state }])),
+      };
     }
   } catch (e) {
     return Response.json(
@@ -48,6 +55,8 @@ export async function GET() {
     name: row.name,
     area: row.area,
     tier: row.tier,
+    city: cache!.where.get(row.account_id)?.city ?? null,
+    state: cache!.where.get(row.account_id)?.state ?? null,
   }));
 
   return Response.json(

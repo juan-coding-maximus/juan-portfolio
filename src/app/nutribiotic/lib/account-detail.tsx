@@ -306,11 +306,16 @@ export function AccountDetailBody({
                 // real information (an owner named with no job title stated) and
                 // used to render nothing at all here, silently.
                 const roleLabel = c.title || (c.role_tag ? c.role_tag[0].toUpperCase() + c.role_tag.slice(1) : null);
+                // The front desk whose name he did not catch is a real person he
+                // met, so the role takes the name's place instead of leaving a
+                // bare grey label floating where a person should be.
+                const lead = name || roleLabel;
+                if (!lead) return null;
                 return (
                   <li key={c.id} className="flex flex-col gap-0.5 text-[13.5px]">
                     <div className="flex items-baseline gap-2">
-                      {name && <span className="font-medium">{name}</span>}
-                      {roleLabel && <span className="text-[12px] text-[#8A928C]">{roleLabel}</span>}
+                      <span className="font-medium">{lead}</span>
+                      {name && roleLabel && <span className="text-[12px] text-[#8A928C]">{roleLabel}</span>}
                       {c.is_decision_maker && (
                         <span className="rounded bg-[#ECEAE1] px-1.5 py-0.5 text-[10.5px] font-medium tracking-wide text-[#3D4A44] uppercase">
                           Decision maker

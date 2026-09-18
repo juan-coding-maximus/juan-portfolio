@@ -30,6 +30,41 @@ import {
 } from "./dal";
 import type { Readiness } from "./priority";
 import { enrichAccountQuickly, type QuickEnrichResult } from "./quick-enrich";
+import { rankMatches, selectiveTokens } from "./search-match";
+
+/**
+ * WHY THESE TWO SEARCHES FETCH ON ONE WORD AND RANK HERE (2026-09-17).
+ *
+ * dal's searchOwnedAccounts/searchOwnedContacts are a single PostgREST `ilike`
+ * on one column, which is everything that layer can express. Hand either of
+ * them a sentence a person would actually type ("shine natural market,
+ * encinitas") and it answers with nothing, because no name column contains
+ * that string. So the request goes out on the most selective single WORD, and
+ * which rows survive is decided here by lib/search-match.ts, the same rule
+ * every in-memory box in the OS uses. The common case is still one request:
+ * the second word is only tried when the first comes back empty, and the
+ * shortened third probe only when both do, which is how a mistyped tail
+ * ("lassans") still finds Lassens.
+ */
+const PROBE_FETCH_CAP = 40;
+
+function probes(query: string): string[] {
+  const tokens = selectiveTokens(query, 2);
+  if (tokens.length === 0) return [query.trim()];
+  const head = tokens[0].slice(0, 4);
+  return tokens[0].length > 5 ? [...tokens, head] : tokens;
+}
+
+async function probeFetch<T>(
+  query: string,
+  fetcher: (probe: string, limit: number) => Promise<{ data: T[] }>,
+): Promise<T[]> {
+  for (const probe of probes(query)) {
+    const res = await fetcher(probe, PROBE_FETCH_CAP);
+    if (res.data.length > 0) return res.data;
+  }
+  return [];
+}
 
 export type SdrSearchHit = {
   accountId: string;
@@ -57,12 +92,17 @@ export type SdrSearchHit = {
 export async function searchSdrClients(q: string): Promise<SdrSearchHit[]> {
   const query = q.trim();
   if (query.length < 2) return [];
-  const [accounts, contacts] = await Promise.all([searchOwnedAccounts(query, 6), searchOwnedContacts(query, 6)]);
+  const [accountRows, contactRows] = await Promise.all([
+    probeFetch(query, searchOwnedAccounts),
+    probeFetch(query, searchOwnedContacts),
+  ]);
+  const accounts = rankMatches(query, accountRows, (a) => ({ name: a.name, also: [a.city, a.area] }), 6);
+  const contacts = rankMatches(query, contactRows, (c) => ({ name: c.name, also: [c.title, c.account_name, c.city] }), 6);
   const byAccount = new Map<string, SdrSearchHit>();
-  for (const a of accounts.data) {
+  for (const a of accounts) {
     byAccount.set(a.id, { accountId: a.id, accountName: a.name, city: a.city, phone: a.phone, area: a.area, contactName: null, contactTitle: null });
   }
-  for (const c of contacts.data) {
+  for (const c of contacts) {
     const existing = byAccount.get(c.account_id);
     if (existing && !existing.contactName) {
       byAccount.set(c.account_id, { ...existing, contactName: c.name, contactTitle: c.title });
@@ -325,8 +365,8 @@ export async function runQuickEnrichment(accountId: string): Promise<QuickEnrich
 }
 
 export async function searchSdrAccounts(query: string) {
-  const res = await searchOwnedAccounts(query);
-  return res.data;
+  const rows = await probeFetch(query, searchOwnedAccounts);
+  return rankMatches(query, rows, (a) => ({ name: a.name, also: [a.city, a.area] }), 8);
 }
 
 export async function addSdrScheduleItem(input: NewSdrScheduleItem): Promise<SdrScheduleItem> {

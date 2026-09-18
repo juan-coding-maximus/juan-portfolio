@@ -35,12 +35,11 @@ import {
   listOwnerContactPhones,
   isConfigured,
 } from "../lib/dal";
-import { AccountLink } from "../lib/modal";
 import { ManualEmailComposer } from "../lib/manual-email-ui";
-import { ChannelLabel, DraftActions, QuickReach, type ChannelKind } from "../lib/outbound-ui";
+import { DraftQueue, QuickReach, type DraftRow } from "../lib/outbound-ui";
 import { OutreachComposer } from "../lib/outreach-ui";
-import { PriorityChip, PriorityPanel } from "../lib/priority-ui";
-import { Card, Empty, Ico, PageHead, daysAgo } from "../lib/ui";
+import { PriorityPanel } from "../lib/priority-ui";
+import { Card, Empty, PageHead } from "../lib/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -134,6 +133,19 @@ export default async function Outbound({
     contactNamesByAccount.set(c.account_id, list);
   }
 
+  /* Everything each card prints, resolved here and handed down as plain data.
+     The list itself is a client component now (DraftQueue), because a draft
+     Juan has marked sent or dismissed has to LEAVE the queue rather than sit in
+     it wearing a confirmation (Juan, 2026-09-17). The order above is untouched:
+     this maps `drafts` in place. */
+  const rows: DraftRow[] = drafts.map((d) => ({
+    draft: d,
+    phone: d.account_id ? (phoneByAccount.get(d.account_id) ?? null) : null,
+    contactNames: d.account_id ? (contactNamesByAccount.get(d.account_id) ?? []) : [],
+    accountName: d.account_id ? (accounts.find((a) => a.id === d.account_id)?.name ?? null) : null,
+    priority: d.account_id ? (priority.byId.get(d.account_id) ?? null) : null,
+  }));
+
   return (
     <>
       <PageHead title="Outbound" />
@@ -204,76 +216,14 @@ export default async function Outbound({
           </Empty>
         )
       ) : (
-        <ul className="flex flex-col gap-3">
-          {drafts.map((d) => (
-            <li key={d.id}>
-              <Card>
-                <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <ChannelLabel channel={d.preferred_channel ?? (d.channel as ChannelKind)} preferred={Boolean(d.preferred_channel)} />
-                  {d.subject && <span className="text-[14px] font-medium">{d.subject}</span>}
-                  {d.to_email && (
-                    <span className="text-[12px] text-[#8A928C]">
-                      {d.to_name ? `${d.to_name} · ` : ""}
-                      {d.to_email}
-                    </span>
-                  )}
-                  {d.account_id && (contactNamesByAccount.get(d.account_id)?.length ?? 0) > 0 && (
-                    <span className="text-[12px] text-[#8A928C]" title="Contacts on file for this account">
-                      {contactNamesByAccount.get(d.account_id)!.join(", ")}
-                    </span>
-                  )}
-                  {d.account_id && (
-                    <AccountLink
-                      id={d.account_id}
-                      className="inline-flex items-center gap-1 text-[12px] font-medium text-[#5B6560] hover:text-[#14201B]"
-                    >
-                      <Ico name="external" size={12} />
-                      Account
-                    </AccountLink>
-                  )}
-                  <span className="text-[12px] text-[#8A928C]">{daysAgo(d.created_at)}</span>
-                  {/* The reason the queue is in this order. Shown only for the
-                      two tiers that mean "do something", so the screen stays
-                      quiet, and carrying its own evidence in the tooltip: a
-                      priority with no stated reason is one nobody can correct. */}
-                  {(d.urgency === 2 || d.urgency === 1) && (
-                    <span
-                      className={
-                        d.urgency === 2
-                          ? "rounded bg-[#F3E3C6] px-1.5 py-0.5 text-[11px] font-medium text-[#8A6D2F]"
-                          : "rounded border border-[#DAD7CC] px-1.5 py-0.5 text-[11px] text-[#5B6560]"
-                      }
-                      title={d.urgency_reason ?? undefined}
-                    >
-                      {d.urgency === 2 ? "needs a reply today" : "soon"}
-                    </span>
-                  )}
-                  {/* The account's own priority, second to the urgency chip
-                      beside it and printed the same way: a number that carries
-                      its evidence sentence, never a bare grade. */}
-                  {d.account_id && <PriorityChip result={priority.byId.get(d.account_id)} compact />}
-                  {d.play_key && (
-                    <span
-                      className="rounded bg-[#ECEAE1] px-1.5 py-0.5 text-[11px] text-[#3D4A44]"
-                      title="Which play produced this draft. Recorded so reply rates can be compared by approach."
-                    >
-                      {d.play_key.replace(/_/g, " ")}
-                    </span>
-                  )}
-                </div>
-                <p className="max-w-[76ch] text-[13.5px] leading-relaxed whitespace-pre-wrap text-[#3D4A44]">
-                  {d.body_md}
-                </p>
-                <DraftActions
-                  draft={d}
-                  phone={d.account_id ? (phoneByAccount.get(d.account_id) ?? null) : null}
-                  files={files}
-                  synthetic={synthetic}
-                />
-              </Card>
-            </li>
-          ))}
-        </ul>
+        <DraftQueue
+          rows={rows}
+          files={files}
+          synthetic={synthetic}
+          emptyMessage={
+            accountFilter ? "Nothing queued for this account right now." : "No drafts waiting on you."
+          }
+        />
       )}
     </>
   );

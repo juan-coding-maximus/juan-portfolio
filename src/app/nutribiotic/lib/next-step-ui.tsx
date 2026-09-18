@@ -14,6 +14,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import type { Touchpoint } from "./dal";
+import { ResolvingRow } from "./queue-ui";
 import { resolveTouchpointNextStep, type ResolveResult } from "./touchpoint";
 import { Ico, SuccessNote } from "./ui";
 
@@ -21,10 +22,15 @@ export function NextStepResolver({
   touchpointId,
   accountName,
   onResolved,
+  onSuccess,
 }: {
   touchpointId: string;
   accountName: string | null;
   onResolved?: () => void;
+  /** Fired the instant the write lands, for a caller that owns the row's own
+   *  exit timing (PendingNextSteps below). `onResolved` stays what it was: the
+   *  "that's had its 3.5 seconds" beat the capture box uses to reset itself. */
+  onSuccess?: () => void;
 }) {
   const [text, setText] = useState("");
   const [result, setResult] = useState<ResolveResult | null>(null);
@@ -35,6 +41,7 @@ export function NextStepResolver({
   // matchResult/created): read it, or wait, either way it clears itself.
   useEffect(() => {
     if (!result?.ok) return;
+    onSuccess?.();
     const t = setTimeout(() => onResolved?.(), 3500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -109,6 +116,34 @@ type QueuePayload = {
   accountNames?: Record<string, string>;
 };
 
+/** One row of the queue: the note, the box that answers it, and the exit it
+ *  takes once answered (lib/queue-ui.tsx). */
+function PendingNextStepRow({
+  touchpointId,
+  rawText,
+  accountName,
+  onGone,
+}: {
+  touchpointId: string;
+  rawText: string;
+  accountName: string | null;
+  onGone: () => void;
+}) {
+  const [resolved, setResolved] = useState(false);
+  return (
+    <ResolvingRow resolved={resolved} onGone={onGone}>
+      <div className="rounded-xl border border-[#E2DFD5] bg-white p-4">
+        <p className="line-clamp-3 text-[13px] leading-relaxed text-[#3D4A44]">{rawText}</p>
+        <NextStepResolver
+          touchpointId={touchpointId}
+          accountName={accountName}
+          onSuccess={() => setResolved(true)}
+        />
+      </div>
+    </ResolvingRow>
+  );
+}
+
 /**
  * A voice-recorded visit resolves async, after transcription, on nobody's
  * screen (the same gap listPendingAccountMatches/unmatched-ui.tsx exist for,
@@ -121,6 +156,9 @@ type QueuePayload = {
 export function PendingNextSteps() {
   const [data, setData] = useState<QueuePayload | null>(null);
   const [failed, setFailed] = useState(false);
+  // Answered rows leave after their confirmation, rather than holding a place
+  // in a list headed "Needs a next step" that no longer needs one.
+  const [gone, setGone] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -152,7 +190,7 @@ export function PendingNextSteps() {
     );
   }
 
-  const rows = data?.pendingNextSteps ?? [];
+  const rows = (data?.pendingNextSteps ?? []).filter((tp) => !gone.has(tp.id));
   const accountNames = data?.accountNames ?? {};
   if (rows.length === 0) return null;
 
@@ -163,13 +201,13 @@ export function PendingNextSteps() {
       </h2>
       <div className="flex flex-col gap-4">
         {rows.map((tp) => (
-          <div key={tp.id} className="rounded-xl border border-[#E2DFD5] bg-white p-4">
-            <p className="line-clamp-3 text-[13px] leading-relaxed text-[#3D4A44]">{tp.raw_text}</p>
-            <NextStepResolver
-              touchpointId={tp.id}
-              accountName={tp.account_id ? accountNames[tp.account_id] ?? null : null}
-            />
-          </div>
+          <PendingNextStepRow
+            key={tp.id}
+            touchpointId={tp.id}
+            rawText={tp.raw_text}
+            accountName={tp.account_id ? accountNames[tp.account_id] ?? null : null}
+            onGone={() => setGone((prev) => new Set(prev).add(tp.id))}
+          />
         ))}
       </div>
     </section>

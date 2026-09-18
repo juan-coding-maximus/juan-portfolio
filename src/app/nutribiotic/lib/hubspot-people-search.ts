@@ -22,14 +22,28 @@
  * with each other, and never a number invented when neither side has one --
  * the call still gets added, just with an empty phone field to fill by hand,
  * same as searching for nothing at all.
+ *
+ * ONE WORD GOES OUT, THE FULL QUERY DECIDES THE ORDER (2026-09-17). HubSpot's
+ * CONTAINS_TOKEN takes one string and nothing else, so a name typed with the
+ * city after it came back empty. The search now goes out on the most
+ * selective single word and the results are ranked here against everything
+ * Juan typed, through lib/search-match.ts. Ranked, never filtered: HubSpot
+ * hands back no city on a contact, so a row this rule cannot explain sinks to
+ * the bottom of the list rather than being taken off a screen that used to
+ * show it.
  */
 
 import { batchRead, request } from "./hubspot";
+import { matchScore, selectiveTokens } from "./search-match";
 
 export type HubspotCallCandidate = {
   id: string;
   kind: "contact" | "company";
   label: string;
+  /** Read for the ranking, so a query that names the town lands on the right
+   *  branch. Only a company carries one; HubSpot's contact search does not
+   *  hand back an address. */
+  city: string | null;
   phone: string | null;
   /** Set only when the phone came from the OTHER object, not this one, so the
    *  UI can say "via <company>" rather than implying it's this contact's own
@@ -54,6 +68,40 @@ function toE164(raw: string | null | undefined): string | null {
   return trimmed;
 }
 
+async function searchOnce(term: string): Promise<{ contacts: SearchHit[]; companies: SearchHit[] }> {
+  const [contactsRes, companiesRes] = await Promise.all([
+    request<{ results?: SearchHit[] }>({
+      method: "POST",
+      path: "/crm/v3/objects/contacts/search",
+      body: {
+        limit: 6,
+        properties: ["firstname", "lastname", "phone", "associatedcompanyid"],
+        // Two filter GROUPS, not two filters in one group: HubSpot ANDs
+        // within a group and ORs across groups, and "Amanda" has to match
+        // firstname OR lastname, not both at once.
+        filterGroups: [
+          { filters: [{ propertyName: "firstname", operator: "CONTAINS_TOKEN", value: term }] },
+          { filters: [{ propertyName: "lastname", operator: "CONTAINS_TOKEN", value: term }] },
+        ],
+      },
+      entity: "contacts",
+      operation: "search",
+    }),
+    request<{ results?: SearchHit[] }>({
+      method: "POST",
+      path: "/crm/v3/objects/companies/search",
+      body: {
+        limit: 6,
+        properties: ["name", "phone", "city"],
+        filterGroups: [{ filters: [{ propertyName: "name", operator: "CONTAINS_TOKEN", value: term }] }],
+      },
+      entity: "companies",
+      operation: "search",
+    }),
+  ]);
+  return { contacts: contactsRes.results ?? [], companies: companiesRes.results ?? [] };
+}
+
 export async function searchHubspotForCall(query: string): Promise<HubspotCallCandidate[]> {
   const q = query.trim();
   if (q.length < 2) return [];
@@ -61,38 +109,15 @@ export async function searchHubspotForCall(query: string): Promise<HubspotCallCa
   let contacts: SearchHit[] = [];
   let companies: SearchHit[] = [];
   try {
-    const [contactsRes, companiesRes] = await Promise.all([
-      request<{ results?: SearchHit[] }>({
-        method: "POST",
-        path: "/crm/v3/objects/contacts/search",
-        body: {
-          limit: 6,
-          properties: ["firstname", "lastname", "phone", "associatedcompanyid"],
-          // Two filter GROUPS, not two filters in one group: HubSpot ANDs
-          // within a group and ORs across groups, and "Amanda" has to match
-          // firstname OR lastname, not both at once.
-          filterGroups: [
-            { filters: [{ propertyName: "firstname", operator: "CONTAINS_TOKEN", value: q }] },
-            { filters: [{ propertyName: "lastname", operator: "CONTAINS_TOKEN", value: q }] },
-          ],
-        },
-        entity: "contacts",
-        operation: "search",
-      }),
-      request<{ results?: SearchHit[] }>({
-        method: "POST",
-        path: "/crm/v3/objects/companies/search",
-        body: {
-          limit: 6,
-          properties: ["name", "phone"],
-          filterGroups: [{ filters: [{ propertyName: "name", operator: "CONTAINS_TOKEN", value: q }] }],
-        },
-        entity: "companies",
-        operation: "search",
-      }),
-    ]);
-    contacts = contactsRes.results ?? [];
-    companies = companiesRes.results ?? [];
+    const terms = selectiveTokens(q, 2);
+    for (const term of terms.length > 0 ? terms : [q]) {
+      const hit = await searchOnce(term);
+      if (hit.contacts.length > 0 || hit.companies.length > 0) {
+        contacts = hit.contacts;
+        companies = hit.companies;
+        break;
+      }
+    }
   } catch {
     // HubSpot unreachable or unconfigured: the field still works, it just
     // has nothing to suggest, same as searchRouteAddresses degrading to [].
@@ -135,6 +160,7 @@ export async function searchHubspotForCall(query: string): Promise<HubspotCallCa
       id: c.id,
       kind: "contact",
       label: name,
+      city: null,
       phone: ownPhone ?? toE164(fallbackRaw),
       phoneVia: ownPhone ? null : fallbackRaw ? companyNameById.get(companyId!) ?? "their company" : null,
     };
@@ -183,10 +209,14 @@ export async function searchHubspotForCall(query: string): Promise<HubspotCallCa
       id: co.id,
       kind: "company",
       label: co.properties?.name ?? "(no name)",
+      city: co.properties?.city ?? null,
       phone: ownPhone ?? toE164(fallback?.phone ?? null),
       phoneVia: ownPhone ? null : fallback ? fallback.name : null,
     };
   });
 
-  return [...contactResults, ...companyResults];
+  return [...contactResults, ...companyResults]
+    .map((c) => ({ c, score: matchScore(q, { name: c.label, also: [c.city] }) ?? Number.POSITIVE_INFINITY }))
+    .sort((a, b) => a.score - b.score)
+    .map(({ c }) => c);
 }

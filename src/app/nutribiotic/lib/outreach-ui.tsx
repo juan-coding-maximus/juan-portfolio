@@ -7,6 +7,7 @@ import type { RecordTouchpointResult } from "./touchpoint";
 import { NextStepResolver } from "./next-step-ui";
 import { recordOutreachSent } from "./outreach-actions";
 import { draftOutreachMessage, type LastDraftLite } from "./outreach-draft";
+import { matches, rankMatches } from "./search-match";
 import {
   genericTemplates,
   timedTemplatesFor,
@@ -146,16 +147,22 @@ export function OutreachComposer({
   // contact hit found only through their account's name), never gated
   // behind a mode toggle Juan has to pick before he can even type.
   const directoryMatches = useMemo<DirectoryMatch[]>(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim();
     if (!q) return [];
-    const accountHits: DirectoryMatch[] = accounts
-      .filter((a) => a.name.toLowerCase().includes(q))
-      .map((a): DirectoryMatch => ({ kind: "account", key: `a:${a.id}`, account: a }));
+    const accountHits: DirectoryMatch[] = rankMatches(
+      q,
+      accounts,
+      (a) => ({ name: a.name, also: [a.city] }),
+    ).map((a): DirectoryMatch => ({ kind: "account", key: `a:${a.id}`, account: a }));
+    // A person is findable by their own name and by the company they work at,
+    // since half of what Juan remembers about a contact is where they work.
     const contactHits: DirectoryMatch[] = [];
     for (const c of contacts) {
-      if (![c.first_name, c.last_name].filter(Boolean).join(" ").toLowerCase().includes(q)) continue;
       const a = accounts.find((x) => x.id === c.account_id);
-      if (a) contactHits.push({ kind: "contact", key: `c:${c.id}`, contact: c, account: a });
+      if (!a) continue;
+      const name = [c.first_name, c.last_name].filter(Boolean).join(" ");
+      if (!matches(q, { name, also: [c.title, a.name] })) continue;
+      contactHits.push({ kind: "contact", key: `c:${c.id}`, contact: c, account: a });
     }
     return [...accountHits, ...contactHits].slice(0, 8);
   }, [accounts, contacts, search]);

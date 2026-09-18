@@ -12,6 +12,7 @@
 import { useMemo, useState } from "react";
 import type { DraftSentResult } from "./outbound-actions";
 import { recordManualEmail } from "./outbound-actions";
+import { rankMatches } from "./search-match";
 import { Card, Ico, SuccessNote } from "./ui";
 
 type Account = { id: string; name: string };
@@ -43,9 +44,9 @@ export function ManualEmailComposer({ accounts, contacts }: { accounts: Account[
 
   const accountName = accounts.find((a) => a.id === accountId)?.name ?? null;
   const matches = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim();
     if (!q || accountId) return [];
-    return accounts.filter((a) => a.name.toLowerCase().includes(q)).slice(0, 8);
+    return rankMatches(q, accounts, (a) => ({ name: a.name }), 8);
   }, [accounts, search, accountId]);
   const accountContacts = useMemo(
     () => contacts.filter((c) => c.account_id === accountId),

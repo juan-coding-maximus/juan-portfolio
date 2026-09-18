@@ -38,17 +38,19 @@ import {
   insertActivity,
   insertCloseSignal,
   insertContact,
+  insertAskDraft,
   insertDirectives,
-  insertDraftRequest,
   insertFieldNote,
   insertTouchpoint,
   listAccountsForMatching,
+  listAskKeys,
   listContacts,
   markRouteStopDoneForAccountToday,
   patchContact,
   type AccountFactsReport,
   type Contact,
 } from "./dal";
+import { asksCollide, composeAsk } from "./ask-compose";
 import { Blocked, runEngagement } from "./hubspot-engagement";
 import { ensurePortalCompanyForActivity } from "./hubspot-graduate";
 import { formatBusinessHours, pushBusinessHours, pushCompanyEmail, pushCompanyPhone } from "./hubspot-company";
@@ -368,16 +370,63 @@ function agencyDirectiveRows(
  * promised something, never invented to fill a gap. field_note notes never
  * reach this (no customer was contacted), so this is only called from the
  * two real-contact branches below.
+ *
+ * IT IS WRITTEN HERE, NOT LEFT AS A FRAGMENT (2026-09-17). Until now this
+ * queued the ask exactly as the extractor phrased it, and the Outbound card
+ * rendered that half-sentence as though it were a draft: no subject, no
+ * recipient, nothing a person could send. Juan: "these drafts are bullshit."
+ * Each ask now goes through lib/ask-compose.ts on the way in, with the note it
+ * came from as its only other source, and an ask that cannot honestly be
+ * turned into an email is filed saying so instead of pretending.
+ *
+ * ONE ASK, ONE ROW, FOREVER. The collision check runs against every ask
+ * already filed for this account whatever became of it, so the same
+ * conversation logged twice (which is exactly what happened at Lazy Acres on
+ * 2026-09-15, the same note submitted seventeen seconds apart) files once, and
+ * a row Juan dismissed is never proposed again.
  */
 async function fileOutreachAsks(
   asks: ParsedOutreachAsk[] | undefined,
   accountId: string | null,
+  noteText: string,
 ): Promise<number> {
   if (!accountId || !asks?.length) return 0;
+
+  const [accountRes, contactsRes, alreadyFiled] = await Promise.all([
+    getAccount(accountId),
+    listContacts(accountId),
+    listAskKeys(accountId),
+  ]);
+  const account = accountRes.data[0];
+  if (!account) return 0;
+
+  const seen = alreadyFiled.map((r) => r.source_ask);
+  const contacts = contactsRes.data
+    .map((c) => ({
+      id: c.id,
+      name: [c.first_name, c.last_name].filter(Boolean).join(" ").trim(),
+      title: c.title,
+      email: c.email,
+    }))
+    .filter((c) => c.name);
+
+  let filed = 0;
   for (const a of asks) {
-    await insertDraftRequest({ account_id: accountId, specifics: a.ask });
+    const ask = a.ask?.trim();
+    if (!ask) continue;
+    if (seen.some((prior) => asksCollide(prior, ask))) continue;
+
+    const composed = await composeAsk({
+      ask,
+      noteText,
+      account: { id: account.id, name: account.name, city: account.city, email: account.email },
+      contacts,
+    });
+    await insertAskDraft({ account_id: accountId, ask, composed });
+    seen.push(ask);
+    filed += 1;
   }
-  return asks.length;
+  return filed;
 }
 
 /**
@@ -510,7 +559,7 @@ const EXTRACT_TOOL = {
       },
       outreach_asks: {
         type: "array",
-        description: "Something the customer explicitly asked to be sent, or was promised, by email: pricing, a catalog, product/samples info, an order form, being added to a mailing list. Extract only when the text says the CUSTOMER asked for or was promised something to follow up on, in the rep's own words. Empty array is the normal answer; most notes carry none. This is content ABOUT the customer, not an instruction to the agency, so never duplicate it into directives, and never invent a need that wasn't actually stated.",
+        description: "Something the customer explicitly asked to be sent, or was promised, by email: pricing, a catalog, product/samples info, an order form, being added to a mailing list. Extract only when the text says the CUSTOMER asked for or was promised something to follow up on, in the rep's own words. IT MUST BE SOMETHING THE REP SENDS THEM. A thing the other side will send HIM (a quote a printer promised him, an email the owner is expected to write, an order they will place) is not an outreach ask however real it is: it is already in the note, and there is nothing here for him to write. Empty array is the normal answer; most notes carry none. This is content ABOUT the customer, not an instruction to the agency, so never duplicate it into directives, and never invent a need that wasn't actually stated.",
         items: {
           type: "object",
           properties: {
@@ -572,7 +621,7 @@ RULES, all absolute:
 - Never set account_confidence to "high" on a field note unless the note is genuinely ABOUT that specific account (an observation about that store). A note to self that merely happens to mention a place is account_confidence "none" with account_id null. Attaching a note to self to a business is how a company gets created to receive it, which has already happened once and is what this kind exists to stop.
 - directives carry instructions aimed at the agency, verbatim, and those same words must NOT appear in hubspot_summary. A note can be a real customer visit AND carry a directive; extract both. A note that is nothing but an instruction is a field_note whose detail is the instruction's own content.
 - account_facts is for a fact about the BUSINESS as a whole, not a person: hours, a general store phone, a general ordering email. Only fill a field when the text states it about the store/office itself ("their hours are...", "the store's number is..."); a person's own phone or email belongs in people[], never here. Most visits state none of this, null is the normal answer.
-- outreach_asks is for something the CUSTOMER asked for or was promised (pricing, a catalog, samples info, an order form), not something the rep decided to go do on his own. Only extract it when the text actually says the customer asked or was told something would be sent. Do not put the same content in both outreach_asks and directives; directives are the rep's own instructions to his agency, outreach_asks are about the customer.
+- outreach_asks is for something the CUSTOMER asked for or was promised (pricing, a catalog, samples info, an order form), not something the rep decided to go do on his own, and not something the other side is going to send HIM. Only extract it when the text actually says the customer asked or was told something would be sent, by the rep. Do not put the same content in both outreach_asks and directives; directives are the rep's own instructions to his agency, outreach_asks are about the customer.
 - next_step is a short, concrete statement of what happens with this account next, written so a different rep could act on it without rereading the note. Fill it whenever the text states or clearly implies a next action, INCLUDING an explicit "no follow-up" ("he said no", "nothing further, not interested", "all set for now"). The bar is that it NAMES the action: "bring a GSE sample Thursday", "call Maria back about case pricing", "email the catalog to the buyer". A vague "follow up", "check in", "touch base" or "circle back" with no stated object is NOT a next action, and is left null so the rep gets asked directly rather than shipped a line nobody can act on. Leave it null when the text is silent, or only that vague; the rep is asked one short question and answers in his own words, which is always better than a guess. Never invent a next step, and never turn a vague phrase into a specific-sounding one.`;
 }
 
@@ -1055,7 +1104,7 @@ async function finishTouchpoint(input: {
     ...agencyDirectiveRows(parsed.directives, null, accountId),
     ...routeRows,
   ]);
-  await fileOutreachAsks(parsed.outreach_asks, accountId);
+  await fileOutreachAsks(parsed.outreach_asks, accountId, input.rawText);
 
   const hubspot = autoFileHubspot
     ? await autoFileEngagement(activity.id)
@@ -1359,7 +1408,7 @@ export async function resolveTouchpointToAccount(
     ...agencyDirectiveRows(parsed.directives, null, accountId),
     ...routeRows,
   ]);
-  await fileOutreachAsks(parsed.outreach_asks, accountId);
+  await fileOutreachAsks(parsed.outreach_asks, accountId, tp.raw_text);
 
   const hubspot = await autoFileEngagement(activity.id);
 

@@ -37,6 +37,10 @@ type Payload = {
 export function VisitQueues() {
   const [data, setData] = useState<Payload | null>(null);
   const [failed, setFailed] = useState(false);
+  // Proposals that have been decided and finished their exit. A decided row
+  // confirms itself for a beat and then leaves, rather than sitting in a list
+  // headed "to confirm" after it has been confirmed (Juan, 2026-09-17).
+  const [gone, setGone] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -76,7 +80,7 @@ export function VisitQueues() {
   if (!data) return null;
 
   const unfiled = data.unfiled ?? [];
-  const proposals = data.proposals ?? [];
+  const proposals = (data.proposals ?? []).filter((p) => !gone.has(p.id));
 
   return (
     <>
@@ -91,7 +95,11 @@ export function VisitQueues() {
           </h2>
           <ul className="divide-y divide-[#EDEBE3] overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
             {proposals.map((p) => (
-              <CalendarProposalRow key={p.id} proposal={p} />
+              <CalendarProposalRow
+                key={p.id}
+                proposal={p}
+                onGone={() => setGone((prev) => new Set(prev).add(p.id))}
+              />
             ))}
           </ul>
         </section>

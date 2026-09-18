@@ -20,11 +20,18 @@
  * SAME PORTAL IDIOM AS CallSearchField/RouteEndpointField: the form sits
  * inside a clipping ancestor, so the results list renders into a portal on
  * <body>, positioned from the input's own bounding rect.
+ *
+ * THE CITY IS PART OF THE NAME, as far as typing goes (2026-09-17). "Shine
+ * natural market, Encinitas" used to come back as no account of his, because
+ * the match was the whole string against the name column alone. Matching now
+ * lives in lib/search-match.ts, one rule shared with every other box in the
+ * OS, and it reads the city and state on the row too.
  */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { MapAccount } from "../lib/dal";
+import { rankMatches } from "../lib/search-match";
 
 export type ClientSearchAccount = Pick<
   MapAccount,
@@ -32,16 +39,6 @@ export type ClientSearchAccount = Pick<
 >;
 
 const LIMIT = 8;
-
-/** Name match, prefix first. Word-start beats mid-word beats nothing, which is
- *  what makes typing "sprout" put Sprouts above "Bean Sprout Cafe". */
-function rank(name: string, q: string): number {
-  const n = name.toLowerCase();
-  if (n.startsWith(q)) return 0;
-  if (n.includes(` ${q}`)) return 1;
-  if (n.includes(q)) return 2;
-  return -1;
-}
 
 export function ClientSearchField({
   accounts,
@@ -61,20 +58,14 @@ export function ClientSearchField({
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
-  const q = query.trim().toLowerCase();
+  const q = query.trim();
 
   const results = useMemo(() => {
     if (q.length < 2) return [];
-    const hits: { a: ClientSearchAccount; r: number }[] = [];
-    for (const a of accounts) {
-      // The waypoint account is Juan's apartment (migration 0029), the two
-      // ends of the day rather than a place anything is sold. Never a stop.
-      if (a.lifecycle === "waypoint") continue;
-      const r = rank(a.name, q);
-      if (r >= 0) hits.push({ a, r });
-    }
-    hits.sort((x, y) => x.r - y.r || x.a.name.localeCompare(y.a.name));
-    return hits.slice(0, LIMIT).map((h) => h.a);
+    // The waypoint account is Juan's apartment (migration 0029), the two ends
+    // of the day rather than a place anything is sold. Never a stop.
+    const searchable = accounts.filter((a) => a.lifecycle !== "waypoint");
+    return rankMatches(q, searchable, (a) => ({ name: a.name, also: [a.city, a.state] }), LIMIT);
   }, [accounts, q]);
 
   useEffect(() => {
@@ -133,7 +124,7 @@ export function ClientSearchField({
             if (first) pick(first);
           }
         }}
-        placeholder="Search your accounts, e.g. Lassens Los Alamitos"
+        placeholder="Search your accounts, e.g. Lazy Acres Long Beach"
         autoFocus
         className="w-full min-w-0 rounded-md border border-[#E2DFD5] bg-[#FCFBF7] px-3 py-2 text-[13.5px] outline-none placeholder:text-[#A9AFA9] focus:border-[#8A928C]"
       />

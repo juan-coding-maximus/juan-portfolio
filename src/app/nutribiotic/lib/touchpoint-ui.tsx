@@ -8,6 +8,7 @@ import type { Tier } from "./dal";
 import type { Readiness } from "./priority";
 import { AccountMatchResolver } from "./new-account-ui";
 import { NextStepResolver } from "./next-step-ui";
+import { ResolvingRow } from "./queue-ui";
 import { ReviewCard } from "./review-ui";
 import { previewTouchpoint, type RecordTouchpointResult, type TouchpointDraft } from "./touchpoint";
 import { Ico, SuccessNote } from "./ui";
@@ -637,18 +638,40 @@ export type ProposalRowData = {
   notes: string | null;
 };
 
-export function CalendarProposalRow({ proposal }: { proposal: ProposalRowData }) {
+export function CalendarProposalRow({
+  proposal,
+  onGone,
+}: {
+  proposal: ProposalRowData;
+  /** Lets the list drop this row once it has finished leaving. Without it the
+   *  row still resolves, it just stays on screen as its own confirmation. */
+  onGone?: () => void;
+}) {
   const [pending, startTransition] = useTransition();
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState<"Approved" | "Dismissed" | null>(null);
 
   function decide(decision: "approved" | "dismissed") {
     startTransition(async () => {
       await decideCalendarProposal(proposal.id, decision);
-      setDone(true);
+      setDone(decision === "approved" ? "Approved" : "Dismissed");
     });
   }
 
-  if (done) return null;
+  // The confirmation beat, then the row goes (lib/queue-ui.tsx). This used to
+  // return null the instant the write landed, which is a silent success: the
+  // row you tapped simply disappeared, and a tap that did nothing looked
+  // identical (Juan, 2026-08-14, on the same failure mode in Outbound).
+  if (done) {
+    return (
+      <li>
+        <ResolvingRow resolved onGone={() => onGone?.()}>
+          <div className="px-4 py-3">
+            <SuccessNote title={`${done}: ${proposal.title}`} />
+          </div>
+        </ResolvingRow>
+      </li>
+    );
+  }
 
   const when = proposal.starts_at
     ? new Date(proposal.starts_at).toLocaleString("en-US", {

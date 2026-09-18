@@ -38,6 +38,13 @@ import { cache } from "react";
 import { unstable_cache, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { hasAccess } from "./devices";
+import {
+  ASK_COMPOSED_PLAY,
+  ASK_UNWRITTEN_PLAY,
+  normalizeAsk,
+  unwrittenBody,
+  type ComposedAsk,
+} from "./ask-compose";
 import { hasWidgetToken } from "./session";
 import { areaProspectCounts, byOriginThenPriority, computePriority, type PriorityInput, type PriorityResult, type Readiness } from "./priority";
 import type { LeadStage } from "./account-filters";
@@ -366,6 +373,22 @@ export async function listAccountsForMatching(): Promise<Result<TierRow>> {
     hubspot_owner_id: `eq.${JUAN_OWNER_ID}`,
     closed_at: "is.null",
     lifecycle: "neq.waypoint",
+    limit: 1000,
+  });
+}
+
+/**
+ * Where each account in the book is. The tier view carries no city, and a
+ * search box that cannot see one cannot answer "Shine natural market,
+ * Encinitas", which is how Juan actually types a name he knows (2026-09-17).
+ */
+export type BookPlace = { id: string; city: string | null; state: string | null; origin?: Origin };
+
+export async function listBookPlaces(): Promise<Result<BookPlace>> {
+  return query<BookPlace>("nb_accounts", {
+    select: "id,city,state",
+    hubspot_owner_id: `eq.${JUAN_OWNER_ID}`,
+    closed_at: "is.null",
     limit: 1000,
   });
 }
@@ -1830,25 +1853,56 @@ export async function setSdrScheduleStatus(
 }
 
 /**
- * "Tell outbound a client needs an email with specifics", filed straight into
- * the SAME queue decideDraft()/listDrafts() already read (nb_outbound_drafts),
- * not a second one. `urgency` is left null on purpose: that column is set by
- * bridges/nutribiotic/draft_urgency.py FROM what the account's HubSpot notes
- * actually say (see its column comment above), never from this row's own
- * text, and a fresh ask typed here has no note history yet to grade it against.
+ * Every ask already filed for one account, whatever became of it.
+ *
+ * READ ACROSS ALL STATUSES, on purpose. A sent ask is done and a dismissed ask
+ * was refused, and proposing either one again is the failure this read exists
+ * to prevent. Juan dismissed three of these on 2026-09-16 and the queue was
+ * free to re-file them the next time the same conversation was logged.
  */
-export async function insertDraftRequest(input: {
+export async function listAskKeys(accountId: string): Promise<{ id: string; source_ask: string; status: string }[]> {
+  const res = await query<{ id: string; source_ask: string | null; status: string; origin?: Origin }>("nb_outbound_drafts", {
+    select: "id,source_ask,status",
+    account_id: `eq.${accountId}`,
+    source_ask: "not.is.null",
+    limit: 200,
+  });
+  return res.data.filter((r): r is { id: string; source_ask: string; status: string } => Boolean(r.source_ask));
+}
+
+/**
+ * File one thing a customer asked for, as an email that can be sent.
+ *
+ * WHAT CHANGED, 2026-09-17. This used to be insertDraftRequest, which wrote
+ * the raw ask into body_md with a null subject and a null recipient, and the
+ * Outbound queue rendered that fragment as though it were a written draft.
+ * Juan: "these drafts are bullshit." He was right. The composition now happens
+ * before the row exists (lib/ask-compose.ts), and a row that could not be
+ * composed says so on its face rather than impersonating a draft.
+ *
+ * `urgency` is still left null on purpose: that column is set by
+ * bridges/nutribiotic/draft_urgency.py FROM what the account's HubSpot notes
+ * actually say (see its column comment above), never from this row's own text,
+ * and a fresh ask has no note history yet to grade it against.
+ */
+export async function insertAskDraft(input: {
   account_id: string;
-  specifics: string;
-  subject?: string | null;
+  /** The ask verbatim, in Juan's words. Stored normalized in source_ask. */
+  ask: string;
+  composed: ComposedAsk;
 }): Promise<Draft> {
+  const c = input.composed;
   const [row] = await mutate<Draft>("nb_outbound_drafts", "POST", {
     id: randId("draft"),
     account_id: input.account_id,
+    contact_id: c.written ? c.contactId : null,
     channel: "email",
-    subject: input.subject ?? null,
-    body_md: input.specifics,
-    play_key: null,
+    subject: c.written ? c.subject : null,
+    body_md: c.written ? c.body : unwrittenBody(input.ask, c.reason),
+    to_email: c.written ? c.toEmail : null,
+    to_name: c.written ? c.toName : null,
+    play_key: c.written ? ASK_COMPOSED_PLAY : ASK_UNWRITTEN_PLAY,
+    source_ask: normalizeAsk(input.ask),
     campaign_id: null,
     status: "pending",
     origin: "manual",

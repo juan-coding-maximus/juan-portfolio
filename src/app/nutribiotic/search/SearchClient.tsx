@@ -54,6 +54,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Ico, SuccessNote } from "../lib/ui";
 import { useModal } from "../lib/modal";
+import { rankMatches } from "../lib/search-match";
 import { AreaPicker, mapsUrl, type Pin } from "./AreaPicker";
 
 /* ------------------------------------------------------------------ *
@@ -931,20 +932,16 @@ export function SearchClient() {
   );
 }
 
-type BookResult = { id: string; name: string; area: string | null; tier: string | null };
+type BookResult = {
+  id: string;
+  name: string;
+  area: string | null;
+  tier: string | null;
+  city: string | null;
+  state: string | null;
+};
 
 const BOOK_RESULT_LIMIT = 5;
-
-/** Lowercase, punctuation folded to spaces, whitespace collapsed, so "Dr. Pure
- *  Nature" and "dr pure" are substrings of each other's normal form without
- *  Juan having to type a period he doesn't feel like typing. */
-function normalizeBookName(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/[.,'’&/-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 /**
  * "Search our book": find an account Juan already has, by name, without
@@ -954,7 +951,10 @@ function normalizeBookName(s: string): string {
  *
  * SEARCHES A LIST FETCHED ONCE, IN MEMORY, the same idiom as
  * map/ClientSearchField.tsx: instant per keystroke and one request for the
- * whole session rather than one per keystroke.
+ * whole session rather than one per keystroke. The match itself is
+ * lib/search-match.ts, shared with every other box in the OS, so the city and
+ * the area count as part of what he can type and a missed letter is not a
+ * refusal. The city rides in from the route, since the tier view has none.
  */
 function BookSearch() {
   const { open, prefetch } = useModal();
@@ -976,18 +976,8 @@ function BookSearch() {
   }, []);
 
   const results = useMemo(() => {
-    const query = normalizeBookName(q);
-    if (query.length < 2) return [];
-    const hits: { r: BookResult; rank: number; nameLen: number }[] = [];
-    for (const r of book) {
-      const name = normalizeBookName(r.name || "");
-      const at = name.indexOf(query);
-      if (at < 0) continue;
-      const wordStart = at === 0 || name[at - 1] === " ";
-      hits.push({ r, rank: wordStart ? 0 : 1, nameLen: name.length });
-    }
-    hits.sort((a, b) => a.rank - b.rank || a.nameLen - b.nameLen);
-    return hits.slice(0, BOOK_RESULT_LIMIT).map((h) => h.r);
+    if (q.trim().length < 2) return [];
+    return rankMatches(q, book, (r) => ({ name: r.name || "", also: [r.city, r.state, r.area] }), BOOK_RESULT_LIMIT);
   }, [book, q]);
 
   return (
@@ -1028,7 +1018,9 @@ function BookSearch() {
               className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-[13px] hover:bg-[#FAF9F5]"
             >
               <span className="truncate font-medium text-[#14201B]">{r.name}</span>
-              {r.area && <span className="shrink-0 text-[11.5px] text-[#8A928C]">{r.area}</span>}
+              {(r.city || r.area) && (
+                <span className="shrink-0 text-[11.5px] text-[#8A928C]">{r.city ?? r.area}</span>
+              )}
             </button>
           ))}
         </div>
