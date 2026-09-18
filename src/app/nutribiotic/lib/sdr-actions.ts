@@ -122,8 +122,8 @@ export async function searchSdrClients(q: string): Promise<SdrSearchHit[]> {
 }
 
 /**
- * channel -> a substring of the one real collateral PDF in the "marketing"
- * bucket (~/Desktop/NutriBiotic/15-sales-collateral, synced by
+ * channel -> a substring of the one real collateral PDF in the "field"
+ * bucket folder (~/Desktop/NutriBiotic/15-sales-collateral, synced by
  * bridges/nutribiotic/sync_marketing_files.py) that fits what this kind of
  * account actually is. Juan, 2026-09-15: a call brief with "an angle" means
  * naming which real piece to bring, not a generic pitch line. Deliberately a

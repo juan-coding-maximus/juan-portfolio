@@ -4330,13 +4330,13 @@ export async function listPlaybookReportArchive(): Promise<PlaybookReportArchive
 const MARKETING_BUCKET = "nb-marketing";
 
 export type MarketingFile = {
-  folder: "marketing" | "field" | "fact_cards";
+  folder: "marketing" | "field";
   name: string;
   label: string;
   url: string;
 };
 
-async function listMarketingFolder(folder: "marketing" | "field" | "fact_cards"): Promise<MarketingFile[]> {
+async function listMarketingFolder(folder: "marketing" | "field"): Promise<MarketingFile[]> {
   // Both calls below are POST verbs but reads/generates, no persisted side
   // effect either way, safe to retry once on a dropped connection.
   const listRes = await fetchWithTimeout(
@@ -4403,12 +4403,11 @@ export async function listMarketingFiles(): Promise<MarketingFile[]> {
   await verifySession();
   if (!isConfigured()) return [];
   try {
-    const [marketing, field, factCards] = await Promise.all([
+    const [marketing, field] = await Promise.all([
       listMarketingFolder("marketing"),
       listMarketingFolder("field"),
-      listMarketingFolder("fact_cards"),
     ]);
-    return [...marketing, ...field, ...factCards];
+    return [...marketing, ...field];
   } catch {
     return [];
   }
@@ -4477,13 +4476,21 @@ export async function getCollateralPipeline(): Promise<CollateralPipeline> {
 
 /**
  * Finds one marketing PDF whose filename contains `hint` (case-insensitive),
- * in the "marketing" folder only, and signs just that one file. Distinct from
- * listMarketingFiles, which lists AND signs every file in all three folders
- * (built for a picker UI, too slow to call once per SDR panel open just to
- * find one match). Used by sdr-actions.ts to point a rep at the one real
- * collateral piece that fits an account's channel; returns null rather than
- * guessing when the bucket has no match, never a fabricated file name
- * (AGENTS.md P2).
+ * in the "field" folder (the current 15-sales-collateral sync, where every
+ * CHANNEL_PACK_HINT value in sdr-actions.ts actually lives), and signs just
+ * that one file. Distinct from listMarketingFiles, which lists AND signs
+ * every file in both folders (built for a picker UI, too slow to call once
+ * per SDR panel open just to find one match). Used by sdr-actions.ts to
+ * point a rep at the one real collateral piece that fits an account's
+ * channel; returns null rather than guessing when the bucket has no match,
+ * never a fabricated file name (AGENTS.md P2).
+ *
+ * FIXED 2026-09-18: this searched "marketing/" until today, a folder that
+ * has never held any of the four hint strings ("Pharmacy Vitamin", "Grocery
+ * GSE", "Sports Nutrition", "Spa Partner"; confirmed against a live bucket
+ * listing). Every call from every channel had been returning null since at
+ * least 2026-09-11, silently emptying the SDR panel's "bring this piece"
+ * recommendation for every account.
  */
 export async function findMarketingFile(hint: string): Promise<{ label: string; url: string } | null> {
   await verifySession();
@@ -4494,7 +4501,7 @@ export async function findMarketingFile(hint: string): Promise<{ label: string; 
       {
         method: "POST",
         headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ prefix: "marketing/", limit: 200, sortBy: { column: "name", order: "asc" } }),
+        body: JSON.stringify({ prefix: "field/", limit: 200, sortBy: { column: "name", order: "asc" } }),
         cache: "no-store",
       },
       { retries: 1 },
@@ -4504,7 +4511,7 @@ export async function findMarketingFile(hint: string): Promise<{ label: string; 
     const match = objects.find((o) => o.name.toLowerCase().includes(hint.toLowerCase()));
     if (!match) return null;
     const signRes = await fetchWithTimeout(
-      `${SB_URL}/storage/v1/object/sign/${MARKETING_BUCKET}/marketing/${encodeURIComponent(match.name)}`,
+      `${SB_URL}/storage/v1/object/sign/${MARKETING_BUCKET}/field/${encodeURIComponent(match.name)}`,
       {
         method: "POST",
         headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" },
