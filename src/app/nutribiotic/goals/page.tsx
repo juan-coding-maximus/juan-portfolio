@@ -1,17 +1,24 @@
 /**
  * Goals. The ladder, posted where it is seen every day.
  *
- * Static by design: a goal changes at a QBR, not on a request cycle. Source of
- * truth is agency/nutribiotic/playbook/GOALS.md; data.ts mirrors it. The page's
- * one job is to make the ladder impossible to forget: the mantra on top, the six
- * goals under it, the measured baselines they are judged against.
+ * THE LADDER IS STATIC, THE BASELINES ARE NOT (2026-09-18). A goal changes at a
+ * QBR, so NORTH_STAR, GOALS, ARC and CADENCE mirror
+ * agency/nutribiotic/playbook/GOALS.md and change when it does. The numbers
+ * those goals are judged against used to be mirrored the same way and were
+ * stale most of the time, so the three that can be counted are read live
+ * (getGoalBaselines) and the two that cannot carry the date they were measured.
  */
 
 import Link from "next/link";
+import { getGoalBaselines } from "../lib/dal";
 import { PageHead, Card, Ico } from "../lib/ui";
-import { NORTH_STAR, BASELINES, GOALS, ARC, CADENCE } from "./data";
+import { NORTH_STAR, STATED_BASELINES, GOALS, ARC, CADENCE } from "./data";
 
 export const metadata = { title: "Goals · NutriBiotic OS" };
+
+// The baselines are counted on load, so the ladder is never judged against
+// last month's territory.
+export const dynamic = "force-dynamic";
 
 function ProposedTag() {
   return (
@@ -21,13 +28,24 @@ function ProposedTag() {
   );
 }
 
-export default function GoalsPage() {
+export default async function GoalsPage() {
+  const live = await getGoalBaselines();
+  // A failed read drops the three live cards rather than printing a zero he
+  // would have to disprove. The two dated ones stand on their own date.
+  const baselines = [
+    ...(live
+      ? [
+          { value: String(live.accountsOwned), label: "SoCal accounts owned", asOf: null },
+          { value: String(live.orderedSince2024), label: "ordered since 2024", asOf: null },
+          { value: String(live.withNamedContact), label: "with a named contact", asOf: null },
+        ]
+      : []),
+    ...STATED_BASELINES,
+  ];
+
   return (
     <>
-      <PageHead
-        title="Goals"
-        sub="The ladder. Targets marked proposed are ratified or re-set at each QBR; baselines are measured, sourced numbers."
-      />
+      <PageHead title="Goals" />
 
       {/* The mantra. The one thing to remember if nothing else is read. */}
       <div className="mb-6 rounded-lg border border-[#14201B] bg-[#14201B] p-6 text-[#F7F6F1]">
@@ -51,20 +69,23 @@ export default function GoalsPage() {
         </div>
       </div>
 
-      {/* Measured baselines: the numbers every goal is judged against. */}
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {BASELINES.map((b) => (
+      {/* The numbers every goal is judged against. Three counted on load, two
+          carrying the date they were measured, because nothing can count them. */}
+      <div
+        className={`mb-6 grid grid-cols-2 gap-3 ${
+          baselines.length === 5 ? "sm:grid-cols-5" : "sm:grid-cols-2"
+        }`}
+      >
+        {baselines.map((b) => (
           <Card key={b.label} className="p-3.5 text-center">
             <div className="font-[family-name:var(--font-fraunces)] text-[22px] leading-none font-semibold tracking-tight">
               {b.value}
             </div>
             <div className="mt-1.5 text-[11px] leading-snug text-[#5B6560]">{b.label}</div>
+            {b.asOf && <div className="mt-1 text-[10.5px] text-[#A9AFA9]">{b.asOf}</div>}
           </Card>
         ))}
       </div>
-      <p className="mb-6 -mt-3 text-[11.5px] text-[#8A928C]">
-        Baselines measured 2026-08-02 from the OS and the ERP export. Sources in GOALS.md.
-      </p>
 
       {/* The six Year-1 goals. */}
       <div className="mb-8 grid gap-4 md:grid-cols-2">

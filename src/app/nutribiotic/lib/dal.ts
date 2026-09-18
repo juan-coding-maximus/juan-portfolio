@@ -4734,6 +4734,61 @@ export async function getBookMetrics(): Promise<BookMetrics | null> {
   }
 }
 
+export type GoalBaselines = {
+  accountsOwned: number;
+  orderedSince2024: number;
+  withNamedContact: number;
+};
+
+/**
+ * The three Goals baselines that can be counted, counted.
+ *
+ * THEY USED TO BE TYPED INTO goals/data.ts and refreshed whenever somebody
+ * remembered, under a comment recording the last time somebody had. They were
+ * wrong again by 2026-09-18: the file said 398 accounts owned against 477 live,
+ * and 185 with a named contact against 220. A number a human has to remember to
+ * refresh is wrong on the day it matters.
+ *
+ * The definitions are the ones check_config_drift.py was using, so the screen
+ * and the cron diagnostics cannot tell Juan two different things.
+ *
+ * NAMED means named. A contact row carrying only a role ("front desk", a real
+ * person whose name he did not catch) is not a named contact, and counting it
+ * as one would inflate the number the label promises by five accounts.
+ *
+ * Null on a failed read, never zero. The cards render absent rather than
+ * telling him he owns no accounts.
+ */
+export async function getGoalBaselines(): Promise<GoalBaselines | null> {
+  await verifySession();
+  if (!isConfigured()) return null;
+  try {
+    const [accounts, contacts] = await Promise.all([
+      raw<{ id: string; first_order_at: string | null; last_order_at: string | null }>(
+        `nb_accounts?select=id,first_order_at,last_order_at&hubspot_owner_id=eq.${JUAN_OWNER_ID}&closed_at=is.null`,
+      ),
+      raw<{ account_id: string; first_name: string | null; last_name: string | null }>(
+        "nb_contacts?select=account_id,first_name,last_name",
+      ),
+    ]);
+    const live = new Set(accounts.map((a) => a.id));
+    const named = new Set(
+      contacts
+        .filter((c) => live.has(c.account_id) && `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim())
+        .map((c) => c.account_id),
+    );
+    return {
+      accountsOwned: accounts.length,
+      orderedSince2024: accounts.filter(
+        (a) => (a.first_order_at ?? "") >= "2024-01-01" || (a.last_order_at ?? "") >= "2024-01-01",
+      ).length,
+      withNamedContact: named.size,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Today in Los Angeles, which is the day the report is about. Never the
  *  server's date: Vercel runs UTC, and after 17:00 LA those disagree. */
 export function reportDateLA(): string {

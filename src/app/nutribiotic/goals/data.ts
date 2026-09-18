@@ -24,18 +24,20 @@ export const NORTH_STAR = {
   ],
 };
 
-/* Refreshed 2026-09-08 via bridges/nutribiotic/check_config_drift.py against nb_accounts/
- * nb_contacts live (owner 36242368, not closed); territory grew from 273 to 398 owned since
- * the 2026-08-02 measurement. "overdue for reorder" and "median reorder gap" are left at
- * their 2026-08-02 values below, unverified since: they are methodologically coupled (overdue
- * is defined relative to the gap figure) and no live query for the median gap exists yet in
- * this codebase, see GOALS.md's Baselines section. */
-export const BASELINES = [
-  { value: "398", label: "SoCal accounts owned" },
-  { value: "56", label: "ordered since 2024" },
-  { value: "66", label: "overdue for reorder (2026-08-02, unverified since)" },
-  { value: "41d", label: "median reorder gap (2026-08-02, unverified since)" },
-  { value: "185", label: "with a named contact" },
+/* THE COUNTABLE BASELINES ARE NOT HERE ANY MORE (2026-09-18). Accounts owned,
+ * ordered since 2024 and accounts with a named contact were typed into this
+ * file and refreshed by hand, which meant they were stale most of the time:
+ * 398 against 477 live, 185 against 220. They are read live now, by
+ * getGoalBaselines() in ../lib/dal.ts.
+ *
+ * These two stay written down because nothing can count them. They are
+ * methodologically coupled, overdue is defined relative to the gap, and this
+ * codebase has no live definition of the median gap at all. Inventing a query
+ * to make the cards match would be a number nobody measured, so they carry the
+ * date they were measured on instead. See GOALS.md's Baselines section. */
+export const STATED_BASELINES = [
+  { value: "66", label: "overdue for reorder", asOf: "2026-08-02" },
+  { value: "41d", label: "median reorder gap", asOf: "2026-08-02" },
 ];
 
 export type Goal = {
