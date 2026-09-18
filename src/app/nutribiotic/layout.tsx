@@ -99,6 +99,12 @@ const NAV: { href: string; label: string; icon: React.ComponentProps<typeof Ico>
 
 const MORE_NAV: typeof NAV = [
   { href: "/nutribiotic/clients", label: "Clients", icon: "accounts" },
+  /* Matrix, 2026-09-17 (Juan's ask): the agency's Eisenhower board rebuilt for
+     this department alone, plus the effort/yield view. It answers "what do I
+     work first" for the whole book at once, which the ranked panel answers a
+     row at a time, so it is a standing reference screen rather than a step in
+     the door-to-door loop. More, on the same test Goals and Playbook passed. */
+  { href: "/nutribiotic/matrix", label: "Matrix", icon: "matrix" },
   /* Demoted from the top-level bar 2026-09-08 when SDR took its slot, see
      above. Still a twice-a-month task, not a daily-loop one. */
   { href: "/nutribiotic/expenses", label: "Expenses", icon: "receipt" },
