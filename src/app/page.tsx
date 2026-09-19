@@ -192,7 +192,7 @@ function Hero() {
         style={{ textShadow: "0 2px 28px rgba(8,14,11,0.85), 0 1px 4px rgba(8,14,11,0.7)" }}
       >
         <h1 className="font-display font-light leading-[0.95] text-[clamp(2.5rem,8vw,6.5rem)] tracking-tight">
-          JUAN ARENAS
+          JUAN ARENAS MARTIN
         </h1>
         <p className="mt-6 font-display italic text-[clamp(1rem,2.2vw,1.5rem)] text-[#C9A24B] text-balance">
           Marketing that takes science to the next level.
@@ -661,7 +661,7 @@ function CaseArtifact({ art }: { art: string }) {
       <div className="rounded-3xl overflow-hidden relative aspect-[4/3]">
         <Image
           src="/img/aura-founder.webp"
-          alt="Juan Arenas as Founder at Your Aura Fragrance"
+          alt="Juan Arenas Martin as Founder at Your Aura Fragrance"
           fill
           className="object-cover"
           style={{ objectPosition: "center top" }}
@@ -1245,7 +1245,7 @@ function About() {
             <div className="absolute left-0 right-0 bottom-0 h-[135%]">
               <Image
                 src="/img/juan-usc.png"
-                alt="Juan Arenas at USC"
+                alt="Juan Arenas Martin at USC"
                 fill
                 className="object-cover object-top"
                 sizes="(max-width: 768px) 100vw, 50vw"
@@ -1394,8 +1394,14 @@ function Footer() {
         <span>Juan Arenas Martin · Los Angeles, CA</span>
       </div>
       <span>
-        (323) 775-3850 · juan.arenas.rec@gmail.com ·
-        linkedin.com/in/juanarenasmartin
+        (323) 775-3850 · juan.arenas.rec@gmail.com ·{" "}
+        <a href="https://linkedin.com/in/juanarenasmartin" target="_blank" rel="noopener noreferrer" className="hover:text-[#F2EFE6]/70">
+          linkedin.com/in/juanarenasmartin
+        </a>{" "}
+        ·{" "}
+        <a href="https://osmoticventures.com" target="_blank" rel="noopener noreferrer" className="hover:text-[#F2EFE6]/70">
+          osmoticventures.com
+        </a>
       </span>
     </footer>
   );

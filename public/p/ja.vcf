@@ -1,8 +1,9 @@
 BEGIN:VCARD
 VERSION:3.0
-N:Arenas;Juan;;;
-FN:Juan Arenas
-ORG:NutriBiotic Representative
+N:Arenas Martin;Juan;;;
+FN:Juan Arenas Martin
+ORG:NutriBiotic
+TITLE:Field Sales Manager
 TEL;TYPE=WORK,VOICE:+17079723395
 EMAIL;TYPE=WORK:juan@nutribiotic.com
 URL:https://www.nutribiotic.com
