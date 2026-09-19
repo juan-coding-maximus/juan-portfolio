@@ -2,10 +2,10 @@
 
 import { headers } from "next/headers";
 import { searchPlaces } from "../nutribiotic/lib/places";
-import { RATE_CHEAPEST, RATE_QUICKEST, TANK_GALLONS } from "./lib/constants";
+import { RATE_CHEAPEST, RATE_QUICKEST, RESERVE_MILES, TANK_GALLONS } from "./lib/constants";
 import { carWashNearby, type WashStation } from "./lib/carwash";
 import { fuelNearby } from "./lib/fuel";
-import { detourMinutes, route, sampleAlong, type LatLng } from "./lib/osrm";
+import { detourMinutes, milesFromOrigin, route, sampleAlong, type LatLng } from "./lib/osrm";
 import { scoreStations, type Scored, type Station } from "./lib/score";
 import { scoreCarWashes, type WashScored } from "./lib/washscore";
 
@@ -17,6 +17,8 @@ export type FindInput = {
   dest: DestInput;
   gallons: number;
   quickest: boolean;
+  /** Typed straight off the dashboard, not inferred from the tank gauge. */
+  milesToEmpty?: number | null;
 };
 
 export type CarWashInput = {
@@ -106,8 +108,20 @@ export async function findGas(input: FindInput): Promise<FindResult> {
     for (const s of b.value) if (!seen.has(s.id)) seen.set(s.id, s);
   }
   if (!anyOk) return { ok: false, error: "Couldn't read gas prices right now. Try again." };
-  const stations = [...seen.values()].sort((a, b) => a.regular - b.regular).slice(0, MAX_RESULTS);
+  let stations = [...seen.values()].sort((a, b) => a.regular - b.regular).slice(0, MAX_RESULTS);
   if (stations.length === 0) return { ok: false, error: "No stations with a posted price along this drive." };
+
+  const milesToEmpty = Number(input.milesToEmpty);
+  if (Number.isFinite(milesToEmpty) && milesToEmpty > 0) {
+    const reach = milesToEmpty - RESERVE_MILES;
+    if (reach <= 0) return { ok: false, error: `${milesToEmpty} miles to empty leaves no room past the ${RESERVE_MILES}-mile reserve.` };
+    const originMiles = await milesFromOrigin(origin, stations);
+    if (!originMiles) return { ok: false, error: "Couldn't check which stations are in reach right now. Try again." };
+    stations = stations.filter((_, i) => originMiles[i] <= reach);
+    if (stations.length === 0) {
+      return { ok: false, error: `No priced station within ${Math.round(reach)} miles, the range ${milesToEmpty} miles to empty leaves after a ${RESERVE_MILES}-mile reserve.` };
+    }
+  }
 
   const detours = await detourMinutes(origin, dest, stations);
   if (!detours) return { ok: false, error: "Couldn't time the detours right now. Try again." };

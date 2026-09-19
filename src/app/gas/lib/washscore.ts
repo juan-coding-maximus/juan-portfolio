@@ -23,11 +23,13 @@ export function priceLevelLabel(level: PriceLevel | null): string | null {
 }
 
 /**
- * Ranks car washes on the one signal every result has, detour minutes, since
- * Places has no dollar price for a car wash the way it does for gas. A place
- * within 3 minutes of the closest one is treated as a tie and broken by
- * priceLevel when Google returned one; a place with no priceLevel never gets
- * penalized for the gap, it just falls back to the detour order.
+ * "Close to the destination" means close to the route, not close to the
+ * destination point: this ranks on `detourMinutes`, the same OSRM route
+ * detour gas's quickest mode uses, never straight-line distance to `dest`.
+ * Places has no dollar price for a car wash the way it does for gas, so a
+ * place within 3 minutes of the closest one is treated as a tie and broken
+ * by priceLevel when Google returned one; a place with no priceLevel never
+ * gets penalized for the gap, it just falls back to the detour order.
  */
 export function scoreCarWashes(stations: WashStation[], detourMinutes: number[]): WashScored[] {
   const out: WashScored[] = [];

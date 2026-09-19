@@ -63,6 +63,29 @@ export async function detourMinutes(origin: LatLng, dest: LatLng, stations: LatL
   }
 }
 
+/** Road miles from origin to each point, one table call with a single
+ *  source row. Used only to drop stations a low tank can't physically reach,
+ *  never to rank them, that's still detourMinutes. */
+export async function milesFromOrigin(origin: LatLng, points: LatLng[]): Promise<number[] | null> {
+  if (points.length === 0) return [];
+  const pts = [origin, ...points];
+  const path = pts.map((p) => `${p.lng},${p.lat}`).join(";");
+  const url = `${OSRM}/table/v1/driving/${path}?sources=0&annotations=distance`;
+  try {
+    const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(15_000) });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { code?: string; distances?: (number | null)[][] };
+    const row = data.distances?.[0];
+    if (data.code !== "Ok" || !row) return null;
+    return points.map((_, i) => {
+      const m = row[i + 1];
+      return typeof m === "number" ? m / 1609.344 : NaN;
+    });
+  } catch {
+    return null;
+  }
+}
+
 /** Points spread evenly along the road, origin first, at most `count`. */
 export function sampleAlong(coords: [number, number][], count: number): LatLng[] {
   if (coords.length === 0) return [];

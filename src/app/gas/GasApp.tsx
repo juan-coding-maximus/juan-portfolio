@@ -12,8 +12,8 @@ type LocState = "asking" | "ok" | "denied";
 type Product = "gas" | "carwash";
 
 const PREFS_KEY = "gas-stop-v1";
-type Prefs = { now: number; fillTo: number; favId: string | null; quickest: boolean; product: Product };
-const DEFAULT_PREFS: Prefs = { now: 4, fillTo: TANK_GALLONS, favId: "home", quickest: false, product: "gas" };
+type Prefs = { now: number; fillTo: number; favId: string | null; quickest: boolean; product: Product; milesToEmpty: number | null };
+const DEFAULT_PREFS: Prefs = { now: 4, fillTo: TANK_GALLONS, favId: "home", quickest: false, product: "gas", milesToEmpty: null };
 
 type Result = ({ product: "gas" } & FindResult) | ({ product: "carwash" } & CarWashResult);
 
@@ -121,7 +121,7 @@ export default function GasApp() {
     const dest = fav ? { lat: fav.lat, lng: fav.lng, address: fav.address, label: fav.label } : { query };
     startTransition(async () => {
       if (product === "gas") {
-        const r = await findGas({ origin: loc, dest, gallons, quickest: prefs.quickest });
+        const r = await findGas({ origin: loc, dest, gallons, quickest: prefs.quickest, milesToEmpty: prefs.milesToEmpty });
         setResult({ product: "gas", ...r });
       } else {
         const r = await findCarWash({ origin: loc, dest });
@@ -178,6 +178,18 @@ export default function GasApp() {
                 </Chip>
               </div>
             </div>
+          </div>
+          <div className="mt-4 border-t border-[#E2DFD5] pt-4">
+            <div className="text-[14px] font-medium">Miles to empty</div>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              value={prefs.milesToEmpty ?? ""}
+              onChange={(e) => update({ milesToEmpty: e.target.value === "" ? null : Math.max(0, Number(e.target.value)) })}
+              placeholder="From the dashboard"
+              className="mt-2 h-11 w-32 rounded-xl border border-[#E2DFD5] bg-white px-3 text-[16px] outline-none placeholder:text-[#8A928C] focus-visible:border-[#2C6A46] focus-visible:ring-2 focus-visible:ring-[#2C6A46]/25"
+            />
           </div>
         </section>
       )}
