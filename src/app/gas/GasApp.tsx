@@ -314,9 +314,16 @@ function StationCard({ s, rank, gallons, destAddress }: { s: Scored; rank: numbe
           <span className="ml-2 text-[13px] text-[#5B6560]">after {Math.round(DISCOUNT_PER_GAL * 100)}¢ off {usd(s.regular)}</span>
         </div>
       </div>
+      {s.stale && (
+        <div className="mt-2">
+          <span className="rounded-full bg-[#8A6D2F]/10 px-2.5 py-1 text-[12px] font-medium text-[#8A6D2F]">Price may be outdated</span>
+        </div>
+      )}
       <div className="mt-2 text-[14px] text-[#3D4A44]">
         ${Math.round(s.afterDiscount * gallons)} for {gal(gallons)} gal
-        {s.updatedAt && <span className="text-[#8A928C]"> · price {ago(s.updatedAt)}</span>}
+        {s.updatedAt && (
+          <span className={s.stale ? "font-medium text-[#8A6D2F]" : "text-[#8A928C]"}> · price {ago(s.updatedAt)}</span>
+        )}
         <span className="text-[#8A928C]"> · </span>
         <a href={gasBuddyUrl(s)} target="_blank" rel="noopener" className="text-[#2C6A46] underline-offset-2 hover:underline">
           GasBuddy
