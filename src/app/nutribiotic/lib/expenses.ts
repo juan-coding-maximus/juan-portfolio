@@ -92,8 +92,27 @@ function parseDate(dateStr: string): Date {
   return d;
 }
 
+/** A date before PERIOD_EPOCH still gets the calendar 1st-15th/16th-end split the Monday
+ * cadence replaced, never the Monday math projected backward. Projecting backward computes
+ * a DIFFERENT boundary (e.g. Aug 17-30 instead of the already-filed Aug 16-31) that happens
+ * to still stringify to the same "2026-08b" label (periodLabelParts keys off the month/half
+ * of the period's own midpoint), so a late entry for an old date would silently point at a
+ * brand-new, wrong-boundary sheet and overwrite that key's saved pointer to the real one.
+ * Mirrors the same guard in expense_log.py's period_bounds, added there 2026-09-21 after a
+ * pre-epoch receipt hit exactly this collision. */
 export function periodBounds(dateStr: string): PeriodBounds {
   const d = parseDate(dateStr);
+  if (d.getTime() < PERIOD_EPOCH_MS) {
+    const day = d.getUTCDate();
+    if (day <= 15) {
+      const start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+      const end = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 15);
+      return { start: new Date(start), end: new Date(end) };
+    }
+    const start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 16);
+    const end = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0); // last day of month
+    return { start: new Date(start), end: new Date(end) };
+  }
   const diffDays = Math.floor((d.getTime() - PERIOD_EPOCH_MS) / MS_PER_DAY);
   const periodIndex = Math.floor(diffDays / 14);
   const startMs = PERIOD_EPOCH_MS + periodIndex * 14 * MS_PER_DAY;
