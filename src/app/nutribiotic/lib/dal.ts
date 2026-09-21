@@ -5124,6 +5124,24 @@ export async function setMatrixTaskDone(id: string, done: boolean): Promise<Matr
   return row;
 }
 
+/** Edit an existing task's own facts: text, details, or which quadrant it
+ *  sits in. Juan can change any of these at any point, not just at the
+ *  moment he adds the task. */
+export async function updateMatrixTask(
+  id: string,
+  fields: { text?: string; description?: string | null; quadrant?: MatrixQuadrant },
+): Promise<MatrixTask> {
+  const [row] = await mutate<MatrixTask>(
+    "nb_matrix_items",
+    "PATCH",
+    fields,
+    { id: `eq.${id}`, select: MATRIX_TASK_COLUMNS },
+    "return=representation",
+    true,
+  );
+  return row;
+}
+
 /** Place (or move) the dot: effort and yield, 0-1, set by hand. */
 export async function setMatrixTaskPosition(
   id: string,

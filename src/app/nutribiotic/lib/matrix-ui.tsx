@@ -196,19 +196,104 @@ function AddTaskForm({
   );
 }
 
+/* -------------------------------------------------------------- edit row */
+
+function EditTaskForm({
+  task,
+  onSave,
+  onClose,
+}: {
+  task: MatrixTask;
+  onSave: (fields: { text: string; description: string | null; quadrant: MatrixQuadrant }) => Promise<boolean>;
+  onClose: () => void;
+}) {
+  const [text, setText] = useState(task.text);
+  const [description, setDescription] = useState(task.description ?? "");
+  const [quadrant, setQuadrant] = useState<MatrixQuadrant>(task.quadrant);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    const t = text.trim();
+    if (!t || busy) return;
+    setBusy(true);
+    const ok = await onSave({ text: t, description: description.trim() || null, quadrant });
+    setBusy(false);
+    if (ok) onClose();
+  };
+
+  return (
+    <div className="border-t border-[#EDEBE3] bg-[#FAF9F5] px-2.5 py-2">
+      <input
+        autoFocus
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            void submit();
+          }
+          if (e.key === "Escape") onClose();
+        }}
+        className="w-full rounded-md border border-[#E2DFD5] bg-white px-2.5 py-2 text-[13px] text-[#14201B] focus:outline-none focus:ring-1 focus:ring-[#2C6A46]"
+      />
+      <textarea
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        rows={2}
+        placeholder="Details"
+        className="mt-1.5 w-full resize-none rounded-md border border-[#E2DFD5] bg-white px-2.5 py-1.5 text-[12.5px] text-[#14201B] placeholder:text-[#8A928C] focus:outline-none focus:ring-1 focus:ring-[#2C6A46]"
+      />
+      <div className="mt-1.5 flex flex-wrap gap-1">
+        {ORDER.map((q) => (
+          <button
+            key={q}
+            type="button"
+            onClick={() => setQuadrant(q)}
+            className={`min-h-[28px] rounded-md px-2 text-[12px] transition-colors ${
+              quadrant === q ? "bg-[#14201B] text-[#F7F6F1]" : "bg-[#ECEAE1] text-[#3D4A44] hover:bg-[#E2DFD5]"
+            }`}
+          >
+            {q} · {QUADRANTS[q].title}
+          </button>
+        ))}
+      </div>
+      <div className="mt-2 flex justify-end gap-1.5">
+        <button
+          type="button"
+          onClick={onClose}
+          className="min-h-[32px] rounded-md px-2.5 text-[12.5px] text-[#5B6560] transition-colors hover:bg-[#ECEAE1]"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={() => void submit()}
+          disabled={!text.trim() || busy}
+          className="min-h-[32px] rounded-md bg-[#14201B] px-3 text-[12.5px] text-[#F7F6F1] transition-colors hover:bg-[#25332C] disabled:opacity-40"
+        >
+          Save
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* -------------------------------------------------------------- task row */
 
 function TaskRow({
   task,
   onCheck,
   onGone,
+  onEdit,
 }: {
   task: MatrixTask;
   onCheck: (id: string) => Promise<boolean>;
   onGone: (task: MatrixTask) => void;
+  onEdit: (id: string, fields: { text: string; description: string | null; quadrant: MatrixQuadrant }) => Promise<boolean>;
 }) {
   const [resolved, setResolved] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   const check = async () => {
     if (busy || resolved) return;
@@ -217,6 +302,10 @@ function TaskRow({
     setBusy(false);
     if (ok) setResolved(true);
   };
+
+  if (editing) {
+    return <EditTaskForm task={task} onSave={(fields) => onEdit(task.id, fields)} onClose={() => setEditing(false)} />;
+  }
 
   return (
     <ResolvingRow resolved={resolved} onGone={() => onGone(task)}>
@@ -234,12 +323,12 @@ function TaskRow({
           {resolved ? (
             <SuccessNote title="Done" />
           ) : (
-            <>
+            <button type="button" onClick={() => setEditing(true)} className="block w-full text-left">
               <p className="text-[13px] font-medium leading-snug text-[#14201B]">{task.text}</p>
               {task.description && (
                 <p className="mt-0.5 text-[11.5px] leading-snug text-[#5B6560]">{task.description}</p>
               )}
-            </>
+            </button>
           )}
         </div>
       </div>
@@ -248,8 +337,6 @@ function TaskRow({
 }
 
 /* ------------------------------------------------------------------ cell */
-
-const CELL_ROWS = 4;
 
 function Cell({
   q,
@@ -262,6 +349,7 @@ function Cell({
   onAdd,
   onCheck,
   onGone,
+  onEdit,
 }: {
   q: MatrixQuadrant;
   tasks: MatrixTask[];
@@ -273,10 +361,8 @@ function Cell({
   onAdd: (text: string, description: string | null, effort: number, yieldScore: number) => Promise<boolean>;
   onCheck: (id: string) => Promise<boolean>;
   onGone: (task: MatrixTask) => void;
+  onEdit: (id: string, fields: { text: string; description: string | null; quadrant: MatrixQuadrant }) => Promise<boolean>;
 }) {
-  const shown = focused ? tasks : tasks.slice(0, CELL_ROWS);
-  const rest = tasks.length - shown.length;
-
   return (
     <section className="flex h-full flex-col overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
       <div className="flex w-full items-center gap-2 border-l-[3px] px-2.5 py-2.5" style={{ borderLeftColor: RAIL[q] }}>
@@ -315,18 +401,9 @@ function Cell({
         )
       ) : (
         <div>
-          {shown.map((t) => (
-            <TaskRow key={t.id} task={t} onCheck={onCheck} onGone={onGone} />
+          {tasks.map((t) => (
+            <TaskRow key={t.id} task={t} onCheck={onCheck} onGone={onGone} onEdit={onEdit} />
           ))}
-          {rest > 0 && (
-            <button
-              type="button"
-              onClick={onFocus}
-              className="flex min-h-[40px] w-full items-center justify-center border-t border-[#EDEBE3] px-2.5 text-[12px] text-[#3D4A44] transition-colors hover:bg-[#F7F6F1]"
-            >
-              {rest} more
-            </button>
-          )}
         </div>
       )}
     </section>
@@ -473,12 +550,16 @@ function ScatterBoard({
 /* --------------------------------------------------------------- success */
 
 function SuccessList({ tasks, onReopen }: { tasks: MatrixTask[]; onReopen: (task: MatrixTask) => void }) {
-  if (tasks.length === 0) return null;
   return (
     <section className="mt-6">
       <h2 className="text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
         Success <span className="tabular-nums text-[#B4B9B3]">{tasks.length}</span>
       </h2>
+      {tasks.length === 0 ? (
+        <p className="mt-2 rounded-lg border border-[#E2DFD5] bg-white px-3.5 py-4 text-center text-[12.5px] text-[#8A928C]">
+          Nothing checked off yet.
+        </p>
+      ) : (
       <ul className="mt-2 divide-y divide-[#EDEBE3] overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
         {tasks.map((t) => (
           <li key={t.id} className="flex items-start gap-2.5 px-3.5 py-2.5">
@@ -497,6 +578,7 @@ function SuccessList({ tasks, onReopen }: { tasks: MatrixTask[]; onReopen: (task
           </li>
         ))}
       </ul>
+      )}
     </section>
   );
 }
@@ -542,6 +624,17 @@ export function MatrixScreen({
 
   async function checkOff(id: string): Promise<boolean> {
     const res = await postJSON("/nutribiotic/api/matrix/done", { id, done: true });
+    return res.ok;
+  }
+
+  async function editTask(
+    id: string,
+    fields: { text: string; description: string | null; quadrant: MatrixQuadrant },
+  ): Promise<boolean> {
+    const res = await postJSON("/nutribiotic/api/matrix/edit", { id, ...fields });
+    if (res.ok) {
+      setOpenTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...fields } : t)));
+    }
     return res.ok;
   }
 
@@ -614,6 +707,7 @@ export function MatrixScreen({
               onAdd={(text, description, effort, yieldScore) => addTask(focus, text, description, effort, yieldScore)}
               onCheck={checkOff}
               onGone={taskGone}
+              onEdit={editTask}
             />
           </div>
         ) : (
@@ -631,6 +725,7 @@ export function MatrixScreen({
                 onAdd={(text, description, effort, yieldScore) => addTask(q, text, description, effort, yieldScore)}
                 onCheck={checkOff}
                 onGone={taskGone}
+                onEdit={editTask}
               />
             ))}
           </div>
