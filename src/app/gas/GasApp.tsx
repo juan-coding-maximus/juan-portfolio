@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { findCarWash, findGas, type CarWashResult, type FindResult } from "./actions";
-import { DISCOUNT_PER_GAL, FAVORITES, GALLON_STEP, TANK_GALLONS } from "./lib/constants";
+import { FAVORITES, GALLON_STEP, TANK_GALLONS, UPSIDE_MAX_PER_GAL } from "./lib/constants";
 import type { Scored } from "./lib/score";
 import { priceLevelLabel } from "./lib/washscore";
 import type { WashScored } from "./lib/washscore";
@@ -310,17 +310,16 @@ function StationCard({ s, rank, gallons, destAddress }: { s: Scored; rank: numbe
       </div>
       <div className="mt-3 flex items-end justify-between">
         <div>
-          <span className="font-[family-name:var(--font-fraunces)] text-[40px] font-semibold leading-none tracking-tight">{usd(s.afterDiscount)}</span>
-          <span className="ml-2 text-[13px] text-[#5B6560]">after {Math.round(DISCOUNT_PER_GAL * 100)}¢ off {usd(s.regular)}</span>
+          <span className="font-[family-name:var(--font-fraunces)] text-[40px] font-semibold leading-none tracking-tight">{usd(s.regular)}</span>
+          <span className="ml-2 text-[13px] text-[#5B6560]">per gallon</span>
         </div>
       </div>
-      {s.stale && (
-        <div className="mt-2">
-          <span className="rounded-full bg-[#8A6D2F]/10 px-2.5 py-1 text-[12px] font-medium text-[#8A6D2F]">Price may be outdated</span>
-        </div>
-      )}
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {s.stale && <Badge tone="warn">Price may be outdated</Badge>}
+        <Badge>Up to {Math.round(UPSIDE_MAX_PER_GAL * 100)}¢/gal with Upside</Badge>
+      </div>
       <div className="mt-2 text-[14px] text-[#3D4A44]">
-        ${Math.round(s.afterDiscount * gallons)} for {gal(gallons)} gal
+        ${Math.round(s.regular * gallons)} for {gal(gallons)} gal
         {s.updatedAt && (
           <span className={s.stale ? "font-medium text-[#8A6D2F]" : "text-[#8A928C]"}> · price {ago(s.updatedAt)}</span>
         )}
@@ -383,8 +382,9 @@ function WashCard({ s, rank, destAddress }: { s: WashScored; rank: number; destA
   );
 }
 
-function Badge({ children }: { children: React.ReactNode }) {
-  return <span className="rounded-full bg-[#ECEAE1] px-2.5 py-1 text-[12px] font-medium text-[#3D4A44]">{children}</span>;
+function Badge({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "warn" }) {
+  const cls = tone === "warn" ? "bg-[#8A6D2F]/10 text-[#8A6D2F]" : "bg-[#ECEAE1] text-[#3D4A44]";
+  return <span className={`rounded-full px-2.5 py-1 text-[12px] font-medium ${cls}`}>{children}</span>;
 }
 
 function LocationPill({ state, onRetry }: { state: LocState; onRetry: () => void }) {

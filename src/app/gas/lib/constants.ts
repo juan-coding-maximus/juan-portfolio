@@ -11,8 +11,12 @@ export const FAVORITES: Favorite[] = [
 export const TANK_GALLONS = 16;
 export const GALLON_STEP = 0.5;
 
-/** The per-gallon discount Juan gets at any pump. */
-export const DISCOUNT_PER_GAL = 0.1;
+/* Upside publishes no per-station price feed (re-checked 2026-09-20, still
+   true), so this is not a confirmed discount for any specific station, many
+   of the cheapest stations Juan finds don't run Upside offers at all. Shown
+   as a conditional "up to" annotation only, never subtracted from a
+   station's ranked price. */
+export const UPSIDE_MAX_PER_GAL = 0.1;
 
 /** Dollars per minute of detour, per gallon bought. */
 export const RATE_CHEAPEST = 0.01;

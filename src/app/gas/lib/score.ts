@@ -1,5 +1,3 @@
-import { DISCOUNT_PER_GAL } from "./constants";
-
 export type Station = {
   id: string;
   name: string;
@@ -13,7 +11,6 @@ export type Station = {
 
 export type Scored = Station & {
   detourMinutes: number;
-  afterDiscount: number;
   perGallon: number;
   total: number;
   priceAgeHours: number | null;
@@ -39,11 +36,15 @@ function stalenessPenalty(ageHours: number | null): number {
 }
 
 /**
- * Ranks stations by what the fill really costs: the pump price minus the
- * discount, plus a staleness penalty for an old price, plus every detour
- * minute priced at `rate` per gallon bought. A minute is worth more when
- * there is more fuel to buy, which is exactly why a long empty-tank drive is
- * where this pays and a quarter-tank top-up isn't.
+ * Ranks stations by what the fill really costs: the real posted pump price,
+ * plus a staleness penalty for an old price, plus every detour minute priced
+ * at `rate` per gallon bought. A minute is worth more when there is more
+ * fuel to buy, which is exactly why a long empty-tank drive is where this
+ * pays and a quarter-tank top-up isn't.
+ *
+ * No discount is assumed here. Upside's per-station availability isn't
+ * public data, so it's never subtracted from a station's price before
+ * ranking, that would rank stations on a saving that may not exist for them.
  */
 export function scoreStations(
   stations: Station[],
@@ -57,12 +58,10 @@ export function scoreStations(
     const detour = detourMinutes[i];
     if (!Number.isFinite(detour)) continue;
     const ageHours = priceAgeHours(s.updatedAt);
-    const afterDiscount = s.regular - DISCOUNT_PER_GAL;
-    const perGallon = afterDiscount + stalenessPenalty(ageHours) + Math.max(0, detour) * rate;
+    const perGallon = s.regular + stalenessPenalty(ageHours) + Math.max(0, detour) * rate;
     out.push({
       ...s,
       detourMinutes: detour,
-      afterDiscount,
       perGallon,
       total: perGallon * gallons,
       priceAgeHours: ageHours,

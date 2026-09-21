@@ -31,6 +31,16 @@ type RawPlace = {
    not a price Juan can pay. Delete the pattern if he ever joins one. */
 const MEMBERS_ONLY = /costco|sam[’']?s club/i;
 
+/* Juan's own stated brand tendency, not verified per-station data: Arco and
+   Unocal run cheap where he drives, Chevron never does. Verified live
+   against this endpoint near Home on 2026-09-20: Arco was 9 of 20 results
+   and posted the lowest real price in the set ($5.90 vs $6.40 Chevron), no
+   coverage gap. "Unocal" is a defunct retail brand, its stations are "76"
+   today, so there's nothing distinct left to sample for it. Since a real
+   observed price already surfaces the cheap brands correctly, no brand
+   scoring adjustment is applied, that would risk overriding an actual
+   price with an assumption. */
+
 /** Gas stations around one point, keeping only those Google has a live
  *  regular-unleaded price for. A station with no price is not a candidate:
  *  showing it would mean inventing a number. Closed stations are dropped. */
