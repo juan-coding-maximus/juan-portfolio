@@ -343,24 +343,32 @@ function ScatterBoard({
   onDone,
 }: {
   tasks: MatrixTask[];
-  onMove: (task: MatrixTask, effort: number, yieldScore: number) => void;
+  onMove: (task: MatrixTask, effort: number, yieldScore: number, commit: boolean) => void;
   onDone: (task: MatrixTask) => void;
 }) {
   const [pinnedId, setPinnedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [moving, setMoving] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const dragMoved = useRef(false);
   const svgRef = useRef<SVGSVGElement>(null);
 
   const pinned = tasks.find((t) => t.id === pinnedId) ?? null;
-  const hovered = !moving ? (tasks.find((t) => t.id === hoveredId) ?? null) : null;
+  const hovered = !draggingId ? (tasks.find((t) => t.id === hoveredId) ?? null) : null;
 
-  const pick = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (!moving || !pinned) return;
+  const posFromEvent = (e: React.PointerEvent) => {
     const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    if (!rect) return null;
     const x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
     const y = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
-    onMove(pinned, x, 1 - y);
+    return { x, y: 1 - y };
+  };
+
+  const endDrag = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (!draggingId) return;
+    const t = tasks.find((x) => x.id === draggingId);
+    const p = posFromEvent(e);
+    if (t && p && dragMoved.current) onMove(t, p.x, p.y, true);
+    setDraggingId(null);
   };
 
   return (
@@ -373,16 +381,18 @@ function ScatterBoard({
           <svg
             ref={svgRef}
             viewBox="0 0 100 100"
-            onPointerDown={(e) => {
-              if (!moving) return;
-              (e.target as Element).setPointerCapture?.(e.pointerId);
-              pick(e);
-            }}
             onPointerMove={(e) => {
-              if (moving && e.buttons === 1) pick(e);
+              if (!draggingId) return;
+              const t = tasks.find((x) => x.id === draggingId);
+              const p = posFromEvent(e);
+              if (!t || !p) return;
+              dragMoved.current = true;
+              onMove(t, p.x, p.y, false);
             }}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
             onMouseLeave={() => setHoveredId(null)}
-            className={`aspect-square w-full touch-none rounded-lg border border-[#E2DFD5] bg-white ${moving ? "cursor-crosshair" : ""}`}
+            className={`aspect-square w-full touch-none rounded-lg border border-[#E2DFD5] bg-white ${draggingId ? "cursor-grabbing" : ""}`}
           >
             <line x1="50" y1="0" x2="50" y2="100" stroke="#E2DFD5" strokeWidth="0.4" strokeDasharray="2 2" />
             <line x1="0" y1="50" x2="100" y2="50" stroke="#E2DFD5" strokeWidth="0.4" strokeDasharray="2 2" />
@@ -390,17 +400,20 @@ function ScatterBoard({
             {tasks.map((t) => {
               const x = PAD + (t.effort ?? 0.5) * (100 - 2 * PAD);
               const y = PAD + (1 - (t.yield_score ?? 0.5)) * (100 - 2 * PAD);
-              const on = t.id === pinnedId;
+              const on = t.id === pinnedId || t.id === draggingId;
               return (
                 <g
                   key={t.id}
-                  onClick={() => {
+                  onPointerDown={(e) => {
+                    (e.target as Element).setPointerCapture?.(e.pointerId);
+                    dragMoved.current = false;
+                    setDraggingId(t.id);
                     setPinnedId(t.id);
-                    setMoving(false);
+                    setHoveredId(null);
                   }}
                   onMouseEnter={() => setHoveredId(t.id)}
                   onMouseLeave={() => setHoveredId((id) => (id === t.id ? null : id))}
-                  className="cursor-pointer"
+                  className="cursor-grab active:cursor-grabbing"
                 >
                   <circle cx={x} cy={y} r="4.5" fill="transparent" />
                   <circle cx={x} cy={y} r={on ? 2.8 : 2} fill={RAIL[t.quadrant]} stroke="#FFFFFF" strokeWidth="0.5" />
@@ -438,20 +451,9 @@ function ScatterBoard({
             <div className="mt-2.5 flex gap-1.5">
               <button
                 type="button"
-                onClick={() => setMoving((m) => !m)}
-                aria-pressed={moving}
-                className={`inline-flex min-h-[34px] items-center gap-1.5 rounded-md px-3 text-[12.5px] transition-colors ${
-                  moving ? "bg-[#2C6A46] text-white" : "bg-[#ECEAE1] text-[#3D4A44] hover:bg-[#E2DFD5]"
-                }`}
-              >
-                {moving ? "Tap the board" : "Move"}
-              </button>
-              <button
-                type="button"
                 onClick={() => {
                   onDone(pinned);
                   setPinnedId(null);
-                  setMoving(false);
                 }}
                 className="inline-flex min-h-[34px] items-center gap-1.5 rounded-md bg-[#14201B] px-3 text-[12.5px] text-[#F7F6F1] transition-colors hover:bg-[#25332C]"
               >
@@ -560,11 +562,11 @@ export function MatrixScreen({
     if (ok) taskGone(task);
   }
 
-  function move(task: MatrixTask, effort: number, yieldScore: number) {
+  function move(task: MatrixTask, effort: number, yieldScore: number, commit: boolean) {
     setOpenTasks((prev) =>
       prev.map((t) => (t.id === task.id ? { ...t, effort, yield_score: yieldScore } : t)),
     );
-    void postJSON("/nutribiotic/api/matrix/position", { id: task.id, effort, yield_score: yieldScore });
+    if (commit) void postJSON("/nutribiotic/api/matrix/position", { id: task.id, effort, yield_score: yieldScore });
   }
 
   return (
