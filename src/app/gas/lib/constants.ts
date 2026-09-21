@@ -22,6 +22,10 @@ export const UPSIDE_MAX_PER_GAL = 0.1;
 export const RATE_CHEAPEST = 0.01;
 export const RATE_QUICKEST = 0.03;
 
+/* Juan set this directly, 2026-09-20: each minute of detour for a car wash is
+   worth 30c. Flat, not per gallon, a wash isn't bought by the gallon. */
+export const RATE_CARWASH = 0.3;
+
 /** Miles kept unspent when a typed miles-to-empty number filters out
  *  stations the tank can't actually reach. */
 export const RESERVE_MILES = 20;

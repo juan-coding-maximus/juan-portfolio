@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { searchPlaces } from "../nutribiotic/lib/places";
-import { RATE_CHEAPEST, RATE_QUICKEST, RESERVE_MILES, TANK_GALLONS } from "./lib/constants";
+import { RATE_CARWASH, RATE_CHEAPEST, RATE_QUICKEST, RESERVE_MILES, TANK_GALLONS } from "./lib/constants";
 import { carWashNearby, type WashStation } from "./lib/carwash";
 import { fuelNearby } from "./lib/fuel";
 import { detourMinutes, milesFromOrigin, route, sampleAlong, type LatLng } from "./lib/osrm";
@@ -160,6 +160,6 @@ export async function findCarWash(input: CarWashInput): Promise<CarWashResult> {
   const detours = await detourMinutes(origin, dest, stations);
   if (!detours) return { ok: false, error: "Couldn't time the detours right now. Try again." };
 
-  const scored = scoreCarWashes(stations, detours);
+  const scored = scoreCarWashes(stations, detours, RATE_CARWASH);
   return { ok: true, dest, directMinutes: shape.minutes, considered: scored.length, best: scored.slice(0, 3) };
 }

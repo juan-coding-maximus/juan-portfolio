@@ -1,0 +1,51 @@
+{
+  "ChIJjW47YYm1woARa8f3hmv33Cs": {
+    "name": "Fast5Xpress Car Wash Torrance",
+    "tier": "Bronze",
+    "price": 12,
+    "sourceUrl": "https://www.fast5xpress.com/19150-harborgateway-torrance-ca/",
+    "verifiedAt": "2026-09-20"
+  },
+  "ChIJ1yT0mk63woARR8ByWDG-DBA": {
+    "name": "Spot Free Car Wash (Centinela Ave)",
+    "tier": "Deluxe",
+    "price": 12,
+    "sourceUrl": "https://www.spotfreecar.com/car-wash-pricing-guide-membership-single-wash-los-angeles/",
+    "verifiedAt": "2026-09-20"
+  },
+  "ChIJN8bgSVC7woART0zXUiZYjQo": {
+    "name": "Spot Free Car Wash (Washington Pl)",
+    "tier": "Deluxe",
+    "price": 12,
+    "sourceUrl": "https://www.spotfreecar.com/car-wash-pricing-guide-membership-single-wash-los-angeles/",
+    "verifiedAt": "2026-09-20"
+  },
+  "ChIJJ8mWflKxwoARr39g6_Pnor4": {
+    "name": "El Segundo 5-Minute Express",
+    "tier": "Value Express Wash",
+    "price": 14,
+    "sourceUrl": "http://www.5mincarwash.com/",
+    "verifiedAt": "2026-09-20"
+  },
+  "ChIJCxPLcD-7woAR2nI2QP0yIaA": {
+    "name": "Olympic Speedwash",
+    "tier": "Speedwash",
+    "price": 15,
+    "sourceUrl": "https://www.speedwashes.com/locations/express-car-wash-in-los-angeles-speedwash/",
+    "verifiedAt": "2026-09-20"
+  },
+  "ChIJXRNy_e7f3IAR7aFDGg0n5KU": {
+    "name": "Fast5Xpress Car Wash (Costa Mesa)",
+    "tier": "Bronze",
+    "price": 12,
+    "sourceUrl": "https://www.fast5xpress.com/481-east-17thstreet-costamesa-ca/",
+    "verifiedAt": "2026-09-20"
+  },
+  "ChIJMWLIikHf3IARQEbVdh-qoco": {
+    "name": "Wild Water Express (Costa Mesa)",
+    "tier": "Basic",
+    "price": 13,
+    "sourceUrl": "https://wildwaterexpress.com/locations/costa-mesa/",
+    "verifiedAt": "2026-09-20"
+  }
+}

@@ -1,5 +1,6 @@
 import "server-only";
 import type { LatLng } from "./osrm";
+import PRICE_CACHE from "./carwash-prices.json";
 
 const TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
 
@@ -8,26 +9,13 @@ const FIELD_MASK = [
   "places.displayName",
   "places.shortFormattedAddress",
   "places.location",
-  "places.priceLevel",
   "places.currentOpeningHours.openNow",
   "places.editorialSummary",
   "places.reviews",
 ].join(",");
 
-export type PriceLevel =
-  | "PRICE_LEVEL_FREE"
-  | "PRICE_LEVEL_INEXPENSIVE"
-  | "PRICE_LEVEL_MODERATE"
-  | "PRICE_LEVEL_EXPENSIVE"
-  | "PRICE_LEVEL_VERY_EXPENSIVE";
-
-const VALID_PRICE_LEVELS = new Set<string>([
-  "PRICE_LEVEL_FREE",
-  "PRICE_LEVEL_INEXPENSIVE",
-  "PRICE_LEVEL_MODERATE",
-  "PRICE_LEVEL_EXPENSIVE",
-  "PRICE_LEVEL_VERY_EXPENSIVE",
-]);
+type CachedTier = { name: string; tier: string; price: number; sourceUrl: string; verifiedAt: string };
+const PRICES: Record<string, CachedTier> = PRICE_CACHE;
 
 export type WashStation = {
   id: string;
@@ -35,12 +23,21 @@ export type WashStation = {
   address: string;
   lat: number;
   lng: number;
-  /** Only set when Google itself returns a price level for this place. */
-  priceLevel: PriceLevel | null;
+  /** The real posted dollar price for the cheapest tier confirmed to include
+   *  both an outside/exterior machine wash and a free vacuum, from
+   *  carwash-prices.json. Never a Google priceLevel bucket, never guessed:
+   *  null when a place hasn't been looked up and verified yet. */
+  price: number | null;
+  /** The tier name that price applies to (e.g. "Basic", "Bronze"), when known. */
+  tier: string | null;
+  /** Where the price was verified, so it can be checked and refreshed. */
+  priceSourceUrl: string | null;
   /** Only true when "drive-through" (or a clear paraphrase) appears in
    *  Places' own text for this place, never assumed from the search query. */
   driveThrough: boolean;
-  /** Same rule as driveThrough: corroborated by Places' own text, or false. */
+  /** True when a free vacuum is confirmed either by the price cache (its
+   *  qualifying tier is only ever cached when the vacuum is free) or by
+   *  Places' own text for this place. */
   freeVacuums: boolean;
 };
 
@@ -49,7 +46,6 @@ type RawPlace = {
   displayName?: { text?: string };
   shortFormattedAddress?: string;
   location?: { latitude?: number; longitude?: number };
-  priceLevel?: string;
   currentOpeningHours?: { openNow?: boolean };
   editorialSummary?: { text?: string };
   reviews?: Array<{ text?: { text?: string } }>;
@@ -59,13 +55,16 @@ const DRIVE_THROUGH_RE = /drive[\s-]?(?:thru|through)/i;
 const FREE_VACUUM_RE = /(free|complimentary)\s+vacuum|vacuums?\s+(?:are\s+|included\s+)?free/i;
 
 /**
- * Car washes near one point. Unlike gas stations, Places (New) has no price
- * field and no drive-through/vacuum field for `car_wash` places, so this
- * uses Text Search (which matches free text against name/description/review
- * snippets) instead of Nearby Search, biased to `center`. `priceLevel` is
- * read straight off the response when Google has one; "drive-through" and
- * "free vacuums" are never inferred from the query, only read back from
- * Places' own editorial summary or review text for that exact place.
+ * Car washes near one point. Unlike gas stations, Places (New) has no real
+ * price field for `car_wash` places, so this uses Text Search (which matches
+ * free text against name/description/review snippets) instead of Nearby
+ * Search, biased to `center`. The real dollar price is never from Google:
+ * it's looked up separately and cached in carwash-prices.json, keyed by
+ * Places id. "Drive-through" and "free vacuums" are never inferred from the
+ * query, only read back from Places' own editorial summary or review text
+ * for that exact place, or confirmed directly when a price was verified.
+ * Only a place confirmed on both counts, outside machine wash and free
+ * vacuum, is returned at all.
  */
 export async function carWashNearby(center: LatLng, radiusMeters: number): Promise<WashStation[]> {
   const key = process.env.NB_PLACES_API_KEY ?? "";
@@ -97,15 +96,21 @@ export async function carWashNearby(center: LatLng, radiusMeters: number): Promi
     const lng = p.location?.longitude;
     if (!p.id || lat == null || lng == null) continue;
     const text = [p.editorialSummary?.text, ...(p.reviews ?? []).map((r) => r.text?.text)].filter(Boolean).join(" \n ");
+    const cached = PRICES[p.id];
+    const driveThrough = Boolean(cached) || DRIVE_THROUGH_RE.test(text);
+    const freeVacuums = Boolean(cached) || FREE_VACUUM_RE.test(text);
+    if (!driveThrough || !freeVacuums) continue;
     out.push({
       id: p.id,
       name: p.displayName?.text ?? "Car wash",
       address: p.shortFormattedAddress ?? "",
       lat,
       lng,
-      priceLevel: VALID_PRICE_LEVELS.has(p.priceLevel ?? "") ? (p.priceLevel as PriceLevel) : null,
-      driveThrough: DRIVE_THROUGH_RE.test(text),
-      freeVacuums: FREE_VACUUM_RE.test(text),
+      price: cached?.price ?? null,
+      tier: cached?.tier ?? null,
+      priceSourceUrl: cached?.sourceUrl ?? null,
+      driveThrough,
+      freeVacuums,
     });
   }
   return out;

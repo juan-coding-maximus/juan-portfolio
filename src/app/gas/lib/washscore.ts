@@ -1,49 +1,23 @@
-import type { PriceLevel, WashStation } from "./carwash";
+import type { WashStation } from "./carwash";
 
-export type WashScored = WashStation & { detourMinutes: number };
-
-const PRICE_RANK: Record<PriceLevel, number> = {
-  PRICE_LEVEL_FREE: 0,
-  PRICE_LEVEL_INEXPENSIVE: 1,
-  PRICE_LEVEL_MODERATE: 2,
-  PRICE_LEVEL_EXPENSIVE: 3,
-  PRICE_LEVEL_VERY_EXPENSIVE: 4,
-};
-
-const PRICE_LABEL: Record<PriceLevel, string> = {
-  PRICE_LEVEL_FREE: "Free",
-  PRICE_LEVEL_INEXPENSIVE: "Inexpensive",
-  PRICE_LEVEL_MODERATE: "Moderate",
-  PRICE_LEVEL_EXPENSIVE: "Expensive",
-  PRICE_LEVEL_VERY_EXPENSIVE: "Very expensive",
-};
-
-export function priceLevelLabel(level: PriceLevel | null): string | null {
-  return level ? PRICE_LABEL[level] : null;
-}
+export type WashScored = WashStation & { detourMinutes: number; total: number };
 
 /**
- * "Close to the destination" means close to the route, not close to the
- * destination point: this ranks on `detourMinutes`, the same OSRM route
- * detour gas's quickest mode uses, never straight-line distance to `dest`.
- * Places has no dollar price for a car wash the way it does for gas, so a
- * place within 3 minutes of the closest one is treated as a tie and broken
- * by priceLevel when Google returned one; a place with no priceLevel never
- * gets penalized for the gap, it just falls back to the detour order.
+ * Ranks car washes the same way gas ranks stations: `total = price +
+ * detourMinutes * rate`, ascending. `price` is the real posted dollar price
+ * for the cheapest tier confirmed to include both an outside machine wash
+ * and a free vacuum (carwash-prices.json), never a priceLevel bucket. Only
+ * stations with a verified price are ranked, since there's nothing real to
+ * rank a guess against.
  */
-export function scoreCarWashes(stations: WashStation[], detourMinutes: number[]): WashScored[] {
+export function scoreCarWashes(stations: WashStation[], detourMinutes: number[], rate: number): WashScored[] {
   const out: WashScored[] = [];
   for (let i = 0; i < stations.length; i++) {
+    const s = stations[i];
     const detour = detourMinutes[i];
-    if (!Number.isFinite(detour)) continue;
-    out.push({ ...stations[i], detourMinutes: detour });
+    if (!Number.isFinite(detour) || s.price == null) continue;
+    out.push({ ...s, detourMinutes: detour, total: s.price + Math.max(0, detour) * rate });
   }
-  out.sort((a, b) => {
-    const d = a.detourMinutes - b.detourMinutes;
-    if (Math.abs(d) > 3) return d;
-    const pa = a.priceLevel ? PRICE_RANK[a.priceLevel] : 2.5;
-    const pb = b.priceLevel ? PRICE_RANK[b.priceLevel] : 2.5;
-    return pa - pb || d;
-  });
+  out.sort((a, b) => a.total - b.total || a.detourMinutes - b.detourMinutes);
   return out;
 }

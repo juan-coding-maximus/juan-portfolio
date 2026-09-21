@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { findCarWash, findGas, type CarWashResult, type FindResult } from "./actions";
 import { FAVORITES, GALLON_STEP, TANK_GALLONS, UPSIDE_MAX_PER_GAL } from "./lib/constants";
 import type { Scored } from "./lib/score";
-import { priceLevelLabel } from "./lib/washscore";
 import type { WashScored } from "./lib/washscore";
 
 type LatLng = { lat: number; lng: number };
@@ -351,7 +350,6 @@ function StationCard({ s, rank, gallons, destAddress }: { s: Scored; rank: numbe
 function WashCard({ s, rank, destAddress }: { s: WashScored; rank: number; destAddress: string }) {
   const best = rank === 1;
   const minutes = Math.round(s.detourMinutes);
-  const price = priceLevelLabel(s.priceLevel);
   return (
     <li className={`rounded-2xl border bg-white p-4 ${best ? "border-[#2C6A46] shadow-[0_0_0_1px_#2C6A46]" : "border-[#E2DFD5]"}`}>
       <div className="flex items-start justify-between gap-3">
@@ -363,11 +361,23 @@ function WashCard({ s, rank, destAddress }: { s: WashScored; rank: number; destA
           <div className="text-[17px] font-semibold">{minutes <= 0 ? "on the way" : `+${minutes} min`}</div>
         </div>
       </div>
-      {(price || s.driveThrough || s.freeVacuums) && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {price && <Badge>{price}</Badge>}
-          {s.driveThrough && <Badge>Drive-through</Badge>}
-          {s.freeVacuums && <Badge>Free vacuums</Badge>}
+      <div className="mt-3 flex items-end justify-between">
+        <div>
+          <span className="font-[family-name:var(--font-fraunces)] text-[40px] font-semibold leading-none tracking-tight">
+            {s.price != null ? usd(s.price) : "—"}
+          </span>
+          {s.tier && <span className="ml-2 text-[13px] text-[#5B6560]">{s.tier}</span>}
+        </div>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        <Badge>Outside wash</Badge>
+        <Badge>Free vacuums</Badge>
+      </div>
+      {s.priceSourceUrl && (
+        <div className="mt-2 text-[14px] text-[#3D4A44]">
+          <a href={s.priceSourceUrl} target="_blank" rel="noopener" className="text-[#2C6A46] underline-offset-2 hover:underline">
+            Price source
+          </a>
         </div>
       )}
       <div className="mt-4">
