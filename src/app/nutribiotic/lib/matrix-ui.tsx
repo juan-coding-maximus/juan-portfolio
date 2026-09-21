@@ -347,10 +347,12 @@ function ScatterBoard({
   onDone: (task: MatrixTask) => void;
 }) {
   const [pinnedId, setPinnedId] = useState<string | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
 
   const pinned = tasks.find((t) => t.id === pinnedId) ?? null;
+  const hovered = !moving ? (tasks.find((t) => t.id === hoveredId) ?? null) : null;
 
   const pick = (e: React.PointerEvent<SVGSVGElement>) => {
     if (!moving || !pinned) return;
@@ -367,43 +369,59 @@ function ScatterBoard({
         <span className="flex w-5 shrink-0 items-center justify-center text-[10.5px] tracking-wide text-[#8A928C] [writing-mode:vertical-lr] rotate-180">
           Yield
         </span>
-        <svg
-          ref={svgRef}
-          viewBox="0 0 100 100"
-          onPointerDown={(e) => {
-            if (!moving) return;
-            (e.target as Element).setPointerCapture?.(e.pointerId);
-            pick(e);
-          }}
-          onPointerMove={(e) => {
-            if (moving && e.buttons === 1) pick(e);
-          }}
-          className={`aspect-square w-full touch-none rounded-lg border border-[#E2DFD5] bg-white ${moving ? "cursor-crosshair" : ""}`}
-        >
-          <line x1="50" y1="0" x2="50" y2="100" stroke="#E2DFD5" strokeWidth="0.4" strokeDasharray="2 2" />
-          <line x1="0" y1="50" x2="100" y2="50" stroke="#E2DFD5" strokeWidth="0.4" strokeDasharray="2 2" />
+        <div className="relative w-full">
+          <svg
+            ref={svgRef}
+            viewBox="0 0 100 100"
+            onPointerDown={(e) => {
+              if (!moving) return;
+              (e.target as Element).setPointerCapture?.(e.pointerId);
+              pick(e);
+            }}
+            onPointerMove={(e) => {
+              if (moving && e.buttons === 1) pick(e);
+            }}
+            onMouseLeave={() => setHoveredId(null)}
+            className={`aspect-square w-full touch-none rounded-lg border border-[#E2DFD5] bg-white ${moving ? "cursor-crosshair" : ""}`}
+          >
+            <line x1="50" y1="0" x2="50" y2="100" stroke="#E2DFD5" strokeWidth="0.4" strokeDasharray="2 2" />
+            <line x1="0" y1="50" x2="100" y2="50" stroke="#E2DFD5" strokeWidth="0.4" strokeDasharray="2 2" />
 
-          {tasks.map((t) => {
-            const x = PAD + (t.effort ?? 0.5) * (100 - 2 * PAD);
-            const y = PAD + (1 - (t.yield_score ?? 0.5)) * (100 - 2 * PAD);
-            const on = t.id === pinnedId;
-            return (
-              <g
-                key={t.id}
-                onClick={() => {
-                  setPinnedId(t.id);
-                  setMoving(false);
-                }}
-                className="cursor-pointer"
-              >
-                <circle cx={x} cy={y} r="4.5" fill="transparent" />
-                <circle cx={x} cy={y} r={on ? 2.8 : 2} fill={RAIL[t.quadrant]} stroke="#FFFFFF" strokeWidth="0.5">
-                  <title>{t.text}</title>
-                </circle>
-              </g>
-            );
-          })}
-        </svg>
+            {tasks.map((t) => {
+              const x = PAD + (t.effort ?? 0.5) * (100 - 2 * PAD);
+              const y = PAD + (1 - (t.yield_score ?? 0.5)) * (100 - 2 * PAD);
+              const on = t.id === pinnedId;
+              return (
+                <g
+                  key={t.id}
+                  onClick={() => {
+                    setPinnedId(t.id);
+                    setMoving(false);
+                  }}
+                  onMouseEnter={() => setHoveredId(t.id)}
+                  onMouseLeave={() => setHoveredId((id) => (id === t.id ? null : id))}
+                  className="cursor-pointer"
+                >
+                  <circle cx={x} cy={y} r="4.5" fill="transparent" />
+                  <circle cx={x} cy={y} r={on ? 2.8 : 2} fill={RAIL[t.quadrant]} stroke="#FFFFFF" strokeWidth="0.5" />
+                </g>
+              );
+            })}
+          </svg>
+
+          {hovered && (
+            <div
+              className="pointer-events-none absolute z-10 whitespace-nowrap rounded-md border border-[#E2DFD5] bg-white px-2 py-1 text-[12px] font-medium text-[#14201B] shadow-md"
+              style={{
+                left: `${PAD + (hovered.effort ?? 0.5) * (100 - 2 * PAD)}%`,
+                top: `${PAD + (1 - (hovered.yield_score ?? 0.5)) * (100 - 2 * PAD)}%`,
+                transform: "translate(-50%, -135%)",
+              }}
+            >
+              {hovered.text}
+            </div>
+          )}
+        </div>
       </div>
       <p className="ml-7 mt-1.5 text-center text-[10.5px] tracking-wide text-[#8A928C]">Effort</p>
 
