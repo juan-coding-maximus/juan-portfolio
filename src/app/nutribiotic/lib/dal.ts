@@ -1271,7 +1271,69 @@ export type NewActivity = {
   at?: string;
 };
 
+/** NEAR-VERBATIM, and no looser than that, measured against the real pairs.
+ *
+ *  The Arcana re-say scores 1.0 here: identical text, weeks apart, which no
+ *  human types twice. The Herbalife one scores 0.62, because the second
+ *  telling rephrased the opening hours, and 0.62 is also what two GENUINE
+ *  visits to one account score when described in the same plain words ("I
+ *  visited X and spoke with Mari again..."). There is no threshold that
+ *  catches the rephrased one without refusing real captures, and refusing a
+ *  real capture costs Juan a note he is standing in a doorway to file.
+ *
+ *  So this door only stops what is provably a re-say, and the rephrased kind
+ *  is caught before publication instead, by retract_activity.py --scan, which
+ *  weekly_report.py runs over every week it builds. */
+const RESAY_SIMILARITY = 0.9;
+
+function resaySimilarity(a: string, b: string): number {
+  const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
+  const wa = new Set(norm(a).split(/\s+/).filter((w) => w.length > 3));
+  const wb = new Set(norm(b).split(/\s+/).filter((w) => w.length > 3));
+  if (wa.size < 4 || wb.size < 4) return 0;
+  let shared = 0;
+  for (const w of wa) if (wb.has(w)) shared += 1;
+  return shared / Math.min(wa.size, wb.size);
+}
+
 export async function insertActivity(input: NewActivity): Promise<Activity> {
+  // A CAPTURE THAT RE-SAYS AN OLDER ONE IS REFUSED (2026-09-21).
+  //
+  // Twice in September a note from weeks earlier was filed again as a fresh
+  // visit, at the tail of a batch of genuine same-day captures: the Herbalife
+  // in Lawndale on Sep 14, word for word from Aug 18, and Arcana Empothecary
+  // on Sep 16 from Aug 27. Juan found them by reading his own weekly report
+  // and saying "I didn't go there." Both had to be retracted out of the
+  // ledger, the portal and two published reports by hand.
+  //
+  // The check is deliberately at the one door every manual capture comes
+  // through rather than in the reports that read it, because a phantom filed
+  // here reaches the account timeline, the route's last-touch, HubSpot and
+  // every report at once. Same day is exempt: two genuine touches on one
+  // account in a day happen (a visit, then a call about it), and it is the
+  // weeks-later repeat that has never once been real.
+  if (input.detail && input.detail.trim().length > 40) {
+    const prior = await query<{ id: number; at: string; detail: string | null; origin?: Origin }>(
+      "nb_activities",
+      {
+        select: "id,at,detail",
+        account_id: `eq.${input.account_id}`,
+        order: "at.desc",
+        limit: "25",
+      },
+    );
+    const today = (input.at ?? new Date().toISOString()).slice(0, 10);
+    for (const p of prior.data) {
+      if (!p.detail || p.at.slice(0, 10) === today) continue;
+      if (resaySimilarity(input.detail, p.detail) >= RESAY_SIMILARITY) {
+        throw new Error(
+          `This reads like activity ${p.id} from ${p.at.slice(0, 10)} on the same account, ` +
+            `so it was not filed. If it really happened again, say what was different this time.`,
+        );
+      }
+    }
+  }
+
   const [row] = await mutate<Activity>("nb_activities", "POST", {
     ...input,
     actor: "juan",
