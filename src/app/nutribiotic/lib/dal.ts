@@ -4268,8 +4268,15 @@ function reportLabel(kind: "daily" | "weekly", name: string): string {
       year: "numeric",
       timeZone: "UTC",
     });
+  // "Mon. Sep 21, 2026" (Juan, 2026-09-22). A daily report is read as a day of
+  // the week, not as a date, and a list of bare dates makes him count back to
+  // work out which one was a Saturday. en-US gives "Mon" with no period, so
+  // the period is added here. Same string the PDF's own title carries
+  // (field_report.py's date_label) -- change one, change both.
+  const dayName = (iso: string) =>
+    new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
   const stem = name.replace(/^(daily|weekly)-/, "").replace(/\.pdf$/, "");
-  if (kind === "daily") return fmt(stem);
+  if (kind === "daily") return `${dayName(stem)}. ${fmt(stem)}`;
   const [start, end] = stem.split("_to_");
   if (!start || !end) return stem;
   return `${fmt(start)} – ${fmt(end)}`;
