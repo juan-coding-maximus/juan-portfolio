@@ -2587,8 +2587,10 @@ export async function getPriorityBook(): Promise<PriorityBook> {
     // HARD RULE 18: every counting surface reads the effective view, not the
     // append-only table, so a touchpoint filed on the wrong account and then
     // corrected does not keep making that account look freshly worked.
+    // `retracted` too (migration 0083): a capture that recorded something that
+    // did not happen must not hold an account off the route as freshly worked.
     rawCached<{ account_id: string; at: string }>(
-      "nb_v_activities_effective?select=account_id,at&corrected=is.false&order=at.desc&limit=2000",
+      "nb_v_activities_effective?select=account_id,at&corrected=is.false&retracted=is.false&order=at.desc&limit=2000",
     ),
   ]);
 
@@ -4239,32 +4241,14 @@ async function listReportObjectsByKind(): Promise<Record<"daily" | "weekly", str
   };
 }
 
-async function signReportNames(names: string[]): Promise<PlaybookReport[]> {
-  const signed = await Promise.all(
-    names.map(async (name) => {
-      const kind = name.startsWith("daily-") ? ("daily" as const) : ("weekly" as const);
-      // POST verb, but minting a signed URL has no persisted side effect
-      // either, safe to retry.
-      const signRes = await fetchWithTimeout(
-        `${SB_URL}/storage/v1/object/sign/${REPORTS_BUCKET}/${encodeURIComponent(name)}`,
-        {
-          method: "POST",
-          headers: {
-            apikey: SB_KEY,
-            Authorization: `Bearer ${SB_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ expiresIn: 300 }),
-          cache: "no-store",
-        },
-        { retries: 1 },
-      );
-      if (!signRes.ok) return null;
-      const { signedURL } = (await signRes.json()) as { signedURL: string };
-      return { kind, label: reportLabel(kind, name), url: `${SB_URL}/storage/v1${signedURL}` };
-    }),
-  );
-  return signed.filter((r): r is PlaybookReport => r !== null);
+/** Archive rows. The name is already known to be in the bucket (it came from
+ *  the listing), and the URL is the stable one, so this makes no network call
+ *  at all and no link here can expire before it is clicked. */
+function signReportNames(names: string[]): PlaybookReport[] {
+  return names.map((name) => {
+    const kind = name.startsWith("daily-") ? ("daily" as const) : ("weekly" as const);
+    return { kind, label: reportLabel(kind, name), url: reportHref(name) };
+  });
 }
 
 /** Latest report of each kind. Never throws: an unreachable or empty bucket
@@ -4278,7 +4262,7 @@ export async function listPlaybookReports(): Promise<PlaybookReport[]> {
     const latestNames = (["daily", "weekly"] as const)
       .map((kind) => byKind[kind][0])
       .filter((n): n is string => Boolean(n));
-    return await signReportNames(latestNames);
+    return signReportNames(latestNames);
   } catch {
     return [];
   }
@@ -4307,7 +4291,7 @@ export async function listPlaybookReportArchive(): Promise<PlaybookReportArchive
       names.push(...older.slice(0, ARCHIVE_CAP_PER_KIND));
       if (older.length > ARCHIVE_CAP_PER_KIND) truncated[kind] = older.length - ARCHIVE_CAP_PER_KIND;
     }
-    const reports = await signReportNames(names);
+    const reports = signReportNames(names);
     return { reports, truncated };
   } catch {
     return { reports: [], truncated: {} };
@@ -4956,7 +4940,13 @@ export async function saveReportDraftPayload(dateISO: string, payload: ReportPay
 
 /** A short-lived link to the preview PDF, so the review is done against the
  *  real artifact, map and all, rather than a second rendering of the data. */
-export async function signReportPreview(name: string): Promise<string | null> {
+/** A signed URL for one report object, good for the next few minutes.
+ *
+ *  ONLY api/report SHOULD CALL THIS. A signature starts ageing when it is
+ *  minted, so anything that mints one and then puts it in a page is handing
+ *  out a link with a fuse on it (see that route's header for the 2026-09-21
+ *  InvalidJWT). Mint it when the click arrives, redirect, done. */
+export async function signReportObject(name: string): Promise<string | null> {
   try {
     const res = await fetchWithTimeout(
       `${SB_URL}/storage/v1/object/sign/${REPORTS_BUCKET}/${encodeURIComponent(name)}`,
@@ -4974,6 +4964,30 @@ export async function signReportPreview(name: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+/** The link the Reports tab renders: stable, gated, signed on click.
+ *
+ *  Still returns null when the object is not in the bucket, because every
+ *  caller uses that to decide whether there is a report to offer at all. The
+ *  existence check is a HEAD, not a signature, so nothing with an expiry is
+ *  created just to find out whether a file is there. */
+export async function signReportPreview(name: string): Promise<string | null> {
+  try {
+    const res = await fetchWithTimeout(
+      `${SB_URL}/storage/v1/object/info/${REPORTS_BUCKET}/${encodeURIComponent(name)}`,
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, cache: "no-store" },
+      { retries: 1 },
+    );
+    if (!res.ok) return null;
+    return reportHref(name);
+  } catch {
+    return null;
+  }
+}
+
+export function reportHref(name: string): string {
+  return `/nutribiotic/api/report?name=${encodeURIComponent(name)}`;
 }
 
 // ---------------------------------------------------------------------------
