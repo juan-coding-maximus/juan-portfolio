@@ -629,6 +629,21 @@ export function AccountsMap({
     [visibleAccounts, filters, priorityById],
   );
 
+  /* A stop on today's charted route stays on the map even when a chip would
+     otherwise filter its account out: the route number is a promise about
+     the day, not about the current chip selection, and a gap in the
+     sequence (1, then 4, no 2 or 3) reads as a bug rather than a filter. */
+  const accountsById = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
+
+  const pinAccounts = useMemo(() => {
+    if (!showRouteChain || routeStops.length === 0) return filtered;
+    const shown = new Set(filtered.map((a) => a.id));
+    const missingRouteStops = routeStops
+      .map((s) => accountsById.get(s.id))
+      .filter((a): a is MapAccount => a != null && !shown.has(a.id));
+    return missingRouteStops.length > 0 ? [...filtered, ...missingRouteStops] : filtered;
+  }, [filtered, showRouteChain, routeStops, accountsById]);
+
   /* THE PIN CHRONOLOGY (Juan, 2026-09-17): "numbers instead of red pins ...
      a number that shows the chronology of my visits and calls." first_touch_at
      (nb_v_account_first_touch, migration 0078) is the earliest visit, call,
@@ -1130,7 +1145,7 @@ export function AccountsMap({
             />
           ))}
 
-          {filtered.map((a) => {
+          {pinAccounts.map((a) => {
             const prospect = isProspect(a);
             // A prospect wears its flat blue regardless of tier: no touchpoint
             // logged is the fact this colour states, and an account can carry
