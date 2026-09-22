@@ -1,5 +1,5 @@
 /**
- * Metri Bio client pages: /metri/sow and /metri/strategy (any letter case).
+ * Metri Bio client pages: /metri/sow, /metri/strategy, and /metri/why (any letter case).
  *
  * The documents are built in the agency repo (projects/metri-bio/deliverables) and copied into
  * ../docs.generated.ts by that repo's publish_site.py. They are never in public/, so the HTML is
