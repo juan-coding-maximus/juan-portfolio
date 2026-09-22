@@ -1167,8 +1167,8 @@ export function AccountsMap({
                   strokeWeight: pinNum ? 2 : 1.5,
                 }}
                 label={
-                  pinNum
-                    ? { text: String(pinNum), color: "#F7F6F1", fontSize: "11px", fontWeight: "700" }
+                  routeNum
+                    ? { text: String(routeNum), color: "#F7F6F1", fontSize: "11px", fontWeight: "700" }
                     : undefined
                 }
               />
