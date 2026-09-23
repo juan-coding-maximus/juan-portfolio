@@ -84,7 +84,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
             className="w-full max-w-[880px] rounded-xl border border-[#E2DFD5] bg-[#F7F6F1] shadow-2xl"
             onClick={(e: MouseEvent) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-4 border-b border-[#E2DFD5] px-6 py-5">
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-4 rounded-t-xl border-b border-[#E2DFD5] bg-[#F7F6F1] px-6 py-5">
               <div className="min-w-0">
                 <h2 className="truncate font-[family-name:var(--font-fraunces)] text-[22px] leading-tight font-semibold tracking-tight">
                   {loading ? "Loading..." : (data?.account.name ?? "Not found")}
@@ -106,7 +106,11 @@ export function ModalProvider({ children }: { children: ReactNode }) {
               </button>
             </div>
 
-            <div className="max-h-[75vh] overflow-x-hidden overflow-y-auto px-6 py-6">
+            {/* No max-h/overflow-y here: iOS Safari won't hand a touch-scroll
+                gesture between nested overflow-y-auto containers, so nesting
+                one inside the backdrop's own scroll region (below) traps the
+                gesture on the backdrop. One scroll container for the modal. */}
+            <div className="overflow-x-hidden px-6 py-6">
               {loading && <div className="py-10 text-center text-[13.5px] text-[#8A928C]">Loading account...</div>}
               {!loading && !data && (
                 <div className="py-10 text-center text-[13.5px] text-[#8A928C]">Account not found.</div>

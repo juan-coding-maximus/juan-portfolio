@@ -63,7 +63,7 @@ function LogVisitSheet({ account, onClose }: { account: Account; onClose: () => 
         className="w-full max-w-[600px] rounded-xl border border-[#E2DFD5] bg-[#F7F6F1] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-4 border-b border-[#E2DFD5] px-5 py-4">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-4 rounded-t-xl border-b border-[#E2DFD5] bg-[#F7F6F1] px-5 py-4">
           <h2 className="truncate font-[family-name:var(--font-fraunces)] text-[19px] leading-none font-semibold tracking-tight">
             Log a visit &middot; {account.name}
           </h2>
@@ -75,7 +75,11 @@ function LogVisitSheet({ account, onClose }: { account: Account; onClose: () => 
             <Ico name="close" size={16} />
           </button>
         </div>
-        <div className="max-h-[78vh] overflow-x-hidden overflow-y-auto px-5 py-5">
+        {/* No max-h/overflow-y here: iOS Safari won't hand a touch-scroll
+            gesture between nested overflow-y-auto containers, so nesting
+            one inside the backdrop's own scroll region (above) traps the
+            gesture on the backdrop. One scroll container for the modal. */}
+        <div className="overflow-x-hidden px-5 py-5">
           <TouchpointCapture accountIdHint={account.id} initialText={`${account.name}: `} />
         </div>
       </div>
