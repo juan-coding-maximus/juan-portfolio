@@ -3011,15 +3011,13 @@ export async function setShowProspectAccounts(show: boolean): Promise<void> {
 }
 
 /**
- * The four numbers that turn the ordered route into a day with times on it
- * (migration 0037): when he leaves, how long a door takes, how long lunch is,
- * and when he wants to be home.
+ * The three numbers that turn the ordered route into a day with times on it
+ * (migration 0037): when he leaves, how long a door takes, how long lunch is.
  *
  * The SCHEDULE ITSELF IS NOT STORED. Given the order and these inputs, every
  * arrival follows, so keeping the computed times would be a second copy of a
  * fact the list already determines and it would be wrong the moment a stop
- * moved. The panel derives them on render. `returnBy` is a target the screen
- * reports against, not a constraint anything enforces.
+ * moved. The panel derives them on render.
  */
 /**
  * Where a route starts or ends, when it is not the waypoint account (0040).
@@ -3050,7 +3048,6 @@ export type RouteSchedulePrefs = {
   depart: string;          // "09:30", local, no zone: it is a wall clock
   dwellMinutes: number;
   lunchMinutes: number;
-  returnBy: string | null;
 };
 
 /** Postgres hands back "09:30:00"; the inputs and the display want "09:30". */
@@ -3079,16 +3076,14 @@ export async function getRouteSchedulePrefs(): Promise<RouteSchedulePrefs> {
     route_depart: string | null;
     route_dwell_minutes: number | null;
     route_lunch_minutes: number | null;
-    route_return_by: string | null;
   }>(
-    "nb_ui_prefs?select=route_depart,route_dwell_minutes,route_lunch_minutes,route_return_by&id=eq.1",
+    "nb_ui_prefs?select=route_depart,route_dwell_minutes,route_lunch_minutes&id=eq.1",
   );
   const r = rows[0];
   return {
     depart: hhmm(r?.route_depart ?? null) ?? "09:30",
     dwellMinutes: r?.route_dwell_minutes ?? 20,
     lunchMinutes: r?.route_lunch_minutes ?? 60,
-    returnBy: hhmm(r?.route_return_by ?? null),
   };
 }
 
@@ -3100,7 +3095,6 @@ export async function setRouteSchedulePrefs(p: RouteSchedulePrefs): Promise<void
       route_depart: p.depart,
       route_dwell_minutes: p.dwellMinutes,
       route_lunch_minutes: p.lunchMinutes,
-      route_return_by: p.returnBy,
       updated_at: new Date().toISOString(),
     },
     { id: "eq.1" },

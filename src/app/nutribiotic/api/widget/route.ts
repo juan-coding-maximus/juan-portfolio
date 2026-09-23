@@ -247,7 +247,7 @@ export async function GET(request: Request) {
    */
   const dayMileage = mileageByDay[day] ?? {};
   const home = accounts.data.find((a) => a.lifecycle === "waypoint");
-  let schedule: { depart: string; finish_clock: string; over: boolean; return_by: string | null; live: boolean; rough: true } | null = null;
+  let schedule: { depart: string; finish_clock: string; live: boolean; rough: true } | null = null;
   if (home && stops.length > 0) {
     const CIRCUITY = 1.28;
     const FREEWAY_MPH = 42;
@@ -317,15 +317,9 @@ export async function GET(request: Request) {
       const wrapped = ((Math.round(mins) % 1440) + 1440) % 1440;
       return `${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
     };
-    const returnByMin = prefs.returnBy ? (() => {
-      const [rh, rm] = prefs.returnBy!.split(":").map(Number);
-      return rh * 60 + rm;
-    })() : null;
     schedule = {
       depart: prefs.depart,
       finish_clock: clock(t),
-      over: returnByMin !== null && t > returnByMin,
-      return_by: prefs.returnBy,
       live: dayStarted,
       rough: true,
     };

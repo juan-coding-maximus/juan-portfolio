@@ -179,12 +179,12 @@ function divider(w) {
   d.addSpacer();
 }
 
-/** "back ~18:24", red and bold past the returnBy target. See the API route's
- *  own comment for why this is a rough, no-traffic estimate rather than the
- *  router-backed clock RoutePanel shows on /nutribiotic/map. */
+/** "back ~18:24". See the API route's own comment for why this is a rough,
+ *  no-traffic estimate rather than the router-backed clock RoutePanel shows
+ *  on /nutribiotic/map. */
 function backLine(data) {
   if (!data.schedule) return null;
-  return { text: `back ~${data.schedule.finish_clock}`, over: data.schedule.over };
+  return { text: `back ~${data.schedule.finish_clock}` };
 }
 
 /**
@@ -292,7 +292,7 @@ function renderSmall(w, data) {
   const tail = [data.count > 1 ? `then ${data.count - 1} more` : null, back ? back.text : null]
     .filter(Boolean)
     .join("  ·  ");
-  if (tail) txt(w, tail, { size: 10, color: back && back.over ? RED : FAINT, bold: Boolean(back && back.over) });
+  if (tail) txt(w, tail, { size: 10, color: FAINT });
   stamp(w, data);
   w.url = s.maps_url;
 }
@@ -333,7 +333,7 @@ function renderMedium(w, data) {
   }
   top.addSpacer();
   const back = backLine(data);
-  if (back) txt(top, back.text, { size: 10, color: back.over ? RED : FAINT, bold: back.over });
+  if (back) txt(top, back.text, { size: 10, color: FAINT });
 
   w.addSpacer(8);
   actionRow(w, s);
@@ -401,7 +401,7 @@ function renderLarge(w, data) {
     txt(w, "All stops done", { size: 11, color: GREEN, bold: true });
     w.addSpacer(4);
   } else if (back) {
-    txt(w, back.text, { size: 10.5, color: back.over ? RED : FAINT, bold: back.over });
+    txt(w, back.text, { size: 10.5, color: FAINT });
     w.addSpacer(4);
   }
   shown.forEach((s, i) => {

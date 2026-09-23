@@ -108,9 +108,9 @@ export async function reportLiveLocation(lat: number, lng: number): Promise<void
 }
 
 /**
- * Departure, dwell, lunch and the home-by target (migration 0037). Persisted
- * for the same reason the route itself is: a day set up at the kitchen table
- * has to still be the day when the phone comes out in the car.
+ * Departure, dwell and lunch (migration 0037). Persisted for the same reason
+ * the route itself is: a day set up at the kitchen table has to still be the
+ * day when the phone comes out in the car.
  *
  * Clamped here rather than trusted from the client, because the column
  * constraint would reject a bad value with a 400 the panel would have to
@@ -127,7 +127,6 @@ export async function saveRouteSchedulePrefs(p: RouteSchedulePrefs): Promise<voi
     depart: time(p.depart, "09:30")!,
     dwellMinutes: clamp(p.dwellMinutes, 1, 240, 20),
     lunchMinutes: clamp(p.lunchMinutes, 0, 240, 60),
-    returnBy: time(p.returnBy, null),
   });
 }
 

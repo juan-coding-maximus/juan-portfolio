@@ -699,9 +699,6 @@ function DayBar({
   /** Whether the day has stops to measure a schedule from. */
   hasStops: boolean;
 }) {
-  const over =
-    finish !== null && prefs.returnBy !== null && finish > minutesOfDay(prefs.returnBy);
-
   const field =
     "rounded-md border border-[#E2DFD5] bg-[#FCFBF7] px-2 py-1.5 text-[13px] tabular-nums outline-none focus:border-[#8A928C]";
 
@@ -744,13 +741,6 @@ function DayBar({
         <label className="flex items-center gap-1.5 text-[12.5px] text-[#5B6560]">
           Arrive
           <RouteEndpointField value={end} fallback={home} home={home} onChange={onChangeEnd} />
-          by
-          <input
-            type="time"
-            value={prefs.returnBy ?? ""}
-            onChange={(e) => onChange({ ...prefs, returnBy: e.target.value || null })}
-            className={field}
-          />
         </label>
       </div>
 
@@ -769,20 +759,10 @@ function DayBar({
 
           {state === "ok" && finish !== null && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className={over ? "font-semibold text-[#B5372A]" : "font-semibold text-[#2C6A46]"}>
-                {over ? "Back " : endLabel === "Home" ? "Back home " : `Back at ${endLabel} `}
+              <span className="font-semibold text-[#2C6A46]">
+                {endLabel === "Home" ? "Back home " : `Back at ${endLabel} `}
                 <span className="tabular-nums">{clock(finish)}</span>
               </span>
-              {over && prefs.returnBy && (
-                <span className="text-[#B5372A]">
-                  {duration(finish - minutesOfDay(prefs.returnBy))} past {prefs.returnBy}
-                </span>
-              )}
-              {!over && prefs.returnBy && (
-                <span className="text-[#5B6560]">
-                  {duration(minutesOfDay(prefs.returnBy) - finish)} spare
-                </span>
-              )}
               {driveMinutes !== null && (
                 <span className="text-[#5B6560]">
                   <span className="tabular-nums">{duration(driveMinutes)}</span> driving
@@ -1075,25 +1055,6 @@ export function RoutePanel({
     [legs, stops, start, end, prefs, activeDay, stopTimes],
   );
 
-  /**
-   * STAR CLIENTS AT RISK OF THE CUT (Juan's ask 2026-08-26): an account
-   * carrying Potential A on this screen (MapAccount.tier, nb_v_account_potential,
-   * the HQ A-G scale TierChip already renders here -- see dal.ts's MapAccount
-   * comment for why the map shows potential rather than the fit x engagement
-   * tier) whose scheduled arrival lands after the returnBy target. Never
-   * auto-moved or auto-postponed -- Juan's order stays his -- just named, so
-   * the account with the most upside is never the one quietly dropped when
-   * the day runs long. Computed off the same schedule the clock above shows.
-   */
-  const atRiskStars = useMemo(() => {
-    if (!schedule || !prefs.returnBy) return [];
-    const limit = minutesOfDay(prefs.returnBy);
-    return stops
-      .map((s, i) => ({ s, i }))
-      .filter(({ s, i }) => s.type === "account" && s.account.tier === "A" && schedule.rows[i].arrive > limit);
-  }, [schedule, stops, prefs.returnBy]);
-  const atRiskIds = useMemo(() => new Set(atRiskStars.map(({ s }) => s.id)), [atRiskStars]);
-
   // The priced legs, not the raw ones: what the row shows must be the number
   // the finish clock was actually computed from.
   const shownLegs = schedule?.priced ?? legs;
@@ -1212,21 +1173,6 @@ export function RoutePanel({
         )}
       </div>
 
-      {/* STAR CLIENTS AT RISK (2026-08-26): named, not hidden inside the row
-          math below -- if the day is going to run short, this is what Juan
-          should read before he starts cutting stops. */}
-      {atRiskStars.length > 0 && (
-        <div className="mb-2 flex items-start gap-2 rounded-md border border-[#E8C9C0] bg-[#FBF4F2] px-3 py-2.5 text-[12.5px] leading-relaxed text-[#8A3B2E]">
-          <Ico name="flag" size={13} />
-          <span>
-            {atRiskStars.length === 1 ? "A Potential-A stop" : `${atRiskStars.length} Potential-A stops`} would
-            land after your {prefs.returnBy} target if the day runs long:{" "}
-            {atRiskStars.map(({ s }) => (s.type === "account" ? s.account.name : "")).join(", ")}. If a cut
-            has to happen, protect these first, move them earlier or postpone a lower-tier stop instead.
-          </span>
-        </div>
-      )}
-
       <div className="overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
         {/* The drive out. Not a stop, so it is a rule above the first one
             rather than a numbered row, but it is the reason stop 1 is not at
@@ -1252,7 +1198,6 @@ export function RoutePanel({
             const c = s.type === "custom" ? s.custom : null;
             const title = a ? a.name : c!.label;
             const isDone = done.has(s.id);
-            const isAtRisk = atRiskIds.has(s.id);
             // CONTROLS DROP TO THEIR OWN ROW ON A PHONE. Five buttons beside
             // the text left the name as "DIRECTLY FR..." and the address as
             // "621 RUSHING C..." in Juan's 2026-08-05 screenshot, which is a
@@ -1378,15 +1323,6 @@ export function RoutePanel({
                       {a!.name}
                     </AccountLink>
                     {a!.tier && <TierChip tier={a!.tier} scale="hq" />}
-                    {isAtRisk && (
-                      <span
-                        title={`Scheduled after your ${prefs.returnBy} target -- protect this one if the day gets cut`}
-                        className="inline-flex items-center gap-1 rounded bg-[#FBF4F2] px-1.5 py-0.5 text-[10.5px] font-medium text-[#8A3B2E]"
-                      >
-                        <Ico name="flag" size={10} />
-                        at risk
-                      </span>
-                    )}
                   </div>
                   <div className="mt-0.5 truncate text-[12.5px] text-[#5B6560]">
                     {a!.street}
