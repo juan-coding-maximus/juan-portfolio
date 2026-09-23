@@ -136,8 +136,43 @@ the market is actually asking for.
 cover steps 1 and 7 above already. What's new here is the golden-minute framing, the novelty/promo
 sequencing, and the top-seller surprise beat, none of which are explicit in Sections 1-6 today.
 
+**Direct from Armando (2026-09-23, in person, not a relay this time), still not field-tested:**
+
+- **The history line, as an actual script for the golden minute.** NutriBiotic (GSE) is 42 years
+  old, ATP Farma is 40, "two companies" built on formulation history. Open with: "vengo a ayudar,
+  GSE da claridad hoy" (I'm here to help, GSE brings clarity today). Practice this as a memorized
+  line, not improvised, same as the golden-minute framing above.
+- **The credibility claim to lead with**: "expertos en compuestos efectivos, desde cultivos propios
+  a I+D propio" (own cultivation through to own R&D). Differentiates from a generic supplement
+  brand before any product talk starts.
+- **Three-part pitch structure**: cuidamos bien el negocio (we look after the account's business),
+  productos que sincronizan (products that work together, i.e. cross-sell), efectivo + beneficios
+  (effective, with clear benefits).
+- **Cross-sell pairings, ready to use at the door**: magnesium plus the full line, sold as one
+  treatment, not a single SKU. Hígado + cerebro (liver + brain) as the energy/mental pairing. Open
+  with "tired, physically or mentally?" to route the pitch: physical tiredness to the general line,
+  mental tiredness to the liver+brain / Huperzine A pairing.
+- **Huperzine A talking point**: pitched as helping a tired brain with more dopamine, framed as a
+  health-benefit claim. Armando's framing: the responsibility to sell it is the rep's, the chain is
+  buyer to retailer to end consumer, and the sale doesn't happen unless the rep makes it happen.
+- **Average ticket grows through cross-selling**, not through pushing a single SKU harder.
+- **With older, experienced retailers**: open with "ayúdame a aprender" (help me learn) instead of
+  a pitch. When a question can't be answered on the spot: "sé gente en mi empresa que puede
+  responder" (I know people at my company who can answer that), never a guess.
+- **The relationship pitch**: "yo te genero negocio" (I generate business for you), delivered
+  through short in-store staff trainings (microformación), framed as therapeutic/educational, not
+  a sales push. The benefit named for the account: better margin and loyalty against online
+  competitors.
+- **Follow-up (seguimiento) and rehearsing the golden-minute script** are the two habits Armando
+  named as the ones he repeats most.
+- Closed on the same line as the 2026-09-15 relay, now confirmed direct: **do trainings, help them
+  sell.**
+
 ## Changelog
 
+- 2026-09-23 · added a direct-from-Armando addendum to Section 10 (golden-minute script, credibility
+  line, cross-sell pairings, Huperzine A talking point), from Juan's in-person notes, still not
+  field-tested.
 - 2026-09-15 · added Section 10 (Plameca's own sales meeting framework, from Óscar Fernández via
   the Armando referral, not yet field-tested).
 - 2026-09-04 · added Section 9 (weekly action checklist, a run-order compression of Sections 1-3/6/7, two items marked TODO).
