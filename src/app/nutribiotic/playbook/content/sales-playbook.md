@@ -154,6 +154,11 @@ sequencing, and the top-seller surprise beat, none of which are explicit in Sect
 - **Cross-selling means personalized treatments**, not a single SKU. Ask whether the person is
   tired physically or mentally: physical tiredness routes to the general line, mental tiredness
   routes to the Clarity+ product (built on liver + brain support, including Huperzine A).
+- **Why a therapy, not a product, is the actual in-person advantage.** A single product sold on
+  its own is less effective and doesn't read as a personalized therapy, at which point there's no
+  reason for the buyer not to just order it online. Building a personalized, multi-product
+  treatment is the thing a rep can do in person that a webpage can't, it's the differentiator
+  itself, not a nice-to-have upsell.
 - **Huperzine A talking point**: pitched as helping a tired brain with more dopamine, a specific
   health-benefit claim. Armando's framing: the responsibility to sell it is the rep's, the chain
   runs buyer to retailer to end consumer, and the sale doesn't happen unless the rep makes it
@@ -175,6 +180,8 @@ sequencing, and the top-seller surprise beat, none of which are explicit in Sect
 
 ## Changelog
 
+- 2026-09-23 · added the why behind therapy-based cross-selling: a single product is less effective
+  and doesn't feel personalized, so it competes with online; a built treatment doesn't.
 - 2026-09-23 · translated the direct-from-Armando addendum to English and added the business-partner
   framing, staff product training, and the Clarity+ routing for the physical/mental question, from
   Juan's follow-up notes.
