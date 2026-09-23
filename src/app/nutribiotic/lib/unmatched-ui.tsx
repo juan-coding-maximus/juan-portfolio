@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Touchpoint } from "./dal";
 import { AccountMatchResolver } from "./new-account-ui";
+import { ResolvingRow } from "./queue-ui";
 import type { ParsedTouchpoint } from "./touchpoint";
 
 type Payload = {
@@ -30,9 +31,50 @@ type Payload = {
  * server work on a screen may hold its response open. See
  * api/visit-queues/route.ts.
  */
+/** One row of the queue: the note, the resolver, and the exit it takes once
+ *  matched or discarded (lib/queue-ui.tsx), same shape as
+ *  next-step-ui.tsx's PendingNextStepRow. Before this existed, a resolved or
+ *  discarded row stayed on screen showing its own success note until the
+ *  page reloaded, the exact "doesn't actually work" Juan hit tapping a
+ *  duplicate match (2026-09-23): the write landed, nothing on screen said the
+ *  queue had moved on. */
+function UnmatchedRow({
+  touchpointId,
+  rawText,
+  nameGuess,
+  matchAccountId,
+  matchAccountName,
+  onGone,
+}: {
+  touchpointId: string;
+  rawText: string;
+  nameGuess: string | null;
+  matchAccountId: string | null;
+  matchAccountName: string | null;
+  onGone: () => void;
+}) {
+  const [resolved, setResolved] = useState(false);
+  return (
+    <ResolvingRow resolved={resolved} onGone={onGone}>
+      <div className="rounded-xl border border-[#E2DFD5] bg-white p-4">
+        <p className="line-clamp-3 text-[13px] leading-relaxed text-[#3D4A44]">{rawText}</p>
+        <AccountMatchResolver
+          touchpointId={touchpointId}
+          nameGuess={nameGuess}
+          matchAccountId={matchAccountId}
+          matchAccountName={matchAccountName}
+          onSuccess={() => setResolved(true)}
+          onDiscarded={onGone}
+        />
+      </div>
+    </ResolvingRow>
+  );
+}
+
 export function UnmatchedTouchpoints() {
   const [data, setData] = useState<Payload | null>(null);
   const [failed, setFailed] = useState(false);
+  const [gone, setGone] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -64,7 +106,7 @@ export function UnmatchedTouchpoints() {
     );
   }
 
-  const pending = data?.pending ?? [];
+  const pending = (data?.pending ?? []).filter((tp) => !gone.has(tp.id));
   const accountNames = data?.accountNames ?? {};
   if (pending.length === 0) return null;
 
@@ -79,15 +121,15 @@ export function UnmatchedTouchpoints() {
           const matchAccountId =
             parsed?.account_confidence === "low" && parsed.account_id ? parsed.account_id : null;
           return (
-            <div key={tp.id} className="rounded-xl border border-[#E2DFD5] bg-white p-4">
-              <p className="line-clamp-3 text-[13px] leading-relaxed text-[#3D4A44]">{tp.raw_text}</p>
-              <AccountMatchResolver
-                touchpointId={tp.id}
-                nameGuess={parsed?.business_name_guess ?? null}
-                matchAccountId={matchAccountId}
-                matchAccountName={matchAccountId ? (accountNames[matchAccountId] ?? null) : null}
-              />
-            </div>
+            <UnmatchedRow
+              key={tp.id}
+              touchpointId={tp.id}
+              rawText={tp.raw_text}
+              nameGuess={parsed?.business_name_guess ?? null}
+              matchAccountId={matchAccountId}
+              matchAccountName={matchAccountId ? (accountNames[matchAccountId] ?? null) : null}
+              onGone={() => setGone((prev) => new Set(prev).add(tp.id))}
+            />
           );
         })}
       </div>

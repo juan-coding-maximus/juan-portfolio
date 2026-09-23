@@ -30,6 +30,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { revalidatePath } from "next/cache";
 import {
   applyAccountFacts,
+  discardTouchpoint as discardTouchpointRow,
   finalizeTouchpointAccount,
   finalizeTouchpointNextStep,
   getAccount,
@@ -1426,6 +1427,32 @@ export async function resolveTouchpointToAccount(
     routeDirectives: routeRows.length,
     ...hubspot,
   };
+}
+
+export type DiscardResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Juan's one-tap fix for a touchpoint that should never have parked here at
+ * all, a smoke test from building this screen, a note-to-self that leaked
+ * past the field_note gate, anything he says outright isn't a real client
+ * (Juan, 2026-09-23: these should never even have been there, and clearing
+ * one should be immediate). Marks the row discarded rather than deleting it,
+ * same auditability contract as every other state change (root AGENTS.md
+ * P7): the row stays queryable, it just stops surfacing in
+ * listPendingAccountMatches / listPendingNextSteps, both of which filter on
+ * status, so a discarded row can never resurface in the queue.
+ */
+export async function discardTouchpoint(
+  touchpointId: string,
+  fromStatus: "needs_account" | "needs_next_step",
+): Promise<DiscardResult> {
+  const row = await discardTouchpointRow(touchpointId, fromStatus);
+  if (!row) {
+    return { ok: false, error: "That note was already resolved or discarded by another request." };
+  }
+  revalidatePath("/nutribiotic/visit");
+  revalidatePath("/nutribiotic/clients");
+  return { ok: true };
 }
 
 /**

@@ -33,7 +33,7 @@ import {
   type BusinessSearchOutcome,
   type CreateBusinessOutcome,
 } from "./new-account-actions";
-import { resolveTouchpointToAccount, type ResolveResult } from "./touchpoint";
+import { discardTouchpoint, resolveTouchpointToAccount, type ResolveResult } from "./touchpoint";
 import type { PlaceCandidate } from "./places";
 import { Ico, SuccessNote } from "./ui";
 
@@ -159,6 +159,8 @@ export function AccountMatchResolver({
   pendingGrade = null,
   pendingReadiness = null,
   onResolved,
+  onSuccess,
+  onDiscarded,
 }: {
   touchpointId: string;
   nameGuess: string | null;
@@ -171,9 +173,21 @@ export function AccountMatchResolver({
    * was known. Same hold-until-resolved pattern as pendingGrade. */
   pendingReadiness?: Readiness | null;
   onResolved?: () => void;
+  /** Fired the instant a match, a create, or a discard lands, for a caller
+   *  that owns the row's own exit timing (unmatched-ui.tsx's queue), same
+   *  contract as NextStepResolver's onSuccess. `onResolved` stays what it
+   *  was: the "that's had its read" beat the capture card uses to reset. */
+  onSuccess?: () => void;
+  /** Fired once a discard is confirmed, in place of onSuccess/onResolved: a
+   *  discarded touchpoint never resolved to a match, it just left the queue. */
+  onDiscarded?: () => void;
 }) {
   const [matchResult, setMatchResult] = useState<ResolveResult | null>(null);
   const [matching, startMatching] = useTransition();
+
+  const [discarding, startDiscard] = useTransition();
+  const [discardError, setDiscardError] = useState<string | null>(null);
+  const [discarded, setDiscarded] = useState(false);
 
   const [search, setSearch] = useState<BusinessSearchOutcome | null>(null);
   const [searching, startSearch] = useTransition();
@@ -264,7 +278,10 @@ export function AccountMatchResolver({
     startMatching(async () => {
       const res = await resolveTouchpointToAccount(touchpointId, matchAccountId, matchAccountName);
       setMatchResult(res);
-      if (res.ok) applyPendingGrade(res.accountId);
+      if (res.ok) {
+        applyPendingGrade(res.accountId);
+        onSuccess?.();
+      }
     });
   }
 
@@ -277,9 +294,38 @@ export function AccountMatchResolver({
     startLink(async () => {
       const res = await linkTouchpointToExistingCompany(touchpointId, companyId);
       setMatchResult(res);
-      if (res.ok) applyPendingGrade(res.accountId);
+      if (res.ok) {
+        applyPendingGrade(res.accountId);
+        onSuccess?.();
+      }
     });
   }
+
+  /** Juan's one-tap fix for a touchpoint that never should have parked here
+   * (a smoke test, a note-to-self that leaked past the field_note gate): out
+   * of the queue for good, immediately, no second confirmation. Low blast
+   * radius (discardTouchpoint marks the row, never deletes it, root
+   * AGENTS.md P7), which is why this is one tap rather than a hold-to-confirm. */
+  function discard() {
+    if (discarding || discarded) return;
+    setDiscardError(null);
+    startDiscard(async () => {
+      const res = await discardTouchpoint(touchpointId, "needs_account");
+      if (!res.ok) {
+        setDiscardError(res.error);
+        return;
+      }
+      setDiscarded(true);
+      onSuccess?.();
+    });
+  }
+
+  useEffect(() => {
+    if (!discarded) return;
+    const t = setTimeout(() => (onDiscarded ?? onResolved)?.(), 1200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [discarded]);
 
   function pick(place: PlaceCandidate, force = false) {
     setCreatingId(place.placeId);
@@ -287,7 +333,10 @@ export function AccountMatchResolver({
     startCreate(async () => {
       const res = await createBusinessFromPlace(touchpointId, place, { force });
       setCreated(res);
-      if (res.ok) applyPendingGrade(res.accountId);
+      if (res.ok) {
+        applyPendingGrade(res.accountId);
+        onSuccess?.();
+      }
     });
   }
 
@@ -312,6 +361,16 @@ export function AccountMatchResolver({
       setCreated(null);
       setSearch(await searchNewBusiness(query, nearMe));
     });
+  }
+
+  if (discarded) {
+    return (
+      <div className="mt-3">
+        <button onClick={() => (onDiscarded ?? onResolved)?.()} className="block w-full text-left">
+          <SuccessNote title="Discarded" detail="Not filed anywhere, and it will not come back in this queue." />
+        </button>
+      </div>
+    );
   }
 
   // Resolved: show the one success note in place of everything else. Tappable
@@ -412,9 +471,22 @@ export function AccountMatchResolver({
           <div className="flex flex-wrap gap-2">
             <MatchPill label={matchAccountName} onYes={confirmMatch} pending={matching} disabled={creating || linking} />
           </div>
-          {matchResult && !matchResult.ok && (
-            <div className="mt-1.5 text-[12px] text-[#8A6D2F]">{matchResult.error}</div>
-          )}
+        </div>
+      )}
+
+      {/* Not nested inside the Client Match block above: a tap on "That's it,
+          use it" in the duplicates list below (linkExisting) sets this exact
+          same matchResult, and until this moved out here that failure had no
+          screen to show on at all, the resolver just went back to its normal
+          state as if nothing had been tapped (Juan, 2026-09-23: "the UI
+          doesn't actually work"). Every failed write stays on screen, in
+          plain words, no matter which control produced it. */}
+      {matchResult && !matchResult.ok && (
+        <div className="flex items-start gap-1.5 rounded-md bg-[#FBF6E9] px-2.5 py-2 text-[12px] text-[#8A6D2F]">
+          <span className="mt-[1px] shrink-0">
+            <Ico name="alert" size={12} />
+          </span>
+          <span>{matchResult.error}</span>
         </div>
       )}
 
@@ -496,6 +568,18 @@ export function AccountMatchResolver({
             )}
           </div>
         )}
+      </div>
+
+      <div className="flex items-center justify-between gap-2 border-t border-[#EDEBE3] pt-2.5">
+        <button
+          type="button"
+          onClick={discard}
+          disabled={discarding || matching || linking || creating}
+          className="text-[12px] text-[#8A928C] underline underline-offset-2 transition-colors hover:text-[#8A6D2F] disabled:opacity-40"
+        >
+          {discarding ? "Discarding…" : "Not a client, discard"}
+        </button>
+        {discardError && <span className="text-[12px] text-[#8A6D2F]">{discardError}</span>}
       </div>
     </div>
   );

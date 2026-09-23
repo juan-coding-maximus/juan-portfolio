@@ -2223,6 +2223,24 @@ export async function finalizeTouchpointAccount(
   return rows[0] ?? null;
 }
 
+/** Drops a parked touchpoint out of the queues for good (a smoke test, a
+ * note-to-self that leaked into needs_account, anything Juan says was never
+ * a real client). Soft delete, not a row removal: `status` moves to
+ * "discarded" rather than the row disappearing, so the trail survives (root
+ * AGENTS.md P7) and it never resurfaces to listPendingAccountMatches or
+ * listPendingNextSteps, both of which filter on status. Guarded to only ever
+ * discard a row still actually parked, same double-submit shape as
+ * finalizeTouchpointAccount. */
+export async function discardTouchpoint(id: string, fromStatus: "needs_account" | "needs_next_step"): Promise<Touchpoint | null> {
+  const rows = await mutate<Touchpoint>(
+    "nb_touchpoints",
+    "PATCH",
+    { status: "discarded" },
+    { id: `eq.${id}`, status: `eq.${fromStatus}` },
+  );
+  return rows[0] ?? null;
+}
+
 /** Once a needs_next_step touchpoint has Juan's stated next step (typed into
  * the Visit tab's popup, or the explicit "none needed"), stamp it filed.
  * `parsed` carries the next_step back in, since that is the only field the
