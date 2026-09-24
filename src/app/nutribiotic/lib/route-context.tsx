@@ -54,6 +54,19 @@ type RouteCtx = {
    *  "not loaded yet", which look identical and mean opposite things. */
   hydrated: boolean;
   addToRoute: (id: string, atIndex?: number) => void;
+  /** Which day (on the horizon) an id is already scheduled on, if any --
+   *  looks across every day, not just activeDay, so a picker on a screen
+   *  that isn't showing the active day can still tell "already on the
+   *  route" from "not yet". */
+  stopDayById: Map<string, string>;
+  /** Add to a NAMED day rather than whichever one happens to be active
+   *  (2026-09-23, account profile's "Add to route": tapping it used to drop
+   *  the stop onto activeDay -- whatever Juan last had open on /map, not
+   *  necessarily today and not a day he chose for THIS account -- so a
+   *  picker asks which day before writing anything). A no-op if the id is
+   *  already scheduled on any day; adding it again is a mis-tap, same
+   *  reasoning as addToRoute. */
+  addToRouteOnDay: (id: string, day: string) => void;
   addCustomStop: (stop: Omit<CustomStop, "id">, atIndex?: number) => void;
   removeFromRoute: (id: string) => void;
   moveInRoute: (id: string, dir: -1 | 1) => void;
@@ -240,6 +253,21 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   }
 
   const inRoute = useMemo(() => new Set(routeDraft.map(entryId)), [routeDraft]);
+
+  const stopDayById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const day of days) {
+      for (const e of draftByDay[day] ?? []) m.set(entryId(e), day);
+    }
+    return m;
+  }, [draftByDay, days]);
+
+  function addToRouteOnDay(id: string, day: string) {
+    if (!days.includes(day)) return;
+    if (stopDayById.has(id)) return; // already scheduled somewhere on the horizon; another tap is a mis-tap
+    const targetList = draftByDay[day] ?? [];
+    commitDay(day, [...targetList, id]);
+  }
 
   function addToRoute(id: string, atIndex?: number) {
     if (inRoute.has(id)) return; // adding twice is a mis-tap, not a second visit
@@ -432,6 +460,8 @@ export function RouteProvider({ children }: { children: ReactNode }) {
         },
         hydrated,
         addToRoute,
+        stopDayById,
+        addToRouteOnDay,
         addCustomStop,
         removeFromRoute,
         moveInRoute,

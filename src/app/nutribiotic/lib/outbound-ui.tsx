@@ -512,24 +512,28 @@ export function DraftActions({
         </a>
       )}
 
-      {!hasPath && (
-        <button
-          type="button"
-          disabled
-          className="rounded-md bg-[#14201B] px-3 py-1.5 text-[13px] font-medium text-[#F7F6F1] opacity-35"
-          title="No email or phone on file for this account — add one from the Clients screen."
-        >
-          Approve
-        </button>
+      {/* No email or phone on file: nothing to open a compose window against,
+          but the draft is still real material -- Juan's ask, 2026-09-23, for
+          an account whose only reachable door is the store's own website
+          contact form. Copy stands in for the missing deep link; "Mark sent"
+          below still works the same way it does on every other channel, on
+          his word. */}
+      {!hasPath && !synthetic && (
+        <>
+          <CopyBodyButton body={finalBody} />
+          <span className="text-[12px] text-[#8A928C]">
+            No email or phone on file &middot; paste into their site&rsquo;s contact form.
+          </span>
+        </>
       )}
 
-      {hasPath && !synthetic && (
+      {!synthetic && (
         <button
           type="button"
           onClick={() => decide("sent")}
           disabled={pending !== null}
           className="rounded-md border border-[#D8D4C8] px-3 py-1.5 text-[13px] text-[#3D4A44] disabled:opacity-50"
-          title="Marks this sent on your word — the OS can't verify a send on either channel."
+          title="Marks this sent on your word — the OS can't verify a send on any channel."
         >
           {pending === "sent" ? "Marking sent…" : "Mark sent"}
         </button>

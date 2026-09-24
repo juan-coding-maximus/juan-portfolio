@@ -1,9 +1,14 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+import { asksCollide, composeAsk } from "./ask-compose";
 import {
   applyAccountFacts,
   getAccount,
+  getVoiceContext,
+  insertAskDraft,
   listActivities,
+  listAskKeys,
   listContacts,
   listPurchases,
   setAccountPotentialJuan,
@@ -73,4 +78,78 @@ export async function setReadiness(id: string, readiness: Readiness | null): Pro
  */
 export async function setAccountPhone(id: string, phone: string): Promise<void> {
   await applyAccountFacts(id, { business_hours: null, phone, email: null });
+}
+
+export type DraftAccountPitchResult =
+  | { status: "drafted" }
+  | { status: "already_queued" }
+  | { status: "not_written"; reason: string };
+
+/**
+ * The account profile's "Draft outreach" button (2026-09-23): reuse the same
+ * composer that turns a logged visit's ask into a pitch (lib/ask-compose.ts,
+ * called from touchpoint.ts's fileOutreachAsks), but for an account whose
+ * Gap Selling summary (current_state/future_state/impact, the Now/Opening/
+ * Impact card on the profile) IS the opening, even when no customer has
+ * asked for anything yet. Same grounding gate either way: composeAsk may
+ * only reword what current_state/future_state/impact already say, and an
+ * account with none of the three on file is refused before a model is ever
+ * called rather than left to invent an opening.
+ *
+ * A missing recipient does not block this (Juan, 2026-09-23): an account
+ * with no email or phone on file still gets a written draft, meant to be
+ * pasted into the store's own website contact form -- see the "no email or
+ * phone on file" path in outbound-ui.tsx's DraftCard.
+ *
+ * Idempotent the same way fileOutreachAsks is: a second click on an account
+ * that already has this exact opening queued (dismissed or not) finds it via
+ * asksCollide rather than filing a duplicate every time Juan reopens the
+ * profile.
+ */
+export async function draftAccountPitch(id: string): Promise<DraftAccountPitchResult> {
+  const [accRes, contactsRes, alreadyFiled, voice] = await Promise.all([
+    getAccount(id),
+    listContacts(id),
+    listAskKeys(id),
+    getVoiceContext(id),
+  ]);
+  const account = accRes.data[0];
+  if (!account) return { status: "not_written", reason: "Account not found." };
+
+  const opening = account.future_state || account.impact || account.current_state;
+  if (!opening) {
+    return { status: "not_written", reason: "Nothing on file yet describes an opening for this account." };
+  }
+  if (alreadyFiled.some((r) => asksCollide(r.source_ask, opening))) {
+    return { status: "already_queued" };
+  }
+
+  const noteText = [
+    account.current_state ? `Now: ${account.current_state}` : null,
+    account.future_state ? `Opening: ${account.future_state}` : null,
+    account.impact ? `Impact: ${account.impact}` : null,
+  ]
+    .filter((v): v is string => Boolean(v))
+    .join("\n\n");
+
+  const contacts = contactsRes.data
+    .map((c) => ({
+      id: c.id,
+      name: [c.first_name, c.last_name].filter(Boolean).join(" ").trim(),
+      title: c.title,
+      email: c.email,
+    }))
+    .filter((c) => c.name);
+
+  const composed = await composeAsk({
+    ask: opening,
+    noteText,
+    account: { id: account.id, name: account.name, city: account.city, email: account.email },
+    contacts,
+    voice,
+  });
+  await insertAskDraft({ account_id: id, ask: opening, composed });
+  revalidatePath("/nutribiotic/outbound");
+
+  return composed.written ? { status: "drafted" } : { status: "not_written", reason: composed.reason };
 }

@@ -11,11 +11,13 @@
  * this as a client child.
  */
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import type { Account, Activity, Contact, PurchaseLine, PurchaseOrder, Tier } from "./dal";
-import { setPotentialJuan } from "./account-actions";
+import { draftAccountPitch, setPotentialJuan } from "./account-actions";
+import { planningHorizonDates } from "./field-week";
 import { owaComposeLink } from "./outbound-ui";
 import { useRoute } from "./route-context";
+import { addAccountToSdr } from "./sdr-actions";
 import { TouchpointCapture } from "./touchpoint-ui";
 import {
   Card,
@@ -83,6 +85,224 @@ function LogVisitSheet({ account, onClose }: { account: Account; onClose: () => 
           <TouchpointCapture accountIdHint={account.id} initialText={`${account.name}: `} />
         </div>
       </div>
+    </div>
+  );
+}
+
+function routeDayLabel(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+/**
+ * Add to route, asking which day first (Juan, 2026-09-23: the plain button
+ * used to drop the account onto whichever day happened to be active on
+ * /map, not necessarily today and not a day chosen for this account). A tap
+ * opens a day picker scoped to the planning horizon; nothing is written
+ * until a day is actually picked. Once scheduled, on ANY day, it goes inert
+ * and names the day rather than staying tappable, same one-tap rule as the
+ * plain button it replaces.
+ */
+function AddToRoutePicker({ accountId }: { accountId: string }) {
+  const { days, stopDayById, addToRouteOnDay } = useRoute();
+  const [picking, setPicking] = useState(false);
+  const [date, setDate] = useState(days[0]);
+  const scheduledDay = stopDayById.get(accountId) ?? null;
+
+  if (scheduledDay) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-md bg-[#EEECE3] px-3.5 py-2 text-[13px] font-semibold text-[#5B6560]">
+        <Ico name="check" size={13} />
+        On the route &middot; {routeDayLabel(scheduledDay)}
+      </span>
+    );
+  }
+
+  if (!picking) {
+    return (
+      <button
+        type="button"
+        onClick={() => setPicking(true)}
+        className="inline-flex items-center gap-1.5 rounded-md bg-[#2C6A46] px-3.5 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+      >
+        <Ico name="route" size={13} />
+        Add to route
+      </button>
+    );
+  }
+
+  return (
+    <div className="inline-flex items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white py-1 pr-1 pl-2.5">
+      <select
+        value={date}
+        onChange={(ev) => setDate(ev.target.value)}
+        aria-label="Route day"
+        className="bg-transparent text-[13px] font-medium text-[#3D4A44] outline-none"
+      >
+        {days.map((d) => (
+          <option key={d} value={d}>
+            {routeDayLabel(d)}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        onClick={() => {
+          addToRouteOnDay(accountId, date);
+          setPicking(false);
+        }}
+        className="rounded-md bg-[#2C6A46] px-2.5 py-1.5 text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90"
+      >
+        Add
+      </button>
+      <button
+        type="button"
+        onClick={() => setPicking(false)}
+        aria-label="Cancel"
+        className="rounded-md p-1.5 text-[#8A928C] transition-colors hover:bg-[#ECEAE1] hover:text-[#14201B]"
+      >
+        <Ico name="close" size={12} />
+      </button>
+    </div>
+  );
+}
+
+const SDR_HORIZON_DAYS = 14;
+
+/**
+ * Add to SDR, same day-picker shape as AddToRoutePicker just above (Juan,
+ * 2026-09-23: "same quick select date as in route but for sdr in the next 2
+ * weeks"), over a longer horizon since the SDR desk queue is worked further
+ * out than the drivable route is. Writes straight to nb_sdr_schedule as a
+ * call (addAccountToSdr, the same action the map pin's own "Add to SDR" card
+ * uses, see AccountsMap.tsx), always at "mid" priority: this button is one
+ * plain queue-it action, not the map card's three-way priority picker.
+ * "On SDR" afterward is session-local, matching the map card's own
+ * queued-state, since nothing here re-reads nb_sdr_schedule to know it was
+ * already scheduled from elsewhere.
+ */
+function AddToSdrPicker({ accountId }: { accountId: string }) {
+  const days = useMemo(() => planningHorizonDates(SDR_HORIZON_DAYS), []);
+  const [picking, setPicking] = useState(false);
+  const [date, setDate] = useState(days[0]);
+  const [queuedFor, setQueuedFor] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function add() {
+    setError(null);
+    startTransition(async () => {
+      const res = await addAccountToSdr(accountId, "mid", date);
+      if (res.ok) {
+        setQueuedFor(date);
+        setPicking(false);
+      } else {
+        setError(res.error);
+      }
+    });
+  }
+
+  if (queuedFor) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-md bg-[#EEECE3] px-3.5 py-2 text-[13px] font-semibold text-[#5B6560]">
+        <Ico name="check" size={13} />
+        On SDR &middot; {routeDayLabel(queuedFor)}
+      </span>
+    );
+  }
+
+  if (!picking) {
+    return (
+      <button
+        type="button"
+        onClick={() => setPicking(true)}
+        className="inline-flex items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white px-3.5 py-2 text-[13px] font-medium text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] hover:text-[#14201B]"
+      >
+        <Ico name="phone" size={13} />
+        Add to SDR
+      </button>
+    );
+  }
+
+  return (
+    <div className="inline-flex flex-col gap-1">
+      <div className="inline-flex items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white py-1 pr-1 pl-2.5">
+        <select
+          value={date}
+          onChange={(ev) => setDate(ev.target.value)}
+          aria-label="SDR day"
+          className="bg-transparent text-[13px] font-medium text-[#3D4A44] outline-none"
+        >
+          {days.map((d) => (
+            <option key={d} value={d}>
+              {routeDayLabel(d)}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={add}
+          disabled={pending}
+          className="rounded-md bg-[#14201B] px-2.5 py-1.5 text-[12.5px] font-semibold text-[#F7F6F1] disabled:opacity-50"
+        >
+          {pending ? "Adding…" : "Add"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setPicking(false)}
+          aria-label="Cancel"
+          className="rounded-md p-1.5 text-[#8A928C] transition-colors hover:bg-[#ECEAE1] hover:text-[#14201B]"
+        >
+          <Ico name="close" size={12} />
+        </button>
+      </div>
+      {error && <span className="max-w-[32ch] text-[12px] text-[#8A2E2E]">{error}</span>}
+    </div>
+  );
+}
+
+/**
+ * Draft outreach, on the spot (Juan, 2026-09-23: "need to be able to open
+ * this in outbound and automatically draft upon the click"). One tap
+ * composes a pitch from this account's own Now/Opening/Impact summary --
+ * the same composer touchpoint.ts calls on a logged customer ask, see
+ * account-actions.ts's draftAccountPitch -- and, once it lands, opens
+ * Outbound scoped to this account so the new draft is the first thing he
+ * sees. A missing email or phone never blocks the draft itself: the
+ * Outbound card offers a Copy button instead, meant for pasting into the
+ * store's own website contact form.
+ */
+function DraftOutreachButton({ accountId }: { accountId: string }) {
+  const [pending, startTransition] = useTransition();
+  const [note, setNote] = useState<string | null>(null);
+
+  function run() {
+    setNote(null);
+    startTransition(async () => {
+      const res = await draftAccountPitch(accountId);
+      if (res.status === "not_written") {
+        setNote(res.reason);
+        return;
+      }
+      window.open(`/nutribiotic/outbound?account=${accountId}`, "_blank", "noopener,noreferrer");
+    });
+  }
+
+  return (
+    <div className="inline-flex flex-col gap-1">
+      <button
+        type="button"
+        onClick={run}
+        disabled={pending}
+        className="inline-flex items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white px-3.5 py-2 text-[13px] font-medium text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] hover:text-[#14201B] disabled:opacity-50"
+      >
+        <Ico name="mail" size={13} />
+        {pending ? "Drafting…" : "Draft outreach"}
+      </button>
+      {note && <span className="max-w-[32ch] text-[12px] text-[#8A928C]">{note}</span>}
     </div>
   );
 }
@@ -186,8 +406,6 @@ export function AccountDetailBody({
 }) {
   const gap = a.current_state || a.future_state || a.impact;
   const links = SOCIAL_LINKS(a);
-  const { addToRoute, inRoute } = useRoute();
-  const onRoute = inRoute.has(a.id);
   const [logVisitOpen, setLogVisitOpen] = useState(false);
 
   return (
@@ -253,23 +471,18 @@ export function AccountDetailBody({
           </span>
         )}
 
-        {/* Add to route, same action and same one-tap rule as a pin's card on
-            the map (see RoutePanel.tsx / AccountsMap.tsx): once it is on the
-            route, tapping again can only be a mis-tap, so it goes inert rather
-            than staying live. Removing is the route panel's job. */}
-        <button
-          type="button"
-          onClick={() => addToRoute(a.id)}
-          disabled={onRoute}
-          className={`inline-flex items-center gap-1.5 rounded-md px-3.5 py-2 text-[13px] font-semibold transition-opacity ${
-            onRoute
-              ? "cursor-default bg-[#EEECE3] text-[#5B6560]"
-              : "bg-[#2C6A46] text-white hover:opacity-90"
-          }`}
-        >
-          <Ico name={onRoute ? "check" : "route"} size={13} />
-          {onRoute ? "On the route" : "Add to route"}
-        </button>
+        {/* Add to route, asking which day (AddToRoutePicker, account-detail.tsx):
+            once scheduled, on any day, it goes inert and names the day rather
+            than staying tappable. Removing a stop is the route panel's job. */}
+        <AddToRoutePicker accountId={a.id} />
+
+        {/* Add to SDR, same day-picker shape, over the desk queue's own
+            two-week horizon (AddToSdrPicker, above). */}
+        <AddToSdrPicker accountId={a.id} />
+
+        {/* Draft outreach, composed from this account's own gap-selling summary
+            and opened straight into Outbound (DraftOutreachButton, above). */}
+        <DraftOutreachButton accountId={a.id} />
 
         {/* Log a visit, right here. Same capture box as ClientOS and /visit,
             pre-aimed at this account so it never has to say the store's name. */}
