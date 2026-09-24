@@ -58,6 +58,7 @@ import Anthropic from "@anthropic-ai/sdk";
 // imported by scripts/repair-ask-drafts.mts under `node --experimental-strip-types`,
 // which resolves real files and will not guess an extension.
 import { EMAIL_VOICE } from "./email-voice.generated.ts";
+import { TALKING_POINTS } from "./talking-points.generated.ts";
 import {
   BANNED,
   BODY_LIMIT,
@@ -85,14 +86,26 @@ export type AskAccount = {
   email: string | null;
 };
 
+/** What Juan's own rewrites of past drafts teach this one (dal.getVoiceContext). */
+export type VoiceContext = {
+  lessons: { lesson: string; before: string | null; after: string | null; seen: number }[];
+  pairs: { draft: string; sent: string }[];
+};
+
 export type ComposeAskInput = {
   /** What the customer asked for, in the rep's own words, verbatim. */
   ask: string;
-  /** The full note the ask was extracted from. The only other source of truth. */
+  /** The full note the ask was extracted from. With the account record and the
+   *  approved talking points, the only sources of truth. */
   noteText: string;
   account: AskAccount;
   contacts: AskContact[];
+  voice?: VoiceContext;
 };
+
+/** Facts Juan wrote in his own sent mail and approved as a source, 2026-09-23.
+ *  Source text for the number check, like the note. */
+const TALKING_POINT_TEXT = TALKING_POINTS.map((t) => t.line).join("\n");
 
 export type ComposedAsk =
   | {
@@ -310,13 +323,24 @@ export function fabricationFailure(
 
   // The greeting names a person, and that person is on file. A greeting is the
   // first fabrication a reader would notice, and the cheapest one to make.
-  const greeting = body.match(/^\s*(hi|hello|hey)\b([^,\n]*),/i);
+  // "Hi Honey and Susan," greets everyone he met (EMAIL-VOICE.md). Each name
+  // must be on file for the account or named in the note itself: a person the
+  // note mentions is a person he met, not an invention.
+  const greeting = body.match(/^\s*(hi|hello|hey|hola)\b([^,\n]*),/i);
   if (greeting) {
     const named = greeting[2].trim();
     if (named) {
       const allowed = allowedFirstNames.map((n) => n.toLowerCase());
-      const first = named.split(/\s+/)[0].toLowerCase();
-      if (!allowed.includes(first)) return `the draft greeted "${named}", who is not on file for this account`;
+      const sourceText = sources.join(" \n ").toLowerCase();
+      for (const person of named.split(/\s*(?:&|\/|,|\band\b|\by\b)\s*/i).filter(Boolean)) {
+        const first = person.split(/\s+/)[0].toLowerCase();
+        const clean = first.replace(/[^a-z\u00c0-\u024f]/g, "");
+        if (!clean) continue;
+        const inNote = new RegExp(`\\b${clean}\\b`).test(sourceText);
+        if (!allowed.includes(first) && !inNote) {
+          return `the draft greeted "${person}", who is not on file for this account or named in the note`;
+        }
+      }
     }
   }
 
@@ -427,17 +451,34 @@ HOW HE WRITES. What follows is his own voice file, written from his own sent mai
 
 ${EMAIL_VOICE}
 
-THREE THINGS THAT FILE DOES NOT SAY, because they are about you and not about him:
+WHAT THIS EMAIL IS FOR. Your habit is to write a report of his visit note. He rewrites every one of those into a pitch: an appointment, or a straight ask for the sale. Most of these are a first email to a store or a clinic, so write it as one unless the note shows he is answering something they sent.
 
-1. Sign off with his first name alone, "Juan", on its own line. Never type "Juan Arenas Martin" or a company line under it: his mail client adds the block, and a draft carrying one sends it twice.
+1. Name everyone on their team that the note or the contacts list names, in the first two lines: who connected you, who he met, who he is writing to. "Hi Honey and Susan," / "Following up after meeting with Carmen." / "Miriam told me this address is the way to reach Mehrdad."
 
-2. Every sentence must carry a fact from the note, a concrete ask, or a specific kindness about that person. A sentence that would read the same for any account in his book is filler, and filler is refused before he ever sees the draft. "Let me know what other information you need from me to move forward" is refused. "What sizes are you thinking to start with?" is not.
+2. In a first email, say who he is in one line: "I'm Juan, your representative with NutriBiotic." Not in a reply.
 
-3. Greet the person by the first name on file: "Hi Julie,". If the note shows him replying rather than opening, skip the greeting and answer, the way he does. If no named contact fits, open with "Hello,".
+3. Turn account data into the relationship: "Your company has been trusting NutriBiotic for years." Never recite order dates or order history; those are his notes, not their news.
 
-4. The last line before his name does one of two things, and nothing else: it asks them one concrete question they can answer in a sentence, or it states the one thing he is doing next that the note already says he is doing. "Which sizes do you want to start with?" is a close. "I'll bring the Chlorella when I come back Thursday" is a close. "Following up as the next step" is not a close, it is a label, and it means the email asked for nothing.
+4. Give the reason it helps THEM: helping them sell the products and inform their customers is his job as their rep. "help you sell our products better" / "so your team can better inform customers". Never "go through what is moving and what is not".
 
-Three short sentences is the normal length. Four or five is a long one.`;
+5. You may use one or two APPROVED TALKING POINTS (below) when they fit, close to verbatim. They are facts he wrote himself. Nothing else outside the note is a fact.
+
+6. The ask is his to propose, and small. Offer a day or a window rather than asking them to pick one ("Do you have 15 minutes Thursday or Friday morning?", "How is next Monday?"), and use a day or time the note states when it states one. Never write a clock time or a date that is not in the note. When they are ready to buy, the ask is the order itself.
+
+7. Time is relative: "a couple weeks ago", "recently", "two days ago", never the exact date from the note unless it was a day or two ago. Leave out logistics they already know or that go without saying ("with at least a week of notice", "so I am writing here").
+
+8. An attachment is never mentioned alone: say what it is for ("so you can see all products and prices", "helpful to print and show to customers"), and mention one only when the note says he is sending it.
+
+9. Every sentence carries a fact from the note, a talking point, a concrete ask, or a specific kindness about that person. A sentence that would read the same for any account is filler and is refused. "Let me know what other information you need from me to move forward" is refused.
+
+10. Close with appreciation, "Thank you," or "Thanks," ("Gracias," to a Spanish-speaking buyer), then his first name alone, "Juan", on its own line. Never type "Juan Arenas Martin" or a company line: his mail client adds the block.
+
+11. Greet by first name: "Hi Julie,". If no named person fits, open with "Hello,".
+
+A first email runs four to six short paragraphs of one or two sentences each. A reply is shorter.
+
+APPROVED TALKING POINTS:
+${TALKING_POINTS.map((t) => `- (${t.topic}) ${t.line}`).join("\n")}`;
 }
 
 function userPrompt(input: ComposeAskInput): string {
@@ -456,7 +497,28 @@ THE ASK, in Juan's own words:
 ${input.ask}
 
 THE FULL NOTE the ask came from, which is the only other thing you know:
-${input.noteText}`;
+${input.noteText}${voiceSection(input.voice)}`;
+}
+
+/** His own corrections of earlier drafts. Habits to copy, never facts: a name,
+ *  product or number in a pair belongs to that other email, and the checks
+ *  refuse it here. */
+function voiceSection(voice?: VoiceContext): string {
+  if (!voice || (!voice.lessons.length && !voice.pairs.length)) return "";
+  const lessons = voice.lessons
+    .map((l) => `- ${l.lesson}${l.before || l.after ? ` (draft: "${l.before ?? ""}" -> he sent: "${l.after ?? ""}")` : ""}`)
+    .join("\n");
+  const pairs = voice.pairs
+    .map((p, i) => `EXAMPLE ${i + 1}. A draft like yours:\n${p.draft}\n\nWhat he actually sent instead:\n${p.sent}`)
+    .join("\n\n");
+  return `
+
+WHAT HE KEEPS CHANGING IN DRAFTS LIKE THIS ONE. Each line below is a correction he has made by hand more than once. Write it his way the first time.
+${lessons || "(none yet)"}
+
+${pairs}
+
+Copy the habits in those examples, never their facts: their names, products and numbers belong to other customers.`;
 }
 
 const client = process.env.ANTHROPIC_API_KEY ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) : null;
@@ -502,7 +564,7 @@ async function askModel(input: ComposeAskInput, correction: string | null): Prom
 export async function composeAsk(input: ComposeAskInput): Promise<ComposedAsk> {
   if (!client) return { written: false, reason: "Not written: no model is configured on this deployment." };
 
-  const sources = [input.ask, input.noteText, input.account.name, input.account.city ?? ""];
+  const sources = [input.ask, input.noteText, input.account.name, input.account.city ?? "", TALKING_POINT_TEXT];
   const firstNames = input.contacts.map((c) => c.name.split(/\s+/)[0]).filter(Boolean);
 
   let correction: string | null = null;

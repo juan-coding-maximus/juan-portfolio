@@ -36,6 +36,7 @@ import {
   getAccount,
   getPriorityBook,
   getTouchpointById,
+  getVoiceContext,
   insertActivity,
   insertCloseSignal,
   insertContact,
@@ -393,10 +394,11 @@ async function fileOutreachAsks(
 ): Promise<number> {
   if (!accountId || !asks?.length) return 0;
 
-  const [accountRes, contactsRes, alreadyFiled] = await Promise.all([
+  const [accountRes, contactsRes, alreadyFiled, voice] = await Promise.all([
     getAccount(accountId),
     listContacts(accountId),
     listAskKeys(accountId),
+    getVoiceContext(accountId),
   ]);
   const account = accountRes.data[0];
   if (!account) return 0;
@@ -422,6 +424,7 @@ async function fileOutreachAsks(
       noteText,
       account: { id: account.id, name: account.name, city: account.city, email: account.email },
       contacts,
+      voice,
     });
     await insertAskDraft({ account_id: accountId, ask, composed });
     seen.push(ask);

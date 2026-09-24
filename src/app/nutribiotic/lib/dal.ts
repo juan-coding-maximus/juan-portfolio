@@ -2028,6 +2028,41 @@ export async function setSdrScheduleStatus(
  * to prevent. Juan dismissed three of these on 2026-09-16 and the queue was
  * free to re-file them the next time the same conversation was logged.
  */
+/**
+ * What Juan's own rewrites teach the composer (migration 0087, 2026-09-23).
+ *
+ * Lessons seen at least twice (a pattern, not a one-off) and the two closest
+ * draft-vs-sent pairs: this account's first, then the most recent. Written by
+ * bridges/email_voice/email_voice_scout.py; raw pairs live 30 days, lessons
+ * stay. A read that fails returns nothing: composing never waits on this.
+ */
+export async function getVoiceContext(accountId: string): Promise<{
+  lessons: { lesson: string; before: string | null; after: string | null; seen: number }[];
+  pairs: { draft: string; sent: string }[];
+}> {
+  try {
+    type L = { lesson: string; before_quote: string | null; after_quote: string | null; seen_count: number; origin?: Origin };
+    type P = { draft: string; sent: string; account_id: string | null; origin?: Origin };
+    const [lessons, own, recent] = await Promise.all([
+      query<L>("voice_lessons", {
+        select: "lesson,before_quote,after_quote,seen_count",
+        seen_count: "gte.2",
+        order: "seen_count.desc,last_seen.desc",
+        limit: 12,
+      }),
+      query<P>("voice_pairs", { select: "draft,sent,account_id", account_id: `eq.${accountId}`, order: "sent_at.desc", limit: 2 }),
+      query<P>("voice_pairs", { select: "draft,sent,account_id", order: "sent_at.desc", limit: 4 }),
+    ]);
+    const pairs = [...own.data, ...recent.data.filter((r) => r.account_id !== accountId)].slice(0, 2);
+    return {
+      lessons: lessons.data.map((l) => ({ lesson: l.lesson, before: l.before_quote, after: l.after_quote, seen: l.seen_count })),
+      pairs: pairs.map((p) => ({ draft: p.draft, sent: p.sent })),
+    };
+  } catch {
+    return { lessons: [], pairs: [] };
+  }
+}
+
 export async function listAskKeys(accountId: string): Promise<{ id: string; source_ask: string; status: string }[]> {
   const res = await query<{ id: string; source_ask: string | null; status: string; origin?: Origin }>("nb_outbound_drafts", {
     select: "id,source_ask,status",

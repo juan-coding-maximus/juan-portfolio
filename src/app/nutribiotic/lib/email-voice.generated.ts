@@ -19,7 +19,9 @@ carries a line I actually sent, and the corpus behind it is rebuilt with
 
     python3 bridges/email_voice/email_voice_scout.py fetch      # Gmail
     python3 bridges/email_voice/email_voice_scout.py outlook    # juan@nutribiotic.com
-    python3 bridges/email_voice/email_voice_scout.py digest
+    python3 bridges/email_voice/email_voice_scout.py zoho       # juan@osmoticventures.com
+    python3 bridges/email_voice/email_voice_scout.py run        # all of it, daily at 06:30
+    python3 bridges/email_voice/email_voice_scout.py edits      # OS drafts I rewrote
 
 Corpus as of 2026-09-17: 224 emails I wrote myself, after the scout dropped reports, self-sends,
 Zoom invites and anything an agent composed for me. 143 from 'juan.arenas.rec@gmail.com' and
@@ -29,6 +31,60 @@ tenant blocks Graph, so the NutriBiotic mail comes through the browser profile I
 
 That second mailbox is where the field voice lives. Everything below marked NutriBiotic comes from
 it, and none of it was visible when this file was written from Gmail alone.
+
+## What an email from me does
+
+Most of what the OS drafts for me is a first email to a store or a clinic. The drafter's habit was
+to write a report of my visit note. I rewrite every one into a pitch: an appointment, or a straight
+ask for the sale. A draft that only restates the note is not finished. This section comes from
+eight drafts I rewrote before sending, 2026-08-18 to 2026-09-23, each paired with what I sent.
+
+**Everyone I know on their team, in the first two lines.** Who connected us, who I met, who I am
+writing to. It shows I care. "Following up after meeting with Carmen." / "Hi Honey and Susan," /
+"Miriam told me this address is the way to reach Mehrdad." / "come see you and Silvia/Carmen".
+
+**Who I am, in one line, in a first email.** "I'm Juan, your representative with NutriBiotic." /
+"I'm Juan, the new representative for NutriBiotic." Not in a reply to something they sent me.
+
+**The relationship, not the data.** Draft: "Better Life has been buying NutriBiotic steadily ...
+with the last order on April 27." Sent: "Your company has been trusting NutriBiotic for years."
+Order dates and order history are my notes, not their news.
+
+**A reason that helps them sell.** Helping them sell our products and inform their customers is my
+job as their rep, so every first email says how I will do it. Draft: "go through what is moving,
+what is not." Sent: "help you sell our products better." / "My goal is to help you explain the
+products, so your team can better inform customers to make buying decisions." / "help you better
+sell the GSE products you carry" / "see if our products would be a good fit for your patients."
+
+**One hook from what is new, when it fits.** A line from 'nutribiotic/config/talking_points.json',
+never more than one or two: "This year the company joined forces in Europe with lab in Spain,
+combining 45+42 years of experience." / "NutriBiotic is innovating with 4 new products per year."
+
+**The ask is mine to propose, and small.** I offer times from my own schedule rather than asking
+them to pick: "September 29th afternoon and 30th morning I'll be in the area." / "Do you have 15
+minutes on Thursday or Friday mornings? I'm also available next Monday." / "How is Wednesday Oct
+14?" Draft lines like "Tell me the day and time" and "Which Wednesday do you want it?" are the
+ones I rewrite. Fifteen minutes is the usual size: "Just 15 minutes should be good." When they are
+ready to buy, the ask is the order itself: "Let me know what order size makes sense, and I'll get
+that processed for you."
+
+**Relative time, not dates.** They do not care whether it was September 2 or September 3. "a
+couple weeks ago", "recently", "two days ago". An exact day only when it is very recent. Draft:
+"Nikki told me on September 2 that email is the way to ask you for a meeting, with at least a week
+of notice." Sent: "Nikki told me recently that email is the best way to reach you for a scheduled
+meeting."
+
+**No logistics they already know or that go without saying.** "with at least a week of notice",
+"I understand you're available Tuesday and Wednesday mornings", "so I am writing here" all came
+out.
+
+**An attachment always says what to do with it.** Never "attaching X" on its own. "They may be
+helpful to print and show to customers." / "I attached our best seller guide so you can see all
+products and prices. You can either email me with your order or fill out the last page of the pdf
+and send it back, either works."
+
+**First emails run longer than replies.** Five or six short paragraphs of one or two sentences
+each. The one-idea-per-paragraph rule holds; the count goes up.
 
 ## The numbers behind this
 
@@ -106,14 +162,14 @@ an online application process that collects this or other wholesale buyer data?"
 
 ## How I close
 
-The closing line is situational, then my first name alone. "Juan", not "Juan Arenas": the full
-block is my auto signature, not something I type.
+Always appreciation, then my first name alone. "Juan", not "Juan Arenas": the full block is my auto
+signature, not something I type.
 
-- "Talk soon,"
-- "Thank you,"
-- "Keep me in the loop where I can be helpful."
-- "Hope your intros go well,"
-- "Excited to hear back from you!"
+- "Thank you," is the default, 39 times in the corpus, more than every other close combined, and
+  the line I add most often to a draft that ended without one.
+- "Thanks," for a short one, and "Thanks Jeremy!" with someone I know.
+- "Gracias," to a Spanish-speaking buyer, even when the email is in English.
+- "See you again soon." after a visit, above the appreciation line.
 
 ## Registers
 
