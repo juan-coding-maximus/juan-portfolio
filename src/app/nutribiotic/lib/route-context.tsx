@@ -69,8 +69,10 @@ type RouteCtx = {
   addToRouteOnDay: (id: string, day: string) => void;
   addCustomStop: (stop: Omit<CustomStop, "id">, atIndex?: number) => void;
   removeFromRoute: (id: string) => void;
-  moveInRoute: (id: string, dir: -1 | 1) => void;
-  moveToTop: (id: string) => void;
+  /** Reorder the whole day to an exact id order (2026-09-23: the only way to
+   *  reorder now -- the single-step move/move-to-top actions this replaced
+   *  are gone, per RoutePanel's drag-only list). Both Optimize route and the
+   *  drag handle call this, all-or-nothing, never a partial reorder. */
   reorderRoute: (idsInOrder: string[]) => void;
   /** Move one stop from the active day to any day on the horizon (2026-08-25,
    *  generalizes the old "postpone to next day only" button into a day
@@ -290,28 +292,6 @@ export function RouteProvider({ children }: { children: ReactNode }) {
     if (done.has(id)) commitDone(activeDay, [...done].filter((d) => d !== id));
   }
 
-  function moveInRoute(id: string, dir: -1 | 1) {
-    const i = routeDraft.findIndex((e) => entryId(e) === id);
-    const j = i + dir;
-    if (i < 0 || j < 0 || j >= routeDraft.length) return;
-    const next = [...routeDraft];
-    [next[i], next[j]] = [next[j], next[i]];
-    commitDay(activeDay, next);
-  }
-
-  // Lifts one stop straight to position 1, the rest sliding down in place
-  // rather than swapping pairwise -- Juan's ask 2026-08-21, so a stop found
-  // six deep on the ten-closest list does not cost six taps of the single-step
-  // chevron to become the day's first door.
-  function moveToTop(id: string) {
-    const i = routeDraft.findIndex((e) => entryId(e) === id);
-    if (i <= 0) return;
-    const next = [...routeDraft];
-    const [entry] = next.splice(i, 1);
-    next.unshift(entry);
-    commitDay(activeDay, next);
-  }
-
   // The whole day reordered at once (Optimize route, 2026-08-23): MapScreen
   // hands back the same ids it was given, just in the order route-optimize.ts
   // found shortest. Anything not in the current list (stale computation racing
@@ -464,8 +444,6 @@ export function RouteProvider({ children }: { children: ReactNode }) {
         addToRouteOnDay,
         addCustomStop,
         removeFromRoute,
-        moveInRoute,
-        moveToTop,
         reorderRoute,
         moveStopToDay,
         clearRoute,

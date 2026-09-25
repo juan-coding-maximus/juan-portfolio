@@ -91,16 +91,12 @@ export const ICONS: Record<string, ReactNode> = {
   flag: <><path d="M3.8 14.2V2.2" /><path d="M3.8 2.8h8.4l-1.9 2.8 1.9 2.8H3.8" /></>,
   book: <g><path d="M8 3.4C6.9 2.5 5 2.2 3 2.2v10.2c2 0 3.9.3 5 1.2 1.1-.9 3-1.2 5-1.2V2.2c-2 0-3.9.3-5 1.2Z" /><path d="M8 3.4v10.2" /></g>,
   locate: <><circle cx="8" cy="8" r="2.3" /><path d="M8 1.6v2.5M8 11.9v2.5M1.6 8h2.5M11.9 8h2.5" /></>,
-  // Route reordering (0029). Bare chevrons, no shaft: at 13px a full arrow
-  // turns to mud, and these sit four-abreast in a row of small controls.
+  // Expand/collapse disclosure. Bare chevron, no shaft: at 13px a full arrow
+  // turns to mud in a small control.
   "chevron-up": <><path d="m4 10 4-4 4 4" /></>,
   "chevron-down": <><path d="m4 6 4 4 4-4" /></>,
-  // "Move to top" (2026-08-21): a second chevron stacked above the first
-  // reads as "all the way", the same convention a media player's >>| uses,
-  // without needing a distinct glyph the small button row has no room for.
-  "chevrons-up": <><path d="m4 8 4-4 4 4" /><path d="m4 12 4-4 4 4" /></>,
-  // Postpone a stop to the next day tab (2026-08-23): the same "all the way"
-  // double-chevron as chevrons-up, rotated -- one tab over, not one position.
+  // Move a stop or a call to a named day (2026-08-23): a double chevron reads
+  // as "all the way over", the same convention a media player's >>| uses.
   "chevrons-right": <><path d="m4 4 4 4-4 4" /><path d="m8 4 4 4-4 4" /></>,
   phone: <><path d="M5.6 2.6H3.4c-.7 0-1.3.6-1.2 1.3.3 5.2 4.7 9.6 9.9 9.9.7.1 1.3-.5 1.3-1.2v-2.2l-2.8-.9-1.2 1.4a9.4 9.4 0 0 1-4.1-4.1l1.4-1.2z" /></>,
   tag: <><path d="M2.6 2.6h5.2l5.6 5.6c.5.5.5 1.3 0 1.8l-3.4 3.4c-.5.5-1.3.5-1.8 0L2.6 7.8z" /><circle cx="5.7" cy="5.7" r="0.6" fill="currentColor" stroke="none" /></>,
