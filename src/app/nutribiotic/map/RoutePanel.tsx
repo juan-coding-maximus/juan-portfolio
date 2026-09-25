@@ -1473,7 +1473,6 @@ export function RoutePanel({
       <>
         {header}
         <DayTabs days={days} active={activeDay} onSelect={onSelectDay} />
-        <ReturnSuggestions suggestions={returnSuggestions} accounts={accounts} onAddAccount={onAddAccount} />
         {callsSection}
         {/* ADD A CLIENT / ADD A STOP, between Calls and the Leave-at bar
             (Juan's ask 2026-09-23): the two stacked rows sit here in both the
@@ -1490,6 +1489,11 @@ export function RoutePanel({
           />
         </div>
         {dayBar}
+        {/* Suggested returns sits below everything committed to the day
+            (Juan, 2026-09-25): it is potential, not planned, so it never
+            competes for position with the stops themselves, empty day or
+            not -- the panel does not shift when the first stop is added. */}
+        <ReturnSuggestions suggestions={returnSuggestions} accounts={accounts} onAddAccount={onAddAccount} />
       </>
     );
   }
@@ -1508,8 +1512,6 @@ export function RoutePanel({
       )}
 
       <DayTabs days={days} active={activeDay} onSelect={onSelectDay} />
-
-      <ReturnSuggestions suggestions={returnSuggestions} accounts={accounts} onAddAccount={onAddAccount} />
 
       {callsSection}
 
@@ -1643,6 +1645,11 @@ export function RoutePanel({
           </button>
         </div>
       </div>
+
+      {/* Suggested returns sits below the day's actual stops (Juan,
+          2026-09-25): it is potential, not planned, so it never competes
+          with or interrupts what is already committed to the route. */}
+      <ReturnSuggestions suggestions={returnSuggestions} accounts={accounts} onAddAccount={onAddAccount} />
     </>
   );
 }
