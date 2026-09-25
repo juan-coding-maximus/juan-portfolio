@@ -13,6 +13,7 @@
     "@anthropic-ai/sdk": "^0.98.0",
     "@react-google-maps/api": "^2.20.8",
     "googleapis": "^174.0.1",
+    "motion": "^13.4.2",
     "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
