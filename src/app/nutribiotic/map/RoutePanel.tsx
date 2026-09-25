@@ -40,15 +40,16 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CallEntry, CustomStop, CustomStopKind, RouteEndpoint, RouteSchedulePrefs } from "../lib/dal";
-import { dayLabel } from "../lib/field-week";
+import { Reorder, useDragControls } from "motion/react";
+import type { CallEntry, CustomStop, RouteEndpoint, RouteSchedulePrefs } from "../lib/dal";
 import { appleMapsUrl, CUSTOM_STOP_LABEL, fullAddress, Ico, prettyPhone, ReachLinks, TierChip } from "../lib/ui";
 import { AccountLink } from "../lib/modal";
 import { useRoute } from "../lib/route-context";
-import { resolveStopAddress } from "../lib/stop-actions";
+import { AddStopForm } from "./AddStopForm";
 import { CallSearchField } from "./CallSearchField";
-import { ClientSearchField, type ClientSearchAccount } from "./ClientSearchField";
+import type { ClientSearchAccount } from "./ClientSearchField";
 import { DayMoveMenu } from "./DayMoveMenu";
+import { DayTabs } from "./DayTabs";
 import { routeDriveLegs, type DriveLeg } from "./drive-actions";
 import { BAND_STYLE, driveBand, likelyDriveMinutes } from "./traffic";
 import type { RouteStopView } from "./MapScreen";
@@ -238,218 +239,6 @@ function buildSchedule(
 function appleMapsRouteUrl(stops: { lat: number; lng: number }[]): string {
   const daddr = stops.map((s) => `${s.lat},${s.lng}`).join("+to:");
   return `https://maps.apple.com/?daddr=${daddr}`;
-}
-
-/**
- * A day is not only accounts (Juan, 2026-08-05). Lunch between two clusters and
- * the hotel at the end of a sleep-away run are stops in the same sense: they
- * take time, they sit in a position, and they belong in the one list the phone
- * navigates from. Anything with an address can be one, which is why the third
- * kind is just "Stop" (a warehouse, a parking garage, a friend's office).
- *
- * THE ADDRESS IS RESOLVED, NOT TYPED THROUGH. Google Places answers with a real
- * place or with nothing (see lib/stop-actions.ts). A stop that cannot be placed
- * is not saved, because a stop with no coordinates is a row with a dead GO
- * button, and finding that out in a parking lot is the worst time to find it.
- */
-const KINDS: { value: CustomStopKind; hint: string }[] = [
-  { value: "lunch", hint: "e.g. In-N-Out Tustin" },
-  { value: "hotel", hint: "e.g. Hampton Inn Carlsbad" },
-  { value: "stop", hint: "Any address or place name" },
-];
-
-/**
- * THE FOURTH PILL (Juan, 2026-09-14): a client, alongside lunch/hotel/stop.
- *
- * It is a fourth choice in the same row but NOT a fourth CustomStopKind, and
- * that difference is the whole point. Lunch, hotel and stop have no row
- * anywhere, so they carry their own label and coordinates into the draft. An
- * account has a row: it goes into route_draft as the bare nb_accounts.id
- * string it has always been (see dal.ts RouteDraftEntry), resolved against the
- * live account on every render. So a client stop keeps its account_id, its
- * tier, its order history and its profile link, and a rename or a move
- * upstream is reflected rather than frozen into the draft.
- */
-type AddKind = CustomStopKind | "client";
-
-function AddStopForm({
-  onAdd,
-  accounts,
-  inRoute,
-  onAddAccount,
-}: {
-  onAdd: (stop: Omit<CustomStop, "id">) => void;
-  accounts: ClientSearchAccount[];
-  inRoute: Set<string>;
-  onAddAccount: (account: ClientSearchAccount) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  // CLIENT IS THE DEFAULT PILL (Juan, 2026-09-14). Nearly every stop he adds by
-  // hand is an account he already has a row for, so the panel opens on the arm
-  // that needs no typing. Lunch, hotel and a plain address stay one tap away.
-  const [kind, setKind] = useState<AddKind>("client");
-  const [query, setQuery] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  function reset() {
-    setQuery("");
-    setError(null);
-  }
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (busy || kind === "client") return; // a client is added by picking one
-    setBusy(true);
-    setError(null);
-    // A THROWN server action, not just an { ok: false } answer, used to reach
-    // Next's error.tsx and take the whole route panel down with it (Juan,
-    // 2026-09-16). resolveStopAddress can throw on a bad deploy or a dropped
-    // connection same as any other network call, and that is exactly the
-    // moment a field-level message matters most.
-    let res;
-    try {
-      res = await resolveStopAddress(query);
-    } catch {
-      setBusy(false);
-      setError("Couldn't reach the lookup. Try again.");
-      return;
-    }
-    setBusy(false);
-    if (!res.ok) {
-      setError(res.error);
-      return;
-    }
-    onAdd({
-      kind,
-      label: res.place.label,
-      address: res.place.address,
-      lat: res.place.lat,
-      lng: res.place.lng,
-    });
-    reset();
-    setOpen(false);
-  }
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => {
-          // Every open starts on Client, not on whatever was picked last time.
-          setKind("client");
-          reset();
-          setOpen(true);
-        }}
-        className="inline-flex items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white px-3 py-2 text-[12.5px] font-medium text-[#3D4A44] transition-colors hover:bg-[#FAF9F5]"
-      >
-        <Ico name="pin" size={13} />
-        Add a client, lunch, hotel or other stop
-      </button>
-    );
-  }
-
-  const hint = KINDS.find((k) => k.value === kind)?.hint ?? "";
-  const pills: { value: AddKind; label: string }[] = [
-    ...KINDS.map((k) => ({ value: k.value as AddKind, label: CUSTOM_STOP_LABEL[k.value] })),
-    { value: "client", label: "Client" },
-  ];
-
-  return (
-    <form
-      onSubmit={submit}
-      className="rounded-lg border border-[#E2DFD5] bg-white p-3.5"
-    >
-      <div className="flex flex-wrap items-center gap-1.5">
-        {pills.map((k) => (
-          <button
-            key={k.value}
-            type="button"
-            onClick={() => {
-              setKind(k.value);
-              reset();
-            }}
-            className={`rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
-              kind === k.value
-                ? "bg-[#14201B] text-[#F7F6F1]"
-                : "border border-[#E2DFD5] text-[#5B6560] hover:bg-[#FAF9F5]"
-            }`}
-          >
-            {k.label}
-          </button>
-        ))}
-      </div>
-
-      {/* A client is searched, not typed through Google Places: it is already a
-          row of Juan's, with its own coordinates and its own history. Picking
-          one from the list IS the add, so this arm has no "Add to route". */}
-      {kind === "client" ? (
-        <>
-          <div className="mt-2.5">
-            <ClientSearchField
-              accounts={accounts}
-              inRoute={inRoute}
-              onPick={(a) => {
-                onAddAccount(a);
-                reset();
-                setOpen(false);
-              }}
-            />
-          </div>
-          <div className="mt-2.5 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                reset();
-                setOpen(false);
-              }}
-              className="rounded-md border border-[#E2DFD5] bg-white px-3 py-2 text-[12.5px] font-medium text-[#8A928C] transition-colors hover:text-[#3D4A44]"
-            >
-              Cancel
-            </button>
-            <span className="text-[12px] text-[#8A928C]">
-              Your accounts and prospects. Pick one to put it on this day.
-            </span>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="mt-2.5">
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={hint}
-              autoFocus
-              className="w-full min-w-0 rounded-md border border-[#E2DFD5] bg-[#FCFBF7] px-3 py-2 text-[13.5px] outline-none placeholder:text-[#A9AFA9] focus:border-[#8A928C]"
-            />
-          </div>
-
-          <div className="mt-2.5 flex items-center gap-2">
-            <button
-              type="submit"
-              disabled={busy || query.trim().length < 3}
-              className="rounded-md bg-[#2C6A46] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {busy ? "Finding..." : "Add to route"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                reset();
-                setOpen(false);
-              }}
-              className="rounded-md border border-[#E2DFD5] bg-white px-3 py-2 text-[12.5px] font-medium text-[#8A928C] transition-colors hover:text-[#3D4A44]"
-            >
-              Cancel
-            </button>
-            <span className="text-[12px] text-[#8A928C]">
-              {error ? <span className="text-[#B5372A]">{error}</span> : "Address or place name, looked up before it is added."}
-            </span>
-          </div>
-        </>
-      )}
-    </form>
-  );
 }
 
 /**
@@ -792,38 +581,365 @@ function DayBar({
  * day further out is still one tap away rather than looking like it doesn't
  * exist.
  */
-function DayTabs({
+/**
+ * One stop, its own component rather than an inline .map() body (2026-09-23):
+ * Reorder.Item needs its own useDragControls() so the grip button starts the
+ * gesture and nothing else on the row does, and a hook can only be called
+ * once per component instance, not once per loop iteration.
+ *
+ * scheduleRow/leg arrive pre-resolved by id and by pair (RoutePanel's
+ * scheduleById/legByPair) rather than by position, so a row never shows
+ * another stop's arrival time or drive leg while a drag has it sitting
+ * somewhere its committed index does not match -- see those maps' comments.
+ */
+function StopRow({
+  stop: s,
+  index: i,
+  prevStop: prev,
+  title,
+  isDone,
+  scheduleRow,
+  missedAnchor,
+  stopTime,
+  onSetStopTime,
+  leg,
+  onToggleDone,
+  onShowInMap,
+  onRemove,
   days,
-  active,
-  onSelect,
+  activeDay,
+  onMoveStopDay,
+  onRowDragStart,
+  onRowDragEnd,
 }: {
+  stop: RouteStopView;
+  index: number;
+  prevStop: RouteStopView | null;
+  title: string;
+  isDone: boolean;
+  scheduleRow: ScheduleRow | null;
+  missedAnchor: boolean;
+  stopTime: string | undefined;
+  onSetStopTime: (id: string, at: string | null) => void;
+  leg: DriveLeg | null;
+  onToggleDone: (id: string) => void;
+  onShowInMap: (id: string) => void;
+  onRemove: (id: string) => void;
   days: string[];
-  active: string;
-  onSelect: (day: string) => void;
+  activeDay: string;
+  onMoveStopDay: (id: string, day: string) => void;
+  onRowDragStart: () => void;
+  onRowDragEnd: () => void;
 }) {
+  const a = s.type === "account" ? s.account : null;
+  const c = s.type === "custom" ? s.custom : null;
+  const dragControls = useDragControls();
+
   return (
-    <div role="tablist" aria-label="Route day" className="mb-2 flex flex-wrap items-center gap-1.5">
-      {days.map((day) => {
-        const { weekday, short } = dayLabel(day);
-        const isActive = day === active;
-        return (
+    <Reorder.Item
+      value={s.id}
+      as="li"
+      dragListener={false}
+      dragControls={dragControls}
+      onDragStart={onRowDragStart}
+      onDragEnd={onRowDragEnd}
+      layout
+      // Damping 1.0 / response 0.4 (apple-design's own "move / reposition"
+      // default): a row sliding into the gap settles smoothly, no bounce --
+      // bounce is reserved for a released flick, and nothing here is thrown.
+      transition={{ type: "spring", bounce: 0, duration: 0.4 }}
+      // The lifted row itself, while held: a small raise and shadow, same
+      // language a dragged card gets anywhere else in this OS, gone the
+      // instant it is let go rather than settling out slowly.
+      whileDrag={{ scale: 1.01, boxShadow: "0 10px 28px rgba(20,32,27,0.16)", zIndex: 1 }}
+      // flex-wrap (2026-08-30): the button cluster below (drag, done,
+      // day-move, locate, GO, remove) is shrink-0 -- it never gets narrower --
+      // so on a route column too skinny to hold both it and the stop's own
+      // text on one line, it now drops to its own line under the text instead
+      // of forcing the row past the column's width.
+      className={`flex flex-col flex-wrap gap-2 bg-white px-4 py-3 sm:flex-row sm:items-center sm:gap-3 ${
+        isDone ? "opacity-50" : ""
+      }`}
+    >
+      <div className="flex min-w-0 flex-1 items-start gap-3">
+      {/* An amber square for a lunch or hotel stop, the same shape and
+          colour it gets on the map, so the list and the map agree at a
+          glance about which stops are not accounts. Done (0042) swaps
+          the position number for a checkmark -- the fact that a stop
+          is #4 stops mattering the moment it's crossed off. */}
+      <div className="flex shrink-0 flex-col items-center gap-1">
+        <span
+          className={`mt-0.5 flex h-6 w-6 items-center justify-center text-[11.5px] font-semibold tabular-nums text-[#F7F6F1] ${
+            c ? "rounded-[4px] bg-[#A0762C]" : "rounded-full bg-[#14201B]"
+          }`}
+        >
+          {isDone ? <Ico name="check" size={12} /> : i + 1}
+        </span>
+        {/* When he is there, in the column he is already scanning for
+            "which stop is this". Absent, not zeroed, when the router
+            could not answer. */}
+        {scheduleRow && (
+          <span className="whitespace-nowrap text-[10.5px] leading-tight tabular-nums text-[#8A928C]">
+            {clock(scheduleRow.arrive)}
+          </span>
+        )}
+        {/* A STATED TIME, and it is a control, not a caption (0065).
+            The day is built around it: the schedule above holds this
+            stop at this clock and starts the next leg from it. Tap it
+            to change it, clear it to hand the stop back to the
+            ordering. Amber when the drive cannot make it, because a
+            route that quietly printed the stated time for a stop it
+            reaches forty minutes later would be inventing the one
+            number Juan plans around. */}
+        {stopTime && (
           <button
-            key={day}
             type="button"
-            role="tab"
-            aria-selected={isActive}
-            onClick={() => onSelect(day)}
-            className={`rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
-              isActive
-                ? "bg-[#14201B] text-[#F7F6F1]"
-                : "border border-[#E2DFD5] bg-white text-[#5B6560] hover:bg-[#FAF9F5]"
+            onClick={() => {
+              const next = window.prompt(
+                "Stated time for this stop (HH:MM). Leave empty to clear it.",
+                stopTime,
+              );
+              if (next === null) return;
+              const trimmed = next.trim();
+              if (!trimmed) return onSetStopTime(s.id, null);
+              if (/^([01]\d|2[0-3]):[0-5]\d$/.test(trimmed)) onSetStopTime(s.id, trimmed);
+            }}
+            title={
+              missedAnchor && scheduleRow
+                ? `Asked for ${stopTime}, but this order gets there at ${clock(scheduleRow.arrive)}`
+                : `Anchored at ${stopTime}. Tap to change or clear.`
+            }
+            className={`whitespace-nowrap rounded px-1 py-0.5 text-[10px] font-medium tabular-nums ${
+              missedAnchor
+                ? "bg-[#F6E4DF] text-[#8A3B2E]"
+                : "bg-[#F3E3C6] text-[#8A6D2F]"
             }`}
           >
-            {weekday} <span className="tabular-nums opacity-80">{short}</span>
+            {stopTime}
           </button>
-        );
-      })}
-    </div>
+        )}
+      </div>
+
+      {/* min-w-[10rem] not min-w-0 (2026-08-31): min-w-0 let this
+          shrink all the way to nothing instead of ever wrapping the
+          button cluster onto its own line -- flex-wrap only kicks
+          in once a child truly can't shrink any further, and a
+          flex-1 item with no floor can always "fit" by crushing the
+          stop's name down to a couple of letters. 160px is enough
+          for a truncated name to still read as a name. */}
+      <div className="min-w-[10rem] flex-1">
+        {c ? (
+          <>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              <span className={`truncate text-[14px] font-medium leading-snug ${isDone ? "line-through" : ""}`}>
+                {c.label}
+              </span>
+              <span className="rounded bg-[#F6EEDD] px-1.5 py-0.5 text-[10.5px] font-medium uppercase tracking-wide text-[#7A5A1E]">
+                {CUSTOM_STOP_LABEL[c.kind]}
+              </span>
+              {/* Lunch is the one stop whose length is not the dwell
+                  everything else uses, so it says how long it is. */}
+              {scheduleRow && scheduleRow.stay > 0 && c.kind !== "stop" && (
+                <span className="text-[11.5px] tabular-nums text-[#8A928C]">
+                  {clock(scheduleRow.arrive)}-{clock(scheduleRow.leave)}
+                </span>
+              )}
+            </div>
+            <div className="mt-0.5 truncate text-[12.5px] text-[#5B6560]">{c.address}</div>
+          </>
+        ) : (
+        <>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <AccountLink
+            id={a!.id}
+            className={`truncate text-[14px] font-medium leading-snug hover:underline ${isDone ? "line-through" : ""}`}
+          >
+            {a!.name}
+          </AccountLink>
+          {a!.tier && <TierChip tier={a!.tier} scale="hq" />}
+        </div>
+        <div className="mt-0.5 truncate text-[12.5px] text-[#5B6560]">
+          {a!.street}
+          {a!.city ? `, ${a!.city}` : ""}
+        </div>
+
+        {/* THE TRADING FACTS, Juan's ask 2026-08-05: last order, what
+            they spent over twelve months and on what, and lifetime.
+            Each one is omitted when it is unknown rather than shown
+            as a zero, because "$0 in 12m" and "we hold no orders for
+            this account" are different sentences and only one of them
+            is true here. 313 of the 459 accounts have no loaded order
+            history at all, so the empty case is the common case. */}
+        <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[12px] text-[#5B6560]">
+          {a!.last_order_at ? (
+            <span>
+              last order{" "}
+              <span className="font-medium text-[#3D4A44]">
+                {monthYear(a!.last_order_at)}
+              </span>
+            </span>
+          ) : (
+            <span className="text-[#A9AFA9]">never ordered</span>
+          )}
+          {a!.trailing_12m_revenue !== null && (
+            <span>
+              12m{" "}
+              <span className="font-medium tabular-nums text-[#3D4A44]">
+                {usd(a!.trailing_12m_revenue)}
+              </span>
+            </span>
+          )}
+          {a!.lifetime_revenue !== null && (
+            <span>
+              lifetime{" "}
+              <span className="font-medium tabular-nums text-[#3D4A44]">
+                {usd(a!.lifetime_revenue)}
+              </span>
+            </span>
+          )}
+          {/* 12m category when they have bought this year, else the
+              lifetime one marked as historic, so "Dietary Supplement"
+              never silently means "back in 2024". */}
+          {a!.top_category_12m ? (
+            <span className="font-medium text-[#2C6A46]">{a!.top_category_12m}</span>
+          ) : a!.top_category_lifetime ? (
+            <span className="text-[#8A928C]">
+              {a!.top_category_lifetime} <span className="text-[#A9AFA9]">(historic)</span>
+            </span>
+          ) : (
+            <span className="text-[#A9AFA9]">no orders on file</span>
+          )}
+        </div>
+
+        {/* HUBSPOT, SITE, PHONE ON EVERY STOP (Juan, 2026-08-05).
+            A stop is decided at the curb: the portal record for what
+            HQ knows, the site for what they sell, the number for
+            "are you open / is the buyer in today". All three were a
+            tap-through into the profile before this, which is the one
+            thing a phone in a car should not have to do. */}
+        <ReachLinks
+          className="mt-1"
+          hubspotId={a!.hubspot_company_id}
+          website={a!.website}
+          phone={a!.phone}
+        />
+        </>
+        )}
+
+        {/* The leg in, then the window. Falls back to the straight-line
+            hop whenever the router gave us nothing for this exact pair
+            (either it is down, or a live drag has made this pair
+            adjacent before the router has ever seen it), so the row
+            never goes blank and never claims a drive time it does not
+            have. */}
+        {prev &&
+          (leg ? (
+            <div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-[#8A928C]">
+              {/* The same band the map draws this leg in (traffic.ts),
+                  so the two panes of the dashboard describe one day
+                  rather than two. A dot, not a word: the row already
+                  carries the exact minutes right beside it. */}
+              <span
+                aria-hidden
+                title={BAND_STYLE[driveBand(leg.minutes)].title}
+                className="inline-block h-2 w-2 shrink-0 rounded-full ring-1 ring-[#14201B]/40"
+                style={{ backgroundColor: BAND_STYLE[driveBand(leg.minutes)].color }}
+              />
+              <span>
+                <span className="tabular-nums">{duration(leg.minutes)}</span>{" "}
+                drive ·{" "}
+                <span className="tabular-nums">{leg.miles.toFixed(1)} mi</span>{" "}
+                from stop {i}
+                {driveBand(leg.minutes) === "walk" && (
+                  <span className="ml-1 font-medium text-[#2C6A46]">walkable</span>
+                )}
+              </span>
+            </div>
+          ) : (
+            <div className="mt-0.5 text-[12px] text-[#8A928C]">
+              <span className="tabular-nums">{haversineMiles(prev, s).toFixed(1)} mi</span>{" "}
+              straight-line from stop {i}
+            </div>
+          ))}
+      </div>
+      </div>
+
+      <div className="flex shrink-0 items-center justify-end gap-1">
+        {/* DRAG HANDLE, THE ONLY WAY TO REORDER (2026-08-25, drag-only since
+            2026-09-23 on Juan's ask -- the up/down/move-to-top buttons that
+            used to sit here are gone; a grip and a full-height drag target
+            replace all three). dragControls.start fires the gesture from
+            this button alone, so GO/remove/day-move stay taps. touchAction:
+            none stops the page itself from scrolling while a finger is
+            mid-drag. */}
+        <button
+          type="button"
+          onPointerDown={(e) => dragControls.start(e)}
+          aria-label={`Drag ${title} to reorder`}
+          style={{ touchAction: "none" }}
+          className="cursor-grab rounded-md border border-[#E2DFD5] bg-white px-2 py-2 text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] active:cursor-grabbing"
+        >
+          <Ico name="grip" size={13} />
+        </button>
+        {/* DONE (0042, 2026-08-26): crosses the stop off without
+            removing it, so the mileage/finish clock above still
+            reflects the whole day, not just what's left. Toggle,
+            not a one-way mark, so a mis-tap costs one more tap. */}
+        <button
+          type="button"
+          onClick={() => onToggleDone(s.id)}
+          aria-label={isDone ? `Mark ${title} not done` : `Mark ${title} done`}
+          aria-pressed={isDone}
+          className={`rounded-md border px-2 py-2 transition-colors ${
+            isDone
+              ? "border-[#2C6A46] bg-[#2C6A46] text-white hover:opacity-90"
+              : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
+          }`}
+        >
+          <Ico name="check" size={13} />
+        </button>
+        {/* MOVE TO A DAY (2026-08-25): was a plain postpone-to-
+            tomorrow button, now opens a picker over the whole
+            horizon -- see DayMoveMenu. Hidden rather than disabled
+            on a single-day horizon, since there is nowhere for it
+            to open onto. */}
+        {days.length > 1 && (
+          <DayMoveMenu
+            days={days}
+            active={activeDay}
+            onPick={(day) => onMoveStopDay(s.id, day)}
+            label={`Move ${title} to a day`}
+            icon="chevrons-right"
+          />
+        )}
+        <button
+          type="button"
+          onClick={() => onShowInMap(s.id)}
+          aria-label={`Show ${title} on the map`}
+          className="rounded-md border border-[#E2DFD5] bg-white px-2 py-2 text-[#3D4A44] transition-colors hover:bg-[#FAF9F5]"
+        >
+          <Ico name="locate" size={13} />
+        </button>
+        <a
+          href={appleMapsUrl({
+            address: c ? c.address : fullAddress(a!),
+            lat: s.lat,
+            lng: s.lng,
+          })}
+          className="rounded-md bg-[#2C6A46] px-3 py-2 text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90"
+        >
+          GO
+        </a>
+        <button
+          type="button"
+          onClick={() => onRemove(s.id)}
+          aria-label={`Remove ${title} from the route`}
+          className="rounded-md border border-[#E2DFD5] bg-white px-2 py-2 text-[#8A928C] transition-colors hover:border-[#D8B3AC] hover:bg-[#FBF4F2] hover:text-[#B5372A]"
+        >
+          <Ico name="close" size={13} />
+        </button>
+      </div>
+    </Reorder.Item>
   );
 }
 
@@ -837,8 +953,6 @@ export function RoutePanel({
   end: endOverride,
   onChangeStart,
   onChangeEnd,
-  onMove,
-  onMoveToTop,
   onReorder,
   onRemove,
   onClear,
@@ -881,11 +995,10 @@ export function RoutePanel({
   end: RouteEndpoint | null;
   onChangeStart: (ep: RouteEndpoint | null) => void;
   onChangeEnd: (ep: RouteEndpoint | null) => void;
-  onMove: (id: string, dir: -1 | 1) => void;
-  onMoveToTop: (id: string) => void;
   /** Reorder the whole day to an exact id order -- both Optimize route and
       the drag handle below call this, the former with the router's answer,
-      the latter with wherever the pointer let go. */
+      the latter with wherever the drag let go. Called exactly once per
+      commit, never mid-gesture (see the drag-to-reorder comment below). */
   onReorder: (idsInOrder: string[]) => void;
   onRemove: (id: string) => void;
   onClear: () => void;
@@ -942,61 +1055,47 @@ export function RoutePanel({
   // report on already lives there.
   const { writeError, dismissWriteError } = useRoute();
 
-  // DRAG TO REORDER (2026-08-25), alongside the up/down chevrons, not instead
-  // of them -- the comment on the chevron button below still holds (one-
-  // handed in a parked car), this is for the times two hands and a longer
-  // list make a drag faster than eight taps of the single-step button.
+  // DRAG TO REORDER, REAL-TIME REFLOW (2026-08-25, rebuilt 2026-09-23 on
+  // Juan's ask: drag-only, no up/down buttons, and the list has to actually
+  // move under the finger rather than show a static insertion line). Built on
+  // Motion's Reorder.Group/Reorder.Item (motion/react, apple-design's own
+  // recommended tool for a live drag-reorder list): each row is a
+  // Reorder.Item with `layout` on, so a row sliding out of the way animates
+  // continuously via a FLIP transform rather than jumping to its new slot.
   //
-  // POINTER CAPTURE ON THE HANDLE, not a window listener: setPointerCapture
-  // keeps move/up events firing on the handle itself even once the finger has
-  // left it, which is exactly what a drag needs and is simpler than manually
-  // adding/removing window listeners on every drag start/end.
-  //
-  // NO LIVE REFLOW WHILE DRAGGING. The dragged row dims and an insertion line
-  // shows where it would land; the actual array only reorders once on drop,
-  // one onReorder call, same all-or-nothing contract Optimize route uses --
-  // never a silent partial reorder mid-drag.
-  const listRef = useRef<HTMLUListElement>(null);
-  const [drag, setDrag] = useState<{ id: string; dropIndex: number } | null>(null);
+  // ORDER IS LOCAL AND VISUAL UNTIL DROP. `orderIds` is what is on screen; it
+  // is driven every frame by Reorder.Group's onReorder while a drag is live,
+  // but the real `onReorder` prop -- the one write that touches route_draft --
+  // fires exactly once, in handleRowDragEnd, same all-or-nothing contract
+  // Optimize route uses. `draggingRef` stops the sync effect below from
+  // overwriting the order the finger is actively setting if a server refresh
+  // (see route-context.tsx's arrival-effect) lands mid-gesture.
+  const [orderIds, setOrderIds] = useState<string[]>(() => stops.map((s) => s.id));
+  const draggingRef = useRef(false);
+  const orderIdsRef = useRef(orderIds);
+  orderIdsRef.current = orderIds;
 
-  function dropIndexAt(clientY: number, excludeId: string): number {
-    const items = listRef.current
-      ? Array.from(listRef.current.querySelectorAll<HTMLLIElement>("li[data-stop-id]"))
-      : [];
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].dataset.stopId === excludeId) continue;
-      const rect = items[i].getBoundingClientRect();
-      if (clientY < rect.top + rect.height / 2) return i;
-    }
-    return items.length;
+  useEffect(() => {
+    if (draggingRef.current) return;
+    setOrderIds(stops.map((s) => s.id));
+  }, [stops]);
+
+  function handleRowDragStart() {
+    draggingRef.current = true;
   }
 
-  function handleGripDown(e: React.PointerEvent<HTMLButtonElement>, id: string, index: number) {
-    if (e.button !== 0 && e.pointerType === "mouse") return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    setDrag({ id, dropIndex: index });
+  function handleRowDragEnd() {
+    draggingRef.current = false;
+    const ids = orderIdsRef.current;
+    // Guards a stale drop racing a stop being added/removed mid-gesture: only
+    // ever commits a full, matching permutation, never a partial one.
+    if (ids.length === stops.length && ids.some((id, i) => id !== stops[i]?.id)) onReorder(ids);
   }
 
-  function handleGripMove(e: React.PointerEvent<HTMLButtonElement>) {
-    if (!drag) return;
-    e.preventDefault();
-    const next = dropIndexAt(e.clientY, drag.id);
-    if (next !== drag.dropIndex) setDrag({ ...drag, dropIndex: next });
-  }
-
-  function handleGripUp(e: React.PointerEvent<HTMLButtonElement>) {
-    if (!drag) return;
-    e.currentTarget.releasePointerCapture(e.pointerId);
-    const ids = stops.map((s) => s.id);
-    const from = ids.indexOf(drag.id);
-    const filtered = ids.filter((id) => id !== drag.id);
-    let insertAt = drag.dropIndex;
-    if (from !== -1 && from < drag.dropIndex) insertAt -= 1;
-    insertAt = Math.max(0, Math.min(filtered.length, insertAt));
-    filtered.splice(insertAt, 0, drag.id);
-    setDrag(null);
-    if (filtered.some((id, i) => id !== ids[i])) onReorder(filtered);
-  }
+  const stopsById = useMemo(() => new Map(stops.map((s) => [s.id, s])), [stops]);
+  const displayStops = orderIds
+    .map((id) => stopsById.get(id))
+    .filter((s): s is RouteStopView => s !== undefined);
 
   /* Where the day actually starts/ends (0040): Juan's override if he picked
      one at either end, else the chain default for start / the waypoint for
@@ -1070,6 +1169,35 @@ export function RoutePanel({
     return shownLegs.slice(start ? 1 : 0, shownLegs.length - (end ? 1 : 0))[i - 1] ?? null;
   };
 
+  // A drive leg belongs to a PAIR of adjacent stops, keyed here by that pair's
+  // ids rather than by position. During a drag, the visual order can put two
+  // stops next to each other the router was never asked about; looked up by
+  // id, that pair simply has no entry and the row falls back to its
+  // straight-line hop (see the render loop) -- correct, not a stale number
+  // attached to the wrong pair, and never a fabricated one either.
+  const legByPair = useMemo(() => {
+    const m = new Map<string, DriveLeg>();
+    stops.forEach((s, i) => {
+      if (i === 0) return;
+      const leg = legBetween(i);
+      if (leg) m.set(`${stops[i - 1].id}:${s.id}`, leg);
+    });
+    return m;
+    // legBetween closes over shownLegs/start/end; stops is the real dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stops, shownLegs]);
+
+  // Same reasoning, keyed by id: a stop's own arrival/leave clock is always
+  // attributable to that stop no matter where the drag has visually moved it
+  // to, even if the minutes themselves are a beat behind the new order until
+  // the drop recomputes them.
+  const scheduleById = useMemo(() => {
+    if (!schedule) return null;
+    const m = new Map<string, ScheduleRow>();
+    stops.forEach((s, i) => m.set(s.id, schedule.rows[i]));
+    return m;
+  }, [schedule, stops]);
+
   const driveMinutes = shownLegs ? shownLegs.reduce((s, l) => s + l.minutes, 0) : null;
   const driveMiles = shownLegs ? shownLegs.reduce((s, l) => s + l.miles, 0) : null;
   const endLabel = end?.label ?? "Home";
@@ -1123,8 +1251,13 @@ export function RoutePanel({
         {header}
         <DayTabs days={days} active={activeDay} onSelect={onSelectDay} />
         {callsSection}
-        {dayBar}
-        <div className="mt-2">
+        {/* ADD A CLIENT / ADD A STOP, between Calls and the Leave-at bar
+            (Juan's ask 2026-09-23): the two stacked rows sit here in both the
+            empty-day and has-stops layouts, so the position never moves
+            depending on whether anything is planned yet. No heading above
+            them -- see AddStopForm's own comment for why the client and stop
+            arms are two rows rather than one button with tabs. */}
+        <div className="mb-2">
           <AddStopForm
             onAdd={onAddCustomStop}
             accounts={accounts}
@@ -1132,6 +1265,7 @@ export function RoutePanel({
             onAddAccount={onAddAccount}
           />
         </div>
+        {dayBar}
       </>
     );
   }
@@ -1152,6 +1286,17 @@ export function RoutePanel({
       <DayTabs days={days} active={activeDay} onSelect={onSelectDay} />
 
       {callsSection}
+
+      {/* ADD A CLIENT / ADD A STOP, between Calls and the Leave-at bar (Juan's
+          ask 2026-09-23), same position as the empty-day layout above. */}
+      <div className="mb-2">
+        <AddStopForm
+          onAdd={onAddCustomStop}
+          accounts={accounts}
+          inRoute={inRoute}
+          onAddAccount={onAddAccount}
+        />
+      </div>
 
       {dayBar}
 
@@ -1191,359 +1336,45 @@ export function RoutePanel({
             )}
           </div>
         )}
-        <ul ref={listRef} className="divide-y divide-[#EEECE3]">
-          {stops.map((s, i) => {
-            const prev = i > 0 ? stops[i - 1] : null;
+        <Reorder.Group
+          as="ul"
+          axis="y"
+          values={orderIds}
+          onReorder={setOrderIds}
+          className="divide-y divide-[#EEECE3]"
+        >
+          {displayStops.map((s, i) => {
+            const prev = i > 0 ? displayStops[i - 1] : null;
             const a = s.type === "account" ? s.account : null;
             const c = s.type === "custom" ? s.custom : null;
             const title = a ? a.name : c!.label;
             const isDone = done.has(s.id);
-            // CONTROLS DROP TO THEIR OWN ROW ON A PHONE. Five buttons beside
-            // the text left the name as "DIRECTLY FR..." and the address as
-            // "621 RUSHING C..." in Juan's 2026-08-05 screenshot, which is a
-            // stop you cannot identify next to controls you do not need until
-            // you have. Below sm the text gets the full width and the buttons
-            // sit under it, right-aligned.
-            //
-            // THE INSERTION LINE (2026-08-25): while a drag is live, the row
-            // at drag.dropIndex gets a top border and the dragged row itself
-            // dims, rather than reflowing the whole list on every pointer
-            // move -- see the drag handlers above for why.
-            const dropBefore = drag && drag.dropIndex === i && drag.id !== s.id;
-            const dropAtEnd = drag && drag.dropIndex === stops.length && i === stops.length - 1;
+            const leg = prev ? legByPair.get(`${prev.id}:${s.id}`) ?? null : null;
             return (
-              <li
+              <StopRow
                 key={s.id}
-                data-stop-id={s.id}
-                // flex-wrap (2026-08-30): the button cluster below (drag,
-                // done, top, up, down, day-move, locate, GO, remove) is
-                // shrink-0 -- it never gets narrower -- so on a route column
-                // too skinny to hold both it and the stop's own text on one
-                // line, it now drops to its own line under the text instead
-                // of forcing the row past the column's width.
-                className={`flex flex-col flex-wrap gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3 ${
-                  drag?.id === s.id ? "opacity-40" : isDone ? "opacity-50" : ""
-                } ${dropBefore ? "border-t-2 border-[#2C6A46]" : ""} ${
-                  dropAtEnd ? "border-b-2 border-[#2C6A46]" : ""
-                }`}
-              >
-                <div className="flex min-w-0 flex-1 items-start gap-3">
-                {/* An amber square for a lunch or hotel stop, the same shape and
-                    colour it gets on the map, so the list and the map agree at a
-                    glance about which stops are not accounts. Done (0042) swaps
-                    the position number for a checkmark -- the fact that a stop
-                    is #4 stops mattering the moment it's crossed off. */}
-                <div className="flex shrink-0 flex-col items-center gap-1">
-                  <span
-                    className={`mt-0.5 flex h-6 w-6 items-center justify-center text-[11.5px] font-semibold tabular-nums text-[#F7F6F1] ${
-                      c ? "rounded-[4px] bg-[#A0762C]" : "rounded-full bg-[#14201B]"
-                    }`}
-                  >
-                    {isDone ? <Ico name="check" size={12} /> : i + 1}
-                  </span>
-                  {/* When he is there, in the column he is already scanning for
-                      "which stop is this". Absent, not zeroed, when the router
-                      could not answer. */}
-                  {schedule && (
-                    <span className="whitespace-nowrap text-[10.5px] leading-tight tabular-nums text-[#8A928C]">
-                      {clock(schedule.rows[i].arrive)}
-                    </span>
-                  )}
-                  {/* A STATED TIME, and it is a control, not a caption (0065).
-                      The day is built around it: the schedule above holds this
-                      stop at this clock and starts the next leg from it. Tap it
-                      to change it, clear it to hand the stop back to the
-                      ordering. Amber when the drive cannot make it, because a
-                      route that quietly printed the stated time for a stop it
-                      reaches forty minutes later would be inventing the one
-                      number Juan plans around. */}
-                  {stopTimes[s.id] && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const next = window.prompt(
-                          "Stated time for this stop (HH:MM). Leave empty to clear it.",
-                          stopTimes[s.id],
-                        );
-                        if (next === null) return;
-                        const trimmed = next.trim();
-                        if (!trimmed) return onSetStopTime(s.id, null);
-                        if (/^([01]\d|2[0-3]):[0-5]\d$/.test(trimmed)) onSetStopTime(s.id, trimmed);
-                      }}
-                      title={
-                        schedule?.missedAnchors.includes(s.id)
-                          ? `Asked for ${stopTimes[s.id]}, but this order gets there at ${clock(schedule.rows[i].arrive)}`
-                          : `Anchored at ${stopTimes[s.id]}. Tap to change or clear.`
-                      }
-                      className={`whitespace-nowrap rounded px-1 py-0.5 text-[10px] font-medium tabular-nums ${
-                        schedule?.missedAnchors.includes(s.id)
-                          ? "bg-[#F6E4DF] text-[#8A3B2E]"
-                          : "bg-[#F3E3C6] text-[#8A6D2F]"
-                      }`}
-                    >
-                      {stopTimes[s.id]}
-                    </button>
-                  )}
-                </div>
-
-                {/* min-w-[10rem] not min-w-0 (2026-08-31): min-w-0 let this
-                    shrink all the way to nothing instead of ever wrapping the
-                    button cluster onto its own line -- flex-wrap only kicks
-                    in once a child truly can't shrink any further, and a
-                    flex-1 item with no floor can always "fit" by crushing the
-                    stop's name down to a couple of letters. 160px is enough
-                    for a truncated name to still read as a name. */}
-                <div className="min-w-[10rem] flex-1">
-                  {c ? (
-                    <>
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                        <span className={`truncate text-[14px] font-medium leading-snug ${isDone ? "line-through" : ""}`}>
-                          {c.label}
-                        </span>
-                        <span className="rounded bg-[#F6EEDD] px-1.5 py-0.5 text-[10.5px] font-medium uppercase tracking-wide text-[#7A5A1E]">
-                          {CUSTOM_STOP_LABEL[c.kind]}
-                        </span>
-                        {/* Lunch is the one stop whose length is not the dwell
-                            everything else uses, so it says how long it is. */}
-                        {schedule && schedule.rows[i].stay > 0 && c.kind !== "stop" && (
-                          <span className="text-[11.5px] tabular-nums text-[#8A928C]">
-                            {clock(schedule.rows[i].arrive)}-{clock(schedule.rows[i].leave)}
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-0.5 truncate text-[12.5px] text-[#5B6560]">{c.address}</div>
-                    </>
-                  ) : (
-                  <>
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                    <AccountLink
-                      id={a!.id}
-                      className={`truncate text-[14px] font-medium leading-snug hover:underline ${isDone ? "line-through" : ""}`}
-                    >
-                      {a!.name}
-                    </AccountLink>
-                    {a!.tier && <TierChip tier={a!.tier} scale="hq" />}
-                  </div>
-                  <div className="mt-0.5 truncate text-[12.5px] text-[#5B6560]">
-                    {a!.street}
-                    {a!.city ? `, ${a!.city}` : ""}
-                  </div>
-
-                  {/* THE TRADING FACTS, Juan's ask 2026-08-05: last order, what
-                      they spent over twelve months and on what, and lifetime.
-                      Each one is omitted when it is unknown rather than shown
-                      as a zero, because "$0 in 12m" and "we hold no orders for
-                      this account" are different sentences and only one of them
-                      is true here. 313 of the 459 accounts have no loaded order
-                      history at all, so the empty case is the common case. */}
-                  <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[12px] text-[#5B6560]">
-                    {a!.last_order_at ? (
-                      <span>
-                        last order{" "}
-                        <span className="font-medium text-[#3D4A44]">
-                          {monthYear(a!.last_order_at)}
-                        </span>
-                      </span>
-                    ) : (
-                      <span className="text-[#A9AFA9]">never ordered</span>
-                    )}
-                    {a!.trailing_12m_revenue !== null && (
-                      <span>
-                        12m{" "}
-                        <span className="font-medium tabular-nums text-[#3D4A44]">
-                          {usd(a!.trailing_12m_revenue)}
-                        </span>
-                      </span>
-                    )}
-                    {a!.lifetime_revenue !== null && (
-                      <span>
-                        lifetime{" "}
-                        <span className="font-medium tabular-nums text-[#3D4A44]">
-                          {usd(a!.lifetime_revenue)}
-                        </span>
-                      </span>
-                    )}
-                    {/* 12m category when they have bought this year, else the
-                        lifetime one marked as historic, so "Dietary Supplement"
-                        never silently means "back in 2024". */}
-                    {a!.top_category_12m ? (
-                      <span className="font-medium text-[#2C6A46]">{a!.top_category_12m}</span>
-                    ) : a!.top_category_lifetime ? (
-                      <span className="text-[#8A928C]">
-                        {a!.top_category_lifetime} <span className="text-[#A9AFA9]">(historic)</span>
-                      </span>
-                    ) : (
-                      <span className="text-[#A9AFA9]">no orders on file</span>
-                    )}
-                  </div>
-
-                  {/* HUBSPOT, SITE, PHONE ON EVERY STOP (Juan, 2026-08-05).
-                      A stop is decided at the curb: the portal record for what
-                      HQ knows, the site for what they sell, the number for
-                      "are you open / is the buyer in today". All three were a
-                      tap-through into the profile before this, which is the one
-                      thing a phone in a car should not have to do. */}
-                  <ReachLinks
-                    className="mt-1"
-                    hubspotId={a!.hubspot_company_id}
-                    website={a!.website}
-                    phone={a!.phone}
-                  />
-                  </>
-                  )}
-
-                  {/* The leg in, then the window. Falls back to the original
-                      straight-line hop whenever the router gave us nothing, so
-                      the row never goes blank and never claims a drive time it
-                      does not have. */}
-                  {prev &&
-                    (legBetween(i) ? (
-                      <div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-[#8A928C]">
-                        {/* The same band the map draws this leg in (traffic.ts),
-                            so the two panes of the dashboard describe one day
-                            rather than two. A dot, not a word: the row already
-                            carries the exact minutes right beside it. */}
-                        <span
-                          aria-hidden
-                          title={BAND_STYLE[driveBand(legBetween(i)!.minutes)].title}
-                          className="inline-block h-2 w-2 shrink-0 rounded-full ring-1 ring-[#14201B]/40"
-                          style={{ backgroundColor: BAND_STYLE[driveBand(legBetween(i)!.minutes)].color }}
-                        />
-                        <span>
-                          <span className="tabular-nums">{duration(legBetween(i)!.minutes)}</span>{" "}
-                          drive ·{" "}
-                          <span className="tabular-nums">{legBetween(i)!.miles.toFixed(1)} mi</span>{" "}
-                          from stop {i}
-                          {driveBand(legBetween(i)!.minutes) === "walk" && (
-                            <span className="ml-1 font-medium text-[#2C6A46]">walkable</span>
-                          )}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="mt-0.5 text-[12px] text-[#8A928C]">
-                        <span className="tabular-nums">{haversineMiles(prev, s).toFixed(1)} mi</span>{" "}
-                        straight-line from stop {i}
-                      </div>
-                    ))}
-                </div>
-                </div>
-
-                <div className="flex shrink-0 items-center justify-end gap-1">
-                  {/* DRAG HANDLE (2026-08-25), first in the row so it sits
-                      right against the stop's own text rather than among the
-                      tap targets: grab and drop anywhere in the list, no
-                      per-position tap count. Alongside the chevrons below,
-                      not instead of them -- see the drag-state comment above
-                      for why both stay. touchAction: none stops the page
-                      itself from scrolling while a finger is mid-drag. */}
-                  <button
-                    type="button"
-                    onPointerDown={(e) => handleGripDown(e, s.id, i)}
-                    onPointerMove={handleGripMove}
-                    onPointerUp={handleGripUp}
-                    onPointerCancel={() => setDrag(null)}
-                    aria-label={`Drag ${title} to reorder`}
-                    style={{ touchAction: "none" }}
-                    className="cursor-grab rounded-md border border-[#E2DFD5] bg-white px-2 py-2 text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] active:cursor-grabbing"
-                  >
-                    <Ico name="grip" size={13} />
-                  </button>
-                  {/* DONE (0042, 2026-08-26): crosses the stop off without
-                      removing it, so the mileage/finish clock above still
-                      reflects the whole day, not just what's left. Toggle,
-                      not a one-way mark, so a mis-tap costs one more tap. */}
-                  <button
-                    type="button"
-                    onClick={() => onToggleDone(s.id)}
-                    aria-label={isDone ? `Mark ${title} not done` : `Mark ${title} done`}
-                    aria-pressed={isDone}
-                    className={`rounded-md border px-2 py-2 transition-colors ${
-                      isDone
-                        ? "border-[#2C6A46] bg-[#2C6A46] text-white hover:opacity-90"
-                        : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
-                    }`}
-                  >
-                    <Ico name="check" size={13} />
-                  </button>
-                  {/* MOVE TO TOP (2026-08-21): a stop found deep on the
-                      ten-closest list otherwise costs one tap of the chevron
-                      per position to become the day's first door. Same
-                      disabled-at-the-top rule as the single-step button next
-                      to it, since "move to top" from the top is a no-op. */}
-                  <button
-                    type="button"
-                    onClick={() => onMoveToTop(s.id)}
-                    disabled={i === 0}
-                    aria-label={`Move ${title} to the top of the route`}
-                    className="rounded-md border border-[#E2DFD5] bg-white px-2 py-2 text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] disabled:cursor-not-allowed disabled:opacity-30"
-                  >
-                    <Ico name="chevrons-up" size={13} />
-                  </button>
-                  {/* Up/down rather than drag: this is used one-handed in a
-                      parked car, where a 44px button beats a drag target. */}
-                  <button
-                    type="button"
-                    onClick={() => onMove(s.id, -1)}
-                    disabled={i === 0}
-                    aria-label={`Move ${title} earlier`}
-                    className="rounded-md border border-[#E2DFD5] bg-white px-2 py-2 text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] disabled:cursor-not-allowed disabled:opacity-30"
-                  >
-                    <Ico name="chevron-up" size={13} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onMove(s.id, 1)}
-                    disabled={i === stops.length - 1}
-                    aria-label={`Move ${title} later`}
-                    className="rounded-md border border-[#E2DFD5] bg-white px-2 py-2 text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] disabled:cursor-not-allowed disabled:opacity-30"
-                  >
-                    <Ico name="chevron-down" size={13} />
-                  </button>
-                  {/* MOVE TO A DAY (2026-08-25): was a plain postpone-to-
-                      tomorrow button, now opens a picker over the whole
-                      horizon -- see DayMoveMenu. Hidden rather than disabled
-                      on a single-day horizon, since there is nowhere for it
-                      to open onto. */}
-                  {days.length > 1 && (
-                    <DayMoveMenu
-                      days={days}
-                      active={activeDay}
-                      onPick={(day) => onMoveStopDay(s.id, day)}
-                      label={`Move ${title} to a day`}
-                      icon="chevrons-right"
-                    />
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => onShowInMap(s.id)}
-                    aria-label={`Show ${title} on the map`}
-                    className="rounded-md border border-[#E2DFD5] bg-white px-2 py-2 text-[#3D4A44] transition-colors hover:bg-[#FAF9F5]"
-                  >
-                    <Ico name="locate" size={13} />
-                  </button>
-                  <a
-                    href={appleMapsUrl({
-                      address: c ? c.address : fullAddress(a!),
-                      lat: s.lat,
-                      lng: s.lng,
-                    })}
-                    className="rounded-md bg-[#2C6A46] px-3 py-2 text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90"
-                  >
-                    GO
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => onRemove(s.id)}
-                    aria-label={`Remove ${title} from the route`}
-                    className="rounded-md border border-[#E2DFD5] bg-white px-2 py-2 text-[#8A928C] transition-colors hover:border-[#D8B3AC] hover:bg-[#FBF4F2] hover:text-[#B5372A]"
-                  >
-                    <Ico name="close" size={13} />
-                  </button>
-                </div>
-              </li>
+                stop={s}
+                index={i}
+                prevStop={prev}
+                title={title}
+                isDone={isDone}
+                scheduleRow={scheduleById?.get(s.id) ?? null}
+                missedAnchor={schedule?.missedAnchors.includes(s.id) ?? false}
+                stopTime={stopTimes[s.id]}
+                onSetStopTime={onSetStopTime}
+                leg={leg}
+                onToggleDone={onToggleDone}
+                onShowInMap={onShowInMap}
+                onRemove={onRemove}
+                days={days}
+                activeDay={activeDay}
+                onMoveStopDay={onMoveStopDay}
+                onRowDragStart={handleRowDragStart}
+                onRowDragEnd={handleRowDragEnd}
+              />
             );
           })}
-        </ul>
+        </Reorder.Group>
 
         {/* The drive back, for the same reason the drive out is there: the day
             is not over when the last door closes. Read-only, same as the
@@ -1559,15 +1390,6 @@ export function RoutePanel({
             </span>
           </div>
         )}
-      </div>
-
-      <div className="mt-2">
-        <AddStopForm
-          onAdd={onAddCustomStop}
-          accounts={accounts}
-          inRoute={inRoute}
-          onAddAccount={onAddAccount}
-        />
       </div>
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">

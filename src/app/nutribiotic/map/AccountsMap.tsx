@@ -58,7 +58,7 @@ import { BAND_STYLE, driveBand } from "./traffic";
  * decision. Tapping again after it lands can only be a mis-tap, so the control
  * becomes a statement, exactly like "On the route" above it.
  */
-const SDR_PRIORITIES: { value: SdrPriority; label: string; tone: string }[] = [
+export const SDR_PRIORITIES: { value: SdrPriority; label: string; tone: string }[] = [
   { value: "low", label: "Low", tone: "bg-[#ECEAE1] text-[#5B6560] hover:bg-[#E2DFD5]" },
   { value: "mid", label: "Mid", tone: "bg-[#E7EDE4] text-[#3D6B4A] hover:bg-[#DCE6D8]" },
   { value: "high", label: "High", tone: "bg-[#F3E3C6] text-[#8A6D2F] hover:bg-[#EDD8AD]" },

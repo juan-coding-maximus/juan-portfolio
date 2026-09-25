@@ -31,6 +31,8 @@ import {
 } from "../lib/prefs-actions";
 import { useRoute } from "../lib/route-context";
 import { AccountsMap, type AccountPriority } from "./AccountsMap";
+import { AddPlaceSheet } from "./AddPlaceSheet";
+import type { ClientSearchAccount } from "./ClientSearchField";
 import { routeDriveMatrix, type DriveLeg } from "./drive-actions";
 import { cheapestGap, haversineMatrix, optimizedStopOrder, type Matrix } from "./route-optimize";
 import { RoutePanel } from "./RoutePanel";
@@ -126,8 +128,6 @@ export function MapScreen({
     addToRouteOnDay,
     addCustomStop,
     removeFromRoute,
-    moveInRoute,
-    moveToTop,
     reorderRoute,
     moveStopToDay,
     clearRoute,
@@ -285,6 +285,15 @@ export function MapScreen({
   async function costMatrix(points: { lat: number; lng: number }[]): Promise<Matrix> {
     const live = await routeDriveMatrix(points).catch(() => null);
     return live ?? haversineMatrix(points);
+  }
+
+  // Shared by RoutePanel's "Add a client" row and the map's own "+"
+  // (AddPlaceSheet): a client picked by name goes through the exact same
+  // smart-insert path a pin's "Add to route" uses, so there is one add-a-
+  // client action on this screen, not two that could disagree on where a
+  // stop lands.
+  function addAccountToRoute(a: ClientSearchAccount) {
+    void handleAddToRoute(a.id, a.lat, a.lng);
   }
 
   async function handleAddToRoute(id: string, lat: number, lng: number) {
@@ -556,8 +565,6 @@ export function MapScreen({
         end={activeEnd}
         onChangeStart={editStart}
         onChangeEnd={editEnd}
-        onMove={moveInRoute}
-        onMoveToTop={moveToTop}
         onReorder={reorderRoute}
         onRemove={removeFromRoute}
         onClear={clearRoute}
@@ -570,7 +577,7 @@ export function MapScreen({
            a stop added by name and a stop added by pin are the same stop. */
         accounts={accounts}
         inRoute={inRoute}
-        onAddAccount={(a) => handleAddToRoute(a.id, a.lat, a.lng)}
+        onAddAccount={addAccountToRoute}
         calls={calls}
         onAddCall={addCall}
         onRemoveCall={removeCall}
@@ -588,6 +595,20 @@ export function MapScreen({
         onLegsChange={setRouteLegs}
       />
       </div>
+
+      {/* The map's own "+" (2026-09-24), replacing the global QuickCapture
+          button here -- see lib/QuickCapture.tsx's suppressed list. Standing
+          on the map the thing worth one tap is a new place on a route or the
+          SDR queue, not logging a visit that already happened. */}
+      <AddPlaceSheet
+        accounts={accounts}
+        inRoute={inRoute}
+        days={days}
+        activeDay={activeDay}
+        onSelectDay={setActiveDay}
+        onAddAccount={addAccountToRoute}
+        onAddCustomStop={handleAddCustomStop}
+      />
     </div>
   );
 }

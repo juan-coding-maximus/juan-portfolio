@@ -50,13 +50,18 @@ const TouchpointCapture = dynamic(
  * /visit already IS the box, so a button that opens the box on top of the box
  * is noise. The promo routes are the buyer's surface, rendered bare on
  * purpose, and nothing belonging to the rep's own tooling goes on a screen a
- * customer is looking at. /gate is pre-session.
+ * customer is looking at. /gate is pre-session. /map has its own "+"
+ * (MapScreen's AddPlaceSheet, 2026-09-24): standing on the map the thing
+ * worth one tap is a new place on a route or the SDR queue, not a logged
+ * visit, so this button steps aside there rather than sitting underneath a
+ * second one in the same corner.
  */
 function suppressed(pathname: string): boolean {
   return (
     pathname === "/nutribiotic/visit" ||
     pathname === "/nutribiotic/gate" ||
-    pathname.startsWith("/nutribiotic/promo")
+    pathname.startsWith("/nutribiotic/promo") ||
+    pathname.startsWith("/nutribiotic/map")
   );
 }
 
