@@ -122,10 +122,10 @@ export function MapScreen({
     activeDay,
     setActiveDay,
     addToRoute,
+    stopDayById,
+    addToRouteOnDay,
     addCustomStop,
     removeFromRoute,
-    moveInRoute,
-    moveToTop,
     reorderRoute,
     moveStopToDay,
     clearRoute,
@@ -306,6 +306,21 @@ export function MapScreen({
       addToRoute(id);
     } finally {
       setRouteBusy(false);
+    }
+  }
+
+  /* A pin's day-button row (AddToRouteDayPicker, AccountsMap.tsx) names the
+     exact day, not just "add now": today keeps the cheapest-insertion drive-
+     time ordering above, since that's the day whose stop order actually gets
+     driven; any other day on the horizon is a plan for later, so it just
+     lands on the end of that day's list (route-context.tsx's own
+     addToRouteOnDay, the same append AddToRoutePicker on the account profile
+     already uses). */
+  function handleAddToRouteOnDay(id: string, day: string, lat: number, lng: number) {
+    if (day === activeDay) {
+      void handleAddToRoute(id, lat, lng);
+    } else {
+      addToRouteOnDay(id, day);
     }
   }
 
@@ -506,8 +521,9 @@ export function MapScreen({
           onToggleShowPractices={togglePractices}
           showProspects={showProspects}
           onToggleShowProspects={toggleProspects}
-          onAddToRoute={handleAddToRoute}
-          inRoute={inRoute}
+          onAddToRouteOnDay={handleAddToRouteOnDay}
+          days={days}
+          stopDayById={stopDayById}
           customStops={customStops}
           routeStops={routeStops}
           routeStart={routeStart}
@@ -538,8 +554,6 @@ export function MapScreen({
         end={activeEnd}
         onChangeStart={editStart}
         onChangeEnd={editEnd}
-        onMove={moveInRoute}
-        onMoveToTop={moveToTop}
         onReorder={reorderRoute}
         onRemove={removeFromRoute}
         onClear={clearRoute}

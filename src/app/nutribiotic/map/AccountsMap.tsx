@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { GoogleMap, MarkerF, InfoWindowF, PolygonF, PolylineF, useLoadScript } from "@react-google-maps/api";
 import type { CustomStop, MapAccount, SdrPriority, TerritoryArea, Tier } from "../lib/dal";
 import { listAreaBoundaries } from "../lib/area-actions";
-import { laTodayIso } from "../lib/field-week";
+import { dayLabel } from "../lib/field-week";
 import { AccountLink } from "../lib/modal";
 import { addAccountToSdr } from "../lib/sdr-actions";
 import { appleMapsUrl, CUSTOM_STOP_LABEL, Ico, ReachLinks, realChannel, money } from "../lib/ui";
@@ -64,18 +64,65 @@ const SDR_PRIORITIES: { value: SdrPriority; label: string; tone: string }[] = [
   { value: "high", label: "High", tone: "bg-[#F3E3C6] text-[#8A6D2F] hover:bg-[#EDD8AD]" },
 ];
 
-function AddToSdr({ accountId }: { accountId: string }) {
+/**
+ * A day off the horizon as one tap: today first and made the prominent one
+ * (it's the day a rep is most often queuing for), the rest of the ten-day
+ * horizon after it as small chips (Juan, 2026-09-24: no confirm step behind
+ * either size, a tap on a day IS the commit). Shared by the route button and
+ * the SDR button below so "add, then say which day" reads the same both
+ * places on the same card.
+ */
+function DayButtons({
+  days,
+  onPick,
+  disabled,
+}: {
+  days: string[];
+  onPick: (day: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      <button
+        type="button"
+        onClick={() => onPick(days[0])}
+        disabled={disabled}
+        className="rounded-md bg-[#2C6A46] px-3 py-2 text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+      >
+        Today
+      </button>
+      {days.slice(1).map((d) => {
+        const { weekday, short } = dayLabel(d);
+        return (
+          <button
+            key={d}
+            type="button"
+            onClick={() => onPick(d)}
+            disabled={disabled}
+            className="rounded-md border border-[#E2DFD5] bg-white px-1.5 py-1 text-[10.5px] font-medium text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] disabled:opacity-40"
+          >
+            {weekday} {short}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function AddToSdr({ accountId, days }: { accountId: string; days: string[] }) {
   const [open, setOpen] = useState(false);
-  const [queued, setQueued] = useState<SdrPriority | null>(null);
+  const [priority, setPriority] = useState<SdrPriority | null>(null);
+  const [queued, setQueued] = useState<{ priority: SdrPriority; day: string } | null>(null);
   const [failReason, setFailReason] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  function queue(priority: SdrPriority) {
+  function queue(day: string) {
+    if (!priority) return;
     setFailReason(null);
     startTransition(async () => {
-      const res = await addAccountToSdr(accountId, priority, laTodayIso());
+      const res = await addAccountToSdr(accountId, priority, day);
       if (res.ok) {
-        setQueued(priority);
+        setQueued({ priority, day });
         setOpen(false);
       } else {
         // Never a silent success. The row either exists or it does not, and a
@@ -89,31 +136,18 @@ function AddToSdr({ accountId }: { accountId: string }) {
   }
 
   if (queued) {
+    const { weekday, short } = dayLabel(queued.day);
     return (
       <div className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-md bg-[#EEECE3] px-3 py-2 text-[12.5px] font-semibold text-[#5B6560]">
         <Ico name="check" size={13} />
-        In the SDR queue · {queued}
+        In the SDR queue · {queued.priority} · {weekday} {short}
       </div>
     );
   }
 
-  return (
-    <div className="mt-1.5">
-      {open ? (
-        <div className="flex items-center gap-1">
-          {SDR_PRIORITIES.map((p) => (
-            <button
-              key={p.value}
-              type="button"
-              onClick={() => queue(p.value)}
-              disabled={pending}
-              className={`flex-1 rounded-md px-2 py-2 text-[12px] font-semibold transition-colors disabled:opacity-40 ${p.tone}`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      ) : (
+  if (!open) {
+    return (
+      <div className="mt-1.5">
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -122,10 +156,101 @@ function AddToSdr({ accountId }: { accountId: string }) {
           <Ico name="phone" size={13} />
           Add to SDR
         </button>
-      )}
+        {failReason && (
+          <div className="mt-1 text-[11.5px] text-[#8A2E2E]">Not scheduled: {failReason}</div>
+        )}
+      </div>
+    );
+  }
+
+  // Priority first, then the day it's for (2026-09-24): "who's this worth
+  // calling" is the judgement migration 0064 requires before anything lands
+  // in the queue, so it stays the first tap; the day buttons only appear
+  // once that's answered.
+  if (!priority) {
+    return (
+      <div className="mt-1.5 flex items-center gap-1">
+        {SDR_PRIORITIES.map((p) => (
+          <button
+            key={p.value}
+            type="button"
+            onClick={() => setPriority(p.value)}
+            className={`flex-1 rounded-md px-2 py-2 text-[12px] font-semibold transition-colors ${p.tone}`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-1.5">
+      <DayButtons days={days} onPick={queue} disabled={pending} />
       {failReason && (
         <div className="mt-1 text-[11.5px] text-[#8A2E2E]">Not scheduled: {failReason}</div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Add to route, day buttons in place of the old one-tap button (2026-09-24):
+ * a pin answers "should I go here", and now also "which day", in the same two
+ * taps AddToSdr above already uses. Today keeps its own cheapest-insertion
+ * ordering (onPick routes it back through handleAddToRoute in MapScreen when
+ * the picked day is the active one); any other day on the horizon just
+ * appends, same as the account profile's own day picker.
+ */
+function AddToRouteDay({
+  accountId,
+  lat,
+  lng,
+  days,
+  scheduledDay,
+  onPick,
+}: {
+  accountId: string;
+  lat: number;
+  lng: number;
+  days: string[];
+  scheduledDay: string | null;
+  onPick: (id: string, day: string, lat: number, lng: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (scheduledDay) {
+    const { weekday, short } = dayLabel(scheduledDay);
+    return (
+      <div className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md bg-[#EEECE3] px-3 py-2 text-[12.5px] font-semibold text-[#5B6560]">
+        <Ico name="check" size={13} />
+        On the route · {weekday} {short}
+      </div>
+    );
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md bg-[#2C6A46] px-3 py-2 text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90"
+      >
+        <Ico name="route" size={13} />
+        Add to route
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-2">
+      <DayButtons
+        days={days}
+        onPick={(day) => {
+          onPick(accountId, day, lat, lng);
+          setOpen(false);
+        }}
+      />
     </div>
   );
 }
@@ -293,8 +418,9 @@ export function AccountsMap({
   onToggleShowPractices,
   showProspects,
   onToggleShowProspects,
-  onAddToRoute,
-  inRoute,
+  onAddToRouteOnDay,
+  days,
+  stopDayById,
   customStops,
   routeStops,
   routeStart,
@@ -322,8 +448,17 @@ export function AccountsMap({
    *  HubSpot company/tier yet, hidden by default same as showChains. */
   showProspects: boolean;
   onToggleShowProspects: () => void;
-  onAddToRoute: (id: string, lat: number, lng: number) => void;
-  inRoute: Set<string>;
+  /** A pin's day-button row (AddToRouteDay, below), 2026-09-24: names the
+   *  exact day, today or any other on the horizon. MapScreen keeps today's
+   *  own cheapest-insertion ordering for that case internally; any other
+   *  day just appends. */
+  onAddToRouteOnDay: (id: string, day: string, lat: number, lng: number) => void;
+  /** The rolling ten-day planning horizon, days[0] is today (field-week.ts),
+   *  for the pin card's day buttons. */
+  days: string[];
+  /** Which day (on the whole horizon, not just activeDay) an account is
+   *  already scheduled on, if any -- route-context.tsx's own map. */
+  stopDayById: Map<string, string>;
   /** The hand-built route, in Juan's order, same array RoutePanel numbers. */
   routeStops: RouteStopView[];
   /** Where the day starts/ends (0040): the waypoint by default, or whatever
@@ -1517,20 +1652,19 @@ export function AccountsMap({
                     becomes a statement rather than staying a live control:
                     tapping it again can only be a mis-tap, since a stop cannot
                     be visited twice in one run. Removing is the route panel's
-                    job, where the stop and its position are both visible. */}
-                <button
-                  type="button"
-                  onClick={() => onAddToRoute(selected.id, selected.lat, selected.lng)}
-                  disabled={inRoute.has(selected.id)}
-                  className={`mt-2 flex w-full items-center justify-center gap-1.5 rounded-md px-3 py-2 text-[12.5px] font-semibold transition-opacity ${
-                    inRoute.has(selected.id)
-                      ? "cursor-default bg-[#EEECE3] text-[#5B6560]"
-                      : "bg-[#2C6A46] text-white hover:opacity-90"
-                  }`}
-                >
-                  <Ico name={inRoute.has(selected.id) ? "check" : "route"} size={13} />
-                  {inRoute.has(selected.id) ? "On the route" : "Add to route"}
-                </button>
+                    job, where the stop and its position are both visible.
+                    Which day it lands on is the second tap (AddToRouteDay,
+                    below), 2026-09-24: a plain button only ever meant
+                    whichever day RoutePanel happened to have open. */}
+                <AddToRouteDay
+                  key={`route-${selected.id}`}
+                  accountId={selected.id}
+                  lat={selected.lat}
+                  lng={selected.lng}
+                  days={days}
+                  scheduledDay={stopDayById.get(selected.id) ?? null}
+                  onPick={onAddToRouteOnDay}
+                />
                 {/* The desk half of the same decision. A pin answers "is this
                     worth my time"; yes can mean a drive (above) or a call from
                     the desk (here), and until now only the drive had a button.
@@ -1542,7 +1676,7 @@ export function AccountsMap({
                     clean, which is the React way to say "this is a different
                     thing now" rather than resetting three pieces of state in
                     an effect. */}
-                <AddToSdr key={selected.id} accountId={selected.id} />
+                <AddToSdr key={selected.id} accountId={selected.id} days={days} />
                 <div className="mt-2">
                   <AccountLink
                     id={selected.id}
