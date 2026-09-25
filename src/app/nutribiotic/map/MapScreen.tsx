@@ -30,6 +30,7 @@ import {
   toggleShowProspectAccounts,
 } from "../lib/prefs-actions";
 import { useRoute } from "../lib/route-context";
+import type { ReturnSuggestion } from "../lib/return-suggestions";
 import { AccountsMap, type AccountPriority } from "./AccountsMap";
 import { AddPlaceSheet } from "./AddPlaceSheet";
 import type { ClientSearchAccount } from "./ClientSearchField";
@@ -60,6 +61,7 @@ export function MapScreen({
   initialShowProspects,
   schedulePrefs,
   endpointsByDay,
+  returnSuggestions,
 }: {
   accounts: MapAccount[];
   /** lib/priority.ts's score per account, computed server-side (see
@@ -78,6 +80,11 @@ export function MapScreen({
   initialShowProspects: boolean;
   schedulePrefs: RouteSchedulePrefs;
   endpointsByDay: { start: RouteEndpointsByDay; end: RouteEndpointsByDay };
+  /** lib/return-suggestions.ts's ranked "come back" list, computed
+   *  server-side off the same priority book and the pending route-planner
+   *  directives (see map/page.tsx). Handed straight to RoutePanel: this
+   *  component doesn't rank, same rule as priorityById above. */
+  returnSuggestions: ReturnSuggestion[];
 }) {
   const [loc, setLoc] = useState<UserLoc | null>(null);
   const [focus, setFocus] = useState<FocusRequest | null>(null);
@@ -578,6 +585,7 @@ export function MapScreen({
         accounts={accounts}
         inRoute={inRoute}
         onAddAccount={addAccountToRoute}
+        returnSuggestions={returnSuggestions}
         calls={calls}
         onAddCall={addCall}
         onRemoveCall={removeCall}

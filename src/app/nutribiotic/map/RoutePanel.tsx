@@ -39,12 +39,16 @@
  *      Nothing is stored, so a time can never disagree with the list above it.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Reorder, useDragControls } from "motion/react";
+import { draftAccountPitchFromReason, resolveReturnDirective } from "../lib/account-actions";
 import type { CallEntry, CustomStop, RouteEndpoint, RouteSchedulePrefs } from "../lib/dal";
+import { laTodayIso } from "../lib/field-week";
 import { appleMapsUrl, CUSTOM_STOP_LABEL, fullAddress, Ico, prettyPhone, ReachLinks, TierChip } from "../lib/ui";
 import { AccountLink } from "../lib/modal";
+import type { ReturnSuggestion } from "../lib/return-suggestions";
 import { useRoute } from "../lib/route-context";
+import { addAccountToSdr } from "../lib/sdr-actions";
 import { AddStopForm } from "./AddStopForm";
 import { CallSearchField } from "./CallSearchField";
 import type { ClientSearchAccount } from "./ClientSearchField";
@@ -239,6 +243,220 @@ function buildSchedule(
 function appleMapsRouteUrl(stops: { lat: number; lng: number }[]): string {
   const daddr = stops.map((s) => `${s.lat},${s.lng}`).join("+to:");
   return `https://maps.apple.com/?daddr=${daddr}`;
+}
+
+/** "2026-09-30T12:00:00-07:00" -> "Wed, Sep 30 · 12:00 PM", Los Angeles
+ *  wall-clock. Null on a timestamp that doesn't parse, never a guess. */
+function statedTimeLabel(iso: string): string | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString("en-US", {
+    timeZone: "America/Los_Angeles",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * Suggested returns (Juan, 2026-09-25): not another email-draft card, a
+ * ranked list of accounts worth going back to and why, sitting inside the
+ * route he is already building. Each row is one of two real facts --
+ * lib/return-suggestions.ts's own header says which -- never a model's guess
+ * at who to see next.
+ *
+ * THREE ACTIONS, EACH A DOOR THAT ALREADY EXISTS. Add to day calls the same
+ * onAddAccount the search field and a map pin already use, so a suggestion
+ * and a hand-picked stop go through one path. Add to SDR calls
+ * addAccountToSdr, the same action the map pin's own SDR card uses. Generate
+ * outbound calls composeAsk through draftAccountPitchFromReason, the same
+ * grounding gate draftAccountPitch holds itself to, just fed Juan's own typed
+ * reason instead of the profile's Gap Selling summary. Nothing here invents
+ * a fourth path.
+ *
+ * A DIRECTIVE ROW RESOLVES ITSELF ON ANY OF THE THREE. Whichever action Juan
+ * takes on a "come back" suggestion IS a human draining nb_directives'
+ * queue (migration 0058), so it is stamped `routed` the same way
+ * follow_through.py stamps one it routes on its own, and
+ * nutribiotic-route-planner will not offer the account again. A reorder
+ * suggestion has no directive row and nothing to resolve; it simply
+ * recomputes fresh next time the cadence math says so.
+ *
+ * THE ROW LEAVES ONLY AFTER IT SUCCEEDED. Add to SDR and Generate outbound
+ * are awaited and can fail (a scope refusal, a grounding refusal); the row
+ * stays and says why. Add to day is the one optimistic exception, matching
+ * the search field and the map pin it shares a path with, neither of which
+ * waits on the write either.
+ */
+function ReturnSuggestions({
+  suggestions,
+  accounts,
+  onAddAccount,
+}: {
+  suggestions: ReturnSuggestion[];
+  accounts: ClientSearchAccount[];
+  onAddAccount: (account: ClientSearchAccount) => void;
+}) {
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [successById, setSuccessById] = useState<Record<string, string>>({});
+  const [errorById, setErrorById] = useState<Record<string, string>>({});
+  const [whyOpenId, setWhyOpenId] = useState<string | null>(null);
+  const [why, setWhy] = useState("");
+  const [pending, startTransition] = useTransition();
+
+  const visible = suggestions.filter((s) => !hidden.has(s.accountId));
+
+  function settle(s: ReturnSuggestion, note: string) {
+    setSuccessById((m) => ({ ...m, [s.accountId]: note }));
+    if (s.directiveId) void resolveReturnDirective(s.directiveId, note);
+    setTimeout(() => {
+      setHidden((h) => new Set(h).add(s.accountId));
+    }, 900);
+  }
+
+  function addToDay(s: ReturnSuggestion) {
+    const account = accounts.find((a) => a.id === s.accountId);
+    if (!account) return;
+    setErrorById((m) => ({ ...m, [s.accountId]: "" }));
+    onAddAccount(account);
+    settle(s, "Added to today's route.");
+  }
+
+  function addToSdr(s: ReturnSuggestion) {
+    setErrorById((m) => ({ ...m, [s.accountId]: "" }));
+    startTransition(async () => {
+      const res = await addAccountToSdr(s.accountId, "mid", laTodayIso());
+      if (res.ok) settle(s, "Added to SDR, today.");
+      else setErrorById((m) => ({ ...m, [s.accountId]: res.error }));
+    });
+  }
+
+  function generateOutbound(s: ReturnSuggestion) {
+    const reason = why.trim();
+    if (!reason) return;
+    setErrorById((m) => ({ ...m, [s.accountId]: "" }));
+    startTransition(async () => {
+      const res = await draftAccountPitchFromReason(s.accountId, reason);
+      if (res.status === "not_written") {
+        setErrorById((m) => ({ ...m, [s.accountId]: res.reason }));
+        return;
+      }
+      window.open(`/nutribiotic/outbound?account=${s.accountId}`, "_blank", "noopener,noreferrer");
+      setWhyOpenId(null);
+      setWhy("");
+      settle(s, res.status === "already_queued" ? "Already queued." : "Drafted.");
+    });
+  }
+
+  if (visible.length === 0) return null;
+
+  return (
+    <div className="mb-3 overflow-hidden rounded-lg border border-[#E2DFD5] bg-white">
+      <div className="border-b border-[#EEECE3] px-4 py-2.5 text-[12.5px] font-semibold text-[#3D4A44]">
+        Suggested returns
+      </div>
+      <ul className="divide-y divide-[#EEECE3]">
+        {visible.map((s) => {
+          const account = accounts.find((a) => a.id === s.accountId);
+          if (!account) return null;
+          const time = s.statedTime ? statedTimeLabel(s.statedTime) : null;
+          const success = successById[s.accountId];
+          const error = errorById[s.accountId];
+          const busy = pending;
+          return (
+            <li key={s.accountId} className="flex flex-col gap-2 px-4 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <AccountLink id={account.id} className="text-[13.5px] font-medium text-[#14201B]">
+                      {account.name}
+                    </AccountLink>
+                    {account.city && <span className="text-[12px] text-[#8A928C]">{account.city}</span>}
+                  </div>
+                  <p className="mt-0.5 text-[12.5px] text-[#5B6560]">{s.reason}</p>
+                  {time && (
+                    <p className="mt-0.5 inline-flex items-center gap-1 text-[12px] font-medium text-[#2C6A46]">
+                      <Ico name="clock" size={11} />
+                      {time}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {success ? (
+                <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[#2C6A46]">
+                  <Ico name="check" size={13} />
+                  {success}
+                </span>
+              ) : whyOpenId === s.accountId ? (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <input
+                    value={why}
+                    onChange={(e) => setWhy(e.target.value)}
+                    placeholder="Why: what to say, what they asked for"
+                    autoFocus
+                    className="min-w-0 flex-1 rounded-md border border-[#E2DFD5] bg-[#FCFBF7] px-2.5 py-1.5 text-[12.5px] outline-none placeholder:text-[#A9AFA9] focus:border-[#8A928C]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => generateOutbound(s)}
+                    disabled={busy || !why.trim()}
+                    className="rounded-md bg-[#14201B] px-3 py-1.5 text-[12px] font-semibold text-[#F7F6F1] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {busy ? "Drafting..." : "Generate"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWhyOpenId(null);
+                      setWhy("");
+                    }}
+                    className="rounded-md px-2 py-1.5 text-[12px] font-medium text-[#8A928C] hover:text-[#3D4A44]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => addToDay(s)}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white px-2.5 py-1.5 text-[12px] font-medium text-[#3D4A44] transition-colors hover:bg-[#FAF9F5]"
+                  >
+                    <Ico name="pin" size={12} />
+                    Add to day
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addToSdr(s)}
+                    disabled={busy}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white px-2.5 py-1.5 text-[12px] font-medium text-[#3D4A44] transition-colors hover:bg-[#FAF9F5] disabled:opacity-40"
+                  >
+                    <Ico name="phone" size={12} />
+                    Add to SDR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWhyOpenId(s.accountId);
+                      setWhy("");
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-[#E2DFD5] bg-white px-2.5 py-1.5 text-[12px] font-medium text-[#3D4A44] transition-colors hover:bg-[#FAF9F5]"
+                  >
+                    <Ico name="mail" size={12} />
+                    Generate outbound
+                  </button>
+                </div>
+              )}
+              {error && <span className="text-[12px] text-[#B5372A]">{error}</span>}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
 }
 
 /**
@@ -961,6 +1179,7 @@ export function RoutePanel({
   accounts,
   inRoute,
   onAddAccount,
+  returnSuggestions,
   calls,
   onAddCall,
   onRemoveCall,
@@ -1014,6 +1233,10 @@ export function RoutePanel({
   /** Put an account on this day. Goes into route_draft as its nb_accounts.id,
    *  never as a copied address. */
   onAddAccount: (account: ClientSearchAccount) => void;
+  /** lib/return-suggestions.ts's ranked "come back" list, computed
+   *  server-side on the map page (2026-09-25). Rendered above the day's own
+   *  stops; each row's three actions are ReturnSuggestions' own concern. */
+  returnSuggestions: ReturnSuggestion[];
   /** This day's calls (0041): phone-only, no drive position. */
   calls: CallEntry[];
   onAddCall: (call: Omit<CallEntry, "id">) => void;
@@ -1250,6 +1473,7 @@ export function RoutePanel({
       <>
         {header}
         <DayTabs days={days} active={activeDay} onSelect={onSelectDay} />
+        <ReturnSuggestions suggestions={returnSuggestions} accounts={accounts} onAddAccount={onAddAccount} />
         {callsSection}
         {/* ADD A CLIENT / ADD A STOP, between Calls and the Leave-at bar
             (Juan's ask 2026-09-23): the two stacked rows sit here in both the
@@ -1284,6 +1508,8 @@ export function RoutePanel({
       )}
 
       <DayTabs days={days} active={activeDay} onSelect={onSelectDay} />
+
+      <ReturnSuggestions suggestions={returnSuggestions} accounts={accounts} onAddAccount={onAddAccount} />
 
       {callsSection}
 
