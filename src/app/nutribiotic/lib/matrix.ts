@@ -89,6 +89,37 @@ export type Urgency = {
  * account's OWN inter-order gaps, so it exists on a minority of the book and
  * is never stood in for by a global default).
  */
+/**
+ * The reorder-cycle fact alone, split out (2026-09-25) so a screen that only
+ * cares about "is this account due for a visit" -- the map's Suggested
+ * returns panel -- reads the exact same math and wording urgencyOf folds in
+ * below, rather than a second copy that could drift from it.
+ */
+export function reorderUrgencyOf(
+  a: Pick<PriorityInput, "last_order_at" | "expected_reorder_days">,
+  nowMs = Date.now(),
+): Urgency {
+  const sinceOrder = daysSince(a.last_order_at, nowMs);
+  if (!a.expected_reorder_days || sinceOrder === null) return { value: null, reason: "" };
+  const over = sinceOrder - a.expected_reorder_days;
+  if (over > a.expected_reorder_days) {
+    return {
+      value: URGENCY_LEVELS.reorderLate,
+      reason: `Reorder ${over}d late on its own ${a.expected_reorder_days}d cycle`,
+    };
+  }
+  if (over > 0) {
+    return {
+      value: URGENCY_LEVELS.reorderDue,
+      reason: `Reorder ${over}d overdue on its own ${a.expected_reorder_days}d cycle`,
+    };
+  }
+  return {
+    value: URGENCY_LEVELS.onCycle,
+    reason: `Reorder due in ${-over}d on its own ${a.expected_reorder_days}d cycle`,
+  };
+}
+
 export function urgencyOf(a: PriorityInput, nowMs = Date.now()): Urgency {
   const found: { value: number; reason: string }[] = [];
 
@@ -114,26 +145,8 @@ export function urgencyOf(a: PriorityInput, nowMs = Date.now()): Urgency {
     found.push({ value: URGENCY_LEVELS.readinessHot, reason: "Rep tagged this hot" });
   }
 
-  const sinceOrder = daysSince(a.last_order_at, nowMs);
-  if (a.expected_reorder_days && sinceOrder !== null) {
-    const over = sinceOrder - a.expected_reorder_days;
-    if (over > a.expected_reorder_days) {
-      found.push({
-        value: URGENCY_LEVELS.reorderLate,
-        reason: `Reorder ${over}d late on its own ${a.expected_reorder_days}d cycle`,
-      });
-    } else if (over > 0) {
-      found.push({
-        value: URGENCY_LEVELS.reorderDue,
-        reason: `Reorder ${over}d overdue on its own ${a.expected_reorder_days}d cycle`,
-      });
-    } else {
-      found.push({
-        value: URGENCY_LEVELS.onCycle,
-        reason: `Reorder due in ${-over}d on its own ${a.expected_reorder_days}d cycle`,
-      });
-    }
-  }
+  const reorder = reorderUrgencyOf(a, nowMs);
+  if (reorder.value !== null) found.push({ value: reorder.value, reason: reorder.reason });
 
   if (!found.length) return { value: null, reason: "" };
   const top = found.reduce((a2, b) => (b.value > a2.value ? b : a2));

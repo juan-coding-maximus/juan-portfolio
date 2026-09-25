@@ -16,9 +16,11 @@ import {
   isConfigured,
   listAreas,
   listOwnerAccounts,
+  listPendingReturnDirectives,
 } from "../lib/dal";
 import type { AccountPriority } from "./AccountsMap";
 import { sortAreasByProspects } from "../lib/priority";
+import { buildReturnSuggestions } from "../lib/return-suggestions";
 import { Empty, PageHead } from "../lib/ui";
 import { MapScreen } from "./MapScreen";
 
@@ -33,14 +35,17 @@ export default async function MapPage({
   searchParams: Promise<{ focus?: string }>;
 }) {
   const focusId = (await searchParams).focus?.trim() || null;
-  const [accounts, areas, displayPrefs, schedulePrefs, endpointsByDay, priority] = await Promise.all([
-    listOwnerAccounts(),
-    listAreas(),
-    getMapDisplayPrefs(),
-    getRouteSchedulePrefs(),
-    getRouteEndpointsByDay(),
-    getPriorityBook(),
-  ]);
+  const [accounts, areas, displayPrefs, schedulePrefs, endpointsByDay, priority, returnDirectives] =
+    await Promise.all([
+      listOwnerAccounts(),
+      listAreas(),
+      getMapDisplayPrefs(),
+      getRouteSchedulePrefs(),
+      getRouteEndpointsByDay(),
+      getPriorityBook(),
+      listPendingReturnDirectives(),
+    ]);
+  const returnSuggestions = buildReturnSuggestions(priority.ranked, returnDirectives);
 
   /* Flattened to a plain object because MapScreen and AccountsMap are client
      components and a Map does not cross that boundary. Only the three fields
@@ -97,6 +102,7 @@ export default async function MapPage({
             initialShowProspects={displayPrefs.showProspects}
             schedulePrefs={schedulePrefs}
             endpointsByDay={endpointsByDay}
+            returnSuggestions={returnSuggestions}
           />
         </>
       )}

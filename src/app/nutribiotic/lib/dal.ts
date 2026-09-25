@@ -1634,6 +1634,63 @@ export async function insertDirectives(
   return rows.length;
 }
 
+export type ReturnDirective = {
+  id: string;
+  account_id: string;
+  directive: string;
+  created_at: string;
+};
+
+/**
+ * Pending "come back" directives, nutribiotic-route-planner's own inbox
+ * (touchpoint.ts's returnVisitDirectiveRows, `[follow-up:<kind>] ...`), read
+ * here too so the map's Suggested returns panel can offer the same account
+ * before a planner run ever touches it. Same filter follow_through.py's
+ * fetch_directives uses: target + status server-side, the "[follow-up:"
+ * prefix in JS, since PostgREST has no clean way to match a literal `[`.
+ * Rows with no account_id (an agency-wide instruction, not a return visit)
+ * are dropped.
+ */
+export async function listPendingReturnDirectives(): Promise<ReturnDirective[]> {
+  const res = await query<{
+    id: string;
+    account_id: string | null;
+    directive: string;
+    created_at: string;
+    origin?: Origin;
+  }>(
+    "nb_directives",
+    {
+      select: "id,account_id,directive,created_at",
+      status: "eq.pending",
+      target: "eq.nutribiotic-route-planner",
+      order: "created_at.asc",
+      limit: 500,
+    },
+  );
+  return res.data.filter(
+    (r): r is ReturnDirective => Boolean(r.account_id) && r.directive.startsWith("[follow-up:"),
+  );
+}
+
+/**
+ * Marks one directive handled from outside the planner: Juan acting straight
+ * off the Suggested returns panel (add to a day, add to SDR, draft outreach)
+ * is the same "drained by a human in a session Juan opened" this row is
+ * queued for (migration 0058), so it is stamped the same way
+ * follow_through.py stamps one it routes itself.
+ */
+export async function resolveDirective(id: string, resolution: string): Promise<void> {
+  await mutate(
+    "nb_directives",
+    "PATCH",
+    { status: "routed", resolution, decided_at: new Date().toISOString() },
+    { id: `eq.${id}` },
+    "return=minimal",
+    true,
+  );
+}
+
 /**
  * A field log that said a business is closed, queued as EVIDENCE (0073).
  *

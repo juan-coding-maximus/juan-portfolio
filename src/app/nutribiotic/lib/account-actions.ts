@@ -11,6 +11,7 @@ import {
   listAskKeys,
   listContacts,
   listPurchases,
+  resolveDirective,
   setAccountPotentialJuan,
   setAccountReadiness,
   type Account,
@@ -152,4 +153,62 @@ export async function draftAccountPitch(id: string): Promise<DraftAccountPitchRe
   revalidatePath("/nutribiotic/outbound");
 
   return composed.written ? { status: "drafted" } : { status: "not_written", reason: composed.reason };
+}
+
+/**
+ * The map's Suggested returns panel offering "Generate outbound" on an
+ * account that has no Gap Selling summary on file yet -- draftAccountPitch's
+ * opening -- so it takes Juan's own typed reason instead. Same composer, same
+ * grounding gate: what he just typed is the only source text, and composeAsk
+ * may only reword what it says, exactly as it may only reword
+ * current_state/future_state/impact on the profile's own button. Not a
+ * looser path, a different source for the identical rule.
+ */
+export async function draftAccountPitchFromReason(id: string, reason: string): Promise<DraftAccountPitchResult> {
+  const trimmed = reason.trim();
+  if (!trimmed) return { status: "not_written", reason: "No reason given." };
+
+  const [accRes, contactsRes, alreadyFiled, voice] = await Promise.all([
+    getAccount(id),
+    listContacts(id),
+    listAskKeys(id),
+    getVoiceContext(id),
+  ]);
+  const account = accRes.data[0];
+  if (!account) return { status: "not_written", reason: "Account not found." };
+  if (alreadyFiled.some((r) => asksCollide(r.source_ask, trimmed))) {
+    return { status: "already_queued" };
+  }
+
+  const contacts = contactsRes.data
+    .map((c) => ({
+      id: c.id,
+      name: [c.first_name, c.last_name].filter(Boolean).join(" ").trim(),
+      title: c.title,
+      email: c.email,
+    }))
+    .filter((c) => c.name);
+
+  const composed = await composeAsk({
+    ask: trimmed,
+    noteText: trimmed,
+    account: { id: account.id, name: account.name, city: account.city, email: account.email },
+    contacts,
+    voice,
+  });
+  await insertAskDraft({ account_id: id, ask: trimmed, composed });
+  revalidatePath("/nutribiotic/outbound");
+
+  return composed.written ? { status: "drafted" } : { status: "not_written", reason: composed.reason };
+}
+
+/**
+ * Marks a return-visit directive handled from the Suggested returns panel,
+ * whichever of its three actions Juan actually took. See dal.ts's
+ * resolveDirective: same stamp follow_through.py leaves when it routes one
+ * itself, so nutribiotic-route-planner does not offer the same account a
+ * second time.
+ */
+export async function resolveReturnDirective(id: string, resolution: string): Promise<void> {
+  await resolveDirective(id, resolution);
 }
