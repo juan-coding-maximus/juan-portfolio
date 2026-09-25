@@ -245,6 +245,20 @@ function appleMapsRouteUrl(stops: { lat: number; lng: number }[]): string {
   return `https://maps.apple.com/?daddr=${daddr}`;
 }
 
+/** "2026-09-24T18:03:00.000Z" -> "Thursday, September 24", Los Angeles
+ *  wall-clock: the day Juan actually said this, for "because on <label>".
+ *  Null on a timestamp that doesn't parse, never a guess. */
+function loggedOnLabel(iso: string): string | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString("en-US", {
+    timeZone: "America/Los_Angeles",
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+}
+
 /** "2026-09-30T12:00:00-07:00" -> "Wed, Sep 30 · 12:00 PM", Los Angeles
  *  wall-clock. Null on a timestamp that doesn't parse, never a guess. */
 function statedTimeLabel(iso: string): string | null {
@@ -261,11 +275,12 @@ function statedTimeLabel(iso: string): string | null {
 }
 
 /**
- * Suggested returns (Juan, 2026-09-25): not another email-draft card, a
- * ranked list of accounts worth going back to and why, sitting inside the
- * route he is already building. Each row is one of two real facts --
- * lib/return-suggestions.ts's own header says which -- never a model's guess
- * at who to see next.
+ * Suggested returns (Juan, 2026-09-25): not another email-draft card, and not
+ * a scoring system, a backlog of accounts Juan said out loud he'd go back to,
+ * sitting below the route he is already building for this day. Only ever a
+ * stated "come back" -- lib/return-suggestions.ts's own header covers how a
+ * directive with no stated date spreads across the week, capped at 4 a day --
+ * never a model's guess at who to see next.
  *
  * THREE ACTIONS, EACH A DOOR THAT ALREADY EXISTS. Add to day calls the same
  * onAddAccount the search field and a map pin already use, so a suggestion
@@ -292,10 +307,12 @@ function statedTimeLabel(iso: string): string | null {
  */
 function ReturnSuggestions({
   suggestions,
+  activeDay,
   accounts,
   onAddAccount,
 }: {
   suggestions: ReturnSuggestion[];
+  activeDay: string;
   accounts: ClientSearchAccount[];
   onAddAccount: (account: ClientSearchAccount) => void;
 }) {
@@ -306,7 +323,7 @@ function ReturnSuggestions({
   const [why, setWhy] = useState("");
   const [pending, startTransition] = useTransition();
 
-  const visible = suggestions.filter((s) => !hidden.has(s.accountId));
+  const visible = suggestions.filter((s) => s.suggestedDate === activeDay && !hidden.has(s.accountId));
 
   function settle(s: ReturnSuggestion, note: string) {
     setSuccessById((m) => ({ ...m, [s.accountId]: note }));
@@ -376,6 +393,12 @@ function ReturnSuggestions({
                     {account.city && <span className="text-[12px] text-[#8A928C]">{account.city}</span>}
                   </div>
                   <p className="mt-0.5 text-[12.5px] text-[#5B6560]">{s.reason}</p>
+                  {s.quote && (
+                    <p className="mt-0.5 text-[12.5px] italic text-[#5B6560]">&ldquo;{s.quote}&rdquo;</p>
+                  )}
+                  {loggedOnLabel(s.loggedAt) && (
+                    <p className="mt-0.5 text-[12px] text-[#8A928C]">Because on {loggedOnLabel(s.loggedAt)}</p>
+                  )}
                   {time && (
                     <p className="mt-0.5 inline-flex items-center gap-1 text-[12px] font-medium text-[#2C6A46]">
                       <Ico name="clock" size={11} />
@@ -1233,9 +1256,10 @@ export function RoutePanel({
   /** Put an account on this day. Goes into route_draft as its nb_accounts.id,
    *  never as a copied address. */
   onAddAccount: (account: ClientSearchAccount) => void;
-  /** lib/return-suggestions.ts's ranked "come back" list, computed
-   *  server-side on the map page (2026-09-25). Rendered above the day's own
-   *  stops; each row's three actions are ReturnSuggestions' own concern. */
+  /** lib/return-suggestions.ts's "come back" backlog, computed server-side
+   *  on the map page for the whole coming week at once (2026-09-25).
+   *  ReturnSuggestions filters it to the active day and renders below the
+   *  day's own stops; each row's three actions are its own concern. */
   returnSuggestions: ReturnSuggestion[];
   /** This day's calls (0041): phone-only, no drive position. */
   calls: CallEntry[];
@@ -1493,7 +1517,7 @@ export function RoutePanel({
             (Juan, 2026-09-25): it is potential, not planned, so it never
             competes for position with the stops themselves, empty day or
             not -- the panel does not shift when the first stop is added. */}
-        <ReturnSuggestions suggestions={returnSuggestions} accounts={accounts} onAddAccount={onAddAccount} />
+        <ReturnSuggestions suggestions={returnSuggestions} activeDay={activeDay} accounts={accounts} onAddAccount={onAddAccount} />
       </>
     );
   }
@@ -1649,7 +1673,7 @@ export function RoutePanel({
       {/* Suggested returns sits below the day's actual stops (Juan,
           2026-09-25): it is potential, not planned, so it never competes
           with or interrupts what is already committed to the route. */}
-      <ReturnSuggestions suggestions={returnSuggestions} accounts={accounts} onAddAccount={onAddAccount} />
+      <ReturnSuggestions suggestions={returnSuggestions} activeDay={activeDay} accounts={accounts} onAddAccount={onAddAccount} />
     </>
   );
 }

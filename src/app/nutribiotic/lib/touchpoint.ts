@@ -256,6 +256,7 @@ type ParsedCalendarAction = {
   when_iso: string | null;
   duration_minutes: number | null;
   notes: string | null;
+  quote: string | null;
 };
 
 type ParsedOutreachAsk = { ask: string };
@@ -336,6 +337,7 @@ function returnVisitDirectiveRows(
     parts.push(ca.when_iso ? `Stated time: ${ca.when_iso}` : "No time stated");
     if (ca.duration_minutes) parts.push(`Stated duration: ${ca.duration_minutes} min`);
     if (ca.notes) parts.push(ca.notes);
+    if (ca.quote) parts.push(`Quote: "${ca.quote}"`);
     return {
       field_note_id: fieldNoteId,
       directive: `[follow-up:${ca.kind}] ${parts.join(" · ")}`,
@@ -534,6 +536,10 @@ const EXTRACT_TOOL = {
             },
             duration_minutes: { type: ["integer", "null"] },
             notes: { type: ["string", "null"] },
+            quote: {
+              type: ["string", "null"],
+              description: "The exact short clause or sentence, copied verbatim from the note, that states the return ask (e.g. \"come back next Friday\"). Not a paraphrase or a summary, the rep's own words only. Null if the note never states one as a distinct phrase.",
+            },
           },
           required: ["kind", "title"],
         },
