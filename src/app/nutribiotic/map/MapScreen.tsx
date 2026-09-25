@@ -126,6 +126,8 @@ export function MapScreen({
     addToRouteOnDay,
     addCustomStop,
     removeFromRoute,
+    moveInRoute,
+    moveToTop,
     reorderRoute,
     moveStopToDay,
     clearRoute,
@@ -554,6 +556,8 @@ export function MapScreen({
         end={activeEnd}
         onChangeStart={editStart}
         onChangeEnd={editEnd}
+        onMove={moveInRoute}
+        onMoveToTop={moveToTop}
         onReorder={reorderRoute}
         onRemove={removeFromRoute}
         onClear={clearRoute}
