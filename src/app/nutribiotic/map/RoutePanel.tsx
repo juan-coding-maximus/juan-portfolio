@@ -876,6 +876,26 @@ function StopRow({
   const c = s.type === "custom" ? s.custom : null;
   const dragControls = useDragControls();
 
+  /* ADD TO SDR, from the route (Juan, 2026-09-28): the same addAccountToSdr
+   * the map pin's own card and ReturnSuggestions use, dated today, mid
+   * priority, a call. A stop he is already driving to can also be worth a
+   * desk follow-up, and retyping the name into the SDR queue's own search
+   * was the gap this closes. Doesn't touch the stop itself: still on the
+   * route, still driven to, this only queues the second, separate action. */
+  const [sdrQueued, setSdrQueued] = useState(false);
+  const [sdrError, setSdrError] = useState<string | null>(null);
+  const [sdrPending, startSdrTransition] = useTransition();
+
+  function addToSdr() {
+    if (!a) return;
+    setSdrError(null);
+    startSdrTransition(async () => {
+      const res = await addAccountToSdr(a.id, "mid", laTodayIso());
+      if (res.ok) setSdrQueued(true);
+      else setSdrError(res.error);
+    });
+  }
+
   return (
     <Reorder.Item
       value={s.id}
@@ -1161,6 +1181,28 @@ function StopRow({
         >
           <Ico name="locate" size={13} />
         </button>
+        {/* ADD TO SDR, account stops only: a custom stop (lunch, hotel) has no
+            account_id for insertSdrScheduleItem to schedule against. */}
+        {a && (
+          <button
+            type="button"
+            onClick={addToSdr}
+            disabled={sdrPending || sdrQueued}
+            aria-label={sdrQueued ? `${title} added to the SDR queue, today` : `Add ${title} to the SDR queue, today`}
+            title={sdrError ?? (sdrQueued ? "In the SDR queue, today" : "Add to SDR, today, mid priority")}
+            className={`inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-2 text-[12px] font-medium transition-colors disabled:opacity-100 ${
+              sdrQueued
+                ? "border-[#2C6A46] bg-[#EAF3EC] text-[#2C6A46]"
+                : "border-[#E2DFD5] bg-white text-[#3D4A44] hover:bg-[#FAF9F5]"
+            }`}
+          >
+            <Ico name={sdrQueued ? "check" : "phone"} size={13} />
+            {sdrQueued ? "Added" : "Add to SDR"}
+          </button>
+        )}
+        {sdrError && (
+          <span className="text-[11px] text-[#B5372A]">{sdrError}</span>
+        )}
         <a
           href={appleMapsUrl({
             address: c ? c.address : fullAddress(a!),
