@@ -38,6 +38,10 @@ const nextConfig: NextConfig = {
       // and the two song files.
       { source: "/stoke", destination: "/stoke/index.html" },
       { source: "/stoke/host", destination: "/stoke/host.html" },
+      // Stoke Club articles (built by agency repo osmotic-ventures/stoke-club/music-site/build.py
+      // into public/stokeclubmusic/), served here until stokeclubmusic.com resolves.
+      { source: "/stokeclubmusic", destination: "/stokeclubmusic/index.html" },
+      { source: "/stokeclubmusic/:slug([a-z0-9-]+)", destination: "/stokeclubmusic/:slug.html" },
     ];
   },
   // Juan's vCard (public/p/ja.vcf) for the NutriBiotic business card QR code.

@@ -407,10 +407,11 @@ function BrandStrip() {
   const metaba:  BrandItem = { kind: "img", src: "/img/logos/metaba.png",            alt: "Metaba Health",                            href: "https://metabahealth.us",       rounded: true };
   const super_:  BrandItem = { kind: "img", src: "/img/logos/superbiome.png",        alt: "Superbiome",                   href: "https://milieuskin.com",        rounded: true };
   const nutri:   BrandItem = { kind: "img", src: "/img/logos/nutribiotic-white.png", alt: "NutriBiotic",                              href: "https://nutribiotic.com" };
+  const stoke:   BrandItem = { kind: "img", src: "/img/logos/stoke-club.png",        alt: "Stoke Club, website and SEO",              href: "https://stokeclubband.com" };
 
-  // Every logo once before any repeat; NutriBiotic twice per cycle. The marquee
+  // Every logo once before any repeat; NutriBiotic twice per cycle. Stoke Club: I built its site and SEO. The marquee
   // translates -50%, so the cycle is doubled for a seamless loop.
-  const cycle: BrandItem[] = [aura, brain, bio, nutri, metaba, super_, tranq, nutri];
+  const cycle: BrandItem[] = [aura, brain, bio, nutri, metaba, super_, stoke, tranq, nutri];
   const all: BrandItem[] = [...cycle, ...cycle];
 
   function tooltip(href: string) {
