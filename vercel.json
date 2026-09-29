@@ -1,6 +1,6 @@
 {
-  "rewrites": [
-    { "source": "/stokeclub", "destination": "https://site-juanarenasrec-4192s-projects.vercel.app/stokeclub" },
-    { "source": "/stokeclub/:path*", "destination": "https://site-juanarenasrec-4192s-projects.vercel.app/stokeclub/:path*" }
+  "redirects": [
+    { "source": "/stokeclub", "destination": "https://stokeclubband.com", "permanent": true },
+    { "source": "/stokeclub/:path*", "destination": "https://stokeclubband.com/:path*", "permanent": true }
   ]
 }
