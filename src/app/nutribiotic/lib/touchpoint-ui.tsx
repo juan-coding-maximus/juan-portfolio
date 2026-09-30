@@ -6,9 +6,17 @@ import { setPotentialJuan, setReadiness } from "./account-actions";
 import type { Tier } from "./dal";
 import type { Readiness } from "./priority";
 import { HubspotRetry } from "./hubspot-retry-ui";
-import { AccountMatchResolver } from "./new-account-ui";
+import {
+  createBusinessFromPlace,
+  linkTouchpointToExistingCompany,
+  searchNewBusiness,
+  type CreateBusinessOutcome,
+  type PendingNote,
+} from "./new-account-actions";
+import type { PlaceCandidate } from "./places";
 import { ReviewCard } from "./review-ui";
 import {
+  fileTouchpointToAccount,
   previewTouchpoint,
   type FiledTouchpoint as Filed,
   type RecordTouchpointResult,
@@ -92,6 +100,41 @@ function writeDraft(value: string, accountIdHint?: string | null): void {
 
 export type FiledTouchpoint = Filed;
 
+/** A tappable pick offered inside the error line when the store is unclear:
+ *  an existing account, a Google Places result for a new company, or an
+ *  existing company the duplicate check found in Juan's own book. */
+type Pick =
+  | { kind: "account"; id: string; name: string }
+  | { kind: "place"; place: PlaceCandidate }
+  | { kind: "company"; companyId: string; name: string };
+
+/** The screen stays exactly as it was; this is the one line under the
+ *  composer that says what could not be told, plus any picks. */
+type Unsure = { message: string; note: PendingNote | null; picks: Pick[]; retry: boolean };
+
+/** A created company's outcome, in the shape the capture's success beat reads. */
+function createdAsFiled(c: Extract<CreateBusinessOutcome, { ok: true }>): Filed {
+  return {
+    ok: true,
+    needsAccount: false,
+    touchpoint_id: c.touchpointId,
+    accountName: c.accountName,
+    accountId: c.accountId,
+    activityId: c.activityId,
+    routeDirectives: c.routeDirectives,
+    summary: c.summary,
+    peopleAdded: c.peopleAdded,
+    peopleUpdated: c.peopleUpdated,
+    hubspotFiled: c.hubspotFiled,
+    hubspotNoteId: c.hubspotNoteId,
+    hubspotError: c.hubspotError,
+    hubspotLeaks: 0,
+    companyPhoneFilled: null,
+    companyPhoneConflict: null,
+    accountFacts: null,
+  };
+}
+
 /**
  * One capture surface for whatever just happened: type it, optionally attach
  * a photo, send. This component is presentation only; recordTouchpoint()
@@ -174,6 +217,9 @@ export function TouchpointCapture({
   const [kindTouched, setKindTouched] = useState(Boolean(lockKind ?? defaultKind));
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<RecordTouchpointResult | null>(null);
+  // Not sure, or a failure: the one red line under the composer. Nothing else
+  // on the screen changes while it shows.
+  const [unsure, setUnsure] = useState<Unsure | null>(null);
   // A clean file gets its own confirmation beat instead of sitting in
   // `result` indefinitely: show it, refresh the page, then drop back to a
   // blank capture on its own (unless HubSpot missed, see the effect below).
@@ -292,6 +338,8 @@ export function TouchpointCapture({
     if (pendingPhoto) void attachPhoto(res.touchpoint_id, pendingPhoto);
     setPendingPhoto(null);
     setDraft(null);
+    setUnsure(null);
+    setResult(null);
     setText("");
     writeDraft("", accountIdHint);
     setKind(lockKind ?? defaultKind ?? "meeting");
@@ -314,6 +362,7 @@ export function TouchpointCapture({
     if (!value.trim() || pending) return;
     startTransition(async () => {
       setResult(null);
+      setUnsure(null);
       let preview: Awaited<ReturnType<typeof previewTouchpoint>>;
       try {
         preview = await previewTouchpoint(value, accountIdHint, {
@@ -340,10 +389,72 @@ export function TouchpointCapture({
       const res = preview.result;
       if (res.ok && !res.needsAccount) {
         handleFiled(res);
-      } else {
-        // Which store, or a failure: nothing was written, the text stays in
-        // the box AND in storage, and the photo waits with it.
+        return;
+      }
+      if (!res.ok) {
         setResult(res);
+        return;
+      }
+      // Which store: nothing was written, the text stays in the box AND in
+      // storage, the photo waits with it, and the screen does not change.
+      const note: PendingNote = { rawText: res.rawText, parsed: res.parsed, occurredAt: res.occurredAt };
+      const guess = res.businessNameGuess?.trim() || null;
+      if (newCompany) {
+        if (!guess) {
+          setUnsure({ message: "Couldn't tell the new store's name. Put it in the note and log again.", note: null, picks: [], retry: false });
+          return;
+        }
+        const found = await searchNewBusiness(guess).catch(() => null);
+        setUnsure({
+          message: found?.ok
+            ? `Couldn't be sure which "${guess}" this is.`
+            : `${found?.error ?? "The business search failed."} Put the store name in the note and log again.`,
+          note,
+          picks: found?.ok ? found.candidates.slice(0, 3).map((place) => ({ kind: "place" as const, place })) : [],
+          retry: !found,
+        });
+        return;
+      }
+      setUnsure({
+        message: guess
+          ? `Couldn't tell which store "${guess}" is. Put the store name in the note and log again.`
+          : "Couldn't tell which store this was. Put the store name in the note and log again.",
+        note,
+        picks:
+          res.matchAccountId && res.matchAccountName ? [{ kind: "account", id: res.matchAccountId, name: res.matchAccountName }] : [],
+        retry: false,
+      });
+    });
+  }
+
+  /** A pick tapped from the error line: files the same parse to it. */
+  function filePick(pick: Pick) {
+    const note = unsure?.note;
+    if (!note || pending) return;
+    startTransition(async () => {
+      try {
+        if (pick.kind === "place") {
+          const made = await createBusinessFromPlace(note, pick.place);
+          if (made.ok) return handleFiled(createdAsFiled(made));
+          const mine = (made.duplicates ?? []).filter((d) => d.isJuans);
+          setUnsure({
+            message: mine.length
+              ? `${pick.place.name} is already in your book.`
+              : made.error,
+            note,
+            picks: mine.map((d) => ({ kind: "company" as const, companyId: d.id, name: d.name ?? pick.place.name })),
+            retry: false,
+          });
+          return;
+        }
+        const res =
+          pick.kind === "account"
+            ? await fileTouchpointToAccount(note.rawText, note.parsed, pick.id, pick.name, note.occurredAt)
+            : await linkTouchpointToExistingCompany(note, pick.companyId);
+        if (res.ok) handleFiled(res);
+        else setUnsure({ ...(unsure as Unsure), message: res.error });
+      } catch (e) {
+        setUnsure({ ...(unsure as Unsure), message: `Not logged: ${e instanceof Error ? e.message : String(e)}` });
       }
     });
   }
@@ -444,6 +555,10 @@ export function TouchpointCapture({
                   const value = e.target.value;
                   setText(value);
                   writeDraft(value, accountIdHint);
+                  if (unsure || result) {
+                    setUnsure(null);
+                    setResult(null);
+                  }
                   autosize(e.target);
                   // Typing before picking a kind is itself a pick: Meeting,
                   // the state `kind` already starts at, is what a rep means
@@ -577,62 +692,46 @@ export function TouchpointCapture({
                 {pending ? "Logging…" : "Log"}
               </button>
             </div>
+
+            {(unsure || (result && !result.ok)) && (
+              <div role="alert" className="mt-3 text-[13.5px] leading-relaxed font-medium text-[#8A2E2E]">
+                <span>{unsure ? unsure.message : result && !result.ok ? result.error : null}</span>
+                {(!unsure || unsure.retry) && (
+                  <button
+                    type="button"
+                    onClick={submit}
+                    disabled={pending || !text.trim()}
+                    className="ml-1.5 inline-flex min-h-11 items-center underline underline-offset-2 disabled:opacity-50"
+                  >
+                    Try again
+                  </button>
+                )}
+                {unsure && unsure.picks.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {unsure.picks.map((pick) => {
+                      const label = pick.kind === "place" ? pick.place.name : pick.name;
+                      const where = pick.kind === "place" ? pick.place.street ?? pick.place.city : null;
+                      return (
+                        <button
+                          key={pick.kind === "place" ? pick.place.placeId : pick.kind === "account" ? pick.id : pick.companyId}
+                          type="button"
+                          onClick={() => filePick(pick)}
+                          disabled={pending}
+                          className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-[#D9B8B3] px-3.5 text-[13px] font-medium text-[#8A2E2E] transition-transform active:scale-[0.97] disabled:opacity-50"
+                        >
+                          {label}
+                          {where && <span className="font-normal opacity-70">{where}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>
 
-      {result && !result.ok && (
-        <div
-          role="alert"
-          className="mt-3 flex items-start justify-between gap-3 rounded-md border border-[#E7C9C5] bg-[#FBEFED] px-3 py-2.5 text-[13px] leading-relaxed text-[#8A2E2E]"
-        >
-          <span className="flex items-start gap-1.5">
-            <span className="mt-[3px] shrink-0">
-              <Ico name="alert" size={12} />
-            </span>
-            <span>{result.error}</span>
-          </span>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={pending || !text.trim()}
-            className="shrink-0 rounded-md bg-[#8A2E2E] px-2.5 py-1 text-[12px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
-          >
-            Try again
-          </button>
-        </div>
-      )}
-
-      {result?.ok && result.needsAccount && (
-        <AccountMatchResolver
-          key={result.rawText}
-          note={{ rawText: result.rawText, parsed: result.parsed, occurredAt: result.occurredAt }}
-          nameGuess={result.businessNameGuess}
-          matchAccountId={result.matchAccountId}
-          matchAccountName={result.matchAccountName}
-          pendingGrade={grade}
-          pendingReadiness={readiness}
-          onSuccess={(touchpointId) => {
-            if (pendingPhoto && touchpointId) void attachPhoto(touchpointId, pendingPhoto);
-            setPendingPhoto(null);
-          }}
-          onResolved={() => {
-            // Fires 5s after the resolver's own success note lands (or on a
-            // tap to skip the wait, same pattern as `success` above). Clears
-            // `result` too, which unmounts the resolver and drops its note:
-            // before 2026-09-02 this stayed forever and the only way back to
-            // a loggable screen was reloading the page.
-            setText("");
-            writeDraft("", accountIdHint);
-            setKind(lockKind ?? defaultKind ?? "meeting");
-            setGrade(null);
-            setReadiness_(null);
-            setNewCompany(false);
-            setResult(null);
-            requestAnimationFrame(() => textareaRef.current && autosize(textareaRef.current));
-          }}
-        />
-      )}
 
     </div>
   );
