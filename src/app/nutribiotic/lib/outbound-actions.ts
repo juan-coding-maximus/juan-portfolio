@@ -7,6 +7,8 @@ import { autoFileEngagement } from "./touchpoint";
 export type DraftSentResult = {
   filed: boolean;
   accountName: string | null;
+  /** What a Retry HubSpot tap refiles when the first file failed. */
+  activityId?: number | null;
   hubspotFiled: boolean;
   hubspotNoteId: string | null;
   hubspotError: string | null;
@@ -23,9 +25,8 @@ export type DraftSentResult = {
  * files it to HubSpot the same way a Visit-tab touchpoint auto-files
  * (autoFileEngagement, see touchpoint.ts) — no LLM extraction step, because
  * the message is already exact text, not a spoken report to parse. A filing
- * failure never unwinds the "sent" mark; the activity just stays unfiled and
- * drops into the Visit tab's retry queue, same failure contract every other
- * capture door has.
+ * failure never unwinds the "sent" mark; it is shown on the spot with a
+ * Retry HubSpot tap, same failure contract every other capture door has.
  *
  * A draft with no account_id (not yet linked to one) has nowhere to file to,
  * so `filed` comes back false with no HubSpot attempt made — surfaced to
@@ -58,7 +59,7 @@ export async function decideDraft(
   const hubspot = await autoFileEngagement(activity.id);
   const names = await getAccountNames([context.accountId]);
 
-  return { filed: true, accountName: names[context.accountId] ?? null, ...hubspot };
+  return { filed: true, accountName: names[context.accountId] ?? null, activityId: activity.id, ...hubspot };
 }
 
 /**
@@ -67,9 +68,8 @@ export async function decideDraft(
  * exact-text contract as decideDraft's sent path: the body Juan pastes in is
  * filed verbatim, never summarized, and lands in HubSpot as the same typed
  * Email engagement (EMAIL for a send, INCOMING_EMAIL for a receive) via
- * autoFileEngagement. A filing failure never unwinds the OS-side log; it just
- * stays unfiled and drops into the Visit tab's retry queue like every other
- * capture door.
+ * autoFileEngagement. A filing failure never unwinds the OS-side log; it is
+ * shown on the spot with a Retry HubSpot tap like every other capture door.
  */
 export async function recordManualEmail(input: {
   accountId: string;
@@ -94,5 +94,5 @@ export async function recordManualEmail(input: {
   const names = await getAccountNames([input.accountId]);
   revalidatePath("/nutribiotic/outbound");
 
-  return { filed: true, accountName: names[input.accountId] ?? null, ...hubspot };
+  return { filed: true, accountName: names[input.accountId] ?? null, activityId: activity.id, ...hubspot };
 }

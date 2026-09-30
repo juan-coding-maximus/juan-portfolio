@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * What shows under a touchpoint that parked as needs_account (Visit tab).
- * Two pill rows, each candidate a tap away from done:
+ * What shows under a note whose store could not be named with confidence
+ * (Visit tab). Nothing about the note is saved yet: it files the moment one
+ * of these is tapped, or stays in the box. Two pill rows, each a tap from done:
  *
  *   Client Match:  the model's own low-confidence guess at an account
  *                  already in the book (see touchpoint.ts's matchAccountId),
@@ -32,8 +33,10 @@ import {
   searchNewBusiness,
   type BusinessSearchOutcome,
   type CreateBusinessOutcome,
+  type PendingNote,
 } from "./new-account-actions";
-import { discardTouchpoint, resolveTouchpointToAccount, type ResolveResult } from "./touchpoint";
+import { HubspotRetry } from "./hubspot-retry-ui";
+import { fileTouchpointToAccount, type ResolveResult } from "./touchpoint";
 import type { PlaceCandidate } from "./places";
 import { Ico, SuccessNote } from "./ui";
 
@@ -152,7 +155,7 @@ function PlacePill({
 }
 
 export function AccountMatchResolver({
-  touchpointId,
+  note,
   nameGuess,
   matchAccountId,
   matchAccountName,
@@ -160,9 +163,9 @@ export function AccountMatchResolver({
   pendingReadiness = null,
   onResolved,
   onSuccess,
-  onDiscarded,
 }: {
-  touchpointId: string;
+  /** The note held on the capture screen, filed the moment a store is picked. */
+  note: PendingNote;
   nameGuess: string | null;
   matchAccountId: string | null;
   matchAccountName: string | null;
@@ -172,22 +175,14 @@ export function AccountMatchResolver({
   /** A readiness tag the rep picked on the capture card before the account
    * was known. Same hold-until-resolved pattern as pendingGrade. */
   pendingReadiness?: Readiness | null;
+  /** The "that's had its read" beat the capture card uses to reset. */
   onResolved?: () => void;
-  /** Fired the instant a match, a create, or a discard lands, for a caller
-   *  that owns the row's own exit timing (unmatched-ui.tsx's queue), same
-   *  contract as NextStepResolver's onSuccess. `onResolved` stays what it
-   *  was: the "that's had its read" beat the capture card uses to reset. */
-  onSuccess?: () => void;
-  /** Fired once a discard is confirmed, in place of onSuccess/onResolved: a
-   *  discarded touchpoint never resolved to a match, it just left the queue. */
-  onDiscarded?: () => void;
+  /** Fired the instant a match or a create lands, with the touchpoint it
+   *  filed as (a photo held on the capture card attaches to it). */
+  onSuccess?: (touchpointId: string | null) => void;
 }) {
   const [matchResult, setMatchResult] = useState<ResolveResult | null>(null);
   const [matching, startMatching] = useTransition();
-
-  const [discarding, startDiscard] = useTransition();
-  const [discardError, setDiscardError] = useState<string | null>(null);
-  const [discarded, setDiscarded] = useState(false);
 
   const [search, setSearch] = useState<BusinessSearchOutcome | null>(null);
   const [searching, startSearch] = useTransition();
@@ -260,14 +255,15 @@ export function AccountMatchResolver({
    * the parent, which is what unmounts this component and drops the note.
    */
   useEffect(() => {
-    if (!matchResult?.ok) return;
+    // A HubSpot miss stays on screen with its Retry until he taps past it.
+    if (!matchResult?.ok || (!matchResult.hubspotFiled && matchResult.hubspotError)) return;
     const t = setTimeout(() => onResolved?.(), 5000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchResult]);
 
   useEffect(() => {
-    if (!created?.ok) return;
+    if (!created?.ok || (!created.hubspotFiled && created.hubspotError)) return;
     const t = setTimeout(() => onResolved?.(), 5000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -276,11 +272,11 @@ export function AccountMatchResolver({
   function confirmMatch() {
     if (!matchAccountId || !matchAccountName || matching) return;
     startMatching(async () => {
-      const res = await resolveTouchpointToAccount(touchpointId, matchAccountId, matchAccountName);
+      const res = await fileTouchpointToAccount(note.rawText, note.parsed, matchAccountId, matchAccountName, note.occurredAt);
       setMatchResult(res);
       if (res.ok) {
-        applyPendingGrade(res.accountId);
-        onSuccess?.();
+        if (res.accountId) applyPendingGrade(res.accountId);
+        onSuccess?.(res.touchpoint_id);
       }
     });
   }
@@ -288,54 +284,28 @@ export function AccountMatchResolver({
   /** The one-tap fix for "this already is a client": a duplicate the block
    * above found that's actually Juan's own account, just not the one the
    * matcher above proposed (or nothing was proposed at all). Files the
-   * touchpoint against it directly, no second company created. */
+   * note against it directly, no second company created. */
   function linkExisting(companyId: string) {
     setLinkingId(companyId);
     startLink(async () => {
-      const res = await linkTouchpointToExistingCompany(touchpointId, companyId);
+      const res = await linkTouchpointToExistingCompany(note, companyId);
       setMatchResult(res);
       if (res.ok) {
-        applyPendingGrade(res.accountId);
-        onSuccess?.();
+        if (res.accountId) applyPendingGrade(res.accountId);
+        onSuccess?.(res.touchpoint_id);
       }
     });
   }
-
-  /** Juan's one-tap fix for a touchpoint that never should have parked here
-   * (a smoke test, a note-to-self that leaked past the field_note gate): out
-   * of the queue for good, immediately, no second confirmation. Low blast
-   * radius (discardTouchpoint marks the row, never deletes it, root
-   * AGENTS.md P7), which is why this is one tap rather than a hold-to-confirm. */
-  function discard() {
-    if (discarding || discarded) return;
-    setDiscardError(null);
-    startDiscard(async () => {
-      const res = await discardTouchpoint(touchpointId, "needs_account");
-      if (!res.ok) {
-        setDiscardError(res.error);
-        return;
-      }
-      setDiscarded(true);
-      onSuccess?.();
-    });
-  }
-
-  useEffect(() => {
-    if (!discarded) return;
-    const t = setTimeout(() => (onDiscarded ?? onResolved)?.(), 1200);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [discarded]);
 
   function pick(place: PlaceCandidate, force = false) {
     setCreatingId(place.placeId);
     setPickedPlace(place);
     startCreate(async () => {
-      const res = await createBusinessFromPlace(touchpointId, place, { force });
+      const res = await createBusinessFromPlace(note, place, { force });
       setCreated(res);
       if (res.ok) {
         applyPendingGrade(res.accountId);
-        onSuccess?.();
+        onSuccess?.(res.touchpointId);
       }
     });
   }
@@ -363,16 +333,6 @@ export function AccountMatchResolver({
     });
   }
 
-  if (discarded) {
-    return (
-      <div className="mt-3">
-        <button onClick={() => (onDiscarded ?? onResolved)?.()} className="block w-full text-left">
-          <SuccessNote title="Discarded" detail="Not filed anywhere, and it will not come back in this queue." />
-        </button>
-      </div>
-    );
-  }
-
   // Resolved: show the one success note in place of everything else. Tappable
   // to skip the 5s wait, same affordance as the plain-match note above it.
   if (matchResult?.ok) {
@@ -385,6 +345,7 @@ export function AccountMatchResolver({
             hubspotFiled={matchResult.hubspotFiled}
             hubspotId={matchResult.hubspotNoteId}
             hubspotError={matchResult.hubspotError}
+            hubspotRetry={<HubspotRetry activityId={matchResult.activityId} />}
             meta={
               <>
                 {(matchResult.peopleAdded > 0 || matchResult.peopleUpdated > 0) && (
@@ -442,11 +403,12 @@ export function AccountMatchResolver({
 
             <div className="mt-3 border-t border-[#EDEBE3] pt-3">
               {created.hubspotFiled !== undefined && (
-                <div className={`flex items-center gap-1.5 text-[12px] ${created.hubspotFiled ? "text-[#8A928C]" : "text-[#8A6D2F]"}`}>
+                <div className={`flex flex-wrap items-center gap-1.5 text-[12px] ${created.hubspotFiled ? "text-[#8A928C]" : "text-[#8A2E2E]"}`}>
                   <Ico name={created.hubspotFiled ? "check" : "alert"} size={11} />
                   {created.hubspotFiled
                     ? `Filed to HubSpot${created.hubspotNoteId ? ` (${created.hubspotNoteId})` : ""}.`
-                    : `Not filed to HubSpot yet: ${created.hubspotError ?? "unknown error"}. It's waiting in the queue below to retry.`}
+                    : `Not filed to HubSpot${created.hubspotError ? `: ${created.hubspotError}` : ""}.`}
+                  {!created.hubspotFiled && <HubspotRetry activityId={created.activityId} />}
                 </div>
               )}
               <div className="mt-1.5 text-[12px] text-[#8A928C]">{facts.join(", ")}</div>
@@ -568,18 +530,6 @@ export function AccountMatchResolver({
             )}
           </div>
         )}
-      </div>
-
-      <div className="flex items-center justify-between gap-2 border-t border-[#EDEBE3] pt-2.5">
-        <button
-          type="button"
-          onClick={discard}
-          disabled={discarding || matching || linking || creating}
-          className="text-[12px] text-[#8A928C] underline underline-offset-2 transition-colors hover:text-[#8A6D2F] disabled:opacity-40"
-        >
-          {discarding ? "Discarding…" : "Not a client, discard"}
-        </button>
-        {discardError && <span className="text-[12px] text-[#8A6D2F]">{discardError}</span>}
       </div>
     </div>
   );

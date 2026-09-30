@@ -6,8 +6,9 @@
  * This is a THIRD DOOR ONTO ONE EXTRACTOR, not a third extractor. Typed notes
  * (touchpoint-ui.tsx), recorded visits (api/visits/transcript) and dictated
  * ones (here) all land in the same recordTouchpoint(), so the parse, the
- * account matching, the fill-never-overwrite contact rule and the pending
- * calendar proposals are identical whichever door was used. A second extraction
+ * account matching and the fill-never-overwrite contact rule are identical
+ * whichever door was used. A note whose store isn't clear comes back 409 with
+ * nothing written, never parked. A second extraction
  * prompt is exactly how a spoken visit and a typed one start disagreeing.
  *
  * Bearer-token gated (NB_SESSION_SECRET), same as the transcript route: this is
@@ -46,6 +47,24 @@ export async function POST(req: Request) {
   const result = await recordTouchpoint(text, accountIdHint, occurredAt, { autoFileHubspot: false });
   if (!result.ok) {
     return Response.json({ ok: false, error: result.error }, { status: 422 });
+  }
+  // No confident store: nothing was written, and nothing is parked. The
+  // caller fails loud and asks Juan which account, then sends the note back
+  // with account_id set.
+  if (result.needsAccount) {
+    const guess = result.businessNameGuess ? `"${result.businessNameGuess}"` : "the store";
+    const match = result.matchAccountName ? ` Closest account: ${result.matchAccountName} (${result.matchAccountId}).` : "";
+    return Response.json(
+      {
+        ok: false,
+        needs_account: true,
+        error: `Not filed: couldn't tell which account ${guess} is.${match} Resend with account_id.`,
+        business_name_guess: result.businessNameGuess,
+        match_account_id: result.matchAccountId,
+        match_account_name: result.matchAccountName,
+      },
+      { status: 409 },
+    );
   }
   return Response.json({ ok: true, result });
 }

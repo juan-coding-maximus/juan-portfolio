@@ -58,12 +58,10 @@ export const metadata = {
  * fail, or hold a connection open, which means there is nothing left here for
  * a bad connection to break.
  *
- * THE BOX AND NOTHING ELSE (Juan, 2026-08-28). The ready-to-file queue and the
- * calendar follow-ups that used to sit below the box (lib/visit-queues-ui.tsx)
- * moved to Clients: reviewing a correction note or approving a follow-up is
- * desk work, and it was the reason this screen was never as fast or as quiet
- * as the doorway needs it to be. The rest of the OS still warms 15 seconds
- * later (lib/WarmRoutes.tsx), invisibly; it renders nothing.
+ * THE BOX AND NOTHING ELSE (Juan, 2026-08-28). There is no queue under it or
+ * anywhere else: a note files, asks which store right there, or fails loud.
+ * The rest of the OS still warms 15 seconds later (lib/WarmRoutes.tsx),
+ * invisibly; it renders nothing.
  */
 export default function VisitPage() {
   return (

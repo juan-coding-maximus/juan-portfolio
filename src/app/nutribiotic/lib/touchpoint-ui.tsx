@@ -3,14 +3,17 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setPotentialJuan, setReadiness } from "./account-actions";
-import { decideCalendarProposal } from "./calendar-actions";
 import type { Tier } from "./dal";
 import type { Readiness } from "./priority";
+import { HubspotRetry } from "./hubspot-retry-ui";
 import { AccountMatchResolver } from "./new-account-ui";
-import { NextStepResolver } from "./next-step-ui";
-import { ResolvingRow } from "./queue-ui";
 import { ReviewCard } from "./review-ui";
-import { previewTouchpoint, type RecordTouchpointResult, type TouchpointDraft } from "./touchpoint";
+import {
+  previewTouchpoint,
+  type FiledTouchpoint as Filed,
+  type RecordTouchpointResult,
+  type TouchpointDraft,
+} from "./touchpoint";
 import { Ico, SuccessNote } from "./ui";
 
 /**
@@ -87,7 +90,7 @@ function writeDraft(value: string, accountIdHint?: string | null): void {
   }
 }
 
-export type FiledTouchpoint = Extract<RecordTouchpointResult, { ok: true; needsAccount: false; needsNextStep: false }>;
+export type FiledTouchpoint = Filed;
 
 /**
  * One capture surface for whatever just happened: type it, optionally attach
@@ -171,11 +174,10 @@ export function TouchpointCapture({
   const [kindTouched, setKindTouched] = useState(Boolean(lockKind ?? defaultKind));
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<RecordTouchpointResult | null>(null);
-  // A clean file (matched, no follow-up needed) gets its own confirmation
-  // beat instead of sitting in `result` indefinitely: show it, refresh the
-  // lists below so the just-filed activity is already gone from the queue,
-  // then drop back to a blank capture on its own. needsAccount/error stay in
-  // `result` since those need Juan to read and act, not a timed dismiss.
+  // A clean file gets its own confirmation beat instead of sitting in
+  // `result` indefinitely: show it, refresh the page, then drop back to a
+  // blank capture on its own (unless HubSpot missed, see the effect below).
+  // needsAccount/error stay in `result` since those need Juan to act.
   const [success, setSuccess] = useState<FiledTouchpoint | null>(null);
   // The size read he formed at the door, applied to whatever account the note
   // lands on. Held here rather than written immediately because the account is
@@ -208,6 +210,8 @@ export function TouchpointCapture({
   useEffect(() => {
     if (!success) return;
     router.refresh();
+    // A HubSpot miss stays on screen with its Retry until he taps past it.
+    if (!success.hubspotFiled && success.hubspotError) return;
     const t = setTimeout(() => setSuccess(null), 2200);
     return () => clearTimeout(t);
   }, [success, router]);
@@ -309,10 +313,19 @@ export function TouchpointCapture({
     const value = text;
     if (!value.trim() || pending) return;
     startTransition(async () => {
-      const preview = await previewTouchpoint(value, accountIdHint, {
-        kindOverride: kindTouched ? kind : undefined,
-        forceNewAccount: newCompany,
-      });
+      setResult(null);
+      let preview: Awaited<ReturnType<typeof previewTouchpoint>>;
+      try {
+        preview = await previewTouchpoint(value, accountIdHint, {
+          kindOverride: kindTouched ? kind : undefined,
+          forceNewAccount: newCompany,
+        });
+      } catch (e) {
+        // A dropped connection or a server crash says so, loud, with the
+        // note still in the box.
+        setResult({ ok: false, error: `Not logged: ${e instanceof Error ? e.message : String(e)}` });
+        return;
+      }
       if (!preview.ok) {
         setResult(preview);
         return;
@@ -325,21 +338,11 @@ export function TouchpointCapture({
         return;
       }
       const res = preview.result;
-      if (res.ok && !res.needsAccount && !res.needsNextStep) {
+      if (res.ok && !res.needsAccount) {
         handleFiled(res);
       } else {
-        // Parked (needs an account, or an account but no stated next step) or
-        // failed: the text stays in the box AND in storage. This is the case
-        // where the rep still has work to do on this note. The account is
-        // already known on a needsNextStep park, so the grade/readiness he
-        // picked at the door can go on right now rather than waiting on the
-        // popup below to resolve.
-        if (res.ok && res.needsNextStep) {
-          if (grade) void setPotentialJuan(res.accountId, grade);
-          if (readiness) void setReadiness(res.accountId, readiness);
-        }
-        if (res.ok && pendingPhoto) void attachPhoto(res.touchpoint_id, pendingPhoto);
-        if (res.ok) setPendingPhoto(null);
+        // Which store, or a failure: nothing was written, the text stays in
+        // the box AND in storage, and the photo waits with it.
         setResult(res);
       }
     });
@@ -359,6 +362,7 @@ export function TouchpointCapture({
               hubspotFiled={success.hubspotFiled}
               hubspotId={success.hubspotNoteId}
               hubspotError={success.hubspotError}
+              hubspotRetry={<HubspotRetry activityId={success.activityId} />}
               meta={
                 <>
                   {(success.peopleAdded > 0 || success.peopleUpdated > 0 || (success.routeDirectives ?? 0) > 0) && (
@@ -578,19 +582,40 @@ export function TouchpointCapture({
       </div>
 
       {result && !result.ok && (
-        <div className="mt-3 rounded-md border border-[#E5D9BF] bg-[#FBF6E9] px-3 py-2.5 text-[13px] leading-relaxed text-[#8A6D2F]">
-          {result.error}
+        <div
+          role="alert"
+          className="mt-3 flex items-start justify-between gap-3 rounded-md border border-[#E7C9C5] bg-[#FBEFED] px-3 py-2.5 text-[13px] leading-relaxed text-[#8A2E2E]"
+        >
+          <span className="flex items-start gap-1.5">
+            <span className="mt-[3px] shrink-0">
+              <Ico name="alert" size={12} />
+            </span>
+            <span>{result.error}</span>
+          </span>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={pending || !text.trim()}
+            className="shrink-0 rounded-md bg-[#8A2E2E] px-2.5 py-1 text-[12px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+          >
+            Try again
+          </button>
         </div>
       )}
 
       {result?.ok && result.needsAccount && (
         <AccountMatchResolver
-          touchpointId={result.touchpoint_id}
+          key={result.rawText}
+          note={{ rawText: result.rawText, parsed: result.parsed, occurredAt: result.occurredAt }}
           nameGuess={result.businessNameGuess}
           matchAccountId={result.matchAccountId}
           matchAccountName={result.matchAccountName}
           pendingGrade={grade}
           pendingReadiness={readiness}
+          onSuccess={(touchpointId) => {
+            if (pendingPhoto && touchpointId) void attachPhoto(touchpointId, pendingPhoto);
+            setPendingPhoto(null);
+          }}
           onResolved={() => {
             // Fires 5s after the resolver's own success note lands (or on a
             // tap to skip the wait, same pattern as `success` above). Clears
@@ -609,105 +634,6 @@ export function TouchpointCapture({
         />
       )}
 
-      {result?.ok && !result.needsAccount && result.needsNextStep && (
-        <NextStepResolver
-          touchpointId={result.touchpoint_id}
-          accountName={result.accountName}
-          onResolved={() => {
-            // Same clear-and-reset as AccountMatchResolver's onResolved above.
-            setText("");
-            writeDraft("", accountIdHint);
-            setKind(lockKind ?? defaultKind ?? "meeting");
-            setGrade(null);
-            setReadiness_(null);
-            setNewCompany(false);
-            setResult(null);
-            requestAnimationFrame(() => textareaRef.current && autosize(textareaRef.current));
-          }}
-        />
-      )}
     </div>
-  );
-}
-
-export type ProposalRowData = {
-  id: string;
-  title: string;
-  kind: string;
-  starts_at: string | null;
-  notes: string | null;
-};
-
-export function CalendarProposalRow({
-  proposal,
-  onGone,
-}: {
-  proposal: ProposalRowData;
-  /** Lets the list drop this row once it has finished leaving. Without it the
-   *  row still resolves, it just stays on screen as its own confirmation. */
-  onGone?: () => void;
-}) {
-  const [pending, startTransition] = useTransition();
-  const [done, setDone] = useState<"Approved" | "Dismissed" | null>(null);
-
-  function decide(decision: "approved" | "dismissed") {
-    startTransition(async () => {
-      await decideCalendarProposal(proposal.id, decision);
-      setDone(decision === "approved" ? "Approved" : "Dismissed");
-    });
-  }
-
-  // The confirmation beat, then the row goes (lib/queue-ui.tsx). This used to
-  // return null the instant the write landed, which is a silent success: the
-  // row you tapped simply disappeared, and a tap that did nothing looked
-  // identical (Juan, 2026-08-14, on the same failure mode in Outbound).
-  if (done) {
-    return (
-      <li>
-        <ResolvingRow resolved onGone={() => onGone?.()}>
-          <div className="px-4 py-3">
-            <SuccessNote title={`${done}: ${proposal.title}`} />
-          </div>
-        </ResolvingRow>
-      </li>
-    );
-  }
-
-  const when = proposal.starts_at
-    ? new Date(proposal.starts_at).toLocaleString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      })
-    : "no time stated";
-
-  return (
-    <li className="flex items-center gap-3 px-4 py-3">
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[14px] font-medium">{proposal.title}</div>
-        <div className="mt-0.5 truncate text-[12px] text-[#8A928C]">
-          {proposal.kind} · {when}
-          {proposal.notes ? ` · ${proposal.notes}` : ""}
-        </div>
-      </div>
-      <div className="flex shrink-0 gap-1.5">
-        <button
-          onClick={() => decide("dismissed")}
-          disabled={pending}
-          className="rounded-md border border-[#E2DFD5] px-2.5 py-1.5 text-[12px] text-[#5B6560] transition-colors hover:bg-[#FAF9F5] disabled:opacity-40"
-        >
-          Dismiss
-        </button>
-        <button
-          onClick={() => decide("approved")}
-          disabled={pending}
-          className="rounded-md bg-[#14201B] px-2.5 py-1.5 text-[12px] font-medium text-[#F7F6F1] transition-opacity hover:opacity-90 disabled:opacity-40"
-        >
-          Approve
-        </button>
-      </div>
-    </li>
   );
 }

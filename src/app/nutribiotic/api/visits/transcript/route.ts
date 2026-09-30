@@ -41,6 +41,13 @@ export async function POST(req: Request) {
     await patchVisitRecording(recordingId, { status: "error", transcript, error: result.error });
     return Response.json({ ok: false, error: result.error });
   }
+  // No confident store: nothing is parked. The recording fails loud with the
+  // transcript kept, so it can be sent again with the account named.
+  if (result.needsAccount) {
+    const error = `Not filed: couldn't tell which account ${result.businessNameGuess ? `"${result.businessNameGuess}"` : "this visit"} is.`;
+    await patchVisitRecording(recordingId, { status: "error", transcript, error });
+    return Response.json({ ok: false, needs_account: true, error });
+  }
 
   await patchVisitRecording(recordingId, {
     status: "processed",

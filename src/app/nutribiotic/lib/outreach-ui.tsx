@@ -4,7 +4,6 @@ import { useMemo, useState, useTransition } from "react";
 import { AttachmentButton, attachmentNote } from "./attachments-ui";
 import type { MarketingFile } from "./dal";
 import type { RecordTouchpointResult } from "./touchpoint";
-import { NextStepResolver } from "./next-step-ui";
 import { recordOutreachSent } from "./outreach-actions";
 import { draftOutreachMessage, type LastDraftLite } from "./outreach-draft";
 import { matches, rankMatches } from "./search-match";
@@ -242,9 +241,14 @@ export function OutreachComposer({
   function markSent() {
     if (!account || pending || !openedChannel) return;
     startTransition(async () => {
-      const res = await recordOutreachSent(account.id, recipientLabel, finalMessage, openedChannel);
+      let res: RecordTouchpointResult;
+      try {
+        res = await recordOutreachSent(account.id, recipientLabel, finalMessage, openedChannel);
+      } catch (e) {
+        res = { ok: false, error: e instanceof Error ? e.message : String(e) };
+      }
       setResult(res);
-      if (res.ok) setOpenedChannel(null);
+      if (res.ok && !res.needsAccount) setOpenedChannel(null);
     });
   }
 
@@ -514,7 +518,7 @@ export function OutreachComposer({
             </div>
           </div>
 
-          {openedChannel && !result && (
+          {openedChannel && !(result?.ok && !result.needsAccount) && (
             <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-[#E2DFD5] bg-[#FAF9F5] px-3 py-2.5">
               <p className="text-[13px] text-[#3D4A44]">
                 Sent it in {openedChannel === "whatsapp" ? "WhatsApp" : "Messages"}? File it to the OS and
@@ -530,33 +534,24 @@ export function OutreachComposer({
             </div>
           )}
 
-          {result?.ok && !result.needsAccount && result.needsNextStep && (
-            <NextStepResolver
-              touchpointId={result.touchpoint_id}
-              accountName={result.accountName}
-              onResolved={() => setResult(null)}
-            />
-          )}
-
-          {result && !(result.ok && !result.needsAccount && result.needsNextStep) && (
+          {result && (
             <div
+              role={result.ok && !result.needsAccount ? undefined : "alert"}
               className={`mt-3 rounded-md border px-3 py-2.5 text-[13px] leading-relaxed ${
-                result.ok
+                result.ok && !result.needsAccount
                   ? "border-[#E2DFD5] bg-[#FAF9F5] text-[#3D4A44]"
-                  : "border-[#E5D9BF] bg-[#FBF6E9] text-[#8A6D2F]"
+                  : "border-[#E7C9C5] bg-[#FBEFED] text-[#8A2E2E]"
               }`}
             >
-              {result.ok ? (
-                result.needsAccount ? (
-                  <>Logged, but couldn&apos;t confidently match an account.</>
-                ) : (
-                  <>
-                    Filed to <span className="font-medium">{result.accountName}</span>. HubSpot Note is queued
-                    for the next dry-run-then-write pass, same gate as clientos.
-                  </>
-                )
+              {result.ok && !result.needsAccount ? (
+                <>
+                  Filed to <span className="font-medium">{result.accountName}</span>
+                  {result.hubspotFiled ? " and HubSpot." : `. Not filed to HubSpot${result.hubspotError ? `: ${result.hubspotError}` : ""}.`}
+                </>
+              ) : result.ok ? (
+                <>Not filed: the account on this conversation did not match. Nothing was saved; tap Mark as sent again.</>
               ) : (
-                result.error
+                <>Not filed: {result.error}</>
               )}
             </div>
           )}

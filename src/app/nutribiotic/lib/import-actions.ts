@@ -6,8 +6,7 @@ import { setImportDecision, type ImportDecision } from "./dal";
 /**
  * The human gate on the import path.
  *
- * Mirrors decideCalendarProposal exactly, and for the same reason: the click
- * RECORDS a decision, it does not execute one. Nothing reaches nb_accounts here.
+ * The click RECORDS a decision, it does not execute one. Nothing reaches nb_accounts here.
  * bridges/nutribiotic/promote_import.py is what applies decided rows, run
  * deliberately from a terminal.
  *

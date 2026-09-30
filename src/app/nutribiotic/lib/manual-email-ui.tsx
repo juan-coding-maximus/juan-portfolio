@@ -9,6 +9,7 @@
  * same contract as decideDraft's "Mark sent" path (see outbound-actions.ts).
  */
 
+import { HubspotRetry } from "./hubspot-retry-ui";
 import { useMemo, useState } from "react";
 import type { DraftSentResult } from "./outbound-actions";
 import { recordManualEmail } from "./outbound-actions";
@@ -101,6 +102,7 @@ export function ManualEmailComposer({ accounts, contacts }: { accounts: Account[
           hubspotFiled={result.hubspotFiled}
           hubspotId={result.hubspotNoteId}
           hubspotError={result.hubspotError}
+          hubspotRetry={<HubspotRetry activityId={result.activityId ?? null} />}
         />
         <button type="button" onClick={() => { reset(); setOpen(false); }} className={`${ghostBtn} mt-3`}>
           Done

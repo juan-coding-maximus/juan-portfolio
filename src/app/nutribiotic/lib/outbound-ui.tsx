@@ -1,5 +1,6 @@
 "use client";
 
+import { HubspotRetry } from "./hubspot-retry-ui";
 import { useState } from "react";
 import { AttachmentButton, attachmentNote } from "./attachments-ui";
 import type { Draft, MarketingFile } from "./dal";
@@ -450,6 +451,7 @@ export function DraftActions({
             hubspotFiled={sentResult.hubspotFiled}
             hubspotId={sentResult.hubspotNoteId}
             hubspotError={sentResult.hubspotError}
+            hubspotRetry={<HubspotRetry activityId={sentResult.activityId ?? null} />}
           />
         ) : (
           <SuccessNote

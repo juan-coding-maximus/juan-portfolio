@@ -982,21 +982,6 @@ export async function findRecentDuplicateEngagement(
   return null;
 }
 
-/** Activities Juan has logged (any door) that have never crossed into HubSpot,
- * for the Visit tab's filing queue. Synthetic rows are excluded at the query
- * rather than left for the caller to filter, same rule hubspot_notes.py's
- * own synthetic guard enforces at write time. */
-export async function listUnfiledActivities(limit = 20): Promise<Result<EngagementActivity>> {
-  return query<EngagementActivity>("nb_activities", {
-    select: "id,account_id,contact_id,at,logged_at,kind,direction,actor,outcome,detail,hubspot_engagement_id,origin",
-    hubspot_engagement_id: "is.null",
-    account_id: "not.is.null",
-    origin: "neq.synthetic",
-    order: "at.desc",
-    limit,
-  });
-}
-
 /** Write-once stamp, mirrors hubspot_notes.py's stamp(): the is.null filter is
  * belt-and-braces with the DB trigger (migration 0002:236-247) that already
  * rejects a second write. Returns the row if this call did the stamping,
@@ -1730,44 +1715,6 @@ export async function getTouchpointParsedForActivity(activityId: number): Promis
   return res.data[0]?.parsed ?? null;
 }
 
-/**
- * Every touchpoint still parked as needs_account, oldest first (a rep reads
- * a queue top-down, same as the calendar-proposals list below it).
- *
- * WHY THIS EXISTS SEPARATELY FROM THE JUST-TYPED RESULT. The Visit tab's
- * TouchpointCapture only shows the AccountMatchResolver for the note Juan
- * just typed in that exact page load. A voice-recorded visit resolves
- * async, after transcription, on nobody's screen, so without this list it
- * parks invisibly until someone opens Claude Code and asks for it by hand
- * (confirmed 2026-08-19, t_345d5c). This list is what a recorded visit's
- * pending match surfaces on, same pills, same "YES!", same SuccessNote.
- */
-export async function listPendingAccountMatches(limit = 10): Promise<Result<Touchpoint>> {
-  return query<Touchpoint>("nb_touchpoints", {
-    select: "id,account_id,raw_text,status,account_match_confidence,activity_id,parsed,origin,created_at",
-    status: "eq.needs_account",
-    order: "created_at.asc",
-    limit,
-  });
-}
-
-/**
- * The same invisible-park problem listPendingAccountMatches exists for
- * (2026-08-19, t_345d5c: a voice-recorded visit resolves async, after
- * transcription, on nobody's screen), now for the next-step gate
- * (touchpoint.ts, 2026-09-10). Unlike a needs_account row, account_id is
- * always set here, since the gate only parks once the account is already
- * known; there is no low-confidence guess to carry.
- */
-export async function listPendingNextSteps(limit = 10): Promise<Result<Touchpoint>> {
-  return query<Touchpoint>("nb_touchpoints", {
-    select: "id,account_id,raw_text,status,account_match_confidence,activity_id,parsed,origin,created_at",
-    status: "eq.needs_next_step",
-    order: "created_at.asc",
-    limit,
-  });
-}
-
 /** id -> name for a handful of accounts, to label a "Client Match:" pill
  * without pulling the whole 500-row book the way recordTouchpoint() does. */
 export async function getAccountNames(ids: string[]): Promise<Record<string, string>> {
@@ -2287,119 +2234,6 @@ export async function resolveAccountForEmail(
   if (!account.hubspot_company_id) return null; // never linked to a real portal company; nothing to file to
 
   return { account_id: accountId, contact_id: contacts[0].id };
-}
-
-export async function getTouchpointById(id: string): Promise<Touchpoint | null> {
-  const res = await query<Touchpoint>("nb_touchpoints", {
-    select: "*",
-    id: `eq.${id}`,
-    limit: 1,
-  });
-  return res.data[0] ?? null;
-}
-
-/** Once a needs_account touchpoint has an account (Juan confirmed a match or
- * a just-created business), stamp it filed. Guarded to never re-file a
- * touchpoint that already has one. */
-export async function finalizeTouchpointAccount(
-  id: string,
-  accountId: string,
-  activityId: number,
-): Promise<Touchpoint | null> {
-  const rows = await mutate<Touchpoint>(
-    "nb_touchpoints",
-    "PATCH",
-    { account_id: accountId, status: "parsed", activity_id: activityId },
-    { id: `eq.${id}`, status: "eq.needs_account" },
-  );
-  return rows[0] ?? null;
-}
-
-/** Drops a parked touchpoint out of the queues for good (a smoke test, a
- * note-to-self that leaked into needs_account, anything Juan says was never
- * a real client). Soft delete, not a row removal: `status` moves to
- * "discarded" rather than the row disappearing, so the trail survives (root
- * AGENTS.md P7) and it never resurfaces to listPendingAccountMatches or
- * listPendingNextSteps, both of which filter on status. Guarded to only ever
- * discard a row still actually parked, same double-submit shape as
- * finalizeTouchpointAccount. */
-export async function discardTouchpoint(id: string, fromStatus: "needs_account" | "needs_next_step"): Promise<Touchpoint | null> {
-  const rows = await mutate<Touchpoint>(
-    "nb_touchpoints",
-    "PATCH",
-    { status: "discarded" },
-    { id: `eq.${id}`, status: `eq.${fromStatus}` },
-  );
-  return rows[0] ?? null;
-}
-
-/** Once a needs_next_step touchpoint has Juan's stated next step (typed into
- * the Visit tab's popup, or the explicit "none needed"), stamp it filed.
- * `parsed` carries the next_step back in, since that is the only field the
- * popup changed; the row's account_id was already set when it parked. Same
- * guard shape as finalizeTouchpointAccount, so a double-submit race patches
- * once and the second call comes back null rather than re-filing. */
-export async function finalizeTouchpointNextStep(
-  id: string,
-  activityId: number,
-  parsed: unknown,
-): Promise<Touchpoint | null> {
-  const rows = await mutate<Touchpoint>(
-    "nb_touchpoints",
-    "PATCH",
-    { status: "parsed", activity_id: activityId, parsed },
-    { id: `eq.${id}`, status: "eq.needs_next_step" },
-  );
-  return rows[0] ?? null;
-}
-
-export type CalendarProposal = {
-  id: string;
-  touchpoint_id: string | null;
-  account_id: string | null;
-  account_name?: string;
-  kind: "meeting" | "reminder" | "visit";
-  title: string;
-  starts_at: string | null;
-  duration_minutes: number;
-  notes: string | null;
-  status: "pending" | "approved" | "dismissed" | "created";
-  gcal_event_id: string | null;
-  origin: Origin;
-  created_at: string;
-};
-
-// nb_calendar_proposals IS READ-ONLY FROM HERE ON (Juan's standing order,
-// 2026-09-03). There is deliberately no insert helper any more. A stated
-// return visit is a route instruction, queued in nb_directives against
-// nutribiotic-route-planner by touchpoint.ts, because a return visit gets
-// scheduled by landing on an upcoming route with its stated time honoured,
-// not by an event this app puts on his real Google Calendar. The table and
-// the two helpers below stay so the rows already in it remain visible and
-// closable; nothing creates a new one.
-
-/** Pending follow-ups, oldest-starting first. This is the human gate: nothing
- * here has touched Google Calendar yet. Legacy rows only, see above. */
-export async function listCalendarProposals(limit = 20): Promise<Result<CalendarProposal>> {
-  return query<CalendarProposal>("nb_calendar_proposals", {
-    select: "*",
-    status: "eq.pending",
-    order: "starts_at.asc.nullslast,created_at.asc",
-    limit,
-  });
-}
-
-export async function setCalendarProposalStatus(
-  id: string,
-  status: "approved" | "dismissed",
-): Promise<CalendarProposal> {
-  const [row] = await mutate<CalendarProposal>(
-    "nb_calendar_proposals",
-    "PATCH",
-    { status, decided_at: new Date().toISOString() },
-    { id: `eq.${id}` },
-  );
-  return row;
 }
 
 // ---------------------------------------------------------------------------

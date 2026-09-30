@@ -1,12 +1,12 @@
 "use server";
 
 /**
- * The new-business path off a needs_account touchpoint (Visit tab). Juan
- * names a store that was not in the book, this looks it up on Google Places,
- * and once he confirms the right one, creates the OS account, the HubSpot
- * company (dedupe-checked portal-wide first), and files the visit he already
- * recorded against it, all in one flow, so a first-time stop takes one more
- * tap instead of a trip to the Clients screen later.
+ * The new-business path off a note whose store could not be named with
+ * confidence (Visit tab). Juan names a store that was not in the book, this
+ * looks it up on Google Places, and once he confirms the right one, creates
+ * the OS account, the HubSpot company (dedupe-checked portal-wide first), and
+ * files the note he just wrote against it, all in one flow. Nothing about the
+ * note is saved until then: it rides in as `note` from the capture screen.
  */
 
 import { revalidatePath } from "next/cache";
@@ -14,7 +14,10 @@ import { getAccountByHubspotCompanyId, getLastVisitedLocationToday, insertAccoun
 import { createCompany, findPossibleDuplicates, type DuplicateCandidate } from "./hubspot-company";
 import { OWNER_ID } from "./hubspot";
 import { searchPlaces, type PlaceCandidate } from "./places";
-import { resolveTouchpointToAccount, type ResolveResult } from "./touchpoint";
+import { fileTouchpointToAccount, type ParsedTouchpoint, type ResolveResult } from "./touchpoint";
+
+/** The note held on the capture screen while its store is picked. */
+export type PendingNote = { rawText: string; parsed: ParsedTouchpoint; occurredAt: string | null };
 
 export type BusinessSearchOutcome = { ok: true; candidates: PlaceCandidate[] } | { ok: false; error: string };
 
@@ -47,6 +50,9 @@ export type CreateBusinessOutcome =
       accountId: string;
       accountName: string;
       companyId: string;
+      /** What a Retry HubSpot tap refiles when the first file failed. */
+      activityId: number | null;
+      touchpointId: string;
       summary: string;
       peopleAdded: number;
       peopleUpdated: number;
@@ -65,7 +71,7 @@ export type CreateBusinessOutcome =
  * default path.
  */
 export async function createBusinessFromPlace(
-  touchpointId: string,
+  note: PendingNote,
   place: PlaceCandidate,
   opts: { force?: boolean } = {},
 ): Promise<CreateBusinessOutcome> {
@@ -102,13 +108,13 @@ export async function createBusinessFromPlace(
 
     await linkAccountHubspotCompany(account.id, companyId, OWNER_ID, "Juan Arenas Martin");
 
-    const filed = await resolveTouchpointToAccount(touchpointId, account.id, account.name);
+    const filed = await fileTouchpointToAccount(note.rawText, note.parsed, account.id, account.name, note.occurredAt);
     if (!filed.ok) {
       // The account and company exist even though filing the visit failed;
       // say both things rather than hiding the partial success.
       return {
         ok: false,
-        error: `Created the account and HubSpot company, but filing the visit failed: ${filed.error}. Add it by hand from the account profile.`,
+        error: `Created ${account.name} in the OS and HubSpot, but the note did not file: ${filed.error}. Tap Log again and pick ${account.name}.`,
       };
     }
 
@@ -118,10 +124,12 @@ export async function createBusinessFromPlace(
       accountId: account.id,
       accountName: account.name,
       companyId,
+      activityId: filed.activityId,
+      touchpointId: filed.touchpoint_id,
       summary: filed.summary,
       peopleAdded: filed.peopleAdded,
       peopleUpdated: filed.peopleUpdated,
-      routeDirectives: filed.routeDirectives,
+      routeDirectives: filed.routeDirectives ?? 0,
       hubspotFiled: filed.hubspotFiled,
       hubspotNoteId: filed.hubspotNoteId,
       hubspotError: filed.hubspotError,
@@ -134,7 +142,7 @@ export async function createBusinessFromPlace(
 /**
  * The other half of the duplicate block above: when findPossibleDuplicates
  * turns up a company that IS actually the store Juan just visited, this
- * files the touchpoint against the local account behind it instead of
+ * files the note against the local account behind it instead of
  * forcing a choice between "create a second company" and losing the note.
  *
  * Only resolves if that company is already linked to one of Juan's own
@@ -143,7 +151,7 @@ export async function createBusinessFromPlace(
  * hand, same as hubspot_create_company.py's own owner check, not a tap.
  */
 export async function linkTouchpointToExistingCompany(
-  touchpointId: string,
+  note: PendingNote,
   hubspotCompanyId: string,
 ): Promise<ResolveResult> {
   try {
@@ -154,7 +162,7 @@ export async function linkTouchpointToExistingCompany(
         error: "That company isn't linked to one of your accounts, so it can't be picked here.",
       };
     }
-    return await resolveTouchpointToAccount(touchpointId, account.id, account.name);
+    return await fileTouchpointToAccount(note.rawText, note.parsed, account.id, account.name, note.occurredAt);
   } catch (e) {
     // Same contract as createBusinessFromPlace above: a raw DB/HubSpot error
     // must never reach Juan as an unhandled server-action rejection. Tapping

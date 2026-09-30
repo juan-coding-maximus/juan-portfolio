@@ -202,6 +202,7 @@ export function SuccessNote({
   hubspotFiled,
   hubspotId,
   hubspotError,
+  hubspotRetry,
   meta,
 }: {
   title: string;
@@ -209,6 +210,9 @@ export function SuccessNote({
   hubspotFiled?: boolean;
   hubspotId?: string | null;
   hubspotError?: string | null;
+  /** The control that retries a failed HubSpot file in place (HubspotRetry).
+   *  There is no queue to wait in. */
+  hubspotRetry?: ReactNode;
   meta?: ReactNode;
 }) {
   return (
@@ -219,11 +223,12 @@ export function SuccessNote({
       </div>
       {detail && <div className="mt-1 text-[#5B6560]">{detail}</div>}
       {hubspotFiled !== undefined && (
-        <div className={`mt-1.5 flex items-center gap-1.5 text-[12px] ${hubspotFiled ? "text-[#8A928C]" : "text-[#8A6D2F]"}`}>
+        <div className={`mt-1.5 flex flex-wrap items-center gap-1.5 text-[12px] ${hubspotFiled ? "text-[#8A928C]" : "text-[#8A2E2E]"}`}>
           <Ico name={hubspotFiled ? "check" : "alert"} size={11} />
           {hubspotFiled
             ? `Filed to HubSpot${hubspotId ? ` (${hubspotId})` : ""}.`
-            : `Not filed to HubSpot yet: ${hubspotError ?? "unknown error"}. It's waiting in the queue below to retry.`}
+            : `Not filed to HubSpot${hubspotError ? `: ${hubspotError}` : ""}.`}
+          {!hubspotFiled && hubspotRetry}
         </div>
       )}
       {meta}

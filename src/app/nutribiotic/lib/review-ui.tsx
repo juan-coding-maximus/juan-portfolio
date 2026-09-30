@@ -9,10 +9,10 @@
  * Touch any field and the countdown stops; nothing commits until the green
  * "Looks good" is pressed. Touch nothing and it commits itself.
  *
- * Field notes, a needs-account park, and a needs-next-step park never reach
- * this screen: they already have their own explicit-tap gate downstream
- * (AccountMatchResolver / NextStepResolver), so previewTouchpoint routes
- * them straight through unchanged.
+ * Field notes never reach this screen, and neither does a note with no
+ * confident store: that one stops at AccountMatchResolver with nothing
+ * written. A note with no stated next step does come here, and the Next
+ * step field is where one gets typed before it commits.
  */
 
 import { useEffect, useRef, useState } from "react";

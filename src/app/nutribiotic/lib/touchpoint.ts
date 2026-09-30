@@ -30,12 +30,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { revalidatePath } from "next/cache";
 import {
   applyAccountFacts,
-  discardTouchpoint as discardTouchpointRow,
-  finalizeTouchpointAccount,
-  finalizeTouchpointNextStep,
   getAccount,
   getPriorityBook,
-  getTouchpointById,
   getVoiceContext,
   insertActivity,
   insertCloseSignal,
@@ -278,8 +274,8 @@ export type ParsedTouchpoint = {
   /**
    * The concrete next action for this account, plainly stated, or an honest
    * null when the note never addresses what happens next (the common case).
-   * Never invented: see EXTRACT_TOOL's own description and needsNextStep
-   * below, which is what asks Juan directly rather than guessing one.
+   * Never invented by the extractor. A note without one still files; the
+   * review card is where Juan types one if he wants it on the record.
    */
   next_step: string | null;
   directives?: ParsedDirective[];
@@ -635,76 +631,64 @@ RULES, all absolute:
 - next_step is a short, concrete statement of what happens with this account next, written so a different rep could act on it without rereading the note. Fill it whenever the text states or clearly implies a next action, INCLUDING an explicit "no follow-up" ("he said no", "nothing further, not interested", "all set for now"). The bar is that it NAMES the action: "bring a GSE sample Thursday", "call Maria back about case pricing", "email the catalog to the buyer". A vague "follow up", "check in", "touch base" or "circle back" with no stated object is NOT a next action, and is left null so the rep gets asked directly rather than shipped a line nobody can act on. Leave it null when the text is silent, or only that vague; the rep is asked one short question and answers in his own words, which is always better than a guess. Never invent a next step, and never turn a vague phrase into a specific-sounding one.`;
 }
 
+/** A note that landed: an activity (or a field note) exists and, unless
+ *  the caller opted out, it has been filed to HubSpot. */
+export type FiledTouchpoint = {
+  ok: true;
+  needsAccount: false;
+  touchpoint_id: string;
+  accountName: string | null;
+  /** The account this landed on. Carried back so the capture surface can
+   * apply a grade Juan picked while typing, without a second lookup. */
+  accountId: string | null;
+  /** The nb_activities row this call/visit was filed as, null for a field
+   *  note (isFieldNote true), which never gets one, see HARD RULE 17. Also
+   *  what a Retry HubSpot tap refiles. */
+  activityId: number | null;
+  /** True when nothing about this was a customer contact: it lives in
+   *  nb_field_notes, counts as a touchpoint, and never reaches HubSpot. */
+  isFieldNote?: boolean;
+  /** Every nb_directives row queued by this note: agency instructions plus
+   *  stated return visits, aimed at the route planner. */
+  directiveCount?: number;
+  routeDirectives?: number;
+  summary: string;
+  peopleAdded: number;
+  peopleUpdated: number;
+  hubspotFiled: boolean;
+  hubspotNoteId: string | null;
+  hubspotError: string | null;
+  hubspotLeaks: number;
+  companyPhoneFilled: string | null;
+  companyPhoneConflict: string | null;
+  accountFacts: AccountFactsReport | null;
+};
+
+/**
+ * NOTHING IS EVER PARKED (Juan, 2026-09-30: "queue should never exist").
+ * A note either files, or it comes back as needsAccount with nothing written
+ * anywhere: the capture surface asks which store right there (the model's
+ * best guess, a Places search, a new company) and sends the SAME parse back
+ * through fileTouchpointToAccount, or it fails loud. A note with no stated
+ * next step files without one; the review card is where one gets added.
+ */
 export type RecordTouchpointResult =
+  | FiledTouchpoint
   | {
       ok: true;
-      touchpoint_id: string;
-      accountName: string | null;
-      /** The account this landed on. Carried back so the capture surface can
-       * apply a grade Juan picked while typing, without a second lookup. */
-      accountId: string | null;
-      /** The nb_activities row this call/visit was actually filed as, null
-       *  for a field note (isFieldNote true), which never gets one, see
-       *  HARD RULE 17. See nb_sdr_schedule (0061): a scheduled item links to
-       *  this rather than duplicating what happened in its own text. */
-      activityId: number | null;
-      needsAccount: false;
-      needsNextStep: false;
-      /** True when nothing about this was a customer contact: it lives in
-       *  nb_field_notes, counts as a touchpoint, and never reaches HubSpot. */
-      isFieldNote?: boolean;
-      /** Every nb_directives row queued by this note: agency instructions
-       *  plus stated return visits. Queued, never executed on arrival. */
-      directiveCount?: number;
-      /** The return-visit subset, aimed at nutribiotic-route-planner. These
-       *  replace what used to be nb_calendar_proposals rows: a stated return
-       *  lands on an upcoming route, never on Juan's Google Calendar. */
-      routeDirectives?: number;
-      summary: string;
-      peopleAdded: number;
-      peopleUpdated: number;
-      hubspotFiled: boolean;
-      hubspotNoteId: string | null;
-      hubspotError: string | null;
-      hubspotLeaks: number;
-      companyPhoneFilled: string | null;
-      companyPhoneConflict: string | null;
-      accountFacts: AccountFactsReport | null;
-    }
-  | {
-      ok: true;
-      touchpoint_id: string;
-      accountName: null;
       needsAccount: true;
-      needsNextStep: false;
       summary: string;
       businessNameGuess: string | null;
       // The model's own low-confidence guess at an EXISTING account, surfaced
-      // as the "Client Match:" pill (see AccountMatchResolver) rather than
-      // discarded. Only ever set when account_confidence is "low": "none"
-      // means the model found no plausible candidate at all, and a "high"
-      // match auto-files below rather than landing here.
+      // as the "Client Match:" pill (see AccountMatchResolver). Only set on
+      // "low": "none" means no plausible candidate, "high" files directly.
       matchAccountId: string | null;
       matchAccountName: string | null;
-      peopleAdded: 0;
-      peopleUpdated: 0;
-      /** Nothing is queued until the note has an account: a return visit with
-       *  no store to return to is not yet a route instruction. It rides in
-       *  `parsed` and is queued by resolveTouchpointToAccount. */
-      routeDirectives: 0;
-    }
-  | {
-      ok: true;
-      /** Account resolved, but the note never says what happens next.
-       *  Parked (nb_touchpoints.status = 'needs_next_step'); nothing is
-       *  filed to HubSpot until Juan answers the popup (see
-       *  resolveTouchpointNextStep) or explicitly says none is needed. */
-      touchpoint_id: string;
-      needsAccount: false;
-      needsNextStep: true;
-      accountId: string;
-      accountName: string | null;
-      summary: string;
+      /** The note and its parse, held by the caller until the store is
+       *  picked. Nothing about this note exists in the database yet. */
+      rawText: string;
+      parsed: ParsedTouchpoint;
+      occurredAt: string | null;
     }
   | { ok: false; error: string };
 
@@ -717,7 +701,7 @@ export async function recordTouchpoint(
     kindOverride?: "meeting" | "call" | "email" | "field_note";
     /**
      * Juan already knows this is not one of his 273. Skip account matching
-     * entirely and park straight into the create-a-business flow.
+     * entirely and go straight to the pick-the-store step (Places / new company).
      *
      * This is an accuracy control, not a shortcut. The matcher's failure mode
      * is confidently attaching a brand-new store to a similarly-named existing
@@ -815,8 +799,8 @@ async function continueTouchpoint(
   // written. What was missing was a way for a note to be about nothing.
   //
   // So: no activity row (nb_activities.account_id is `not null`, which is the
-  // constraint that forces the invention of a company), no needs_account
-  // parking, no HubSpot. A field note keeps its touchpoint credit in
+  // constraint that forces the invention of a company), no account to pick,
+  // no HubSpot. A field note keeps its touchpoint credit in
   // nb_field_notes and its account link only when the note is genuinely about
   // that account.
   if (parsed.activity.kind === "field_note") {
@@ -862,7 +846,6 @@ async function continueTouchpoint(
       accountId: noteAccount?.account_id ?? null,
       activityId: null,
       needsAccount: false,
-      needsNextStep: false,
       isFieldNote: true,
       directiveCount,
       routeDirectives: routeRows.length,
@@ -882,7 +865,7 @@ async function continueTouchpoint(
   // Explicit account picked by the rep in the UI always wins over the model's guess.
   // Only a "high" confidence match auto-files to an existing account; "low" is the
   // model's own hedge that the name match may be wrong (e.g. a same-named store in a
-  // different city) and must park as needs_account like "none" does, not silently file.
+  // different city) and must ask which store like "none" does, not silently file.
   // forceNewAccount outranks even a "high" match: the rep is looking at the
   // storefront, the model is looking at a name.
   const accountId = opts.forceNewAccount
@@ -890,70 +873,34 @@ async function continueTouchpoint(
     : accountIdHint || (parsed.account_confidence === "high" ? parsed.account_id : null);
 
   if (!accountId) {
-    const tp = await insertTouchpoint({
-      account_id: null,
-      raw_text: text,
-      status: "needs_account",
-      account_match_confidence: parsed.account_confidence,
-      parsed,
-    });
-    // A "low" guess still names a real candidate id; "none" never does (see
-    // the extraction prompt above). Resolve it to a name now, once, rather
-    // than making the client look it up.
-    // Suppressed under forceNewAccount: offering a one-tap "YES!" match to an
-    // existing account directly contradicts the rep having just declared this
-    // one new, and re-opens the wrong-attach path the flag exists to close.
-    // The safety net moves downstream and gets stronger there:
-    // createBusinessFromPlace runs findPossibleDuplicates against the WHOLE
-    // portal (not just Juan's book) and blocks on any hit.
+    // Nothing is written: the caller asks which store and files this exact
+    // parse through fileTouchpointToAccount. A "low" guess names a real
+    // candidate id; "none" never does. Suppressed under forceNewAccount: a
+    // one-tap match to an existing account contradicts the rep having just
+    // declared this one new (createBusinessFromPlace's portal-wide duplicate
+    // check is the safety net there).
     const matchAccount =
       !opts.forceNewAccount && parsed.account_confidence === "low" && parsed.account_id
         ? accountsRes.data.find((a) => a.account_id === parsed.account_id)
         : null;
     return {
       ok: true,
-      touchpoint_id: tp.id,
-      accountName: null,
       needsAccount: true,
-      needsNextStep: false,
       summary: parsed.activity?.detail ?? text.slice(0, 140),
       businessNameGuess: parsed.business_name_guess ?? null,
       matchAccountId: matchAccount?.account_id ?? null,
       matchAccountName: matchAccount?.name ?? null,
-      peopleAdded: 0,
-      peopleUpdated: 0,
-      routeDirectives: 0,
+      rawText: text,
+      parsed,
+      occurredAt: occurredAt ?? null,
     };
   }
 
   const account = accountsRes.data.find((a) => a.account_id === accountId);
   const accountName = account?.name ?? null;
 
-  // THE NEXT STEP IS NEVER LEFT TO CHANCE (Juan, 2026-09-10). A note that
-  // resolved to a real account but never says what happens next parks here
-  // instead of filing: the Visit tab asks him directly (see
-  // resolveTouchpointNextStep below) rather than letting a HubSpot record go
-  // out with no next step at all, which is what this whole gate exists to
-  // stop. A field note never reaches this line (it returned above).
-  if (!parsed.next_step || !parsed.next_step.trim()) {
-    const parked = await insertTouchpoint({
-      account_id: accountId,
-      raw_text: text,
-      status: "needs_next_step",
-      account_match_confidence: accountIdHint ? "high" : parsed.account_confidence,
-      parsed,
-    });
-    return {
-      ok: true,
-      touchpoint_id: parked.id,
-      needsAccount: false,
-      needsNextStep: true,
-      accountId,
-      accountName,
-      summary: parsed.activity.detail,
-    };
-  }
-
+  // A note with no stated next step files as it is. The next step is part of
+  // the record when he said one, never a reason to hold the note back.
   return finishTouchpoint({
     accountId,
     accountName,
@@ -966,13 +913,12 @@ async function continueTouchpoint(
 }
 
 /**
- * The shared tail once an account and a next step are both known: files the
- * nb_activities row, the close-signal check, account facts, contact
- * matching, the touchpoint row itself (inserted fresh on the straight-through
- * path, patched in place when the next-step gate above already parked one),
- * directives, outreach asks, and the HubSpot file. Both recordTouchpoint's
- * direct-match path and resolveTouchpointNextStep call this, so a change to
- * any one of those rules never has to be remembered in two places.
+ * The shared tail once the account is known: files the nb_activities row,
+ * the close-signal check, account facts, contact matching, the touchpoint
+ * row, directives, outreach asks, and the HubSpot file. recordTouchpoint's
+ * direct-match path, the review card's commit and fileTouchpointToAccount
+ * all call this, so a change to any one of those rules never has to be
+ * remembered in two places.
  */
 async function finishTouchpoint(input: {
   accountId: string;
@@ -980,13 +926,9 @@ async function finishTouchpoint(input: {
   parsed: ParsedTouchpoint;
   occurredAt?: string | null;
   autoFileHubspot: boolean;
-  /** An existing parked row (status needs_next_step) to patch in place
-   *  instead of inserting a new one. Undefined on the straight-through path,
-   *  where no row exists yet. */
-  existingTouchpointId?: string;
   rawText: string;
   accountMatchConfidence: string | null;
-}): Promise<Extract<RecordTouchpointResult, { ok: true; needsAccount: false; needsNextStep: false }>> {
+}): Promise<FiledTouchpoint> {
   const { accountId, accountName, parsed, occurredAt, autoFileHubspot } = input;
 
   const activity = await insertActivity({
@@ -1087,16 +1029,14 @@ async function finishTouchpoint(input: {
     else if (outcome === "updated") peopleUpdated += 1;
   }
 
-  const tp = input.existingTouchpointId
-    ? await finalizeTouchpointNextStep(input.existingTouchpointId, activity.id, parsed)
-    : await insertTouchpoint({
-        account_id: accountId,
-        raw_text: input.rawText,
-        status: "parsed",
-        account_match_confidence: input.accountMatchConfidence,
-        activity_id: activity.id,
-        parsed,
-      });
+  const tp = await insertTouchpoint({
+    account_id: accountId,
+    raw_text: input.rawText,
+    status: "parsed",
+    account_match_confidence: input.accountMatchConfidence,
+    activity_id: activity.id,
+    parsed,
+  });
 
   // A real customer visit can carry BOTH a directive and a return visit, and
   // until now this path queued neither: insertDirectives only ran on the
@@ -1133,7 +1073,7 @@ async function finishTouchpoint(input: {
 
   return {
     ok: true,
-    touchpoint_id: tp?.id ?? input.existingTouchpointId ?? "",
+    touchpoint_id: tp.id,
     accountName,
     accountId,
     // Carried back so a caller that scheduled this contact (the SDR page) can
@@ -1141,7 +1081,6 @@ async function finishTouchpoint(input: {
     // keeping a second opinion about what happened. See nb_sdr_schedule (0061).
     activityId: activity.id,
     needsAccount: false,
-    needsNextStep: false,
     directiveCount,
     routeDirectives: routeRows.length,
     summary: parsed.activity.detail,
@@ -1153,15 +1092,11 @@ async function finishTouchpoint(input: {
 }
 
 /**
- * The one case that used to go straight to HubSpot with no human in the
- * loop at all: a matched account (his own pick, or the model's own "high"
- * confidence) with a stated next step. Field notes never touch HubSpot to
- * begin with; needs_account and needs_next_step already stop at their own
- * dedicated screen (AccountMatchResolver / NextStepResolver) before either
- * one ever reaches finishTouchpoint. Those three keep working exactly as
- * they always have; only this one path gets a hold-and-review step, since
- * it is the one that previously had none (Juan, 2026-09-15, after a note
- * filed to HubSpot he expected to be asked about first).
+ * A matched note (his own pick, or the model's own "high" confidence) is
+ * held for the review card before it reaches HubSpot (Juan, 2026-09-15,
+ * after a note filed he expected to be asked about first). Field notes never
+ * touch HubSpot; a note with no confident store stops at AccountMatchResolver
+ * with nothing written until he picks one.
  */
 export type TouchpointDraft = {
   rawText: string;
@@ -1238,8 +1173,10 @@ export async function previewTouchpoint(
   const resolvedAccountId = opts.forceNewAccount
     ? null
     : accountIdHint || (parsed.account_confidence === "high" ? parsed.account_id : null);
-  const isReviewable =
-    parsed.activity.kind !== "field_note" && Boolean(resolvedAccountId) && Boolean(parsed.next_step && parsed.next_step.trim());
+  // A matched note is always reviewable, next step or not: the review card
+  // is where a missing next step gets typed, and it commits on its own
+  // timeout either way. Nothing waits in a queue for one.
+  const isReviewable = parsed.activity.kind !== "field_note" && Boolean(resolvedAccountId);
 
   if (!isReviewable) {
     const result = await continueTouchpoint(text, parsed, accountsRes, accountIdHint, null, true, opts, now);
@@ -1306,7 +1243,7 @@ export async function commitTouchpointDraft(
     nextStep?: string;
     contact?: { firstName: string | null; lastName: string | null; title: string | null; phone: string | null; email: string | null };
   } = {},
-): Promise<Extract<RecordTouchpointResult, { ok: true; needsAccount: false; needsNextStep: false }>> {
+): Promise<FiledTouchpoint> {
   const parsed = draft.raw;
   if (overrides.hubspotSummary !== undefined) parsed.activity.hubspot_summary = overrides.hubspotSummary;
   if (overrides.nextStep !== undefined) parsed.next_step = overrides.nextStep;
@@ -1342,186 +1279,49 @@ export async function commitTouchpointDraft(
   });
 }
 
-export type ResolveResult =
-  | {
-      ok: true;
-      accountId: string;
-      accountName: string;
-      summary: string;
-      peopleAdded: number;
-      peopleUpdated: number;
-      directiveCount: number;
-      routeDirectives: number;
-      hubspotFiled: boolean;
-      hubspotNoteId: string | null;
-      hubspotError: string | null;
-      hubspotLeaks: number;
-      companyPhoneFilled: string | null;
-      companyPhoneConflict: string | null;
-    }
-  | { ok: false; error: string };
+export type ResolveResult = FiledTouchpoint | { ok: false; error: string };
 
 /**
- * A touchpoint that parked as needs_account, now that an account exists for
- * it (Juan confirmed a match, or lib/new-account-actions.ts just created one
- * from Google Places). Re-uses the SAME parse the touchpoint already carries
- * rather than calling Claude a second time: he already saw that summary once,
- * asking the model to redo it risks a second, slightly different answer to
- * the exact words he already confirmed.
+ * A note whose store was picked on the spot (the model's low-confidence
+ * guess confirmed, an existing company the duplicate check found, or a new
+ * account just created from Google Places). Files the SAME parse the capture
+ * already showed rather than calling Claude again: a second extraction risks
+ * a different answer to the words he already read.
  */
-export async function resolveTouchpointToAccount(
-  touchpointId: string,
+export async function fileTouchpointToAccount(
+  rawText: string,
+  parsed: ParsedTouchpoint,
   accountId: string,
   accountName: string,
+  occurredAt: string | null = null,
 ): Promise<ResolveResult> {
-  const tp = await getTouchpointById(touchpointId);
-  if (!tp) return { ok: false, error: "That touchpoint no longer exists." };
-  if (tp.status !== "needs_account") {
-    return { ok: false, error: `Touchpoint is already ${tp.status}, not needs_account.` };
-  }
-  const parsed = tp.parsed as ParsedTouchpoint | null;
-  if (!parsed) return { ok: false, error: "That touchpoint has no parsed data to file." };
-  // The create-a-business exit is exactly how four notes to self became
-  // companies in the shared portal on 2026-09-02. A field note has no business
-  // to be resolved to, and reaching this function with one means the capture
-  // path leaked, so it stops here rather than filing an activity and an
-  // engagement on whatever account the caller had in hand.
+  const text = rawText.trim();
+  if (!text || !parsed?.activity) return { ok: false, error: "That note has nothing to file. Log it again." };
+  // A field note has no business to be resolved to; reaching here with one
+  // means the capture path leaked, so it stops rather than filing an activity
+  // and an engagement on whatever account the caller had in hand.
   if (parsed.activity.kind === "field_note") {
     return { ok: false, error: "That is a field note. It stays in the OS and is never filed to an account." };
   }
-
-  const activity = await insertActivity({
-    account_id: accountId,
-    kind: parsed.activity.kind,
-    direction: parsed.activity.direction,
-    outcome: parsed.activity.outcome,
-    detail: parsed.activity.detail,
-  });
-
-  const linked = await finalizeTouchpointAccount(touchpointId, accountId, activity.id);
-  if (!linked) return { ok: false, error: "Touchpoint was already resolved by another request." };
-
-  const existing = await listContacts(accountId);
-  let peopleAdded = 0;
-  let peopleUpdated = 0;
-  for (const p of parsed.people ?? []) {
-    const outcome = await reconcileContact(accountId, existing.data, p);
-    if (outcome === "added") peopleAdded += 1;
-    else if (outcome === "updated") peopleUpdated += 1;
+  try {
+    const filed = await finishTouchpoint({
+      accountId,
+      accountName,
+      parsed,
+      occurredAt,
+      autoFileHubspot: true,
+      rawText: text,
+      accountMatchConfidence: "high",
+    });
+    revalidatePath("/nutribiotic/visit");
+    return filed;
+  } catch (e) {
+    return { ok: false, error: `Not filed: ${e instanceof Error ? e.message : String(e)}` };
   }
-
-  // Same queue as the straight-through path above. This note parked as
-  // needs_account when it was spoken, so its follow-up has been waiting for an
-  // account to attach to; now it has one, it goes to the route planner.
-  const routeRows = returnVisitDirectiveRows(parsed.calendar_actions, null, accountId, accountName);
-  const directiveCount = await insertDirectives([
-    ...agencyDirectiveRows(parsed.directives, null, accountId),
-    ...routeRows,
-  ]);
-  await fileOutreachAsks(parsed.outreach_asks, accountId, tp.raw_text);
-
-  const hubspot = await autoFileEngagement(activity.id);
-
-  await maybeMarkStopServiced(accountId, parsed.activity.kind, hubspot.hubspotFiled);
-
-  revalidatePath("/nutribiotic/visit");
-  return {
-    ok: true,
-    accountId,
-    accountName,
-    summary: parsed.activity.detail,
-    peopleAdded,
-    peopleUpdated,
-    directiveCount,
-    routeDirectives: routeRows.length,
-    ...hubspot,
-  };
 }
 
-export type DiscardResult = { ok: true } | { ok: false; error: string };
-
-/**
- * Juan's one-tap fix for a touchpoint that should never have parked here at
- * all, a smoke test from building this screen, a note-to-self that leaked
- * past the field_note gate, anything he says outright isn't a real client
- * (Juan, 2026-09-23: these should never even have been there, and clearing
- * one should be immediate). Marks the row discarded rather than deleting it,
- * same auditability contract as every other state change (root AGENTS.md
- * P7): the row stays queryable, it just stops surfacing in
- * listPendingAccountMatches / listPendingNextSteps, both of which filter on
- * status, so a discarded row can never resurface in the queue.
- */
-export async function discardTouchpoint(
-  touchpointId: string,
-  fromStatus: "needs_account" | "needs_next_step",
-): Promise<DiscardResult> {
-  const row = await discardTouchpointRow(touchpointId, fromStatus);
-  if (!row) {
-    return { ok: false, error: "That note was already resolved or discarded by another request." };
-  }
-  revalidatePath("/nutribiotic/visit");
-  revalidatePath("/nutribiotic/clients");
-  return { ok: true };
-}
-
-/**
- * Juan answers the next-step popup (Visit tab's NextStepResolver). The
- * account is already known here: the gate in recordTouchpoint above only
- * ever parks a touchpoint at needs_next_step once it has a resolved
- * account_id, so this only needs the one line he typed, or the explicit "no
- * follow-up needed" the popup offers as its own button rather than a silent
- * default. Runs through the same finishTouchpoint tail as the straight-
- * through path, so accountFacts, the close-signal check, contact matching,
- * directives and the HubSpot file behave identically no matter which door
- * supplied the next step.
- */
-export async function resolveTouchpointNextStep(
-  touchpointId: string,
-  nextStepText: string,
-): Promise<ResolveResult> {
-  const stated = nextStepText.trim();
-  if (!stated) return { ok: false, error: "Type the next step, or tap None needed." };
-
-  const tp = await getTouchpointById(touchpointId);
-  if (!tp) return { ok: false, error: "That touchpoint no longer exists." };
-  if (tp.status !== "needs_next_step") {
-    return { ok: false, error: `Touchpoint is already ${tp.status}, not needs_next_step.` };
-  }
-  if (!tp.account_id) return { ok: false, error: "That touchpoint has no account to file against." };
-  const parsed = tp.parsed as ParsedTouchpoint | null;
-  if (!parsed) return { ok: false, error: "That touchpoint has no parsed data to file." };
-
-  parsed.next_step = stated;
-
-  const accountRes = await getAccount(tp.account_id);
-  const account = accountRes.data[0];
-  if (!account) return { ok: false, error: "That account no longer exists." };
-
-  const filed = await finishTouchpoint({
-    accountId: tp.account_id,
-    accountName: account.name,
-    parsed,
-    autoFileHubspot: true,
-    existingTouchpointId: touchpointId,
-    rawText: tp.raw_text,
-    accountMatchConfidence: tp.account_match_confidence,
-  });
-
-  revalidatePath("/nutribiotic/visit");
-  return {
-    ok: true,
-    accountId: tp.account_id,
-    accountName: filed.accountName ?? account.name,
-    summary: filed.summary,
-    peopleAdded: filed.peopleAdded,
-    peopleUpdated: filed.peopleUpdated,
-    directiveCount: filed.directiveCount ?? 0,
-    routeDirectives: filed.routeDirectives ?? 0,
-    hubspotFiled: filed.hubspotFiled,
-    hubspotNoteId: filed.hubspotNoteId,
-    hubspotError: filed.hubspotError,
-    hubspotLeaks: filed.hubspotLeaks,
-    companyPhoneFilled: filed.companyPhoneFilled,
-    companyPhoneConflict: filed.companyPhoneConflict,
-  };
+/** The Retry HubSpot tap on a logged note whose HubSpot file failed. The
+ *  activity is already in the OS; this only carries it across again. */
+export async function retryHubspotFiling(activityId: number): Promise<HubspotFilingReport> {
+  return autoFileEngagement(activityId);
 }
