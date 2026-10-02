@@ -69,7 +69,7 @@ Items 3, 10, 12 and 14 are activities I had not listed; they were already in the
 - **What it is.** Booking a set time with the buyer by phone or email, then running the whole visit
   inside that appointment.
 - **How it moves revenue.** It buys the decision maker's attention, which a walk-in rarely gets. It is
-  how Plameca's own reps book meetings: call ahead, then a reminder email (Sales Playbook §10).
+  how Plameca's own reps book meetings: call ahead, then a reminder email (Sales Playbook section 10).
 - **How I prioritize it.** Grade A and B first, 91 accounts, of which only 10 ordered in 18 months.
 - **How I improve it.** One call script and one request email, approved once and reused. Mark every
   visit as scheduled or walk-in, so the close rate of each becomes measurable.
@@ -94,9 +94,9 @@ Items 3, 10, 12 and 14 are activities I had not listed; they were already in the
   those grades hold 77 percent of the book's recent revenue. This is where seeing better clients
   pays.
 - **How I prioritize it.** Grade A first, worked in route clusters, never alphabetically. Open with
-  "what changed" before any pitch (Sales Playbook §3).
+  "what changed" before any pitch (Sales Playbook section 3).
 - **How I improve it.** Set the number of touches before an account is parked with a dated note. I
-  propose 3, which fills the open TODO in Sales Playbook §6.
+  propose 3, which fills the open TODO in Sales Playbook section 6.
 - **Evidence.** Dormant accounts had no order follow any touch since logging began. Measure: first
   reorder per reactivated account, once fresh ERP orders land.
 
@@ -138,7 +138,7 @@ Items 3, 10, 12 and 14 are activities I had not listed; they were already in the
   whether the account is worth a second.
 - **How I prioritize it.** Prospects scored 50 or higher get a visit; under 50 get a call or email.
 - **How I improve it.** Log every sample dropped, and put a follow-up call 7 days later onto a route.
-  Run the golden minute from Sales Playbook §10.
+  Run the golden minute from Sales Playbook section 10.
 - **Evidence.** 1 new account since logging began: 3 touches, 15 days to first order. Sample drops
   are not recorded anywhere yet.
 
@@ -187,7 +187,7 @@ Items 3, 10, 12 and 14 are activities I had not listed; they were already in the
   Armando named it, with follow-up, as the habit he repeats most.
 - **How I prioritize it.** A pilot at 2 grade A accounts.
 - **How I improve it.** Measure each pilot by a reorder within 60 days.
-- **Evidence.** Not piloted yet (In-Store Program §4).
+- **Evidence.** Not piloted yet (In-Store Program section 4).
 
 ### 13. Recording the visit · leave alone
 Every visit is filed to the OS and HubSpot from one extractor, typed, spoken or recorded. Keep doing
@@ -213,5 +213,5 @@ speed.
   not committed).
 - HQ terms and discounts: `nutribiotic/HQ-REFERENCE.md`, policy sheet effective 01/01/25.
 - Reorder median: `GOALS.md`, measured 2026-08-02.
-- Plameca meeting framework and Armando's habits: `sales-playbook.md` §10.
+- Plameca meeting framework and Armando's habits: `sales-playbook.md` section 10.
 - Tooling: `nutribiotic/AGENTS.md`.
