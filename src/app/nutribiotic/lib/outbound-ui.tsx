@@ -578,13 +578,8 @@ export function DraftActions({
           >
             Open in Outlook &rarr;
           </a>
-          {outlook.bodyOmitted && (
-            <>
-              <CopyBodyButton body={finalBody} />
-              <span className="text-[12px] text-[#8A6D2F]">
-                {tableBody ? "Copy the body, then paste it into the open message." : "Too long to prefill. Outlook opens addressed; paste the body in."}
-              </span>
-            </>
+          {outlook.bodyOmitted && <CopyBodyButton body={finalBody} />}
+        </>
           )}
         </>
       )}
