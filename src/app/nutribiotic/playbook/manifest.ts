@@ -26,6 +26,14 @@ export const DOCS: PlaybookDoc[] = [
     group: "The ladder",
   },
   {
+    slug: "field-activities",
+    file: "field-activities.md",
+    title: "Field Activities by Revenue",
+    blurb:
+      "Every job in the field ranked by how it moves revenue, sorted into focus, improve the method, or leave alone. Proposed, awaiting my approval.",
+    group: "Playbooks",
+  },
+  {
     slug: "notes-to-self",
     file: "notes-to-self.md",
     title: "Notes to Self",
