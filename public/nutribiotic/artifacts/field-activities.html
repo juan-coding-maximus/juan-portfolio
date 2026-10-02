@@ -1,0 +1,440 @@
+<meta charset="utf-8">
+<title>Field Activities by Revenue</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@400;500;600;700&display=swap">
+
+<style>
+  :root {
+    --ground:#F7F6F1; --card:#FFFFFF; --sunken:#EFEDE5; --badge:#ECEAE1;
+    --ink:#14201B; --muted:#5B6560; --faint:#8A928C; --border:#E2DFD5; --border-hi:#CFCBBD;
+    --accent:#2C6A46; --accent-soft:#E4EEE7; --on-accent:#FFFFFF;
+    --cascade:#A32C7E; --cascade-soft:#F6E4F0;
+    --rust:#A8542B; --rust-soft:#F5E5DA;
+    --serif:"Fraunces","Iowan Old Style",Charter,Georgia,serif;
+    --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    --lift: 0 10px 28px -16px rgba(20,32,27,.38), 0 2px 6px -3px rgba(20,32,27,.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:#101512; --card:#171D19; --sunken:#1D2420; --badge:#232B26;
+      --ink:#E8EBE6; --muted:#9BA49E; --faint:#727B76; --border:#28302B; --border-hi:#3A443E;
+      --accent:#5FBE87; --accent-soft:#182B20; --on-accent:#0c140f;
+      --cascade:#E479C4; --cascade-soft:#2E1A28;
+      --rust:#D98A5A; --rust-soft:#2E1E14;
+      --lift: 0 10px 28px -16px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#101512; --card:#171D19; --sunken:#1D2420; --badge:#232B26;
+    --ink:#E8EBE6; --muted:#9BA49E; --faint:#727B76; --border:#28302B; --border-hi:#3A443E;
+    --accent:#5FBE87; --accent-soft:#182B20; --on-accent:#0c140f;
+    --cascade:#E479C4; --cascade-soft:#2E1A28;
+    --rust:#D98A5A; --rust-soft:#2E1E14;
+    --lift: 0 10px 28px -16px rgba(0,0,0,.8);
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body { background:var(--ground); color:var(--ink); font-family:var(--sans); font-size:16px; line-height:1.55;
+         margin:0; padding:0 max(1rem, env(safe-area-inset-right)) 5rem max(1rem, env(safe-area-inset-left));
+         -webkit-font-smoothing:antialiased; -webkit-tap-highlight-color:transparent; }
+  .wrap { max-width:62rem; margin:0 auto; }
+  a { color:var(--accent); }
+  :focus-visible { outline:2px solid var(--cascade); outline-offset:3px; border-radius:4px; }
+  h1,h2,h3 { font-family:var(--serif); font-weight:500; margin:0; }
+  i { font-style:normal; }
+
+  header { padding:2.25rem 0 1.5rem; border-bottom:1px solid var(--border); }
+  h1 { font-size:clamp(2.1rem,6vw,3.3rem); line-height:1.04; letter-spacing:-0.022em; margin-bottom:.7rem; }
+  .lede { font-size:1.05rem; color:var(--muted); margin:0 0 1rem; }
+  .stamp { font-size:.82rem; color:var(--faint); }
+  .stamp b { color:var(--muted); font-weight:600; margin-right:.35rem; }
+
+  section { padding:2.5rem 0 0; scroll-margin-top:1rem; }
+  h2 { font-size:1.55rem; line-height:1.15; letter-spacing:-0.015em; margin-bottom:.9rem; }
+  .sub { color:var(--muted); font-size:.95rem; margin:-.5rem 0 1rem; }
+  .h3 { font-size:1.15rem; letter-spacing:-0.01em; margin:2rem 0 .8rem; }
+
+  .goals { display:grid; gap:.9rem; grid-template-columns:1fr; }
+  .goal { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:1.25rem 1.2rem 1.15rem 1.35rem; position:relative; overflow:hidden; }
+  .goal::before { content:""; position:absolute; inset:0 auto 0 0; width:3px; background:var(--accent); }
+  .goal .n { font-family:var(--serif); font-size:.95rem; color:var(--accent); font-weight:500; }
+  .goal h3 { font-size:1.28rem; line-height:1.22; letter-spacing:-0.012em; margin:.3rem 0 1rem; }
+  .goal dl { margin:0; display:grid; grid-template-columns:1fr; gap:.15rem; font-size:.9rem; }
+  .goal dt { color:var(--faint); font-weight:600; font-size:.8rem; margin-top:.6rem; }
+  .goal dd { margin:0; color:var(--muted); overflow-wrap:anywhere; }
+  .meter { margin-top:1.15rem; }
+  .bar { height:6px; background:var(--sunken); border-radius:99px; overflow:hidden; }
+  .bar i { display:block; height:100%; background:var(--accent); border-radius:99px; transform-origin:left; animation:grow .9s cubic-bezier(.2,.8,.2,1) both; }
+  .cap { display:flex; justify-content:space-between; gap:1rem; font-size:.78rem; color:var(--faint); margin-top:.45rem; }
+  .cap span:last-child { color:var(--muted); font-weight:600; white-space:nowrap; }
+  @keyframes grow { from { transform:scaleX(0); } to { transform:scaleX(1); } }
+
+  .stats { display:grid; grid-template-columns:repeat(6,1fr); gap:.6rem; }
+  .stat { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:.9rem .9rem .85rem; }
+  .stat { grid-column:span 6; }
+  .stat.small { grid-column:span 3; }
+  .stat.lead .v { font-size:2.6rem; }
+  .stat.lead .l { font-size:.92rem; }
+  .stat .v { font-family:var(--serif); font-size:1.65rem; line-height:1.05; letter-spacing:-0.02em; font-weight:500; color:var(--ink); }
+  .stat .l { font-size:.82rem; color:var(--muted); margin-top:.4rem; line-height:1.35; }
+  .stat .s { font-size:.74rem; color:var(--faint); margin-top:.3rem; }
+  .cliff { margin:1.4rem 0 0; color:var(--ink); font-size:1rem; line-height:1.55; }
+  .cliff b { font-weight:600; color:var(--rust); }
+  .chartcard { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:1.1rem 1.1rem .7rem; margin-top:1.4rem; }
+  .chartcard h3 { font-size:1.05rem; letter-spacing:-0.01em; margin-bottom:.9rem; }
+  .crow { display:grid; grid-template-columns:5.6rem 1fr 4.3rem; align-items:center; gap:.65rem; padding:.42rem 0; border-top:1px solid var(--border); }
+  .crow:first-of-type { border-top:0; }
+  .cg { font-weight:600; font-size:.9rem; line-height:1.15; }
+  .cg span { display:block; font-weight:400; font-size:.72rem; color:var(--faint); margin-top:.1rem; }
+  .track { height:14px; position:relative; }
+  .fill { position:absolute; inset:0 auto 0 0; width:var(--w); background:var(--accent); border-radius:4px; transform-origin:left; animation:grow .9s cubic-bezier(.2,.8,.2,1) both; }
+  .fill.low { background:var(--faint); opacity:.55; }
+  .cv { text-align:right; font-weight:600; font-size:.9rem; font-variant-numeric:tabular-nums; }
+
+  .grp i { width:.55rem; height:.55rem; border-radius:99px; display:inline-block; flex:none; }
+  .focus i { background:var(--accent); }
+  .improve i { background:var(--muted); }
+  .leave i { background:transparent; border:1.5px solid var(--faint); }
+  .ladder { display:grid; gap:.5rem; }
+  .grp { font-family:var(--sans); font-size:.92rem; font-weight:700; display:flex; align-items:center; gap:.5rem; margin:1.4rem 0 .2rem; padding-bottom:.5rem; border-bottom:1px solid var(--border); }
+  .grp:first-child { margin-top:0; }
+  .rank { background:var(--card); border:1px solid var(--border); border-radius:12px; position:relative; transition:box-shadow .2s ease, border-color .2s ease; scroll-margin-top:1rem; }
+  .rank::before { content:""; position:absolute; inset:.7rem auto .7rem 0; width:3px; border-radius:0 3px 3px 0; background:var(--border-hi); }
+  .rank.focus::before { background:var(--accent); }
+  .rank.improve::before { background:var(--border-hi); }
+  .rank.top { border-color:var(--border-hi); box-shadow:var(--lift); padding:.15rem 0; }
+  .rank.top::before { inset:.9rem auto .9rem 0; width:4px; }
+  .rank[open] { border-color:var(--border-hi); }
+  summary { list-style:none; cursor:pointer; display:grid; grid-template-columns:auto 1fr auto; gap:.8rem; align-items:start; padding:.85rem .9rem .85rem 1rem; border-radius:12px; transition:background .12s ease; -webkit-user-select:none; user-select:none; }
+  summary::-webkit-details-marker { display:none; }
+  summary:active { background:var(--sunken); }
+  .num { font-family:var(--serif); font-size:1.15rem; font-weight:500; width:2rem; height:2rem; border-radius:99px; background:var(--badge); color:var(--ink); display:grid; place-items:center; line-height:1; margin-top:.05rem; }
+  .rank.top .num { background:var(--accent); color:var(--on-accent); width:2.4rem; height:2.4rem; font-size:1.3rem; }
+  .main { display:block; min-width:0; }
+  .nm { display:block; font-weight:600; font-size:.98rem; line-height:1.3; letter-spacing:-0.005em; }
+  .rank.top .nm { font-family:var(--serif); font-weight:500; font-size:1.2rem; line-height:1.2; letter-spacing:-0.012em; }
+  .chips { display:flex; flex-wrap:wrap; gap:.3rem; margin-top:.5rem; }
+  .lv { font-size:.72rem; font-weight:500; padding:.14rem .5rem; border-radius:99px; background:var(--badge); color:var(--muted); white-space:nowrap; }
+  .chev { color:var(--faint); margin-top:.4rem; transition:transform .28s cubic-bezier(.3,1.2,.4,1); }
+  details[open] > summary .chev { transform:rotate(90deg); }
+  .drawer { padding:.1rem 1rem 1.1rem 1rem; }
+  .drawer dl { margin:0; display:grid; gap:.1rem; }
+  .drawer dt { font-weight:600; font-size:.82rem; color:var(--accent); margin-top:.7rem; }
+  .drawer dt:last-of-type { color:var(--muted); }
+  .drawer dd { margin:0; font-size:.92rem; color:var(--muted); line-height:1.55; overflow-wrap:anywhere; }
+  .one { margin:.1rem 0 0; font-size:.92rem; color:var(--muted); }
+
+
+  .gates { list-style:none; margin:0; padding:0; display:grid; gap:.5rem; }
+  .gate { display:grid; grid-template-columns:auto 1fr; gap:.2rem .8rem; align-items:start; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:.85rem 1rem; position:relative; }
+  .gc { grid-column:2; display:flex; flex-wrap:wrap; gap:.35rem; margin-top:.35rem; }
+  .gn { font-family:var(--serif); font-size:1.1rem; width:2rem; height:2rem; display:grid; place-items:center; border-radius:99px; background:var(--badge); grid-row:span 2; }
+  .gb { display:block; }
+  .gt { display:block; font-weight:600; font-size:.98rem; line-height:1.3; }
+  .gl { display:block; font-size:.88rem; color:var(--muted); margin-top:.15rem; }
+  .gate.lift { box-shadow:var(--lift); border-color:var(--border-hi); padding:1.1rem 1rem; }
+  .gate.lift::before { content:""; position:absolute; inset:.9rem auto .9rem 0; width:4px; border-radius:0 3px 3px 0; background:var(--accent); }
+  .gate.lift .gn { background:var(--accent); color:var(--on-accent); width:2.4rem; height:2.4rem; font-size:1.25rem; }
+  .gate.lift .gt { font-family:var(--serif); font-weight:500; font-size:1.2rem; letter-spacing:-0.012em; }
+
+  .chip { display:inline-block; font-size:.72rem; font-weight:600; padding:.18rem .55rem; border-radius:99px; background:var(--badge); color:var(--muted); white-space:nowrap; }
+  .chip.reversible { background:transparent; border:1px solid var(--border-hi); color:var(--muted); }
+  .chip.final { background:transparent; border:1px solid var(--ink); color:var(--ink); }
+  .chip.g1 { background:var(--accent-soft); color:var(--accent); }
+  .chip.g2 { background:var(--cascade-soft); color:var(--cascade); }
+
+  .deck { display:grid; gap:.8rem; grid-template-columns:1fr; }
+  .deck.quiet { margin-top:1.4rem; }
+  .act { display:flex; flex-direction:column; background:var(--card); border:1px solid var(--border); border-radius:14px; overflow:hidden; transition:border-color .16s ease; }
+  .act:hover { border-color:var(--cascade); }
+  .act.heavy { border-color:var(--border-hi); box-shadow:var(--lift); }
+  .go { display:flex; flex-direction:column; flex:1; text-decoration:none; color:inherit; padding:1.15rem 1.15rem 1rem; transition:transform .12s ease-out, background .12s ease-out; }
+  .go:active { transform:scale(.985); background:var(--sunken); }
+  .act .top { display:flex; align-items:flex-start; justify-content:space-between; gap:.75rem; margin-bottom:.9rem; }
+  .act .label { font-family:var(--serif); font-weight:500; font-size:1.1rem; line-height:1.2; letter-spacing:-0.01em; }
+  .act.heavy .label { font-size:1.3rem; }
+  .act.heavy .go { padding:1.35rem 1.25rem 1.1rem; }
+  .cascade { position:relative; padding-left:1.05rem; margin-bottom:.9rem; }
+  .cascade::before { content:""; position:absolute; left:.19rem; top:.45rem; bottom:1rem; width:2px; background:var(--cascade); opacity:.6; }
+  .cascade .step { position:relative; display:block; font-size:.86rem; color:var(--muted); padding:0 0 .45rem; }
+  .cascade .step::before { content:""; position:absolute; left:-1.05rem; top:.46rem; width:.42rem; height:.42rem; border-radius:99px; background:var(--cascade); }
+  .wall { position:relative; display:block; font-size:.88rem; font-weight:600; color:var(--rust); background:var(--rust-soft); border-radius:8px; padding:.5rem .65rem; margin-top:.1rem; }
+  .wall::before { content:""; position:absolute; left:-1.05rem; top:.78rem; width:.55rem; height:.55rem; background:var(--rust); border-radius:1px; }
+  .wall b { display:block; font-size:.76rem; font-weight:600; opacity:.85; }
+  .clear { position:relative; display:block; font-size:.88rem; color:var(--accent); font-weight:600; padding-top:.05rem; }
+  .clear::before { content:""; position:absolute; left:-1.05rem; top:.4rem; width:.55rem; height:.55rem; background:var(--accent); border-radius:99px; }
+  .foot { margin-top:auto; font-size:.8rem; color:var(--faint); border-top:1px solid var(--border); padding-top:.7rem; }
+  .cmdrow { border-top:1px solid var(--border); padding:.75rem 1.15rem .5rem; background:var(--sunken); display:grid; gap:.3rem; }
+  .cmdlab { font-size:.76rem; font-weight:600; color:var(--faint); }
+  .cmdtext { font-size:.78rem; line-height:1.5; color:var(--muted); overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; line-clamp:3; overflow:hidden; cursor:pointer; }
+  .cmdtext.open { -webkit-line-clamp:unset; line-clamp:unset; display:block; overflow:visible; }
+  .cmdact { min-height:44px; display:flex; justify-content:space-between; align-items:center; gap:.5rem; }
+  .copy { font:inherit; font-size:.78rem; font-weight:600; color:var(--accent); background:var(--card); border:1px solid var(--border-hi); border-radius:99px; padding:.3rem 1rem; cursor:pointer; min-width:5rem; min-height:32px; position:relative; transition:transform .1s ease-out; }
+  .more { font:inherit; font-size:.8rem; font-weight:600; color:var(--muted); background:transparent; border:0; min-height:44px; min-width:44px; padding:0 .25rem; cursor:pointer; }
+  .copy::after { content:""; position:absolute; inset:-6px -4px; }
+  .copy:active { transform:scale(.95); }
+  .more:active { opacity:.55; }
+  .copy.done { background:var(--accent-soft); border-color:transparent; }
+
+  .srcs { list-style:none; margin:0; padding:0; background:var(--card); border:1px solid var(--border); border-radius:12px; }
+  .srcs li { padding:.8rem 1rem; border-top:1px solid var(--border); display:grid; gap:.1rem; font-size:.9rem; }
+  .srcs li:first-child { border-top:0; }
+  .sc { color:var(--ink); }
+  .sp, .sd { color:var(--muted); font-size:.84rem; overflow-wrap:anywhere; }
+  .sd { color:var(--faint); }
+  footer { margin-top:2.5rem; padding-top:1.25rem; border-top:1px solid var(--border); font-size:.8rem; color:var(--faint); }
+
+  @media (min-width:700px) {
+    body { padding-left:1.5rem; padding-right:1.5rem; }
+    header { padding:3.5rem 0 2rem; }
+    section { padding-top:3.25rem; }
+    h2 { font-size:1.75rem; }
+    .goals { grid-template-columns:1fr 1fr; gap:1rem; }
+    .goal { padding:1.5rem 1.5rem 1.35rem 1.65rem; }
+    .goal dl { grid-template-columns:auto 1fr; gap:.5rem .9rem; }
+    .goal dt { margin-top:0; white-space:nowrap; }
+    .stats { grid-template-columns:repeat(12,1fr); gap:.75rem; }
+    .stat { grid-column:span 3; }
+    .stat.lead { grid-column:span 6; padding:1.2rem 1.3rem; }
+    .stat.lead .v { font-size:3.4rem; }
+    .stat.small, .stat.wide { grid-column:span 3; padding:.9rem .9rem .85rem; }
+    .stat .v { font-size:1.9rem; }
+    .crow { grid-template-columns:7rem 1fr 5rem; }
+      .act.heavy .foot { min-height:4.7rem; }
+    .deck { grid-template-columns:repeat(3,1fr); gap:1rem; align-items:stretch; }
+    .deck.quiet { grid-template-columns:repeat(2,1fr); }
+    .srcs li { grid-template-columns:1.1fr 1.2fr 10rem; gap:1.2rem; align-items:baseline; }
+    .sc { grid-column:1; } .sp { grid-column:2; } .sd { grid-column:3; text-align:right; }
+    .gate { grid-template-columns:auto 1fr auto; align-items:center; }
+    .gc { grid-column:3; margin-top:0; justify-content:flex-end; }
+    .gn { grid-row:auto; }
+    summary { padding:1rem 1.1rem 1rem 1.2rem; }
+    .drawer { padding:.1rem 1.4rem 1.3rem 4.2rem; }
+    .drawer dl { grid-template-columns:11rem 1fr; gap:.55rem 1.2rem; }
+    .drawer dt { margin-top:0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior:auto; }
+    .bar i, .fill { animation:none; }
+    .chev, .go, .copy, .rank { transition:none; }
+    .go:active, .copy:active { transform:none; }
+  }
+  @media print { .copy { display:none; } }
+
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Field Activities by Revenue</h1>
+    <p class="lede">Proposed, awaiting my approval</p>
+    <div class="stamp"><span><b>Last true</b> 2026-10-02</span></div>
+  </header>
+
+  <section id="goals">
+    <h2>The two goals</h2>
+    <div class="goals">
+      <div class="goal">
+        <div class="n">Goal 1</div>
+        <h3>Every active account gets 3 or more touches a quarter.</h3>
+        <dl>
+          <dt>Done when</dt><dd>All 37 active accounts are at 3 or more touches in a rolling quarter.</dd>
+          <dt>Measured at</dt><dd>nb_v_activities_effective, touches per active account, excluding enriched rows.</dd>
+          <dt>Standing</dt><dd>13 of 37 since 2026-07-04. 16 had none.</dd>
+        </dl>
+        <div class="meter"><div class="bar"><i style="width:35.1%"></i></div>
+          <div class="cap"><span>Active accounts at 3 or more touches</span><span>13 of 37</span></div></div>
+      </div>
+      <div class="goal">
+        <div class="n">Goal 2</div>
+        <h3>Every in-person visit gets its follow-up within two days.</h3>
+        <dl>
+          <dt>Done when</dt><dd>A follow-up email goes out within 2 days of every in-person touch.</dd>
+          <dt>Measured at</dt><dd>nb_v_activities_effective, email touches after in-person touches, and the Outbound queue.</dd>
+          <dt>Standing</dt><dd>4 of 205. 30 drafts pending.</dd>
+        </dl>
+        <div class="meter"><div class="bar"><i style="width:1.95%"></i></div>
+          <div class="cap"><span>In-person touches followed up in 2 days</span><span>4 of 205</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="stands">
+    <h2>Where it stands</h2>
+    <div class="stats"><div class="stat lead"><div class="v">77%</div><div class="l">of 18-month revenue sits in grades A to C</div><div class="s">$27,222 of $35,117</div></div><div class="stat lead"><div class="v">15 of 174</div><div class="l">A to C accounts ordered in the last 18 months</div></div><div class="stat small"><div class="v">5</div><div class="l">median visits per field day, against a 10-stop plan</div><div class="s">39 days, 216 visits</div></div><div class="stat small"><div class="v">15.5</div><div class="l">miles per visit</div></div><div class="stat wide"><div class="v">1</div><div class="l">new account since logging began</div><div class="s">$178.44, 3 touches, 15 days</div></div><div class="stat wide"><div class="v">$237 to $308</div><div class="l">average order a quarter, flat</div><div class="s">7.1 to 7.6 lines, 2024 to mid-2026</div></div></div>
+    <p class="cliff"><b>Orders on file end 2026-06-30.</b> Logging began 2026-07-20, so no touch-to-order rate is proven yet. Until a fresh order export lands, no activity's effect on orders can be measured, and this ranking rests on the book's shape and my own judgment.</p>
+    <div class="chartcard">
+      <h3>Revenue, last 18 months, by HQ grade</h3>
+      <div class="crow"><div class="cg">A<span>17 accounts</span></div><div class="track"><span class="fill" style="--w:100.0%"></span></div><div class="cv">$11,281</div></div><div class="crow"><div class="cg">B<span>74 accounts</span></div><div class="track"><span class="fill" style="--w:68.2%"></span></div><div class="cv">$7,695</div></div><div class="crow"><div class="cg">C<span>83 accounts</span></div><div class="track"><span class="fill" style="--w:73.1%"></span></div><div class="cv">$8,246</div></div><div class="crow"><div class="cg">D<span>120 accounts</span></div><div class="track"><span class="fill low" style="--w:55.9%"></span></div><div class="cv">$6,301</div></div><div class="crow"><div class="cg">E<span>126 accounts</span></div><div class="track"><span class="fill low" style="--w:14.1%"></span></div><div class="cv">$1,594</div></div><div class="crow"><div class="cg">F and G<span>5 accounts</span></div><div class="track"></div><div class="cv">$0</div></div><div class="crow"><div class="cg">No grade<span>127 accounts</span></div><div class="track"></div><div class="cv">$0</div></div>
+    </div>
+  </section>
+
+  <section id="ranking">
+    <h2>The ranking</h2>
+    <div class="ladder">
+<h3 class="grp focus"><i></i>Focus</h3>
+<details class="rank focus top" id="r1">
+  <summary><span class="num">1</span><span class="main"><span class="nm">Appointment setting with decision makers</span><span class="chips"><span class="lv">Better clients</span><span class="lv">Better seller</span></span></span><svg class="chev" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg></summary>
+  <div class="drawer"><dl><dt>What it is</dt><dd>Booking a set time with the buyer by phone or email, then running the whole visit inside that appointment.</dd><dt>How it moves revenue</dt><dd>It buys the decision maker's attention, which a walk-in rarely gets. It is how Plameca's own reps book meetings: call ahead, then a reminder email (Sales Playbook section 10).</dd><dt>How I prioritize it</dt><dd>Grade A and B first, 91 accounts, of which only 10 ordered in 18 months.</dd><dt>How I improve it</dt><dd>One call script and one request email, approved once and reused. Mark every visit as scheduled or walk-in, so the close rate of each becomes measurable.</dd><dt>Evidence</dt><dd>None yet: nothing in the OS marks a visit as scheduled. Of 184 scheduled SDR rows, 24 are done. Measure to add: a scheduled flag on the activity.</dd></dl></div>
+</details>
+<details class="rank focus top" id="r2">
+  <summary><span class="num">2</span><span class="main"><span class="nm">Restock touches on active accounts</span><span class="chips"><span class="lv">More often</span></span></span><svg class="chev" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg></summary>
+  <div class="drawer"><dl><dt>What it is</dt><dd>Calling or visiting the accounts that already buy, to see what needs restocking. In person I walk the shelf with them; a call saves the drive.</dd><dt>How it moves revenue</dt><dd>It is the only lever with a signal so far: the 13 active accounts with 3 or more touches placed every order the group placed.</dd><dt>How I prioritize it</dt><dd>Accounts past their own reorder gap first (the territory median is 41 days, measured 2026-08-02). Walk the shelf when a route already passes; call when it doesn't.</dd><dt>How I improve it</dt><dd>A call sheet built on reorder cadence, not on stale pipeline steps, which is what the app's "overdue" means today. Target: 3 or more touches a quarter on every active account.</dd><dt>Evidence</dt><dd>16 of 37 active accounts had no touch since 2026-07-04. Calls to active accounts: 41, one followed by an order within 14 days ($282).</dd></dl></div>
+</details>
+<details class="rank focus top" id="r3">
+  <summary><span class="num">3</span><span class="main"><span class="nm">Reactivating A, B and C accounts that stopped</span><span class="chips"><span class="lv">Better clients</span></span></span><svg class="chev" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg></summary>
+  <div class="drawer"><dl><dt>What it is</dt><dd>Working the high-grade accounts with no order in 18 months back to a first reorder.</dd><dt>How it moves revenue</dt><dd>159 of the 174 A, B and C accounts have not ordered in 18 months, and those grades hold 77 percent of the book's recent revenue. This is where seeing better clients pays.</dd><dt>How I prioritize it</dt><dd>Grade A first, worked in route clusters, never alphabetically. Open with "what changed" before any pitch (Sales Playbook section 3).</dd><dt>How I improve it</dt><dd>Set the number of touches before an account is parked with a dated note. I propose 3, which fills the open TODO in Sales Playbook section 6.</dd><dt>Evidence</dt><dd>Dormant accounts had no order follow any touch since logging began. Measure: first reorder per reactivated account, once fresh ERP orders land.</dd></dl></div>
+</details>
+<h3 class="grp improve"><i></i>Improve the method</h3>
+<details class="rank improve" id="r4">
+  <summary><span class="num">4</span><span class="main"><span class="nm">Follow-up within two days</span><span class="chips"><span class="lv">Better seller</span></span></span><svg class="chev" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg></summary>
+  <div class="drawer"><dl><dt>What it is</dt><dd>The email after a visit: what we discussed, what they asked for, the next step.</dd><dt>How it moves revenue</dt><dd>A good email sent on time keeps the visit's momentum and closes the open ask.</dd><dt>How I prioritize it</dt><dd>Every in-person visit, within two days.</dd><dt>How I improve it</dt><dd>The drafts already exist; sending is what doesn't happen. A protected 30 minutes at the start of the 4pm email block on each field day, working the Outbound queue to empty. Email templates and the drafter are the key tooling here.</dd><dt>Evidence</dt><dd>4 of 205 in-person touches followed up within 2 days. 30 drafts pending, 18 sent, 22 dismissed. No order signal yet either way.</dd></dl></div>
+</details>
+<details class="rank improve" id="r5">
+  <summary><span class="num">5</span><span class="main"><span class="nm">Week and route planning</span><span class="chips"><span class="lv">Efficiency</span></span></span><svg class="chev" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg></summary>
+  <div class="drawer"><dl><dt>What it is</dt><dd>Choosing who I see, which day, in what order.</dd><dt>How it moves revenue</dt><dd>It multiplies everything above: more visits a day, less uncertainty between them.</dd><dt>How I prioritize it</dt><dd>Appointments anchor the week; restock and reactivation stops fill around them; prospects fill what is left.</dd><dt>How I improve it</dt><dd>One clear picture of the optimal week, not only the day. Mark each planned stop done or skipped, so plan against actual is visible.</dd><dt>Evidence</dt><dd>Median 5 visits per field day against a 10-stop plan; 15.5 miles per visit. All 51 planned stops on file still read "planned".</dd></dl></div>
+</details>
+<details class="rank improve" id="r6">
+  <summary><span class="num">6</span><span class="main"><span class="nm">Placing orders, with the upsell</span><span class="chips"><span class="lv">Better seller</span></span></span><svg class="chev" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg></summary>
+  <div class="drawer"><dl><dt>What it is</dt><dd>Taking a stated need and sending it to orders@nutribiotic.com, plus the client's confirmation.</dd><dt>How it moves revenue</dt><dd>Each order is a chance to add lines and reach a discount break.</dd><dt>How I prioritize it</dt><dd>Same day, every time.</dd><dt>How I improve it</dt><dd>The order draft names the next volume break (10, 15, 20 percent at 48, 96, 144 units of one SKU) or the new-SKU promotion (25, 30, 50 percent at 1, 10, 20 new SKUs), and any top seller they don't carry. Nothing computes either today.</dd><dt>Evidence</dt><dd>Average order $237 to $308 and 7.1 to 7.6 lines, flat since 2024.</dd></dl></div>
+</details>
+<details class="rank improve" id="r7">
+  <summary><span class="num">7</span><span class="main"><span class="nm">First visit: discovery and sample</span><span class="chips"><span class="lv">Better seller</span></span></span><svg class="chev" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg></summary>
+  <div class="drawer"><dl><dt>What it is</dt><dd>The discovery conversation at a new door, and a sample left behind.</dd><dt>How it moves revenue</dt><dd>It is where qualification happens: a well-qualified first visit decides whether the account is worth a second.</dd><dt>How I prioritize it</dt><dd>Prospects scored 50 or higher get a visit; under 50 get a call or email.</dd><dt>How I improve it</dt><dd>Log every sample dropped, and put a follow-up call 7 days later onto a route. Run the golden minute from Sales Playbook section 10.</dd><dt>Evidence</dt><dd>1 new account since logging began: 3 touches, 15 days to first order. Sample drops are not recorded anywhere yet.</dd></dl></div>
+</details>
+<details class="rank improve" id="r8">
+  <summary><span class="num">8</span><span class="main"><span class="nm">Prospect search and scoring near A, B and C anchors</span><span class="chips"><span class="lv">Better clients</span></span></span><svg class="chev" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg></summary>
+  <div class="drawer"><dl><dt>What it is</dt><dd>Finding stores and clinics not yet in the book, scoring them, and placing them on the map.</dd><dt>How it moves revenue</dt><dd>The book does not yet hold every potential client. New revenue, even small, beats zero.</dd><dt>How I prioritize it</dt><dd>Prospects near an A, B or C account first, so they land on a route I already drive.</dd><dt>How I improve it</dt><dd>Score each prospect by distance to an anchor account, and grade the 127 accounts with no grade yet.</dd><dt>Evidence</dt><dd>34 prospects landed from a Places search; 1 touched, none ordered.</dd></dl></div>
+</details>
+<details class="rank improve" id="r9">
+  <summary><span class="num">9</span><span class="main"><span class="nm">Area prospecting on route days</span><span class="chips"><span class="lv">Better clients</span><span class="lv">Efficiency</span></span></span><svg class="chev" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg></summary>
+  <div class="drawer"><dl><dt>What it is</dt><dd>Already in Newport Beach, finding the high-fit prospects nearby.</dd><dt>How it moves revenue</dt><dd>Adds stops to a drive already paid for.</dd><dt>How I prioritize it</dt><dd>Only to fill a day that is short of stops.</dd><dt>How I improve it</dt><dd>Each planned day fills from 5 toward 8 stops with the nearest scored prospects.</dd><dt>Evidence</dt><dd>Median 5 visits per field day.</dd></dl></div>
+</details>
+<details class="rank improve" id="r10">
+  <summary><span class="num">10</span><span class="main"><span class="nm">New-client onboarding</span><span class="chips"><span class="lv">Better seller</span></span></span><svg class="chev" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg></summary>
+  <div class="drawer"><dl><dt>What it is</dt><dd>Getting a new store from yes to a first order on its way.</dd><dt>How it moves revenue</dt><dd>Today ordering works well only for existing clients. A clear path keeps a new yes from stalling.</dd><dt>How I prioritize it</dt><dd>Every new account.</dd><dt>How I improve it</dt><dd>One documented page: newaccounts@nutribiotic.com, the customer requirements, the $75 minimum, COD until credit is set then Net 30, and the new-store promotion for the first order.</dd><dt>Evidence</dt><dd>No onboarding document exists in the repo.</dd></dl></div>
+</details>
+<details class="rank improve" id="r11">
+  <summary><span class="num">11</span><span class="main"><span class="nm">Cold outbound email for awareness</span><span class="chips"><span class="lv">Better clients</span></span></span><svg class="chev" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg></summary>
+  <div class="drawer"><dl><dt>What it is</dt><dd>High-volume email to the coldest leads, not waiting for replies. Two flavors: existing clients and potential clients.</dd><dt>How it moves revenue</dt><dd>Indirectly: the subject line is read, so the next call lands warmer.</dd><dt>How I prioritize it</dt><dd>After the work above, in batches.</dd><dt>How I improve it</dt><dd>Two approved templates, each send logged as a touch, and replies linked to the email that earned them.</dd><dt>Evidence</dt><dd>18 drafts sent; 3 emails came back, none linked to a send. Measure to add: reply linkage on outbound drafts.</dd></dl></div>
+</details>
+<details class="rank improve" id="r12">
+  <summary><span class="num">12</span><span class="main"><span class="nm">In-store staff training</span><span class="chips"><span class="lv">Better seller</span></span></span><svg class="chev" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg></summary>
+  <div class="drawer"><dl><dt>What it is</dt><dd>Short trainings that teach a store's staff to recommend the product.</dd><dt>How it moves revenue</dt><dd>Sell-through: the shelf empties faster and the reorder comes sooner. Armando named it, with follow-up, as the habit he repeats most.</dd><dt>How I prioritize it</dt><dd>A pilot at 2 grade A accounts.</dd><dt>How I improve it</dt><dd>Measure each pilot by a reorder within 60 days.</dd><dt>Evidence</dt><dd>Not piloted yet (In-Store Program section 4).</dd></dl></div>
+</details>
+<h3 class="grp leave"><i></i>Leave alone</h3>
+<details class="rank leave" id="r13">
+  <summary><span class="num">13</span><span class="main"><span class="nm">Recording the visit</span><span class="chips"><span class="lv">Efficiency</span></span></span><svg class="chev" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg></summary>
+  <div class="drawer"><p class="one">Every visit is filed to the OS and HubSpot from one extractor, typed, spoken or recorded. Keep doing it every time; the OS keeps improving on its own.</p></div>
+</details>
+<details class="rank leave" id="r14">
+  <summary><span class="num">14</span><span class="main"><span class="nm">Decision-maker enrichment</span><span class="chips"><span class="lv">Better seller</span></span></span><svg class="chev" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg></summary>
+  <div class="drawer"><p class="one">Head Hunter runs on its own and found a decision maker for 70 of 132 SDR accounts, up from 46.</p></div>
+</details>
+<details class="rank leave" id="r15">
+  <summary><span class="num">15</span><span class="main"><span class="nm">Reports to the director of sales</span><span class="chips"><span class="lv">Efficiency</span></span></span><svg class="chev" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg></summary>
+  <div class="drawer"><p class="one">The daily and weekly field reports build themselves: visits and calls with summaries, the map, purchases, accounts closed and opened. Only the Sunday hand-off is mine.</p></div>
+</details>
+<details class="rank leave" id="r16">
+  <summary><span class="num">16</span><span class="main"><span class="nm">Biweekly expense report</span><span class="chips"><span class="lv">Efficiency</span></span></span><svg class="chev" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg></summary>
+  <div class="drawer"><p class="one">Photos of odometer readings and receipts file into the pay period's sheet. It does not move revenue; keep it as light as it is.</p></div>
+</details>
+<details class="rank leave" id="r17">
+  <summary><span class="num">17</span><span class="main"><span class="nm">Charging cards and sending invoices</span><span class="chips"><span class="lv">Efficiency</span></span></span><svg class="chev" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg></summary>
+  <div class="drawer"><p class="one">Billing is HQ's (accounting@nutribiotic.com). My part is relaying it accurately. Diligence over speed.</p></div>
+</details>
+    </div>
+  </section>
+
+  <section id="path">
+    <h2>What needs to happen</h2>
+    <ol class="gates">
+<li class="gate lift"><span class="gn">1</span><span class="gb"><span class="gt">Approve the order and method changes</span><span class="gl">My decision on the order.</span></span><span class="gc"><span class="chip reversible">Reversible</span><span class="chip g1">Goal 1</span></span></li>
+<li class="gate"><span class="gn">2</span><span class="gb"><span class="gt">Request fresh ERP orders</span><span class="gl">One email I send. Until then nothing is measurable.</span></span><span class="gc"><span class="chip final">Final</span><span class="chip g1">Goal 1</span></span></li>
+<li class="gate"><span class="gn">3</span><span class="gb"><span class="gt">Protect the follow-up block</span><span class="gl">A calendar yes, then 30 minutes a field day.</span></span><span class="gc"><span class="chip final">Final</span><span class="chip g2">Goal 2</span></span></li>
+<li class="gate"><span class="gn">4</span><span class="gb"><span class="gt">Build the restock call sheet</span><span class="gl">Nothing. The agents run to done.</span></span><span class="gc"><span class="chip reversible">Reversible</span><span class="chip g1">Goal 1</span></span></li>
+<li class="gate"><span class="gn">5</span><span class="gb"><span class="gt">Draft the appointment kit</span><span class="gl">My review of the wording.</span></span><span class="gc"><span class="chip reversible">Reversible</span><span class="chip g1">Goal 1</span></span></li>
+    </ol>
+  </section>
+
+  <section id="sheet">
+    <h2>The link sheet</h2>
+    <div class="deck">
+<article class="act heavy">
+  <a class="go" href="agency://run/nb-activities-approve-order" target="_blank" rel="noopener">
+    <div class="top"><span class="label">Approve the activity order</span><span class="chip g1">Goal 1</span></div>
+    <div class="cascade"><span class="step">Walk the order and the method changes pile by pile.</span><span class="step">Apply my edits to the playbook doc.</span><span class="step">Carry the approved changes into the Sales Playbook and republish the page.</span><span class="wall"><b>My hand</b>My yes on the order and the method changes.</span></div>
+    <div class="foot"><span>Done when: field-activities.md reads approved and sales-playbook.md section 9 carries the approved items.</span></div>
+  </a>
+  <div class="cmdrow"><span class="cmdlab">Command</span><span class="cmdtext" tabindex="0">claude "NutriBiotic. Read portfolio/src/app/nutribiotic/playbook/content/field-activities.md, the proposed ranking of my field activities. Walk me through the order and the method changes one pile at a time and take my edits. When I say approve, mark the doc approved, carry the approved method changes into sales-playbook.md sections 2, 3, 6 and 9 without breaking what is already field-tested, update the Field Activities artifact from resources/artifacts/manifest.json slug nb-field-activities to match, republish it to the same URL, commit and push."</span><div class="cmdact"><button type="button" class="more">Show all</button><button type="button" class="copy">Copy</button></div></div>
+</article><article class="act heavy">
+  <a class="go" href="agency://run/nb-activities-fresh-orders" target="_blank" rel="noopener">
+    <div class="top"><span class="label">Request fresh ERP orders</span><span class="chip g1">Goal 1</span></div>
+    <div class="cascade"><span class="step">Draft the export request to HQ.</span><span class="step">Load the export once it arrives.</span><span class="step">Re-measure touch to order by activity.</span><span class="wall"><b>My hand</b>I send the request to HQ.</span></div>
+    <div class="foot"><span>Done when: nb_orders holds orders dated after 2026-07-20.</span></div>
+  </a>
+  <div class="cmdrow"><span class="cmdlab">Command</span><span class="cmdtext" tabindex="0">claude "NutriBiotic. The ERP orders in nb_orders end 2026-06-30 and touch logging began 2026-07-20, so no activity's effect on orders can be measured. Draft a short email in my voice to HQ asking for the order and invoice export for my book from 2026-07-01 to today, in the same format as the last load. Show it to me and never send it. When the file arrives, load it with bridges/nutribiotic/load_orders.py and re-measure touch to order by activity kind for the Field Activities artifact."</span><div class="cmdact"><button type="button" class="more">Show all</button><button type="button" class="copy">Copy</button></div></div>
+</article><article class="act heavy">
+  <a class="go" href="agency://run/nb-activities-followup-block" target="_blank" rel="noopener">
+    <div class="top"><span class="label">Protect the follow-up block</span><span class="chip g2">Goal 2</span></div>
+    <div class="cascade"><span class="step">Propose the protected block in my weekly schedule.</span><span class="step">Order the pending drafts oldest first.</span><span class="step">Refresh stale drafts from the account record.</span><span class="wall"><b>My hand</b>My yes on the calendar block, then I press send on each email.</span></div>
+    <div class="foot"><span>Done when: The calendar holds the block and the Outbound queue reads oldest visit first.</span></div>
+  </a>
+  <div class="cmdrow"><span class="cmdlab">Command</span><span class="cmdtext" tabindex="0">claude "NutriBiotic. Follow-ups after visits are not going out: 30 drafts sit pending on the ClientOS Outbound screen. Read projects/juan-weekly-schedule/schedule.md and propose a protected 30 minute follow-up block at the start of the 4pm email block on each field day. Show me the calendar change before writing anything. Then order the pending drafts by visit date, oldest first, and refresh any draft older than a week from the account record. Never send an email."</span><div class="cmdact"><button type="button" class="more">Show all</button><button type="button" class="copy">Copy</button></div></div>
+</article>
+    </div>
+    <div class="deck quiet">
+<article class="act">
+  <a class="go" href="agency://run/nb-activities-restock-call-sheet" target="_blank" rel="noopener">
+    <div class="top"><span class="label">Build the restock call sheet</span><span class="chip g1">Goal 1</span></div>
+    <div class="cascade"><span class="step">Compute each active account's reorder gap and touches.</span><span class="step">Build the sheet in ClientOS.</span><span class="step">Deploy and verify it live.</span><span class="clear">No wall. The agents run to done.</span></div>
+    <div class="foot"><span>Done when: ClientOS shows the call sheet with every active account and its touch count for the last 90 days.</span></div>
+  </a>
+  <div class="cmdrow"><span class="cmdlab">Command</span><span class="cmdtext" tabindex="0">claude "NutriBiotic, ClientOS at osmotic-ventures/field-sales-os. Build a restock call sheet for my active accounts, ordered by days past each account's own reorder gap, with touches in the last 90 days beside each one, so the accounts under 3 touches a quarter come first. Overdue here means past the reorder cadence, not a stale pipeline step. Read nutribiotic/AGENTS.md first, count touches from nb_v_activities_effective excluding enriched rows, keep reads small per resources/wiki/supabase-metered-reads.md. Run the tests, commit and push so it deploys, and verify it live."</span><div class="cmdact"><button type="button" class="more">Show all</button><button type="button" class="copy">Copy</button></div></div>
+</article><article class="act">
+  <a class="go" href="agency://run/nb-activities-appointment-kit" target="_blank" rel="noopener">
+    <div class="top"><span class="label">Draft the appointment kit</span><span class="chip g1">Goal 1</span></div>
+    <div class="cascade"><span class="step">Draft the call script and the two emails.</span><span class="step">Propose the scheduled or walk-in flag.</span><span class="wall"><b>My hand</b>My approval of the wording.</span></div>
+    <div class="foot"><span>Done when: The script and both emails are approved and saved on the playbook shelf.</span></div>
+  </a>
+  <div class="cmdrow"><span class="cmdlab">Command</span><span class="cmdtext" tabindex="0">claude "NutriBiotic. Draft my appointment-setting kit for grade A and B decision makers: one phone script and one appointment request email, plus the reminder email Plameca reps send before a meeting, grounded in sales-playbook.md section 10 and my voice in assistant/EMAIL-VOICE.md. No fact that is not already in a source. Also propose how a visit gets marked scheduled or walk-in in the OS so the close rate of each can be measured. Show me the drafts and send nothing."</span><div class="cmdact"><button type="button" class="more">Show all</button><button type="button" class="copy">Copy</button></div></div>
+</article>
+    </div>
+  </section>
+
+  <section id="sources">
+    <h2>Sources</h2>
+    <ul class="srcs"><li><span class="sc">Every measured number: revenue by grade, ordering, touches, follow-ups, field days, new accounts, order size</span><span class="sp">nutribiotic/out/activity-ranking-evidence.md, aggregates only, not committed</span><span class="sd">Measured 2026-10-02</span></li><li><span class="sc">Terms, minimums and discounts</span><span class="sp">nutribiotic/HQ-REFERENCE.md, policy sheet effective 01/01/25</span></li><li><span class="sc">Territory reorder median of 41 days</span><span class="sp">portfolio/src/app/nutribiotic/playbook/content/GOALS.md</span><span class="sd">Measured 2026-08-02</span></li><li><span class="sc">Plameca meeting framework and Armando's habits</span><span class="sp">portfolio/src/app/nutribiotic/playbook/content/sales-playbook.md, section 10</span></li><li><span class="sc">Tooling</span><span class="sp">nutribiotic/AGENTS.md</span></li><li><span class="sc">The ranking, the levers and each activity</span><span class="sp">portfolio/src/app/nutribiotic/playbook/content/field-activities.md</span></li></ul>
+  </section>
+
+  <footer>Built to resources/artifacts/STANDARD.md. Buttons resolve through resources/actions/registry.json.</footer>
+</div>
+
+<script>
+  (function () {
+    function openHash() {
+      var id = location.hash.slice(1);
+      var el = id && document.getElementById(id);
+      if (el && el.tagName === "DETAILS") { el.open = true; el.scrollIntoView({ block: "start" }); }
+    }
+    window.addEventListener("hashchange", openHash);
+    openHash();
+    document.querySelectorAll(".cmdrow").forEach(function (row) {
+      var t = row.querySelector(".cmdtext"), m = row.querySelector(".more");
+      function flip() { var o = t.classList.toggle("open"); m.textContent = o ? "Show less" : "Show all"; }
+      m.addEventListener("click", flip);
+      t.addEventListener("click", function () { var s = getSelection(); if (!s || s.isCollapsed) flip(); });
+    });
+    document.querySelectorAll(".copy").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var t = b.closest(".cmdrow").querySelector(".cmdtext");
+        function ok() { b.textContent = "Copied"; b.classList.add("done"); setTimeout(function () { b.textContent = "Copy"; b.classList.remove("done"); }, 1000); }
+        function pick() { var r = document.createRange(); r.selectNodeContents(t); var s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+        if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(t.textContent).then(ok, pick); } else { pick(); }
+      });
+    });
+  })();
+
+</script>
