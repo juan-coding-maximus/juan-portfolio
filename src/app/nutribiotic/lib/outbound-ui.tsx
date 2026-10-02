@@ -580,8 +580,6 @@ export function DraftActions({
           </a>
           {outlook.bodyOmitted && <CopyBodyButton body={finalBody} />}
         </>
-          )}
-        </>
       )}
 
       {waPhone && !synthetic && (
