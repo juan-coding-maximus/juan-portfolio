@@ -233,9 +233,93 @@ function DraftCard({
           </span>
         )}
       </div>
-      <p className="max-w-[76ch] text-[13.5px] leading-relaxed whitespace-pre-wrap text-[#3D4A44]">{d.body_md}</p>
+      <BodyView body={d.body_md} />
       <DraftActions draft={d} phone={row.phone} files={files} synthetic={synthetic} onResolved={onResolved} />
     </Card>
+  );
+}
+
+/**
+ * A body with a markdown pipe table (Juan, 2026-10-02: an order of more than
+ * five items lists name, item number and units in a table). An Outlook compose
+ * deep-link only carries plain text, so a table body is copied as rich text and
+ * pasted in, and the link opens addressed.
+ */
+const TABLE_ROW = /^\|.*\|\s*$/;
+
+export function hasTable(body: string): boolean {
+  return body.split("\n").filter((l) => TABLE_ROW.test(l)).length >= 3;
+}
+
+type BodyPart = { kind: "text"; text: string } | { kind: "table"; rows: string[][] };
+
+export function splitBody(body: string): BodyPart[] {
+  const parts: BodyPart[] = [];
+  let text: string[] = [];
+  let rows: string[][] = [];
+  const flushText = () => {
+    if (text.length) parts.push({ kind: "text", text: text.join("\n") });
+    text = [];
+  };
+  const flushRows = () => {
+    if (rows.length) parts.push({ kind: "table", rows });
+    rows = [];
+  };
+  for (const line of body.split("\n")) {
+    if (TABLE_ROW.test(line)) {
+      flushText();
+      const cells = line.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+      if (!cells.every((c) => /^-+$/.test(c))) rows.push(cells);
+    } else {
+      flushRows();
+      text.push(line);
+    }
+  }
+  flushText();
+  flushRows();
+  return parts;
+}
+
+const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+export function bodyToHtml(body: string): string {
+  return splitBody(body)
+    .map((p) =>
+      p.kind === "text"
+        ? esc(p.text).replace(/\n/g, "<br>")
+        : `<table style="border-collapse:collapse">` +
+          p.rows
+            .map((r, i) => {
+              const tag = i === 0 ? "th" : "td";
+              return "<tr>" + r.map((c) => `<${tag} style="border:1px solid #999;padding:3px 8px;text-align:left">${esc(c)}</${tag}>`).join("") + "</tr>";
+            })
+            .join("") +
+          `</table>`,
+    )
+    .join("");
+}
+
+export function BodyView({ body }: { body: string }) {
+  return (
+    <div className="max-w-[76ch] text-[13.5px] leading-relaxed text-[#3D4A44]">
+      {splitBody(body).map((p, i) =>
+        p.kind === "text" ? (
+          <p key={i} className="whitespace-pre-wrap">{p.text}</p>
+        ) : (
+          <table key={i} className="my-2 w-full border-collapse text-[13px]">
+            <tbody>
+              {p.rows.map((r, ri) => (
+                <tr key={ri} className={ri === 0 ? "font-medium" : ""}>
+                  {r.map((c, ci) => (
+                    <td key={ci} className="border border-[#D8D4C8] px-2 py-1">{c}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ),
+      )}
+    </div>
   );
 }
 
@@ -252,7 +336,16 @@ export function CopyBodyButton({ body }: { body: string }) {
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(body);
+      if (hasTable(body) && typeof ClipboardItem !== "undefined") {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/html": new Blob([bodyToHtml(body)], { type: "text/html" }),
+            "text/plain": new Blob([body], { type: "text/plain" }),
+          }),
+        ]);
+      } else {
+        await navigator.clipboard.writeText(body);
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -410,7 +503,12 @@ export function DraftActions({
   const [error, setError] = useState<string | null>(null);
   const waPhone = toWhatsAppPhone(phone);
   const finalBody = draft.body_md + attachmentNote(attached);
-  const outlook = draft.to_email ? owaComposeLink(draft.to_email, draft.subject, finalBody, draft.bcc_email) : null;
+  const tableBody = hasTable(finalBody);
+  const outlook = draft.to_email
+    ? tableBody
+      ? { ...owaComposeLink(draft.to_email, draft.subject, "", draft.bcc_email), bodyOmitted: true }
+      : owaComposeLink(draft.to_email, draft.subject, finalBody, draft.bcc_email)
+    : null;
   const hasPath = Boolean(draft.to_email || waPhone);
 
   async function decide(status: "sent" | "dismissed") {
@@ -484,7 +582,7 @@ export function DraftActions({
             <>
               <CopyBodyButton body={finalBody} />
               <span className="text-[12px] text-[#8A6D2F]">
-                Too long to prefill. Outlook opens addressed; paste the body in.
+                {tableBody ? "Copy the body, then paste it into the open message." : "Too long to prefill. Outlook opens addressed; paste the body in."}
               </span>
             </>
           )}
