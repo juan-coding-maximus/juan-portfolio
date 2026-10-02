@@ -87,6 +87,7 @@ import {
   potentialNow,
   sdrClauses,
   sdrScore,
+  LINE,
   type GradeFrom,
   type ScoreInput,
   type Signals,
@@ -368,11 +369,11 @@ export function computePriority(
     // matrix's importance axis and for confidence.
     const sig: Signals = signals.get(r.id) ?? EMPTY_SIGNALS;
     const { grade, from } = potentialNow(r, sig.peak);
-    let score = sdrScore(r, sig, grade, today);
+    let score = sdrScore(r, sig, grade, today, from);
     if (suppressed) score = Math.min(score, 10);
     const reason = [...(suppressed ? [suppressed] : []), ...sdrClauses(r, sig, grade, from, today)].join(" · ");
 
-    const band: PriorityResult["band"] = suppressed ? "later" : score >= 78 ? "now" : score >= 55 ? "soon" : "later";
+    const band: PriorityResult["band"] = suppressed ? "later" : score >= 75 ? "now" : score >= LINE ? "soon" : "later";
 
     out.set(r.id, {
       id: r.id,
@@ -386,7 +387,7 @@ export function computePriority(
       inputsKnown,
       inputsTotal: 3,
       parts: { revenue, engagement, viability },
-      action: nextAction(r, { daysSinceOrder, suppressed }),
+      action: nextAction(r, { daysSinceOrder, suppressed, score }),
       suppressed,
     });
   }
@@ -403,7 +404,7 @@ export function computePriority(
  * Order matters and is not arbitrary: a customer who asked for something
  * outranks a clock, and a clock outranks a cold door.
  */
-function nextAction(r: PriorityInput, ctx: { daysSinceOrder: number | null; suppressed: string | null }): NextAction {
+function nextAction(r: PriorityInput, ctx: { daysSinceOrder: number | null; suppressed: string | null; score: number }): NextAction {
   if (ctx.suppressed) {
     return { kind: "open", label: "Review", href: `/nutribiotic/account/${r.id}` };
   }
@@ -415,6 +416,12 @@ function nextAction(r: PriorityInput, ctx: { daysSinceOrder: number | null; supp
   }
   if (r.phone && (r.lifecycle === "dormant" || r.lifecycle === "lost")) {
     return { kind: "call", label: "Call to reopen", href: `/nutribiotic/sdr?account=${r.id}` };
+  }
+  // Under the line (50) is email and phone only; 50 and up goes on a route.
+  if (ctx.score < LINE) {
+    return r.phone
+      ? { kind: "call", label: "Call or email", href: `/nutribiotic/sdr?account=${r.id}` }
+      : { kind: "email", label: "Email", href: `/nutribiotic/outbound?account=${r.id}` };
   }
   return { kind: "visit", label: "Put on a route", href: `/nutribiotic/map?focus=${r.id}` };
 }

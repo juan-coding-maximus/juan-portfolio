@@ -74,7 +74,7 @@ export const READINESS_EFFECT: Record<ReadinessFilter, string> = {
 /**
  * Juan's own number, stated in the ask ("also a button for 75+ score there"),
  * read against the same lib/priority.ts 0-100 score every other surface ranks
- * on. Deliberately NOT the "now" band's 78 and not PROSPECT_SCORE_MIN's 80:
+ * on. Deliberately NOT the "now" band's 75 and not PROSPECT_SCORE_MIN's 80:
  * those are priority.ts's own tuning knobs and re-tuning either must never
  * silently move a filter Juan asked for by name.
  */
