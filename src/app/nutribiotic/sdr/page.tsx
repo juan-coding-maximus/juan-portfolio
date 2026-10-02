@@ -88,7 +88,9 @@ export default async function SdrPage({
          account behind the row, and stay null for a prospect that is not an
          account yet: a null never matches a chip rather than being bucketed
          into one it was never classified as. */
-      tier: card?.tier ?? null,
+      /* The potential letter from sdr-score.ts (my grade, best year of orders,
+         fit) when the account is in the scored book, the OS grade otherwise. */
+      tier: (p?.grade as SdrDayItem["tier"] | undefined) ?? card?.tier ?? null,
       channel: card?.channel ?? null,
       readiness: card?.readiness ?? null,
       leadStage: card?.leadStage ?? null,

@@ -46,7 +46,22 @@ import {
   type ComposedAsk,
 } from "./ask-compose";
 import { hasWidgetToken } from "./session";
-import { areaProspectCounts, byOriginThenPriority, computePriority, type PriorityInput, type PriorityResult, type Readiness } from "./priority";
+import {
+  areaProspectCounts,
+  buildSignals,
+  byOriginThenPriority,
+  computePriority,
+  CORP_PREFILTER,
+  laDay,
+  NOTE_PREFILTER,
+  type PriorityInput,
+  type PriorityResult,
+  type RawNote,
+  type RawOrder,
+  type RawOrderEmail,
+  type RawTouch,
+  type Readiness,
+} from "./priority";
 import type { LeadStage } from "./account-filters";
 
 const SB_URL = process.env.NB_SUPABASE_URL ?? "";
@@ -2543,7 +2558,11 @@ export async function getPriorityBook(): Promise<PriorityBook> {
   };
   if (!isConfigured()) return empty;
 
-  const [accounts, grades, drafts, touches] = await Promise.all([
+  // The score's own inputs (sdr-score.ts), on the same 5-minute cache. Notes
+  // are prefiltered in Postgres to the lines that can carry a signal, which
+  // keeps the read near 85 KB (measured 2026-10-02) instead of every note.
+  const since = new Date(Date.now() - 121 * 86_400_000).toISOString().slice(0, 10);
+  const [accounts, grades, drafts, touches, orders, scoreTouches, notes, corpNotes, orderEmails] = await Promise.all([
     rawCached<{
       id: string;
       name: string;
@@ -2562,9 +2581,15 @@ export async function getPriorityBook(): Promise<PriorityBook> {
       channel: string | null;
       origin: string | null;
       enrichment_status: { product_fit_signals?: { tags?: Record<string, unknown> } } | null;
+      store_type: string | null;
+      potential_juan: string | null;
+      potential_hq: string | null;
+      locations_count: number | null;
+      places_rating_count: number | null;
     }>(
       "nb_accounts?select=id,name,lifecycle,phone,area,trailing_12m_revenue,lifetime_revenue,first_order_at,last_order_at," +
-        "expected_reorder_days,places_status,closed_at,do_not_visit,readiness,channel,origin,enrichment_status" +
+        "expected_reorder_days,places_status,closed_at,do_not_visit,readiness,channel,origin,enrichment_status," +
+        "store_type,potential_juan,potential_hq,locations_count,places_rating_count" +
         `&hubspot_owner_id=eq.${JUAN_OWNER_ID}` +
         // Same scope every other surface uses: not the waypoint (Juan's own
         // apartment is not an account), and not a closed one. A closed store
@@ -2598,6 +2623,16 @@ export async function getPriorityBook(): Promise<PriorityBook> {
     rawCached<{ account_id: string; at: string }>(
       "nb_v_activities_effective?select=account_id,at&corrected=is.false&retracted=is.false&order=at.desc&limit=2000",
     ),
+    rawCached<RawOrder>("nb_orders?select=account_id,ordered_at,revenue_cents&order=id.asc"),
+    rawCached<RawTouch>("nb_v_activities_effective?select=account_id,at,effective_kind,outcome&retracted=is.false&order=id.asc"),
+    rawCached<RawNote>(
+      `nb_v_activities_effective?select=account_id,at,detail&retracted=is.false&at=gte.${since}` +
+        `&detail=imatch.${encodeURIComponent(NOTE_PREFILTER)}&order=id.asc`,
+    ),
+    rawCached<RawNote>(
+      `nb_v_activities_effective?select=account_id,at,detail&retracted=is.false&detail=imatch.${encodeURIComponent(CORP_PREFILTER)}&order=id.asc`,
+    ),
+    rawCached<RawOrderEmail>("nb_order_emails?select=account_id,no_charge"),
   ]);
 
   const gradeById = new Map(grades.map((g) => [g.account_id, g.potential_grade]));
@@ -2626,7 +2661,8 @@ export async function getPriorityBook(): Promise<PriorityBook> {
     fit_tags: Object.keys(a.enrichment_status?.product_fit_signals?.tags ?? {}),
   }));
 
-  const byId = computePriority(inputs);
+  const signals = buildSignals({ orders, touches: scoreTouches, notes, corpNotes, orderEmails }, laDay(new Date()));
+  const byId = computePriority(inputs, signals);
   const ranked = inputs
     .map((account) => ({ account, result: byId.get(account.id)! }))
     .filter((r) => r.result.score !== null)

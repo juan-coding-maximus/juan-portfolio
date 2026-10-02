@@ -1,6 +1,17 @@
 /**
  * Account priority. ONE deterministic function, three surfaces.
  *
+ * THE SCORE, SINCE 2026-10-02 (Juan: "the SDR potential sounds old"). The
+ * number, its band and its reason come from sdr-score.ts: my own field grade,
+ * the best year of orders, my readiness tag, what my notes say the account
+ * wants or refused, orders through me, and how fresh the last touch is. That
+ * file is byte-identical in ClientOS and matched account for account against
+ * the action lists sheet. What follows below describes the weighted
+ * revenue/engagement/viability parts, which are still computed, but only for
+ * matrix.ts's importance axis and for `confidence`; the neutral 50, the
+ * readiness shift, the $300 cap and the Mother's Market floor described in
+ * this header no longer move the score.
+ *
  * WHY THIS EXISTS. Juan's ask, 2026-09-08, off a vendor deck that named three
  * gaps in how a rep spends a day: no consistent way to rank accounts by revenue
  * potential, no structured way to reallocate time when an account stops being
@@ -13,9 +24,9 @@
  *
  * IT IS CODE, NOT A MODEL. Root AGENTS.md P2: "where a script can enforce this
  * deterministically, the script, not model discretion, is the authority."
- * Every number below is arithmetic over columns that already exist. Nothing in
- * this file reads free text, calls an LLM, or produces a figure that is not a
- * transform of a stored value.
+ * Every number below is arithmetic over columns that already exist. The only
+ * free text read is my own capture notes, through sdr-score.ts's fixed
+ * regular expressions; nothing calls an LLM.
  *
  * NOTHING IS STORED, AND THAT IS DELIBERATE (P4, one source of truth per fact).
  * 0035 stores `urgency` + `urgency_reason` because a model read free text to
@@ -70,26 +81,23 @@
  * filled is a gap to report, not a default to invent (HARD RULE 1).
  */
 
+import {
+  EMPTY_SIGNALS,
+  laDay,
+  potentialNow,
+  sdrClauses,
+  sdrScore,
+  type GradeFrom,
+  type ScoreInput,
+  type Signals,
+} from "./sdr-score";
+
 /** The weights. Stated once, here, so a change to the ranking is a diff. */
 export const PRIORITY_WEIGHTS = { revenue: 45, engagement: 30, viability: 25 } as const;
 
-/**
- * READINESS (Juan, 2026-09-09): a fourth tag, set by hand on the call/visit
- * capture box (touchpoint-ui.tsx), alongside HQ's A-G potential grade,
- * Juan's own potential_juan correction, and outbound's urgency. None of
- * those answer "is this account close to buying right now": this is the
- * rep's own read of that, formed on the call or standing in the store.
- *
- * A STATED ADJUSTMENT, NOT A FOURTH WEIGHTED COMPONENT. revenue/engagement/
- * viability are percentiles blended by weight; readiness is a flat point
- * shift on the final number, so a rep's tag always shows in the score as
- * exactly what it is, never folded invisibly into a blend where its real
- * effect could not be read back out. Applied after the weighted score (or
- * the noInfo=50 default) and before the hard suppressors below, so a closed
- * door or a Mother's Market floor still has the last word over a rep's tag.
- */
-export const READINESS_ADJUSTMENT = { urgent: 20, hot: 10, normal: 0, cold: -10 } as const;
-export type Readiness = keyof typeof READINESS_ADJUSTMENT;
+export type { Readiness } from "./sdr-score";
+export { buildSignals, laDay, CORP_PREFILTER, NOTE_PREFILTER } from "./sdr-score";
+export type { RawNote, RawOrder, RawOrderEmail, RawTouch, Signals } from "./sdr-score";
 
 /** How far back a touch still counts as a live conversation, and where it
  *  decays to nothing. Both are shaping constants, not measurements, and they
@@ -126,7 +134,7 @@ const GRADE_SCALE: Record<string, number> = { A: 1, B: 0.83, C: 0.67, D: 0.5, E:
  */
 export const PROSPECT_SCORE_MIN = 80;
 
-export type PriorityInput = {
+export type PriorityInput = ScoreInput & {
   id: string;
   name: string;
   lifecycle: string | null;
@@ -148,8 +156,6 @@ export type PriorityInput = {
    *  /search prospect (channel is "unknown" until a human sets it) by what
    *  its own site says it does, not only by an ERP-set channel. */
   fit_tags?: string[];
-  /** nb_v_account_potential.potential_grade, the bare letter. */
-  tier: string | null;
   trailing_12m_revenue: number | null;
   lifetime_revenue: number | null;
   /** ERP first invoice date. Used only for the long-tenure-low-revenue rule
@@ -167,11 +173,6 @@ export type PriorityInput = {
   urgency_reason?: string | null;
   /** Most recent nb_v_activities_effective.at for this account. */
   last_touch_at?: string | null;
-  /** nb_accounts.readiness, the rep's own read of how close this account is
-   *  to buying, set by hand on the call/visit capture box. Null means no rep
-   *  has tagged it yet, never "normal" (a real "normal" tag still means the
-   *  rep looked; null means nobody has). */
-  readiness?: Readiness | null;
 };
 
 export type NextAction = {
@@ -183,6 +184,11 @@ export type NextAction = {
 
 export type PriorityResult = {
   id: string;
+  /** The potential letter, A to G (sdr-score.ts potentialNow), or null. */
+  grade: string | null;
+  gradeFrom: GradeFrom;
+  /** A note says buying is decided at corporate. */
+  corporate: boolean;
   /** 0-100, or null when not one input is known. Null sorts last. */
   score: number | null;
   band: "now" | "soon" | "later" | "unscored";
@@ -206,10 +212,6 @@ function daysBetween(iso: string | null | undefined, now: number): number | null
   const t = Date.parse(iso.length === 10 ? `${iso}T00:00:00Z` : iso);
   if (Number.isNaN(t)) return null;
   return Math.floor((now - t) / DAY);
-}
-
-function usd(n: number): string {
-  return `$${Math.round(n).toLocaleString("en-US")}`;
 }
 
 /** Fraction of `values` strictly below `v`. A percentile over the real
@@ -240,7 +242,12 @@ function clamp01(n: number): number {
  * chain, and the only non-invented answer to "is this a big account" is "big
  * compared to the 437 others on this list".
  */
-export function computePriority(rows: PriorityInput[], nowMs = Date.now()): Map<string, PriorityResult> {
+export function computePriority(
+  rows: PriorityInput[],
+  signals: Map<string, Signals> = new Map(),
+  nowMs = Date.now(),
+): Map<string, PriorityResult> {
+  const today = laDay(new Date(nowMs));
   // The revenue distributions, built from rows that actually carry a figure.
   // An account with no loaded orders is absent from these, never a zero in them.
   const t12 = rows.map((r) => r.trailing_12m_revenue).filter((v): v is number => typeof v === "number" && v > 0).sort((a, b) => a - b);
@@ -249,7 +256,6 @@ export function computePriority(rows: PriorityInput[], nowMs = Date.now()): Map<
   const out = new Map<string, PriorityResult>();
 
   for (const r of rows) {
-    const clauses: string[] = [];
 
     // -- Hard suppressors. Facts, not weights: a closed door outranks any
     // score. load_orders.py's rule is honoured, an order inside the last 12
@@ -286,45 +292,18 @@ export function computePriority(rows: PriorityInput[], nowMs = Date.now()): Map<
     const revSubs: number[] = [];
     if (typeof r.trailing_12m_revenue === "number" && r.trailing_12m_revenue > 0) {
       revSubs.push(percentile(t12, r.trailing_12m_revenue));
-      clauses.push(`${usd(r.trailing_12m_revenue)} in the last 12 months`);
     } else if (typeof r.lifetime_revenue === "number" && r.lifetime_revenue > 0) {
       revSubs.push(percentile(life, r.lifetime_revenue));
-      clauses.push(`${usd(r.lifetime_revenue)} lifetime`);
     }
     if (effectiveTier && effectiveTier in GRADE_SCALE) {
       revSubs.push(GRADE_SCALE[effectiveTier]);
-      clauses.push(
-        deadWeight
-          ? `under $300 in ${Math.floor((tenureDays as number) / 365)}y as a client, classified E`
-          : `HQ potential ${effectiveTier}`,
-      );
     }
     const revenue = revSubs.length ? revSubs.reduce((a, b) => a + b, 0) / revSubs.length : null;
-
-    /*
-     * NAMED CHAINS (Juan, 2026-09-08): "Mother's Market" locations are a
-     * strategic account regardless of what this store's own order history
-     * says yet. This is a stated business call, not a measurement, so it
-     * shows up as its own clause and floors the score rather than silently
-     * replacing a real number, the same transparency rule 0035 set for
-     * urgency and this file already applies to `suppressed`.
-     */
-    const isMothersMarket = /mother'?s market/i.test(r.name);
 
     // ------------------------------------------------------------- engagement
     const engSubs: number[] = [];
     if (typeof r.urgency === "number") {
       engSubs.push(r.urgency === 2 ? 1 : r.urgency === 1 ? 0.6 : 0.2);
-      // The evidence travels verbatim. It is the account's own words, read out
-      // of the HubSpot conversation by draft_urgency.py, and rewording it here
-      // would put a second voice on a fact that already has one.
-      clauses.push(
-        r.urgency === 2
-          ? `draft needs a reply today${r.urgency_reason ? `: ${r.urgency_reason}` : ""}`
-          : r.urgency === 1
-            ? `open draft${r.urgency_reason ? `: ${r.urgency_reason}` : ""}`
-            : "open draft, no urgency stated",
-      );
     }
     const daysSinceTouch = daysBetween(r.last_touch_at, nowMs);
     if (daysSinceTouch !== null) {
@@ -333,7 +312,6 @@ export function computePriority(rows: PriorityInput[], nowMs = Date.now()): Map<
           ? 1
           : clamp01((RECENCY_COLD_DAYS - daysSinceTouch) / (RECENCY_COLD_DAYS - RECENCY_FRESH_DAYS)),
       );
-      clauses.push(daysSinceTouch === 0 ? "touched today" : `last touch ${daysSinceTouch}d ago`);
     }
     const engagement = engSubs.length ? engSubs.reduce((a, b) => a + b, 0) / engSubs.length : null;
 
@@ -345,21 +323,12 @@ export function computePriority(rows: PriorityInput[], nowMs = Date.now()): Map<
     // "90 days" applied to the rest would be a number nobody measured.
     if (r.expected_reorder_days && daysSinceOrder !== null) {
       const ratio = daysSinceOrder / r.expected_reorder_days;
-      const overdueDays = daysSinceOrder - r.expected_reorder_days;
       viaSubs.push(ratio < 0.5 ? 0.4 : ratio <= 1.5 ? 1 : ratio <= 2.5 ? 0.7 : 0.3);
-      clauses.push(
-        overdueDays > 0
-          ? `reorder ${overdueDays}d overdue on its own ${r.expected_reorder_days}d cycle`
-          : `reorder due in ${-overdueDays}d on its own ${r.expected_reorder_days}d cycle`,
-      );
-    } else if (daysSinceOrder !== null) {
-      clauses.push(`last order ${daysSinceOrder}d ago`);
     }
     if (r.lifecycle) {
       const byLifecycle: Record<string, number> = { active: 1, prospect: 0.6, dormant: 0.5, lost: 0.1 };
       if (r.lifecycle in byLifecycle) {
         viaSubs.push(byLifecycle[r.lifecycle]);
-        clauses.push(r.lifecycle);
       }
     }
     const viability = suppressed ? 0 : viaSubs.length ? viaSubs.reduce((a, b) => a + b, 0) / viaSubs.length : null;
@@ -376,41 +345,6 @@ export function computePriority(rows: PriorityInput[], nowMs = Date.now()): Map<
     ];
     const known = pairs.filter(([v]) => v !== null) as [number, number][];
     const totalW = PRIORITY_WEIGHTS.revenue + PRIORITY_WEIGHTS.engagement + PRIORITY_WEIGHTS.viability;
-    const knownW = known.reduce((a, [, w]) => a + w, 0);
-    /*
-     * NO INFO IS A SCORE OF 50 (Juan, 2026-09-08, overriding this file's
-     * original "null sorts last" rule for the true no-data case only). An
-     * account with not one measured input used to score null and sort last;
-     * Juan's call is that "unmeasured" reads as neutral, not as bottom of the
-     * book, so it lands exactly on the midpoint instead. `band` still needs
-     * to know this happened (see below), so `noInfo` is kept, not inferred
-     * back from `score === 50`, a real 50 computed from real inputs is a
-     * different fact than a default one.
-     */
-    const noInfo = knownW === 0;
-    let score: number | null = noInfo ? 50 : Math.round((known.reduce((a, [v, w]) => a + v * w, 0) / knownW) * 100);
-
-    // -------------------------------------------------------------- readiness
-    // A flat point shift, not a blended input (see READINESS_ADJUSTMENT's own
-    // comment). Applied even in the noInfo case: a rep who just got a hot read
-    // on an otherwise-unmeasured account is not "no information," the tag
-    // itself is a real, stated fact.
-    if (r.readiness && score !== null) {
-      score = Math.max(0, Math.min(100, score + READINESS_ADJUSTMENT[r.readiness]));
-      clauses.push(`Lead readiness: ${r.readiness}`);
-    }
-    if (suppressed && score !== null) score = Math.min(score, 10);
-    // A history of under $300 across 2+ years is a measured fact, not a gap,
-    // and it caps the score below the "soon" band regardless of what else
-    // fed into it (Juan, 2026-09-08).
-    if (deadWeight && score !== null) score = Math.min(score, 49);
-    // Named-chain floor, applied last so a real suppressor still wins over it
-    // (a closed Mother's Market is closed, not merely deprioritized).
-    if (isMothersMarket && !suppressed && score !== null) {
-      score = Math.max(score, 78);
-      clauses.push("Mother's Market, flagged high priority");
-    }
-
     const inputsKnown = known.length;
     /*
      * CONFIDENCE COUNTS SUB-INPUTS, NOT COMPONENTS. Counting only the three
@@ -429,37 +363,24 @@ export function computePriority(rows: PriorityInput[], nowMs = Date.now()): Map<
         PRIORITY_WEIGHTS.viability * (viaSubs.length / 2)) /
       totalW;
 
-    let reason: string;
-    if (suppressed) {
-      reason = `${suppressed}${clauses.length ? ` · ${clauses.join(" · ")}` : ""}`;
-    } else if (noInfo) {
-      // Not prose about nothing: it names which columns are empty, so the fix
-      // is obvious (run the enricher, load the orders), and says plainly that
-      // 50 is a default, not a measurement. A readiness tag still speaks for
-      // itself here, since it is a real fact even when nothing else is known.
-      reason =
-        "no revenue, engagement or lifecycle data on file yet, scored neutral at 50" +
-        (r.readiness ? ` · Lead readiness: ${r.readiness}` : "");
-    } else {
-      reason = clauses.join(" · ");
-    }
-    if (!noInfo && confidence < 0.6) {
-      reason += ` · scored on ${revSubs.length + engSubs.length + viaSubs.length} of 6 inputs`;
-    }
+    // The score itself: sdr-score.ts, the same rules as ClientOS and the
+    // action lists sheet. The weighted parts above stay only for the
+    // matrix's importance axis and for confidence.
+    const sig: Signals = signals.get(r.id) ?? EMPTY_SIGNALS;
+    const { grade, from } = potentialNow(r, sig.peak);
+    let score = sdrScore(r, sig, grade, today);
+    if (suppressed) score = Math.min(score, 10);
+    const reason = [...(suppressed ? [suppressed] : []), ...sdrClauses(r, sig, grade, from, today)].join(" · ");
 
-    /*
-     * BAND THRESHOLDS, tuned against the live book rather than picked. At
-     * 70/45 the top band held 120 of 436 accounts, which is not a prescriptive
-     * list, it is a quarter of the territory wearing a badge. 78/55 puts
-     * roughly the top 12% in "now", which is about a fortnight of driving.
-     */
-    const band: PriorityResult["band"] =
-      score === null ? "unscored" : suppressed ? "later" : score >= 78 ? "now" : score >= 55 ? "soon" : "later";
+    const band: PriorityResult["band"] = suppressed ? "later" : score >= 78 ? "now" : score >= 55 ? "soon" : "later";
 
     out.set(r.id, {
       id: r.id,
       score,
       band,
+      grade,
+      gradeFrom: from,
+      corporate: sig.corp,
       reason,
       confidence,
       inputsKnown,
