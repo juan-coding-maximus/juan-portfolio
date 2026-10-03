@@ -550,12 +550,23 @@ function ScatterBoard({
 /* --------------------------------------------------------------- success */
 
 function SuccessList({ tasks, onReopen }: { tasks: MatrixTask[]; onReopen: (task: MatrixTask) => void }) {
+  const [open, setOpen] = useState(false);
   return (
     <section className="mt-6">
       <h2 className="text-[11px] uppercase tracking-[0.14em] text-[#8A928C]">
-        Success <span className="tabular-nums text-[#B4B9B3]">{tasks.length}</span>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex min-h-[44px] w-full items-center gap-1.5 text-left uppercase tracking-[0.14em] text-[#8A928C] transition-colors hover:text-[#3D4A44]"
+        >
+          <span>
+            Success <span className="tabular-nums text-[#B4B9B3]">{tasks.length}</span>
+          </span>
+          <Ico name={open ? "chevron-up" : "chevron-down"} size={13} />
+        </button>
       </h2>
-      {tasks.length === 0 ? (
+      {!open ? null : tasks.length === 0 ? (
         <p className="mt-2 rounded-lg border border-[#E2DFD5] bg-white px-3.5 py-4 text-center text-[12.5px] text-[#8A928C]">
           Nothing checked off yet.
         </p>
