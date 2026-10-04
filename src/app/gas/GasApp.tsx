@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { findCarWash, findGas, type CarWashResult, type FindResult } from "./actions";
-import { FAVORITES, GALLON_STEP, TANK_GALLONS, UPSIDE_MAX_PER_GAL } from "./lib/constants";
+import { FAVORITES, GALLON_STEP, TANK_GALLONS } from "./lib/constants";
 import type { Scored } from "./lib/score";
 import type { WashScored } from "./lib/washscore";
 
@@ -36,12 +36,6 @@ function appleMapsTwoStops(stop: { name: string; address: string }, destAddress:
   const end = encodeURIComponent(destAddress);
   return `https://maps.apple.com/?saddr=Current%20Location&daddr=${s}+to:${end}&dirflg=d`;
 }
-
-/* upside.com publishes /mobile/app/* as a universal link for its iOS app
-   (apple-app-site-association, checked 2026-09-14), so this opens the
-   installed app rather than the website. Upside has no public API or
-   per-station link, so the offer and its price are checked in the app. */
-const UPSIDE_URL = "https://www.upside.com/mobile/app/gas";
 
 /** GasBuddy's station search, the one public source that labels cash and
  *  credit separately, for checking the card price before driving. */
@@ -313,32 +307,20 @@ function StationCard({ s, rank, gallons, destAddress }: { s: Scored; rank: numbe
           <span className="ml-2 text-[13px] text-[#5B6560]">per gallon</span>
         </div>
       </div>
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        {s.stale && <Badge tone="warn">Price may be outdated</Badge>}
-        <Badge>Up to {Math.round(UPSIDE_MAX_PER_GAL * 100)}¢/gal with Upside</Badge>
-      </div>
       <div className="mt-2 text-[14px] text-[#3D4A44]">
         ${Math.round(s.regular * gallons)} for {gal(gallons)} gal
         {s.updatedAt && (
-          <span className={s.stale ? "font-medium text-[#8A6D2F]" : "text-[#8A928C]"}> · price {ago(s.updatedAt)}</span>
+          <span className="text-[#8A928C]"> · price {ago(s.updatedAt)}</span>
         )}
         <span className="text-[#8A928C]"> · </span>
         <a href={gasBuddyUrl(s)} target="_blank" rel="noopener" className="text-[#2C6A46] underline-offset-2 hover:underline">
           GasBuddy
         </a>
       </div>
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        <a
-          href={UPSIDE_URL}
-          target="_blank"
-          rel="noopener"
-          className="flex h-11 items-center justify-center rounded-xl border border-[#E2DFD5] text-[15px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2C6A46]"
-        >
-          Upside
-        </a>
+      <div className="mt-4">
         <a
           href={appleMapsTwoStops(s, destAddress)}
-          className="flex h-11 items-center justify-center rounded-xl bg-[#14201B] text-[15px] font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2C6A46] focus-visible:ring-offset-2"
+          className="flex h-11 w-full items-center justify-center rounded-xl bg-[#14201B] text-[15px] font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2C6A46] focus-visible:ring-offset-2"
         >
           Apple Maps
         </a>
@@ -383,7 +365,7 @@ function WashCard({ s, rank, destAddress }: { s: WashScored; rank: number; destA
       <div className="mt-4">
         <a
           href={appleMapsTwoStops(s, destAddress)}
-          className="flex h-11 items-center justify-center rounded-xl bg-[#14201B] text-[15px] font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2C6A46] focus-visible:ring-offset-2"
+          className="flex h-11 w-full items-center justify-center rounded-xl bg-[#14201B] text-[15px] font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2C6A46] focus-visible:ring-offset-2"
         >
           Apple Maps
         </a>

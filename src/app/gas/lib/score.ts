@@ -41,10 +41,7 @@ function stalenessPenalty(ageHours: number | null): number {
  * at `rate` per gallon bought. A minute is worth more when there is more
  * fuel to buy, which is exactly why a long empty-tank drive is where this
  * pays and a quarter-tank top-up isn't.
- *
- * No discount is assumed here. Upside's per-station availability isn't
- * public data, so it's never subtracted from a station's price before
- * ranking, that would rank stations on a saving that may not exist for them.
+
  */
 export function scoreStations(
   stations: Station[],
