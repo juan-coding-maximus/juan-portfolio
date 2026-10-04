@@ -15,6 +15,8 @@ export type Scored = Station & {
   total: number;
   priceAgeHours: number | null;
   stale: boolean;
+  /** Road miles from where the search started, set on the shown few only. */
+  milesAway?: number | null;
 };
 
 /* A GasBuddy-sourced price this old has already moved: a station shown here

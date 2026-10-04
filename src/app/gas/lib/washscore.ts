@@ -1,6 +1,6 @@
 import type { WashStation } from "./carwash";
 
-export type WashScored = WashStation & { detourMinutes: number; total: number };
+export type WashScored = WashStation & { detourMinutes: number; total: number; milesAway?: number | null };
 
 /**
  * Ranks car washes the same way gas ranks stations: `total = price +
