@@ -26,6 +26,3 @@ export const RATE_QUICKEST = 0.03;
    worth 30c. Flat, not per gallon, a wash isn't bought by the gallon. */
 export const RATE_CARWASH = 0.3;
 
-/** Miles kept unspent when a typed miles-to-empty number filters out
- *  stations the tank can't actually reach. */
-export const RESERVE_MILES = 20;

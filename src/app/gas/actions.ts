@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { searchPlaces } from "../nutribiotic/lib/places";
-import { RATE_CARWASH, RATE_CHEAPEST, RATE_QUICKEST, RESERVE_MILES, TANK_GALLONS } from "./lib/constants";
+import { RATE_CARWASH, RATE_CHEAPEST, RATE_QUICKEST, TANK_GALLONS } from "./lib/constants";
 import { carWashNearby, type WashStation } from "./lib/carwash";
 import { fuelNearby } from "./lib/fuel";
 import { detourMinutes, milesFromOrigin, route, sampleAlong, type LatLng } from "./lib/osrm";
@@ -113,14 +113,11 @@ export async function findGas(input: FindInput): Promise<FindResult> {
 
   const milesToEmpty = Number(input.milesToEmpty);
   if (Number.isFinite(milesToEmpty) && milesToEmpty > 0) {
-    const reach = milesToEmpty - RESERVE_MILES;
-    if (reach <= 0) return { ok: false, error: `${milesToEmpty} miles to empty leaves no room past the ${RESERVE_MILES}-mile reserve.` };
     const originMiles = await milesFromOrigin(origin, stations);
     if (!originMiles) return { ok: false, error: "Couldn't check which stations are in reach right now. Try again." };
-    stations = stations.filter((_, i) => originMiles[i] <= reach);
-    if (stations.length === 0) {
-      return { ok: false, error: `No priced station within ${Math.round(reach)} miles, the range ${milesToEmpty} miles to empty leaves after a ${RESERVE_MILES}-mile reserve.` };
-    }
+    const ranked = stations.map((s, i) => ({ s, m: originMiles[i] })).sort((x, y) => x.m - y.m);
+    const inReach = ranked.filter((r) => r.m <= milesToEmpty);
+    stations = (inReach.length > 0 ? inReach : ranked.slice(0, 3)).map((r) => r.s);
   }
 
   const detours = await detourMinutes(origin, dest, stations);
