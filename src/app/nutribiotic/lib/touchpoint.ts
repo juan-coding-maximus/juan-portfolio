@@ -37,6 +37,7 @@ import {
   insertCloseSignal,
   insertContact,
   insertAskDraft,
+  listPendingDirectiveTexts,
   insertDirectives,
   insertFieldNote,
   insertTouchpoint,
@@ -48,7 +49,7 @@ import {
   type AccountFactsReport,
   type Contact,
 } from "./dal";
-import { asksCollide, composeAsk } from "./ask-compose";
+import { asksCollide, composeAsk, normalizeAsk } from "./ask-compose";
 import { Blocked, runEngagement } from "./hubspot-engagement";
 import { ensurePortalCompanyForActivity } from "./hubspot-graduate";
 import { formatBusinessHours, pushBusinessHours, pushCompanyEmail, pushCompanyPhone } from "./hubspot-company";
@@ -392,11 +393,12 @@ async function fileOutreachAsks(
 ): Promise<number> {
   if (!accountId || !asks?.length) return 0;
 
-  const [accountRes, contactsRes, alreadyFiled, voice] = await Promise.all([
+  const [accountRes, contactsRes, alreadyFiled, voice, pendingDirectives] = await Promise.all([
     getAccount(accountId),
     listContacts(accountId),
     listAskKeys(accountId),
     getVoiceContext(accountId),
+    listPendingDirectiveTexts(accountId),
   ]);
   const account = accountRes.data[0];
   if (!account) return 0;
@@ -424,6 +426,25 @@ async function fileOutreachAsks(
       contacts,
       voice,
     });
+    if (!composed.written) {
+      // Not an email Juan can send (Ramiro texting him, a quote coming his
+      // way, no address on file). It does not belong in Outbound. It becomes a
+      // follow-up for the route planner, in the ask's own words, once.
+      const norm = normalizeAsk(ask);
+      if (!pendingDirectives.some((d) => normalizeAsk(d).includes(norm))) {
+        await insertDirectives([
+          {
+            field_note_id: null,
+            directive: `[follow-up:ask] ${account.name}: ${ask}`,
+            target: "nutribiotic-route-planner",
+            scope: "nutribiotic",
+            account_id: accountId,
+          },
+        ]);
+      }
+      seen.push(ask);
+      continue;
+    }
     await insertAskDraft({ account_id: accountId, ask, composed });
     seen.push(ask);
     filed += 1;

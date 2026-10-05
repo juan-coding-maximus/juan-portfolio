@@ -40,9 +40,7 @@ import { redirect } from "next/navigation";
 import { hasAccess } from "./devices";
 import {
   ASK_COMPOSED_PLAY,
-  ASK_UNWRITTEN_PLAY,
   normalizeAsk,
-  unwrittenBody,
   type ComposedAsk,
 } from "./ask-compose";
 import { hasWidgetToken } from "./session";
@@ -2082,6 +2080,17 @@ export async function getVoiceContext(accountId: string): Promise<{
   }
 }
 
+/** Pending directive text for one account, so an ask is not queued twice. */
+export async function listPendingDirectiveTexts(accountId: string): Promise<string[]> {
+  const res = await query<{ directive: string; origin?: Origin }>("nb_directives", {
+    select: "directive",
+    account_id: `eq.${accountId}`,
+    status: "eq.pending",
+    limit: 100,
+  });
+  return res.data.map((r) => r.directive);
+}
+
 export async function listAskKeys(accountId: string): Promise<{ id: string; source_ask: string; status: string }[]> {
   const res = await query<{ id: string; source_ask: string | null; status: string; origin?: Origin }>("nb_outbound_drafts", {
     select: "id,source_ask,status",
@@ -2112,18 +2121,23 @@ export async function insertAskDraft(input: {
   /** The ask verbatim, in Juan's words. Stored normalized in source_ask. */
   ask: string;
   composed: ComposedAsk;
-}): Promise<Draft> {
+}): Promise<Draft | null> {
   const c = input.composed;
+  // An ask that could not be written as an email is not an outbound item: it
+  // is something Juan already knows (it is in the note) or something the other
+  // side sends him. It never gets a row here. Callers that want it kept route
+  // it to nb_directives (touchpoint.ts fileOutreachAsks).
+  if (!c.written) return null;
   const [row] = await mutate<Draft>("nb_outbound_drafts", "POST", {
     id: randId("draft"),
     account_id: input.account_id,
-    contact_id: c.written ? c.contactId : null,
+    contact_id: c.contactId,
     channel: "email",
-    subject: c.written ? c.subject : null,
-    body_md: c.written ? c.body : unwrittenBody(input.ask, c.reason),
-    to_email: c.written ? c.toEmail : null,
-    to_name: c.written ? c.toName : null,
-    play_key: c.written ? ASK_COMPOSED_PLAY : ASK_UNWRITTEN_PLAY,
+    subject: c.subject,
+    body_md: c.body,
+    to_email: c.toEmail,
+    to_name: c.toName,
+    play_key: ASK_COMPOSED_PLAY,
     source_ask: normalizeAsk(input.ask),
     campaign_id: null,
     status: "pending",
