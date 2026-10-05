@@ -62,8 +62,9 @@ the book's shape and my own judgment, not on proven touch-to-order rates.
 | 15 | Reports to the director of sales | Efficiency | Leave alone |
 | 16 | Biweekly expense report | Efficiency | Leave alone |
 | 17 | Charging cards and sending invoices | Efficiency | Leave alone |
-| 18 | TikTok Shop affiliates | Better clients | Test with the budget |
+| 18 | TikTok Shop affiliates, commission only | Better clients | Test with the budget |
 | 19 | Reacher App for creator outreach | Efficiency | Test with the budget |
+| 20 | Paid ads on creator videos | Better clients | Test with the budget |
 
 Items 3, 10, 12 and 14 are activities I had not listed; they were already in the playbook or the OS.
 
@@ -214,12 +215,12 @@ speed.
 
 ## Test with the budget
 
-### 18. TikTok Shop affiliates · test with the budget
-- **What it is.** Paying creators a commission on every TikTok Shop sale of NutriBiotic, with sample sends to the ones who post.
-- **How it moves revenue.** It is the one activity where return is read straight off the dashboard: sales per creator against commission and sample cost. NutriBiotic has $10,000 total for paid media, so I can set a ROAS floor before spending and stop what misses it.
-- **How I prioritize it.** Supplements are priced at 15 to 25 percent commission on the platform, and open collaboration runs lower than targeted collaboration. Two SKUs only, Dual Relax and Clarity Plus, so every creator pushes the same two products and the read stays clean. Start with a small creator list on targeted terms, then widen only what clears the floor. The floor counts commission, not only ad spend. The math: price $40 and a 70 percent gross margin (an assumption I was given, not an HQ figure) leave $28 a unit. Break-even ROAS is 1 divided by (0.70 minus commission minus platform fee). At 20 percent commission it is 2.0 before the platform fee and 2.4 with an 8 percent fee (reported at 6 to 8 percent; the exact rate is in Seller Center). My floor is 2.4. At that floor, $10,000 of spend has to bring back about $24,000, roughly 600 units, just to break even. Sample cost sits on top.
-- **How I improve it.** One page per creator: sales, commission paid, samples sent, ROAS. A weekly read, and cut any creator under the floor after two weeks.
-- **Evidence.** None yet. NutriBiotic has no TikTok Shop seller account, and the OS holds no TikTok Shop sales, spend or creator data. Next step: open the seller account and get Dual Relax and Clarity Plus approved. Measure to add: spend, commission and sales per creator, in one table.
+### 18. TikTok Shop affiliates, commission only · test with the budget
+- **What it is.** Commission-only creators on TikTok Shop, no flat fees, selling Dual Relax and Clarity Plus. Each gets free samples and a commission on every sale.
+- **How it moves revenue.** I pay only when something sells, so the money at risk is the samples and the Reacher plan, not the $10,000. Each creator's videos also become the material for paid ads (activity 20).
+- **How I prioritize it.** Targeted collaboration over open collaboration, since targeted rates run higher and bring better creators. Supplements run 15 to 25 percent commission on the platform. Start with a small list and widen only what sells.
+- **How I improve it.** One page per creator: sales, commission paid, samples sent, video count. I judge each on contribution, not ROAS. At $40 and a 70 percent margin (my assumption, not an HQ figure) a unit leaves $28, and after 20 percent commission and an 8 percent platform fee (reported at 6 to 8 percent; the exact rate is in Seller Center) it leaves about $16.80, before samples and the plan. A creator who sells nothing in two weeks costs me a sample, so I cut them. A creator whose video sells gets asked for permission to run it as an ad.
+- **Evidence.** None yet. NutriBiotic has no TikTok Shop seller account, and the OS holds no TikTok Shop sales, spend or creator data. Next step: open the seller account and get Dual Relax and Clarity Plus approved. Measure to add: samples, commission and sales per creator, in one table.
 
 ### 19. Reacher App for creator outreach · test with the budget
 - **What it is.** The software that runs TikTok Shop affiliate outreach: finds creators, sends invites and messages, queues sample requests, tracks each creator's sales.
@@ -227,6 +228,13 @@ speed.
 - **How I prioritize it.** Start on the Starter plan, $199 a month, and move to Pro, $599 a month, only if outreach volume or AI creator search is the limit. Pro adds AI creator search, automated follow-ups and unlimited daily messages.
 - **How I improve it.** Run it for one month on one product line. Compare the month's creator sales to the plan cost plus commission.
 - **Evidence.** Plan prices from reacherapp.com/pricing, read 2026-10-05. No trial or spend has started, and Reacher works on a TikTok Shop account, so it waits on the seller account. Buying the plan is mine to approve, from the $10,000 total.
+
+### 20. Paid ads on creator videos · test with the budget
+- **What it is.** Running the best commission-only creator videos as ads on TikTok, Meta and Google, with a small test line on each.
+- **How it moves revenue.** A creator video that already sells organically is proven creative, which is the costliest part of paid media to guess at. The $10,000 total goes here, behind the winners only.
+- **How I prioritize it.** Nothing runs until creator sales show which videos convert. Meta carries retargeting and awareness, TikTok carries the Shop traffic, Google gets a small test. Each video needs its creator's permission before it runs as an ad.
+- **How I improve it.** The floor lives here, not on affiliates. Ad spend must clear a break-even ROAS of 2.4: 1 divided by (0.70 minus 20 percent commission minus an 8 percent platform fee). At that floor, $10,000 of spend has to bring back about $24,000, roughly 600 units, just to break even on the first purchase. Published supplement benchmarks sit below that: Google 2.12, Meta 1.50, TikTok ads 1.10, from agency blogs, so repeat purchases have to carry the gap. I stop any ad that sits under the floor after its first full week.
+- **Evidence.** None yet. No ad has run. Measure to add: spend, sales and ROAS per video, with the creator named. The YouTube figure is not separate in the benchmarks; Google covers search and shopping too.
 
 ## Sources
 - OS evidence, measured 2026-10-02: `nutribiotic/out/activity-ranking-evidence.md` (aggregates only,
@@ -238,3 +246,4 @@ speed.
 - TikTok Shop commission ranges: hamstergarage.com and wearemada.com commission guides, read 2026-10-05.
 - Reacher plans and features: reacherapp.com/pricing, read 2026-10-05.
 - TikTok Shop referral fee, reported 6 to 8 percent for health and wellness: darkroomagency.com and bebolddigital.com fee guides, read 2026-10-05. Margin and price: given by me, 2026-10-05.
+- Supplement ROAS by channel and TikTok Shop CAC: eightx.co and influencers-time.com, agency blog figures, read 2026-10-05.
