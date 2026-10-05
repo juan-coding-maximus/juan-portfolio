@@ -217,7 +217,7 @@ speed.
 ### 18. TikTok Shop affiliates · test with the budget
 - **What it is.** Paying creators a commission on every TikTok Shop sale of NutriBiotic, with sample sends to the ones who post.
 - **How it moves revenue.** It is the one activity where return is read straight off the dashboard: sales per creator against commission and sample cost. NutriBiotic has $10,000 total for paid media, so I can set a ROAS floor before spending and stop what misses it.
-- **How I prioritize it.** Supplements are priced at 15 to 25 percent commission on the platform, and open collaboration runs lower than targeted collaboration. Two SKUs only, Dual Relax and Clarity Plus, so every creator pushes the same two products and the read stays clean. Start with a small creator list on targeted terms, then widen only what clears the floor. The floor counts commission, not only ad spend.
+- **How I prioritize it.** Supplements are priced at 15 to 25 percent commission on the platform, and open collaboration runs lower than targeted collaboration. Two SKUs only, Dual Relax and Clarity Plus, so every creator pushes the same two products and the read stays clean. Start with a small creator list on targeted terms, then widen only what clears the floor. The floor counts commission, not only ad spend. The math: price $40 and a 70 percent gross margin (an assumption I was given, not an HQ figure) leave $28 a unit. Break-even ROAS is 1 divided by (0.70 minus commission minus platform fee). At 20 percent commission it is 2.0 before the platform fee and 2.4 with an 8 percent fee (reported at 6 to 8 percent; the exact rate is in Seller Center). My floor is 2.4. At that floor, $10,000 of spend has to bring back about $24,000, roughly 600 units, just to break even. Sample cost sits on top.
 - **How I improve it.** One page per creator: sales, commission paid, samples sent, ROAS. A weekly read, and cut any creator under the floor after two weeks.
 - **Evidence.** None yet. NutriBiotic has no TikTok Shop seller account, and the OS holds no TikTok Shop sales, spend or creator data. Next step: open the seller account and get Dual Relax and Clarity Plus approved. Measure to add: spend, commission and sales per creator, in one table.
 
@@ -237,3 +237,4 @@ speed.
 - Tooling: `nutribiotic/AGENTS.md`.
 - TikTok Shop commission ranges: hamstergarage.com and wearemada.com commission guides, read 2026-10-05.
 - Reacher plans and features: reacherapp.com/pricing, read 2026-10-05.
+- TikTok Shop referral fee, reported 6 to 8 percent for health and wellness: darkroomagency.com and bebolddigital.com fee guides, read 2026-10-05. Margin and price: given by me, 2026-10-05.
