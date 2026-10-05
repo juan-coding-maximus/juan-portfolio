@@ -7,7 +7,7 @@ Every job I do in the field, ranked by how much it moves revenue or saves time, 
 of three piles: **focus** (do more of it, it pays the most), **improve the method** (worth doing,
 done the wrong way today), or **leave alone** (already fine, don't spend thought on it).
 
-A fourth pile, **test with the budget**, holds paid channels whose return reads straight off a dashboard as ROAS. NutriBiotic has $10,000 for paid media.
+A fourth pile, **test with the budget**, holds paid channels whose return reads straight off a dashboard as ROAS. NutriBiotic has $10,000 total for paid media.
 
 Three levers decide the rank:
 
@@ -216,17 +216,17 @@ speed.
 
 ### 18. TikTok Shop affiliates · test with the budget
 - **What it is.** Paying creators a commission on every TikTok Shop sale of NutriBiotic, with sample sends to the ones who post.
-- **How it moves revenue.** It is the one activity where return is read straight off the dashboard: sales per creator against commission and sample cost. NutriBiotic has $10,000 for paid media, so I can set a ROAS floor before spending and stop what misses it.
-- **How I prioritize it.** Supplements are priced at 15 to 25 percent commission on the platform, and open collaboration runs lower than targeted collaboration. Two SKUs only, so every creator pushes the same two products and the read stays clean. Start with a small creator list on targeted terms, then widen only what clears the floor. The floor counts commission, not only ad spend.
+- **How it moves revenue.** It is the one activity where return is read straight off the dashboard: sales per creator against commission and sample cost. NutriBiotic has $10,000 total for paid media, so I can set a ROAS floor before spending and stop what misses it.
+- **How I prioritize it.** Supplements are priced at 15 to 25 percent commission on the platform, and open collaboration runs lower than targeted collaboration. Two SKUs only, Dual Relax and Clarity Plus, so every creator pushes the same two products and the read stays clean. Start with a small creator list on targeted terms, then widen only what clears the floor. The floor counts commission, not only ad spend.
 - **How I improve it.** One page per creator: sales, commission paid, samples sent, ROAS. A weekly read, and cut any creator under the floor after two weeks.
-- **Evidence.** None yet. NutriBiotic has no TikTok Shop seller account, and the OS holds no TikTok Shop sales, spend or creator data. Next step: open the seller account and get the two SKUs approved. Measure to add: spend, commission and sales per creator, in one table.
+- **Evidence.** None yet. NutriBiotic has no TikTok Shop seller account, and the OS holds no TikTok Shop sales, spend or creator data. Next step: open the seller account and get Dual Relax and Clarity Plus approved. Measure to add: spend, commission and sales per creator, in one table.
 
 ### 19. Reacher App for creator outreach · test with the budget
 - **What it is.** The software that runs TikTok Shop affiliate outreach: finds creators, sends invites and messages, queues sample requests, tracks each creator's sales.
 - **How it moves revenue.** It turns activity 18 from a manual chore into a measured channel. Its reporting is what makes ROAS per creator visible without a spreadsheet.
 - **How I prioritize it.** Start on the Starter plan, $199 a month, and move to Pro, $599 a month, only if outreach volume or AI creator search is the limit. Pro adds AI creator search, automated follow-ups and unlimited daily messages.
 - **How I improve it.** Run it for one month on one product line. Compare the month's creator sales to the plan cost plus commission.
-- **Evidence.** Plan prices from reacherapp.com/pricing, read 2026-10-05. No trial or spend has started, and Reacher works on a TikTok Shop account, so it waits on the seller account. Buying the plan is mine to approve, from the $10,000.
+- **Evidence.** Plan prices from reacherapp.com/pricing, read 2026-10-05. No trial or spend has started, and Reacher works on a TikTok Shop account, so it waits on the seller account. Buying the plan is mine to approve, from the $10,000 total.
 
 ## Sources
 - OS evidence, measured 2026-10-02: `nutribiotic/out/activity-ranking-evidence.md` (aggregates only,
