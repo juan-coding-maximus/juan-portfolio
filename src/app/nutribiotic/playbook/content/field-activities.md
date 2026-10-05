@@ -7,6 +7,8 @@ Every job I do in the field, ranked by how much it moves revenue or saves time, 
 of three piles: **focus** (do more of it, it pays the most), **improve the method** (worth doing,
 done the wrong way today), or **leave alone** (already fine, don't spend thought on it).
 
+A fourth pile, **test with the budget**, holds paid channels whose return reads straight off a dashboard as ROAS. NutriBiotic has a budget for them.
+
 Three levers decide the rank:
 
 1. **Better clients.** Time spent on accounts that can buy more.
@@ -60,6 +62,8 @@ the book's shape and my own judgment, not on proven touch-to-order rates.
 | 15 | Reports to the director of sales | Efficiency | Leave alone |
 | 16 | Biweekly expense report | Efficiency | Leave alone |
 | 17 | Charging cards and sending invoices | Efficiency | Leave alone |
+| 18 | TikTok Shop affiliates | Better clients | Test with the budget |
+| 19 | Reacher App for creator outreach | Efficiency | Test with the budget |
 
 Items 3, 10, 12 and 14 are activities I had not listed; they were already in the playbook or the OS.
 
@@ -208,6 +212,22 @@ keep it as light as it is.
 Billing is HQ's (accounting@nutribiotic.com). My part is relaying it accurately. Diligence over
 speed.
 
+## Test with the budget
+
+### 18. TikTok Shop affiliates · test with the budget
+- **What it is.** Paying creators a commission on every TikTok Shop sale of NutriBiotic, with sample sends to the ones who post.
+- **How it moves revenue.** It is the one activity where return is read straight off the dashboard: sales per creator against commission and sample cost. NutriBiotic has a budget for it, so I can set a ROAS floor before spending and stop what misses it.
+- **How I prioritize it.** Supplements are priced at 15 to 25 percent commission on the platform, and open collaboration runs lower than targeted collaboration. Start with a small creator list on targeted terms, then widen only what clears the floor. The floor counts commission, not only ad spend.
+- **How I improve it.** One page per creator: sales, commission paid, samples sent, ROAS. A weekly read, and cut any creator under the floor after two weeks.
+- **Evidence.** None yet. The OS holds no TikTok Shop sales, spend or creator data. Measure to add: spend, commission and sales per creator, in one table. Open before any spend: confirm NutriBiotic has a TikTok Shop seller account and that its supplement listings are approved. Not mine to confirm from here.
+
+### 19. Reacher App for creator outreach · test with the budget
+- **What it is.** The software that runs TikTok Shop affiliate outreach: finds creators, sends invites and messages, queues sample requests, tracks each creator's sales.
+- **How it moves revenue.** It turns activity 18 from a manual chore into a measured channel. Its reporting is what makes ROAS per creator visible without a spreadsheet.
+- **How I prioritize it.** Start on the Starter plan, $199 a month, and move to Pro, $599 a month, only if outreach volume or AI creator search is the limit. Pro adds AI creator search, automated follow-ups and unlimited daily messages.
+- **How I improve it.** Run it for one month on one product line. Compare the month's creator sales to the plan cost plus commission.
+- **Evidence.** Plan prices from reacherapp.com/pricing, read 2026-10-05. No trial or spend has started. Buying the plan is mine to approve, from the NutriBiotic budget.
+
 ## Sources
 - OS evidence, measured 2026-10-02: `nutribiotic/out/activity-ranking-evidence.md` (aggregates only,
   not committed).
@@ -215,3 +235,5 @@ speed.
 - Reorder median: `GOALS.md`, measured 2026-08-02.
 - Plameca meeting framework and Armando's habits: `sales-playbook.md` section 10.
 - Tooling: `nutribiotic/AGENTS.md`.
+- TikTok Shop commission ranges: hamstergarage.com and wearemada.com commission guides, read 2026-10-05.
+- Reacher plans and features: reacherapp.com/pricing, read 2026-10-05.

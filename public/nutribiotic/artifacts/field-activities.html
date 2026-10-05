@@ -96,6 +96,7 @@
 
   .grp i { width:.55rem; height:.55rem; border-radius:99px; display:inline-block; flex:none; }
   .focus i { background:var(--accent); }
+  .budget i { background:var(--accent); opacity:.55; }
   .improve i { background:var(--muted); }
   .leave i { background:transparent; border:1.5px solid var(--faint); }
   .ladder { display:grid; gap:.5rem; }
@@ -104,6 +105,7 @@
   .rank { background:var(--card); border:1px solid var(--border); border-radius:12px; position:relative; transition:box-shadow .2s ease, border-color .2s ease; scroll-margin-top:1rem; }
   .rank::before { content:""; position:absolute; inset:.7rem auto .7rem 0; width:3px; border-radius:0 3px 3px 0; background:var(--border-hi); }
   .rank.focus::before { background:var(--accent); }
+  .rank.budget::before { background:var(--accent); opacity:.55; }
   .rank.improve::before { background:var(--border-hi); }
   .rank.top { border-color:var(--border-hi); box-shadow:var(--lift); padding:.15rem 0; }
   .rank.top::before { inset:.9rem auto .9rem 0; width:4px; }
@@ -345,6 +347,15 @@
   <summary><span class="num">17</span><span class="main"><span class="nm">Charging cards and sending invoices</span><span class="chips"><span class="lv">Efficiency</span></span></span><svg class="chev" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg></summary>
   <div class="drawer"><p class="one">Billing is HQ's (accounting@nutribiotic.com). My part is relaying it accurately. Diligence over speed.</p></div>
 </details>
+<h3 class="grp budget"><i></i>Test with the budget</h3>
+<details class="rank budget" id="r18">
+  <summary><span class="num">18</span><span class="main"><span class="nm">TikTok Shop affiliates</span><span class="chips"><span class="lv">Better clients</span></span></span><svg class="chev" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg></summary>
+  <div class="drawer"><dl><dt>What it is</dt><dd>Paying creators a commission on every TikTok Shop sale of NutriBiotic, with sample sends to the ones who post.</dd><dt>How it moves revenue</dt><dd>It is the one activity where return is read straight off the dashboard: sales per creator against commission and sample cost. NutriBiotic has a budget for it, so I can set a ROAS floor before spending and stop what misses it.</dd><dt>How I prioritize it</dt><dd>Supplements are priced at 15 to 25 percent commission on the platform, and open collaboration runs lower than targeted collaboration. Start with a small creator list on targeted terms, then widen only what clears the floor. The floor counts commission, not only ad spend.</dd><dt>How I improve it</dt><dd>One page per creator: sales, commission paid, samples sent, ROAS. A weekly read, and cut any creator under the floor after two weeks.</dd><dt>Evidence</dt><dd>None yet. The OS holds no TikTok Shop sales, spend or creator data. Measure to add: spend, commission and sales per creator, in one table. Open before any spend: confirm NutriBiotic has a TikTok Shop seller account and that its supplement listings are approved. Not mine to confirm from here.</dd></dl></div>
+</details>
+<details class="rank budget" id="r19">
+  <summary><span class="num">19</span><span class="main"><span class="nm">Reacher App for creator outreach</span><span class="chips"><span class="lv">Efficiency</span></span></span><svg class="chev" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg></summary>
+  <div class="drawer"><dl><dt>What it is</dt><dd>The software that runs TikTok Shop affiliate outreach: finds creators, sends invites and messages, queues sample requests, tracks each creator's sales.</dd><dt>How it moves revenue</dt><dd>It turns activity 18 from a manual chore into a measured channel. Its reporting is what makes ROAS per creator visible without a spreadsheet.</dd><dt>How I prioritize it</dt><dd>Start on the Starter plan, $199 a month, and move to Pro, $599 a month, only if outreach volume or AI creator search is the limit. Pro adds AI creator search, automated follow-ups and unlimited daily messages.</dd><dt>How I improve it</dt><dd>Run it for one month on one product line. Compare the month's creator sales to the plan cost plus commission.</dd><dt>Evidence</dt><dd>Plan prices from reacherapp.com/pricing, read 2026-10-05. No trial or spend has started. Buying the plan is mine to approve, from the NutriBiotic budget.</dd></dl></div>
+</details>
     </div>
   </section>
 
@@ -406,7 +417,7 @@
 
   <section id="sources">
     <h2>Sources</h2>
-    <ul class="srcs"><li><span class="sc">Every measured number: revenue by grade, ordering, touches, follow-ups, field days, new accounts, order size</span><span class="sp">nutribiotic/out/activity-ranking-evidence.md, aggregates only, not committed</span><span class="sd">Measured 2026-10-02</span></li><li><span class="sc">Terms, minimums and discounts</span><span class="sp">nutribiotic/HQ-REFERENCE.md, policy sheet effective 01/01/25</span></li><li><span class="sc">Territory reorder median of 41 days</span><span class="sp">portfolio/src/app/nutribiotic/playbook/content/GOALS.md</span><span class="sd">Measured 2026-08-02</span></li><li><span class="sc">Plameca meeting framework and Armando's habits</span><span class="sp">portfolio/src/app/nutribiotic/playbook/content/sales-playbook.md, section 10</span></li><li><span class="sc">Tooling</span><span class="sp">nutribiotic/AGENTS.md</span></li><li><span class="sc">The ranking, the levers and each activity</span><span class="sp">portfolio/src/app/nutribiotic/playbook/content/field-activities.md</span></li></ul>
+    <ul class="srcs"><li><span class="sc">Every measured number: revenue by grade, ordering, touches, follow-ups, field days, new accounts, order size</span><span class="sp">nutribiotic/out/activity-ranking-evidence.md, aggregates only, not committed</span><span class="sd">Measured 2026-10-02</span></li><li><span class="sc">Terms, minimums and discounts</span><span class="sp">nutribiotic/HQ-REFERENCE.md, policy sheet effective 01/01/25</span></li><li><span class="sc">Territory reorder median of 41 days</span><span class="sp">portfolio/src/app/nutribiotic/playbook/content/GOALS.md</span><span class="sd">Measured 2026-08-02</span></li><li><span class="sc">Plameca meeting framework and Armando's habits</span><span class="sp">portfolio/src/app/nutribiotic/playbook/content/sales-playbook.md, section 10</span></li><li><span class="sc">Tooling</span><span class="sp">nutribiotic/AGENTS.md</span></li><li><span class="sc">The ranking, the levers and each activity</span><span class="sp">portfolio/src/app/nutribiotic/playbook/content/field-activities.md</span></li><li><span class="sc">TikTok Shop commission ranges and ROAS counted after commission</span><span class="sp">hamstergarage.com and wearemada.com commission guides</span><span class="sd">Read 2026-10-05</span></li><li><span class="sc">Reacher plans and prices</span><span class="sp">reacherapp.com/pricing</span><span class="sd">Read 2026-10-05</span></li></ul>
   </section>
 
   <footer>Built to resources/artifacts/STANDARD.md. Buttons resolve through resources/actions/registry.json.</footer>
