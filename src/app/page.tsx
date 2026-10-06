@@ -1239,7 +1239,7 @@ function AskMeAnything() {
 ==================================================== */
 function About() {
   return (
-    <section className="px-6 md:px-12 lg:px-20 py-16 md:py-24 border-t border-[#F2EFE6]/10">
+    <section id="about" className="px-6 md:px-12 lg:px-20 py-16 md:py-24 border-t border-[#F2EFE6]/10">
       <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-12 items-center">
         <Reveal>
           <div className="aspect-[4/4.25] rounded-3xl border border-[#284A3C] overflow-hidden relative">
@@ -1381,29 +1381,103 @@ function CTA() {
 /* ====================================================
    12. FOOTER
 ==================================================== */
+const GRAIN =
+  "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.95  0 0 0 0 0.94  0 0 0 0 0.9  0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")";
+
+const footerHead = "text-[11px] font-medium tracking-[0.04em] text-[#F2EFE6]/85 mb-3";
+const footerLink =
+  "block py-2.5 md:py-1 text-[13px] leading-6 text-[#F2EFE6]/55 hover:text-[#C9A24B] focus-visible:text-[#C9A24B] active:opacity-70 transition-colors";
+
 function Footer() {
   return (
-    <footer className="px-6 md:px-12 lg:px-20 py-10 border-t border-[#F2EFE6]/10 text-xs text-[#F2EFE6]/40 flex flex-col md:flex-row gap-4 justify-between items-center">
-      <div className="flex items-center gap-3">
-        <Image
-          src="/img/ja-logo.png"
-          alt="JA monogram"
-          width={32}
-          height={32}
-          className="rounded-sm opacity-80"
-        />
-        <span>Juan Arenas Martin · Los Angeles, CA</span>
+    <footer className="relative isolate overflow-hidden border-t border-[#F2EFE6]/10 bg-[#13201A]">
+      <svg aria-hidden width="0" height="0" className="absolute">
+        <filter id="footer-duotone" colorInterpolationFilters="sRGB">
+          <feColorMatrix type="matrix" values="0.33 0.5 0.17 0 0  0.33 0.5 0.17 0 0  0.33 0.5 0.17 0 0  0 0 0 1 0" />
+          <feComponentTransfer>
+            <feFuncR type="table" tableValues="0.075 0.30 0.55" />
+            <feFuncG type="table" tableValues="0.125 0.42 0.62" />
+            <feFuncB type="table" tableValues="0.10 0.35 0.56" />
+          </feComponentTransfer>
+        </filter>
+      </svg>
+      {/* paper grain */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.05]"
+        style={{ backgroundImage: GRAIN, backgroundSize: "220px 220px" }}
+      />
+      <div className="px-6 md:px-12 lg:px-20 pt-14 md:pt-16 pb-8">
+        <div className="flex items-center gap-3 text-[13px] text-[#F2EFE6]/80">
+          <Image src="/img/ja-logo.png" alt="" width={24} height={24} className="rounded-[3px] opacity-90" />
+          <span>Juan Arenas Martin</span>
+        </div>
+
+        <Reveal>
+          <h2 className="font-display mt-20 md:mt-28 text-[clamp(2.5rem,5vw,3.75rem)] leading-[1.02] tracking-[-0.02em]">
+            Contact
+          </h2>
+        </Reveal>
+
+        <div className="mt-14 md:mt-16 grid grid-cols-[7.5rem_auto] sm:grid-cols-[10rem_auto] gap-x-8 md:gap-x-12 gap-y-10 w-fit max-w-full">
+          <div>
+            <p className={footerHead}>Based in</p>
+            <p className="py-2.5 md:py-1 text-[13px] leading-6 text-[#F2EFE6]/55">Los Angeles, CA</p>
+          </div>
+          <div>
+            <p className={footerHead}>Get in touch</p>
+            <a href="mailto:juan.arenas.rec@gmail.com" className={footerLink}>
+              juan.arenas.rec@gmail.com
+            </a>
+            <a href="tel:+13237753850" className={footerLink}>
+              (323) 775-3850
+            </a>
+          </div>
+        </div>
+
+        <nav
+          aria-label="Footer"
+          className="mt-16 md:mt-20 grid grid-cols-[7.5rem_auto] sm:grid-cols-[10rem_auto] gap-x-8 md:gap-x-12 gap-y-10 w-fit max-w-full"
+        >
+          <div>
+            <p className={footerHead}>Site</p>
+            <a href="#about" className={footerLink}>About</a>
+            <a href="#portfolio" className={footerLink}>Portfolio</a>
+            <a href="#work" className={footerLink}>Work</a>
+          </div>
+          <div>
+            <p className={footerHead}>Elsewhere</p>
+            <a href="https://linkedin.com/in/juanarenasmartin" target="_blank" rel="noopener noreferrer" className={footerLink}>
+              LinkedIn
+            </a>
+            <a href="https://osmoticventures.com" target="_blank" rel="noopener noreferrer" className={footerLink}>
+              Osmotic Ventures
+            </a>
+            <a href="https://stokeclubband.com" target="_blank" rel="noopener noreferrer" className={footerLink}>
+              Stoke Club
+            </a>
+          </div>
+        </nav>
+
+        {/* illustration */}
+        <div
+          aria-hidden
+          className="[-webkit-mask-image:linear-gradient(to_bottom,transparent_0%,#000_30%,#000_75%,transparent_100%)] [mask-image:linear-gradient(to_bottom,transparent_0%,#000_30%,#000_75%,transparent_100%)] lg:[-webkit-mask-image:linear-gradient(to_right,transparent_0%,rgba(0,0,0,0.03)_12%,rgba(0,0,0,0.12)_25%,rgba(0,0,0,0.3)_40%,rgba(0,0,0,0.55)_58%,rgba(0,0,0,0.85)_78%,#000_100%),linear-gradient(to_bottom,transparent_0%,#000_38%,#000_100%)] lg:[mask-image:linear-gradient(to_right,transparent_0%,rgba(0,0,0,0.03)_12%,rgba(0,0,0,0.12)_25%,rgba(0,0,0,0.3)_40%,rgba(0,0,0,0.55)_58%,rgba(0,0,0,0.85)_78%,#000_100%),linear-gradient(to_bottom,transparent_0%,#000_38%,#000_100%)] lg:[-webkit-mask-composite:source-in] lg:[mask-composite:intersect] lg:[clip-path:inset(0_0_0_3px)] pointer-events-none relative -z-10 -mx-6 md:-mx-12 mt-14 overflow-hidden h-[200px] opacity-[0.4] lg:absolute lg:inset-y-0 lg:right-0 lg:m-0 lg:h-auto lg:opacity-[0.4] lg:w-[54%]"
+        >
+          <Image
+            src="/img/juan-usc.png"
+            alt=""
+            fill
+            sizes="(min-width: 1024px) 54vw, 100vw"
+            className="object-cover object-[50%_44%] md:object-[50%_50%] lg:object-[62%_18%]"
+            style={{ filter: "url(#footer-duotone)" }}
+          />
+        </div>
+
+        <div className="mt-6 lg:mt-20 border-t border-[#F2EFE6]/12 pt-6 text-[11px] leading-5 text-[#F2EFE6]/55 lg:max-w-[52%]">
+          © 2026 Juan Arenas Martin
+        </div>
       </div>
-      <span>
-        (323) 775-3850 · juan.arenas.rec@gmail.com ·{" "}
-        <a href="https://linkedin.com/in/juanarenasmartin" target="_blank" rel="noopener noreferrer" className="hover:text-[#F2EFE6]/70">
-          linkedin.com/in/juanarenasmartin
-        </a>{" "}
-        ·{" "}
-        <a href="https://osmoticventures.com" target="_blank" rel="noopener noreferrer" className="hover:text-[#F2EFE6]/70">
-          osmoticventures.com
-        </a>
-      </span>
     </footer>
   );
 }

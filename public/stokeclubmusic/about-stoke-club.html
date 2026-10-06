@@ -50,9 +50,44 @@ strong{color:#fff;font-weight:600}
 .related li a,.list a{display:block;padding:12px 0;border-bottom:1px solid var(--line);color:#fff;text-decoration:none;font:600 19px/1.3 "Bricolage Grotesque",sans-serif}
 .related li a:hover,.list a:hover{color:var(--blue)}
 .list a span{display:block;font:400 15px/1.5 "Hanken Grotesk",sans-serif;color:var(--muted);margin-top:4px}
-footer{border-top:1px solid var(--line);padding:32px 0 48px;font-size:14px;color:rgba(246,240,230,.45)}
-footer a{color:rgba(246,240,230,.7)}
-footer p{color:inherit;margin:6px 0}
+footer{position:relative;overflow:hidden;isolation:isolate;border-top:1px solid var(--line);margin-top:24px;padding:96px 0 40px;font-size:13px;line-height:1.5;color:rgba(246,240,230,.5)}
+footer::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;opacity:.07;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+footer .wrap{max-width:960px}
+footer p{color:inherit;margin:0}
+footer a{color:rgba(246,240,230,.5);text-decoration:none;transition:color .15s ease-out}
+footer a:hover,footer a:active{color:var(--paper)}
+.rig{position:absolute;z-index:-1;top:0;right:0;bottom:0;width:min(42vw,540px);pointer-events:none;overflow:hidden;
+-webkit-mask-image:linear-gradient(to right,transparent 0,#000 62%),linear-gradient(to bottom,transparent 0,#000 24%,#000 66%,transparent 100%);
+mask-image:linear-gradient(to right,transparent 0,#000 62%),linear-gradient(to bottom,transparent 0,#000 24%,#000 66%,transparent 100%);
+-webkit-mask-composite:source-in;mask-composite:intersect}
+.rig img{display:block;width:100%;height:100%;object-fit:cover;object-position:60% 50%;transform:scale(1.22);transform-origin:62% 52%;filter:grayscale(1) contrast(1.15) brightness(1.12);opacity:.7}
+.foot>*{max-width:min(600px,calc(100vw - min(42vw,540px) - max(20px,(100vw - 960px)/2 + 20px) - 32px))}
+.foot h2{font-size:clamp(44px,5.6vw,72px);line-height:1;letter-spacing:-.035em;margin:0 0 36px;color:var(--paper)}
+.foot h3{font:500 13px/1.4 "Hanken Grotesk",sans-serif;letter-spacing:.01em;color:rgba(246,240,230,.88);margin:0 0 12px}
+.foot-cols{display:grid;grid-template-columns:repeat(3,auto);justify-content:start;gap:32px 64px}
+.foot-cols .top{margin-bottom:64px}
+.foot-cols .wide{grid-column:span 2}
+.foot-cols a{display:block;padding:3px 0}
+.foot-cols .top a{display:inline-block;padding:0;color:rgba(246,240,230,.62)}
+.foot-base{margin-top:96px;padding-top:20px;border-top:1px solid var(--line);font-size:12px;color:rgba(246,240,230,.42)}
+.foot-base a{color:rgba(246,240,230,.62);text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
+@media (max-width:960px){
+footer{display:flex;flex-direction:column;padding:0;margin-top:24px}
+.foot>*{max-width:none}
+.rig{order:-1;position:relative;inset:auto;width:100%;height:300px;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 18%,#000 45%,transparent 100%);mask-image:linear-gradient(to bottom,transparent 0,#000 18%,#000 45%,transparent 100%);-webkit-mask-composite:source-over;mask-composite:add}
+.rig img{transform:scale(1.1);transform-origin:60% 50%;object-position:55% 50%;opacity:.75}
+.foot{margin-top:-24px}
+.foot h2{margin-bottom:28px}
+.foot-cols{gap:0 36px}
+.foot-cols h3{margin-bottom:0;padding:6px 0}
+.foot-cols a,.foot-cols .top p{display:block;padding:12px 0;line-height:20px}
+.foot-cols .top a{display:block;padding:12px 0}
+.foot-cols .top .mail{padding:0}
+.foot-cols .top{margin-bottom:48px}
+.foot-base{margin-top:48px;padding-bottom:32px}
+.foot-base a{display:inline-block;padding:13px 0;margin:-13px 0}
+}
+@media (max-width:420px){.foot-cols{column-gap:28px}}
 @media (max-width:520px){nav a{margin-left:14px;font-size:14px}body{font-size:17px}.chart{font-size:15px}.chart td{padding:10px 6px}}
 </style>
 <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "BlogPosting", "@id": "https://juanarenas.bio/stokeclubmusic/about-stoke-club#article", "headline": "About Stoke Club", "description": "Who Stoke Club is: an indie surf rock band from Newport Beach, California, best known for Polaroid and for writing in the Mixolydian mode.", "url": "https://juanarenas.bio/stokeclubmusic/about-stoke-club", "mainEntityOfPage": "https://juanarenas.bio/stokeclubmusic/about-stoke-club", "datePublished": "2026-09-28", "dateModified": "2026-09-28", "inLanguage": "en-US", "image": "https://stokeclubband.com/img/og-stoke-club.jpg", "author": {"@type": "MusicGroup", "@id": "https://stokeclubband.com/#band", "name": "Stoke Club", "url": "https://stokeclubband.com/"}, "publisher": {"@type": "MusicGroup", "@id": "https://stokeclubband.com/#band", "name": "Stoke Club", "url": "https://stokeclubband.com/"}, "isPartOf": {"@id": "https://juanarenas.bio/stokeclubmusic#website"}, "about": [{"@type": "MusicGroup", "@id": "https://stokeclubband.com/#band", "name": "Stoke Club", "url": "https://stokeclubband.com/"}, {"@type": "MusicRecording", "@id": "https://stokeclubband.com/music/polaroid#recording", "url": "https://stokeclubband.com/music/polaroid"}, {"@type": "MusicRecording", "@id": "https://stokeclubband.com/music/crocodile-tears#recording", "url": "https://stokeclubband.com/music/crocodile-tears"}], "mentions": [{"@type": "Thing", "name": "Mixolydian mode", "sameAs": "https://en.wikipedia.org/wiki/Mixolydian_mode"}]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Stoke Club Music", "item": "https://juanarenas.bio/stokeclubmusic"}, {"@type": "ListItem", "position": 2, "name": "About Stoke Club", "item": "https://juanarenas.bio/stokeclubmusic/about-stoke-club"}]}]}</script>
@@ -83,9 +118,16 @@ footer p{color:inherit;margin:6px 0}
 <li>Come to a show: <a href="https://stokeclubband.com/shows">upcoming shows</a></li>
 </ul>
 <div class="listen"><p>We're Stoke Club, a surf rock band from Newport Beach. All our songs and upcoming shows are at <a href="https://stokeclubband.com">stokeclubband.com</a>.</p></div></article><section class="related"><h2>Keep reading</h2><ul><li><a href="/stokeclubmusic/how-we-stay-stoked">How we stay stoked</a></li><li><a href="/stokeclubmusic/mixolydian-mode">The Mixolydian mode</a></li><li><a href="/stokeclubmusic/your-friends">Your Friends, November 6, 2026</a></li></ul></section></div></main>
-<footer><div class="wrap">
-<p><a href="https://stokeclubband.com">Stoke Club</a> is an indie surf rock band from Newport Beach, California. Listen on <a href="https://open.spotify.com/artist/7lJWtq1ziPVsOBlofMDEaY">Spotify</a> and <a href="https://music.apple.com/us/artist/stoke-club/1896614133">Apple Music</a>.</p>
-<p><a href="https://stokeclubband.com/music/polaroid">Polaroid</a> · <a href="https://stokeclubband.com/music/crocodile-tears">Crocodile Tears</a> · <a href="https://stokeclubband.com/shows">Shows</a> · <a href="https://www.instagram.com/stokeclubband/">Instagram</a> · <a href="https://www.tiktok.com/@stokeclubband">TikTok</a></p>
-<p>Website and SEO by <a href="https://juanarenas.bio">Juan Arenas Martin</a></p>
-</div></footer>
+<footer><div class="wrap foot">
+<h2>Contact</h2>
+<div class="foot-cols">
+<div class="top"><h3>Location</h3><p>Newport Beach, California</p></div>
+<div class="top wide"><h3>Get in touch</h3><p class="mail"><a href="mailto:stokeclubband@gmail.com">stokeclubband@gmail.com</a></p></div>
+<div><h3>Site</h3><a href="https://stokeclubband.com/music/polaroid">Polaroid</a><a href="https://stokeclubband.com/music/crocodile-tears">Crocodile Tears</a><a href="https://stokeclubband.com/shows">Shows</a></div>
+<div><h3>Listen</h3><a href="https://open.spotify.com/artist/7lJWtq1ziPVsOBlofMDEaY">Spotify</a><a href="https://music.apple.com/us/artist/stoke-club/1896614133">Apple Music</a></div>
+<div><h3>Socials</h3><a href="https://www.instagram.com/stokeclubband/">Instagram</a><a href="https://www.tiktok.com/@stokeclubband">TikTok</a><a href="https://www.youtube.com/@stokeclubband">YouTube</a></div>
+</div>
+<p class="foot-base">&copy; 2026 <a href="https://stokeclubband.com">Stoke Club</a> &middot; Website and SEO by <a href="https://juanarenas.bio">Juan Arenas Martin</a></p>
+</div>
+<div class="rig" aria-hidden="true"><img src="/stokeclubmusic/footer-rig.jpg" alt="" width="900" height="1123" loading="lazy"></div></footer>
 </body></html>
