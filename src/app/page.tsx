@@ -1384,6 +1384,8 @@ function CTA() {
 const GRAIN =
   "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.95  0 0 0 0 0.94  0 0 0 0 0.9  0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")";
 
+const footerLinkLg =
+  "block py-2.5 md:py-1 text-[clamp(1.25rem,2.2vw,1.625rem)] leading-[1.5] text-[#F2EFE6]/70 hover:text-[#C9A24B] focus-visible:text-[#C9A24B] active:opacity-70 transition-colors";
 const footerHead = "text-[11px] font-medium tracking-[0.04em] text-[#F2EFE6]/85 mb-3";
 const footerLink =
   "block py-2.5 md:py-1 text-[13px] leading-6 text-[#F2EFE6]/55 hover:text-[#C9A24B] focus-visible:text-[#C9A24B] active:opacity-70 transition-colors";
@@ -1409,27 +1411,27 @@ function Footer() {
       />
       <div className="px-6 md:px-12 lg:px-20 pt-14 md:pt-16 pb-8">
         <div className="flex items-center gap-3 text-[13px] text-[#F2EFE6]/80">
-          <Image src="/img/ja-logo.png" alt="" width={24} height={24} className="rounded-[3px] opacity-90" />
-          <span>Juan Arenas Martin</span>
+          <Image src="/img/ja-logo.png" alt="Juan Arenas Martin" width={24} height={24} className="rounded-[3px] opacity-90" />
         </div>
 
         <Reveal>
-          <h2 className="font-display mt-20 md:mt-28 text-[clamp(2.5rem,5vw,3.75rem)] leading-[1.02] tracking-[-0.02em]">
-            Contact
-          </h2>
+          <div className="mt-20 md:mt-28 inline-block">
+            <h2 className="font-display text-[clamp(2.5rem,5vw,3.75rem)] leading-[1.02] tracking-[-0.02em]">
+              Juan Arenas Martin
+            </h2>
+            <p className="mt-3 text-center text-[clamp(1.125rem,2vw,1.375rem)] leading-[1.3] text-[#F2EFE6]/55">
+              Pharmacologist and go-to-market operator
+            </p>
+          </div>
         </Reveal>
 
-        <div className="mt-14 md:mt-16 grid grid-cols-[7.5rem_auto] sm:grid-cols-[10rem_auto] gap-x-8 md:gap-x-12 gap-y-10 w-fit max-w-full">
-          <div>
-            <p className={footerHead}>Based in</p>
-            <p className="py-2.5 md:py-1 text-[13px] leading-6 text-[#F2EFE6]/55">Los Angeles, CA</p>
-          </div>
-          <div>
-            <p className={footerHead}>Get in touch</p>
-            <a href="mailto:juan.arenas.rec@gmail.com" className={footerLink}>
+        <div className="mt-14 md:mt-16">
+          <p className="text-[12px] font-medium tracking-[0.04em] text-[#F2EFE6]/85 mb-3">Contact</p>
+          <div className="flex flex-col">
+            <a href="mailto:juan.arenas.rec@gmail.com" className={footerLinkLg}>
               juan.arenas.rec@gmail.com
             </a>
-            <a href="tel:+13237753850" className={footerLink}>
+            <a href="tel:+13237753850" className={footerLinkLg}>
               (323) 775-3850
             </a>
           </div>
