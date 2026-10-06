@@ -380,10 +380,10 @@ function MetricWall() {
 
           <Reveal delay={160}>
             <div className="flex justify-center gap-8">
-              <Metric n={<CountUp to={40} />} label="new accounts in 40 days" color="gold" />
-              <Metric n={<CountUp to={30} suffix="+" />} label="reps on my sales playbook" color="" />
+              <Metric n={<CountUp to={400} suffix="+" />} label="creators in the content engine" color="gold" />
+              <Metric n={<CountUp to={40} suffix="k+" />} label="accounts reviewed" color="" />
             </div>
-            <MetricLogo src="/img/logos/nutribiotic-white.png" alt="NutriBiotic" />
+            <MetricLogo src="/img/logos/superbiome.png" alt="Superbiome" />
           </Reveal>
         </div>
       </div>
