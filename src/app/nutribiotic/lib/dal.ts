@@ -4769,7 +4769,8 @@ export async function getAllTimeMetrics(): Promise<AllTimeMetrics | null> {
   if (!isConfigured()) return null;
   try {
     const rows = await raw<{ metric: string; total: number; through_date: string | null }>(
-      "nb_v_report_metrics_alltime?select=metric,total,through_date",
+      // Juan's rows only: since 0090 the view sums per rep (Kyle's live in ClientOS).
+      "nb_v_report_metrics_alltime?select=metric,total,through_date&user_id=eq.juan",
     );
     const byMetric = Object.fromEntries(rows.map((r) => [r.metric, Number(r.total)]));
     const throughDate = rows.reduce<string | null>(
@@ -4943,7 +4944,7 @@ export async function getReportDraft(dateISO: string, kind: "daily" | "weekly" =
   // table has no such column and never will, so claiming one to satisfy a
   // signature would be a lie in the type.
   const rows = await raw<ReportDraft>(
-    `nb_report_drafts?select=*&report_date=eq.${encodeURIComponent(dateISO)}&kind=eq.${kind}&limit=1`,
+    `nb_report_drafts?select=*&report_date=eq.${encodeURIComponent(dateISO)}&kind=eq.${kind}&user_id=eq.juan&limit=1`,
   );
   return rows[0] ?? null;
 }
@@ -4954,7 +4955,7 @@ export async function requestReportRebuild(dateISO: string): Promise<void> {
   await mutate(
     "nb_report_drafts",
     "POST",
-    { report_date: dateISO, kind: "daily", rebuild_requested: true, status: "pending" },
+    { report_date: dateISO, kind: "daily", user_id: "juan", rebuild_requested: true, status: "pending" },
     {},
     "resolution=merge-duplicates,return=minimal",
   );
@@ -4973,7 +4974,7 @@ export async function requestPreviewRender(dateISO: string, kind: "daily" | "wee
     "nb_report_drafts",
     "PATCH",
     { dirty: true, updated_at: new Date().toISOString() },
-    { report_date: `eq.${dateISO}`, kind: `eq.${kind}` },
+    { report_date: `eq.${dateISO}`, kind: `eq.${kind}`, user_id: "eq.juan" },
     "return=minimal",
   );
 }
@@ -4989,7 +4990,7 @@ export async function saveReportDraftPayload(dateISO: string, payload: ReportPay
     "nb_report_drafts",
     "PATCH",
     { payload, dirty: true, edited: true, updated_at: new Date().toISOString() },
-    { report_date: `eq.${dateISO}`, kind: "eq.daily" }, // only the daily row has editable overlay fields yet
+    { report_date: `eq.${dateISO}`, kind: "eq.daily", user_id: "eq.juan" }, // only the daily row has editable overlay fields yet
     "return=minimal",
   );
 }
