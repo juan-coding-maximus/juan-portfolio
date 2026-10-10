@@ -71,7 +71,7 @@ const EXPENSOS: Launcher = {
   name: "ExpensOS",
   short_name: "ExpensOS",
   description:
-    "Clock in and out, log a break, and drop in a receipt or odometer photo. It files into this pay period's sheet.",
+    "Drop in a receipt or odometer photo. It files into this pay period's sheet.",
   start_url: "/nutribiotic/expenses",
   icon: "/nutribiotic/expenses/apple-icon.png",
 };

@@ -1,4 +1,4 @@
-/** ExpensOS's manifest: the tile that opens on clock-in.
+/** ExpensOS's manifest: the tile that opens on Expenses.
  *  See ../../lib/launchers.ts. */
 import { LAUNCHERS, manifestResponse } from "../../lib/launchers";
 

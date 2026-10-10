@@ -225,7 +225,7 @@ export default async function WidgetSetupPage() {
           name="ExpensOS"
           path="/nutribiotic/expenses"
           icon="receipt"
-          blurb="Straight to clock in and out and the photo dropzone, which is the whole point of it: a receipt gets filed in the parking lot or it does not get filed."
+          blurb="Straight to the photo dropzone, which is the whole point of it: a receipt gets filed in the parking lot or it does not get filed."
         />
       </div>
     </>
