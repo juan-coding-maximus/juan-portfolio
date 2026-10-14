@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { findCarWash, findGas, type CarWashResult, type FindResult } from "./actions";
+import { findCarWash, findGas, findNearest, type CarWashResult, type FindResult, type NearestResult } from "./actions";
 import { FAVORITES, GALLON_STEP, TANK_GALLONS } from "./lib/constants";
+import type { NearStation } from "./lib/nearest";
 import type { Scored } from "./lib/score";
 import type { WashScored } from "./lib/washscore";
 
@@ -14,7 +15,7 @@ const PREFS_KEY = "gas-stop-v1";
 type Prefs = { now: number; fillTo: number; favId: string | null; quickest: boolean; product: Product; milesToEmpty: number | null };
 const DEFAULT_PREFS: Prefs = { now: 4, fillTo: TANK_GALLONS, favId: "home", quickest: false, product: "gas", milesToEmpty: null };
 
-type Result = ({ product: "gas" } & FindResult) | ({ product: "carwash" } & CarWashResult);
+type Result = ({ product: "gas" } & FindResult) | ({ product: "carwash" } & CarWashResult) | ({ product: "nearest" } & NearestResult);
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const snap = (v: number) => Math.round(v / GALLON_STEP) * GALLON_STEP;
@@ -134,6 +135,20 @@ export default function GasApp() {
     });
   };
 
+  const nearest = () => {
+    setFormError(null);
+    if (!loc) {
+      locate();
+      setFormError("Allow location first.");
+      return;
+    }
+    startTransition(async () => {
+      const r = await findNearest({ origin: loc });
+      setResult({ product: "nearest", ...r });
+      requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    });
+  };
+
   return (
     <main className="mx-auto max-w-[440px] px-5 pb-16 pt-[max(20px,env(safe-area-inset-top))]">
       <header className="flex items-center justify-between">
@@ -248,7 +263,34 @@ export default function GasApp() {
       >
         {pending ? (product === "gas" ? "Checking prices" : "Checking car washes") : product === "gas" ? "Find gas" : "Find car wash"}
       </button>
+      {product === "gas" && (
+        <button
+          type="button"
+          onClick={nearest}
+          disabled={pending}
+          className="mt-3 h-12 w-full rounded-xl border border-[#14201B] bg-white text-[16px] font-medium text-[#14201B] transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2C6A46] focus-visible:ring-offset-2 disabled:opacity-60"
+        >
+          Nearest
+        </button>
+      )}
       {formError && <p className="mt-3 text-[14px] text-[#8A6D2F]">{formError}</p>}
+
+      {result && !pending && result.product === "nearest" && (
+        <section ref={resultsRef} className="mt-8 scroll-mt-4">
+          {result.ok ? (
+            <>
+              <h2 className="font-[family-name:var(--font-fraunces)] text-[24px] font-semibold leading-tight tracking-tight">Nearest</h2>
+              <ol className="mt-4 space-y-3">
+                {result.best.map((s, i) => (
+                  <NearCard key={s.id} s={s} rank={i + 1} />
+                ))}
+              </ol>
+            </>
+          ) : (
+            <p className="text-[15px] text-[#8A6D2F]">{result.error}</p>
+          )}
+        </section>
+      )}
 
       {result && !pending && result.product === "gas" && (
         <section ref={resultsRef} className="mt-8 scroll-mt-4">
@@ -343,6 +385,37 @@ function StationCard({ s, rank, gallons, destAddress }: { s: Scored; rank: numbe
           href={appleMapsTwoStops(s, destAddress)}
           className="flex h-11 w-full items-center justify-center rounded-xl bg-[#14201B] text-[15px] font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2C6A46] focus-visible:ring-offset-2"
         >
+          Apple Maps
+        </a>
+      </div>
+    </li>
+  );
+}
+
+function NearCard({ s, rank }: { s: NearStation; rank: number }) {
+  const best = rank === 1;
+  const maps = `https://maps.apple.com/?daddr=${encodeURIComponent(`${s.name}, ${s.address}`)}&dirflg=d`;
+  return (
+    <li className={`rounded-2xl border bg-white p-4 ${best ? "border-[#2C6A46] shadow-[0_0_0_1px_#2C6A46]" : "border-[#E2DFD5]"}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate text-[17px] font-semibold">{s.name}</div>
+          <div className="truncate text-[13px] text-[#5B6560]">{s.address}</div>
+        </div>
+        <div className="shrink-0 text-right text-[17px] font-semibold">{milesAway(s.milesAway)}</div>
+      </div>
+      <div className="mt-3">
+        <span className="font-[family-name:var(--font-fraunces)] text-[40px] font-semibold leading-none tracking-tight">{usd(s.regular)}</span>
+        <span className="ml-2 text-[13px] text-[#5B6560]">per gallon</span>
+        {s.updatedAt && <span className="ml-2 text-[13px] text-[#8A928C]">price {ago(s.updatedAt)}</span>}
+      </div>
+      <div className={`mt-4 ${isArco(s.name) ? "grid grid-cols-2 gap-2" : ""}`}>
+        {isArco(s.name) && (
+          <a href={UPSIDE_URL} target="_blank" rel="noopener" className="flex h-11 items-center justify-center rounded-xl border border-[#E2DFD5] text-[15px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2C6A46]">
+            Upside
+          </a>
+        )}
+        <a href={maps} className="flex h-11 w-full items-center justify-center rounded-xl bg-[#14201B] text-[15px] font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2C6A46] focus-visible:ring-offset-2">
           Apple Maps
         </a>
       </div>

@@ -5,6 +5,7 @@ import { searchPlaces } from "../nutribiotic/lib/places";
 import { RATE_CARWASH, RATE_CHEAPEST, RATE_QUICKEST, TANK_GALLONS } from "./lib/constants";
 import { carWashNearby, type WashStation } from "./lib/carwash";
 import { fuelNearby } from "./lib/fuel";
+import { nearestCheapest, type NearStation } from "./lib/nearest";
 import { detourMinutes, milesFromOrigin, route, sampleAlong, type LatLng } from "./lib/osrm";
 import { scoreStations, type Scored, type Station } from "./lib/score";
 import { scoreCarWashes, type WashScored } from "./lib/washscore";
@@ -137,6 +138,24 @@ export async function findGas(input: FindInput): Promise<FindResult> {
   const scored = scoreStations(stations, detours, gallons, rate);
   const best = await withMilesAway(origin, scored.slice(0, 3));
   return { ok: true, dest, directMinutes: shape.minutes, considered: scored.length, gallons, best };
+}
+
+export type NearestResult = { ok: true; best: NearStation[] } | { ok: false; error: string };
+
+export async function findNearest(input: { origin: LatLng }): Promise<NearestResult> {
+  const ip = await currentIp();
+  if (overBudget(ip)) return { ok: false, error: "Too many searches in a row. Try again in a few minutes." };
+  const origin = input.origin;
+  if (!Number.isFinite(origin?.lat) || !Number.isFinite(origin?.lng)) return { ok: false, error: "No location yet." };
+  let best: NearStation[] | null;
+  try {
+    best = await nearestCheapest(origin);
+  } catch {
+    return { ok: false, error: "Couldn't read gas prices right now. Try again." };
+  }
+  if (!best) return { ok: false, error: "Couldn't measure distances right now. Try again." };
+  if (best.length === 0) return { ok: false, error: "No stations with a posted price near you." };
+  return { ok: true, best };
 }
 
 export async function findCarWash(input: CarWashInput): Promise<CarWashResult> {
