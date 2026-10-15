@@ -105,7 +105,12 @@ export default async function Outbound({
    * score. Juan overrode that after a fit-100 draft for NHC/Letty stayed
    * buried under ungraded-urgency older threads.)
    */
+  /* ORDERS LEAD (Juan, 2026-10-14). An order to put in is not outreach, and
+     fit is a prospecting rank: a car stock order has no account to score, so
+     it sank under every scored draft and he could not find it. */
+  const isOrder = (d: { play_key?: string | null }) => d.play_key === "order_request";
   const ordered = [...res.data].sort((a, b) => {
+    if (isOrder(a) !== isOrder(b)) return isOrder(a) ? -1 : 1;
     const pa = a.account_id ? (priority.byId.get(a.account_id)?.score ?? -1) : -1;
     const pb = b.account_id ? (priority.byId.get(b.account_id)?.score ?? -1) : -1;
     if (pa !== pb) return pb - pa;
