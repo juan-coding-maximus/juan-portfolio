@@ -29,7 +29,7 @@ export const BANNED: StyleRule[] = [
    * preferred place - I'll be out in the field so I can adjust my schedule.' A
    * hyphen is allowed on purpose.
    */
-  { re: /[—–]/, why: "an em dash or en dash, which he has never allowed anywhere" },
+  { re: /[\u2014\u2013]/, why: "an em dash or en dash, which he has never allowed anywhere" },
   /**
    * Two queued drafts said 'GSE Liquid Concentrate ships at 2 fl oz'.
    */
