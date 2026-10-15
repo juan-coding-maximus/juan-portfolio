@@ -82,25 +82,41 @@ export default function GasApp() {
     });
   }, []);
 
+  const hasFix = useRef(false);
   const locate = useCallback(() => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       setLocState("denied");
       return;
     }
-    setLocState("asking");
+    // A refresh keeps the last fix on screen instead of dropping back to Locating.
+    if (!hasFix.current) setLocState("asking");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        hasFix.current = true;
         setLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         setLocState("ok");
       },
-      () => setLocState("denied"),
+      () => {
+        if (!hasFix.current) setLocState("denied");
+      },
       { enableHighAccuracy: true, timeout: 12_000, maximumAge: 30_000 },
     );
   }, []);
   useEffect(() => {
-    // The location prompt is the first thing this screen does.
+    // The location request is the first thing this screen does, and it runs
+    // again every time the home-screen app comes back to the front, since
+    // iOS resumes it without remounting.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     locate();
+    const onShow = () => {
+      if (document.visibilityState === "visible") locate();
+    };
+    document.addEventListener("visibilitychange", onShow);
+    window.addEventListener("pageshow", onShow);
+    return () => {
+      document.removeEventListener("visibilitychange", onShow);
+      window.removeEventListener("pageshow", onShow);
+    };
   }, [locate]);
 
   const product = prefs.product;
