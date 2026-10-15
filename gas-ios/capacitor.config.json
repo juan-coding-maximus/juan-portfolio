@@ -1,0 +1,13 @@
+{
+  "appId": "com.osmoticventures.gas",
+  "appName": "Gas",
+  "webDir": "www",
+  "server": {
+    "url": "https://juanarenas.bio/gas",
+    "cleartext": false
+  },
+  "backgroundColor": "#F7F6F1",
+  "ios": {
+    "contentInset": "never"
+  }
+}

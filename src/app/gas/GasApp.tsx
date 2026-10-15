@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { Capacitor } from "@capacitor/core";
+import { Geolocation } from "@capacitor/geolocation";
 import { findCarWash, findGas, findNearest, type CarWashResult, type FindResult, type NearestResult } from "./actions";
 import { FAVORITES, GALLON_STEP, TANK_GALLONS } from "./lib/constants";
 import type { NearStation } from "./lib/nearest";
@@ -90,17 +92,19 @@ export default function GasApp() {
     }
     // A refresh keeps the last fix on screen instead of dropping back to Locating.
     if (!hasFix.current) setLocState("asking");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        hasFix.current = true;
-        setLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setLocState("ok");
-      },
-      () => {
-        if (!hasFix.current) setLocState("denied");
-      },
-      { enableHighAccuracy: true, timeout: 12_000, maximumAge: 30_000 },
-    );
+    const ok = (pos: { coords: { latitude: number; longitude: number } }) => {
+      hasFix.current = true;
+      setLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      setLocState("ok");
+    };
+    const fail = () => {
+      if (!hasFix.current) setLocState("denied");
+    };
+    const opts = { enableHighAccuracy: true, timeout: 12_000, maximumAge: 30_000 };
+    // In the iPhone app (gas-ios) the fix comes from the app's own Always
+    // permission, so WebKit never shows its per-site prompt on top.
+    if (Capacitor.isNativePlatform()) Geolocation.getCurrentPosition(opts).then(ok, fail);
+    else navigator.geolocation.getCurrentPosition(ok, fail, opts);
   }, []);
   useEffect(() => {
     // The location request is the first thing this screen does, and it runs

@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.98.0",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/geolocation": "^8.2.2",
     "@react-google-maps/api": "^2.20.8",
     "googleapis": "^174.0.1",
     "motion": "^13.4.2",
