@@ -109,8 +109,13 @@ export default async function Outbound({
      fit is a prospecting rank: a car stock order has no account to score, so
      it sank under every scored draft and he could not find it. */
   const isOrder = (d: { play_key?: string | null }) => d.play_key === "order_request";
+  /* TRAINING NEXT (Juan, 2026-10-16). A client who asked for a staff training
+     is waiting on me to name a date, so those drafts sit right under orders
+     instead of wherever the account's fit score lands them. */
+  const isTraining = (d: { play_key?: string | null }) => d.play_key === "training_scheduling";
   const ordered = [...res.data].sort((a, b) => {
     if (isOrder(a) !== isOrder(b)) return isOrder(a) ? -1 : 1;
+    if (isTraining(a) !== isTraining(b)) return isTraining(a) ? -1 : 1;
     const pa = a.account_id ? (priority.byId.get(a.account_id)?.score ?? -1) : -1;
     const pb = b.account_id ? (priority.byId.get(b.account_id)?.score ?? -1) : -1;
     if (pa !== pb) return pb - pa;
