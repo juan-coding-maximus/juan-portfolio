@@ -226,7 +226,7 @@
       "enforcement": "script",
       "scope": "always",
       "type": "feedback",
-      "rule": "Never use the em dash (\u2014, U+2014) anywhere in the agency: website copy, code comments, commit messages, chat/Telegram, memory files, docs, drafts. The en dash as a punctuation separator is out too. Use a comma, colon, period, or middot (\u00b7) for title/label separators instead.",
+      "rule": "Never use the em dash (\u2014, U+2014) anywhere in the agency: website copy, code comments, commit messages, memory files, docs, drafts. The en dash as a punctuation separator is out too. Use a comma, colon, period, or middot (\u00b7) for title/label separators instead.",
       "why": "Why: Juan finds the em dash an obvious \"AI wrote this\" tell and dislikes it.",
       "session_note": "ABSOLUTE: never an em dash anywhere; style_check.py refuses the publish",
       "bytes": 1023
