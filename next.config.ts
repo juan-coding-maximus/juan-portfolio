@@ -11,12 +11,6 @@ const nextConfig: NextConfig = {
   // change, and turns the cases that DO mismatch into an automatic hard
   // reload instead of a dead click. See self-hosting.md's Version Skew section.
   deploymentId: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 32),
-  // The playbook pages read their markdown from src/.../playbook/content at
-  // request time (fs.readFile on a manifest-driven path), which the static
-  // tracer cannot see. Without this, the files exist locally and 404 on Vercel.
-  outputFileTracingIncludes: {
-    "/nutribiotic/playbook*": ["src/app/nutribiotic/playbook/content/**/*.md"],
-  },
   // El Departamento case study is shipped as a static asset under
   // public/eldepartamento/ (generated from agency repo
   // archives/el-departamento-rebrand/demo, see DEPLOY.md). Each page has a

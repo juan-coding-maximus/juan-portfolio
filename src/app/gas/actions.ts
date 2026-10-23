@@ -1,7 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
-import { searchPlaces } from "../nutribiotic/lib/places";
+import { searchPlaces } from "./places";
 import { RATE_CARWASH, RATE_CHEAPEST, RATE_QUICKEST, TANK_GALLONS } from "./lib/constants";
 import { carWashNearby, type WashStation } from "./lib/carwash";
 import { fuelNearby } from "./lib/fuel";
