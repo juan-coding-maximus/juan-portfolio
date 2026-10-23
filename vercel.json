@@ -3,6 +3,8 @@
     { "source": "/stokeclub", "destination": "https://stokeclubband.com", "permanent": true },
     { "source": "/stokeclub/:path*", "destination": "https://stokeclubband.com/:path*", "permanent": true },
     { "source": "/nutribiotic", "destination": "https://osmoticventures.com/nb", "permanent": true },
-    { "source": "/nutribiotic/:path*", "destination": "https://osmoticventures.com/nb", "permanent": true }
+    { "source": "/nutribiotic/:path*", "destination": "https://osmoticventures.com/nb", "permanent": true },
+    { "source": "/gas", "destination": "https://osmoticventures.com/gas", "permanent": true },
+    { "source": "/gas/:path*", "destination": "https://osmoticventures.com/gas/:path*", "permanent": true }
   ]
 }
