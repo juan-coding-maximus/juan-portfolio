@@ -6,6 +6,7 @@
 "use client";
 
 import Image from "next/image";
+import { blur_aura, blur_usc } from "./blur";
 import { useEffect, useRef, useState } from "react";
 
 /* ---------- scroll reveal hook ---------- */
@@ -169,7 +170,7 @@ function Hero() {
       </div>
 
       {/* nav */}
-      <div className="absolute top-12 left-6 right-6 md:top-6 md:left-12 md:right-12 flex justify-between items-center text-sm">
+      <div className="hero-nav absolute top-12 left-6 right-6 md:top-6 md:left-12 md:right-12 flex justify-between items-center text-sm">
         <Image
           src="/img/ja-logo.png"
           alt="JA monogram"
@@ -180,7 +181,7 @@ function Hero() {
         />
         <a
           href="#portfolio"
-          className="rounded-full bg-[#C9A24B] text-[#13201A] px-5 py-2 uppercase tracking-widest text-xs font-medium hover:bg-[#d8b563] transition-colors"
+          className="inline-flex min-h-11 items-center rounded-full bg-[#C9A24B] text-[#13201A] px-5 py-2 uppercase tracking-widest text-xs font-medium hover:bg-[#d8b563] transition-colors"
         >
           Portfolio
         </a>
@@ -663,6 +664,8 @@ function CaseArtifact({ art }: { art: string }) {
         <Image
           src="/img/aura-founder.webp"
           alt="Juan Arenas Martin as Founder at Your Aura Fragrance"
+          placeholder="blur"
+          blurDataURL={blur_aura}
           fill
           className="object-cover"
           style={{ objectPosition: "center top" }}
@@ -1247,6 +1250,8 @@ function About() {
               <Image
                 src="/img/juan-usc.png"
                 alt="Juan Arenas Martin at USC"
+                placeholder="blur"
+                blurDataURL={blur_usc}
                 fill
                 className="object-cover object-top"
                 sizes="(max-width: 768px) 100vw, 50vw"
@@ -1469,6 +1474,8 @@ function Footer() {
           <Image
             src="/img/juan-usc.png"
             alt=""
+            placeholder="blur"
+            blurDataURL={blur_usc}
             fill
             sizes="(min-width: 1024px) 54vw, 100vw"
             className="object-cover object-[50%_44%] md:object-[50%_50%] lg:object-[62%_18%]"

@@ -63,3 +63,34 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* UX details standard (resources/wiki/ux-details.md) */
+@view-transition {
+  navigation: auto;
+}
+
+h1, h2, h3, h4 {
+  text-wrap: balance;
+}
+
+p, li {
+  text-wrap: pretty;
+}
+
+body {
+  font-variant-numeric: tabular-nums;
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Notch clearance for the top-pinned hero nav. */
+.hero-nav {
+  margin-top: env(safe-area-inset-top, 0px);
+}
+
+/* Continuous corners where supported; radii stay as authored elsewhere. */
+@supports (corner-shape: squircle) {
+  [class*="rounded-"] {
+    corner-shape: squircle;
+  }
+}
