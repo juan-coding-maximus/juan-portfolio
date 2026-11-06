@@ -167,7 +167,7 @@
 
   function populateSongs() {
     const sel = $('songSelect');
-    sel.innerHTML = songs.map((s) => `<option value="${s.id}">${s.title} — ${s.artist}</option>`).join('');
+    sel.innerHTML = songs.map((s) => `<option value="${s.id}">${s.title}, ${s.artist}</option>`).join('');
     applySongDefaults();
     sel.onchange = applySongDefaults;
   }
@@ -250,7 +250,7 @@
 
   function renderAnalysis() {
     showScreen('analyze');
-    $('analyzeTitle').textContent = `${lastRun.title} — results`;
+    $('analyzeTitle').textContent = `${lastRun.title}, results`;
 
     const allTaps = lastResults.flatMap((r) => r.taps);
     const summary = SCORING.summarize(allTaps);

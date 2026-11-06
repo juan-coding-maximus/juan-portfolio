@@ -1,7 +1,7 @@
-// src/app/page.tsx — Juan Arenas portfolio v1
+// src/app/page.tsx, Juan Arenas portfolio v1
 // Archetypes: MAGICIAN (complexity → systems that feel like magic) + HERO (scrappy, treats it like his own).
 // Palette: ink #13201A · cream #F2EFE6 · forest #284A3C · sage #9FC4AE · gold #C9A24B
-// Fonts: Fraunces (display) + Hanken Grotesk (body) — loaded in layout.tsx
+// Fonts: Fraunces (display) + Hanken Grotesk (body), loaded in layout.tsx
 
 "use client";
 
@@ -492,7 +492,7 @@ function BrandStrip() {
 }
 
 /* ====================================================
-   SCROLL-TRIGGERED VIDEO — plays 2 s after entering view
+   SCROLL-TRIGGERED VIDEO, plays 2 s after entering view
 ==================================================== */
 function ScrollVideo() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -529,7 +529,7 @@ function ScrollVideo() {
 }
 
 /* ====================================================
-   CASE ARTIFACT — media slot for each case study
+   CASE ARTIFACT, media slot for each case study
 ==================================================== */
 function CPBHVideo() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -683,7 +683,7 @@ function CaseArtifact({ art }: { art: string }) {
     return <BCLAVideo />;
   }
 
-  if (art === "Metaba Health — site / ops board") {
+  if (art === "Metaba Health, site / ops board") {
     return <MetabaVideo />;
   }
 
@@ -909,7 +909,7 @@ function CaseStudies() {
           />
         </>
       ),
-      art: "Metaba Health — site / ops board",
+      art: "Metaba Health, site / ops board",
     },
     {
       id: "case-aura",
